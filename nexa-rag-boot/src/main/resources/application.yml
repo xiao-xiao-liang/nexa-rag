@@ -1,0 +1,26 @@
+server:
+  port: 8009
+
+spring:
+  application:
+    name: nexa-rag
+  main:
+    banner-mode: console
+  flyway:
+    enabled: false
+
+nexa:
+  config-center:
+    type: local
+    fallback-to-local: true
+  document:
+    pipeline:
+      mode: local
+      queue-mode: pipeline
+      max-concurrency: 2
+      max-retry-count: 3
+  retrieval:
+    rerank:
+      type: score_fusion
+      vector-weight: 0.7
+      keyword-weight: 0.3
