@@ -1,6 +1,8 @@
 package com.nexarag.document.dto;
 
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.PositiveOrZero;
+import jakarta.validation.constraints.Size;
 
 /**
  * 创建文档请求。
@@ -12,9 +14,17 @@ import jakarta.validation.constraints.NotBlank;
  * @param fileSize         文件大小
  */
 public record CreateDocumentRequest(
-        @NotBlank(message = "文档标题不能为空") String title,
+        @NotBlank(message = "文档标题不能为空")
+        @Size(max = 256, message = "文档标题不能超过256个字符")
+        String title,
+        @Size(max = 1024, message = "文档描述不能超过1024个字符")
         String description,
-        @NotBlank(message = "原始文件名不能为空") String originalFileName,
-        @NotBlank(message = "原始文件地址不能为空") String originalFileUrl,
+        @NotBlank(message = "原始文件名不能为空")
+        @Size(max = 512, message = "原始文件名不能超过512个字符")
+        String originalFileName,
+        @NotBlank(message = "原始文件地址不能为空")
+        @Size(max = 1024, message = "原始文件地址不能超过1024个字符")
+        String originalFileUrl,
+        @PositiveOrZero(message = "文件大小不能小于0")
         Long fileSize) {
 }

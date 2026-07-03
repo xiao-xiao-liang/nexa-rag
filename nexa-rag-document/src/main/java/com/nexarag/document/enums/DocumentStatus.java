@@ -60,11 +60,11 @@ public enum DocumentStatus {
     static {
         TRANSITIONS.put(UPLOADED, EnumSet.of(QUEUED));
         TRANSITIONS.put(QUEUED, EnumSet.of(PARSING, FAILED));
-        TRANSITIONS.put(PARSING, EnumSet.of(PARSED, FAILED));
+        TRANSITIONS.put(PARSING, EnumSet.of(QUEUED, PARSED, FAILED));
         TRANSITIONS.put(PARSED, EnumSet.of(CHUNKING, FAILED));
-        TRANSITIONS.put(CHUNKING, EnumSet.of(CHUNKED, FAILED));
+        TRANSITIONS.put(CHUNKING, EnumSet.of(QUEUED, CHUNKED, FAILED));
         TRANSITIONS.put(CHUNKED, EnumSet.of(INDEXING, FAILED));
-        TRANSITIONS.put(INDEXING, EnumSet.of(INDEXED, FAILED));
+        TRANSITIONS.put(INDEXING, EnumSet.of(QUEUED, INDEXED, FAILED));
         TRANSITIONS.put(INDEXED, EnumSet.of(QUEUED));
         TRANSITIONS.put(FAILED, EnumSet.of(QUEUED));
     }

@@ -11,6 +11,7 @@ import com.nexarag.document.vo.DocumentChunkVO;
 import com.nexarag.document.vo.DocumentDetailVO;
 import com.nexarag.document.vo.DocumentProcessStatusVO;
 import com.nexarag.document.vo.DocumentSummaryVO;
+import com.nexarag.document.vo.PageVO;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -19,12 +20,13 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
 
 /**
- * 文档接口控制器。
+ * 文档接口控制器，负责接收文档相关 REST 请求并返回统一响应。
  */
 @RestController
 @RequestMapping("/api/documents")
@@ -46,15 +48,17 @@ public class DocumentController {
     }
 
     /**
-     * 查询文档列表。
+     * 分页查询文档列表。
      *
-     * @return 文档摘要列表
+     * @param pageNum  页码
+     * @param pageSize 每页数量
+     * @return 文档分页列表
      */
     @GetMapping
-    public Result<List<DocumentSummaryVO>> listDocuments() {
-        return Results.success(documentService.list().stream()
-                .map(DocumentConverter::toSummaryVO)
-                .toList());
+    public Result<PageVO<DocumentSummaryVO>> listDocuments(
+            @RequestParam(defaultValue = "1") long pageNum,
+            @RequestParam(defaultValue = "20") long pageSize) {
+        return Results.success(documentService.pageDocuments(pageNum, pageSize));
     }
 
     /**
@@ -76,7 +80,7 @@ public class DocumentController {
      */
     @DeleteMapping("/{documentId}")
     public Result<Boolean> deleteDocument(@PathVariable Long documentId) {
-        return Results.success(documentService.removeById(documentId));
+        return Results.success(documentService.deleteDocument(documentId));
     }
 
     /**
@@ -88,12 +92,12 @@ public class DocumentController {
      */
     @PostMapping("/{documentId}/process")
     public Result<DocumentProcessStatusVO> processDocument(@PathVariable Long documentId,
-                                                           @RequestBody(required = false) ProcessDocumentRequest request) {
+                                                           @Valid @RequestBody(required = false) ProcessDocumentRequest request) {
         return Results.success(DocumentConverter.toProcessStatusVO(documentService.submitProcess(documentId, request)));
     }
 
     /**
-     * 重试文档处理。
+     * 人工重试失败文档。
      *
      * @param documentId 文档ID
      * @return 文档处理状态响应

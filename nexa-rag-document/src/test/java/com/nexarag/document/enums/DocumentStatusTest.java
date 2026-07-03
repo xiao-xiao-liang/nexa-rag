@@ -18,4 +18,11 @@ class DocumentStatusTest {
     void indexedShouldNotAllowParsingDirectly() {
         assertThat(DocumentStatus.INDEXED.canTransferTo(DocumentStatus.PARSING)).isFalse();
     }
+
+    @Test
+    void processingStatusShouldAllowRequeueForAutoRetry() {
+        assertThat(DocumentStatus.PARSING.canTransferTo(DocumentStatus.QUEUED)).isTrue();
+        assertThat(DocumentStatus.CHUNKING.canTransferTo(DocumentStatus.QUEUED)).isTrue();
+        assertThat(DocumentStatus.INDEXING.canTransferTo(DocumentStatus.QUEUED)).isTrue();
+    }
 }

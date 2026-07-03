@@ -27,7 +27,12 @@ public enum DocumentErrorCode implements IErrorCode {
     /**
      * 文档处理配置不合法。
      */
-    DOCUMENT_PROCESS_CONFIG_INVALID("D000004", "文档处理配置不合法");
+    DOCUMENT_PROCESS_CONFIG_INVALID("D000004", "文档处理配置不合法"),
+
+    /**
+     * 文档重试次数已达上限。
+     */
+    DOCUMENT_RETRY_LIMIT_EXCEEDED("D000005", "文档重试次数已达上限");
 
     private final String code;
     private final String message;
