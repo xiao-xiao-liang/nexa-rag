@@ -3,6 +3,10 @@ package com.nexarag.model.config;
 import com.nexarag.model.prompt.LocalPromptTemplateRepository;
 import com.nexarag.model.prompt.PromptTemplateRepository;
 import com.nexarag.model.prompt.PromptTemplateService;
+import com.nexarag.model.execution.ModelExecutionTemplate;
+import com.nexarag.model.route.ModelRouter;
+import com.nexarag.model.route.PrimaryFallbackModelRouter;
+import com.nexarag.model.service.ModelCallLogService;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -33,5 +37,29 @@ public class ModelConfiguration {
     @Bean
     public PromptTemplateService promptTemplateService(PromptTemplateRepository repository) {
         return new PromptTemplateService(repository);
+    }
+
+    /**
+     * 注册模型路由器。
+     *
+     * @param properties 模型治理配置
+     * @return 模型路由器
+     */
+    @Bean
+    public ModelRouter modelRouter(ModelGovernanceProperties properties) {
+        return new PrimaryFallbackModelRouter(properties);
+    }
+
+    /**
+     * 注册模型执行模板。
+     *
+     * @param modelRouter         模型路由器
+     * @param modelCallLogService 模型调用日志服务
+     * @return 模型执行模板
+     */
+    @Bean
+    public ModelExecutionTemplate modelExecutionTemplate(ModelRouter modelRouter,
+                                                         ModelCallLogService modelCallLogService) {
+        return new ModelExecutionTemplate(modelRouter, modelCallLogService);
     }
 }
