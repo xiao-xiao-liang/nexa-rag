@@ -1,6 +1,6 @@
 package com.nexarag.document.dto;
 
-import com.nexarag.infra.parser.ParserType;
+import com.nexarag.infra.enums.ParserType;
 
 /**
  * 文档解析配置请求，描述本次文档处理希望使用的解析能力。

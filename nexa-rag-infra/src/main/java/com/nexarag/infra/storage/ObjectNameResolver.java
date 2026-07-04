@@ -9,10 +9,10 @@ import java.util.Locale;
 import java.util.UUID;
 
 /**
- * 存储对象名生成器，负责生成安全且可按日期归档的 MinIO 对象路径。
+ * 对象名解析器，负责生成安全且可按日期归档的存储对象路径。
  */
 @Component
-public class StorageObjectNameGenerator {
+public class ObjectNameResolver {
 
     private static final DateTimeFormatter DATE_PATH_FORMATTER = DateTimeFormatter.ofPattern("yyyy/MM/dd");
 
@@ -22,7 +22,7 @@ public class StorageObjectNameGenerator {
      * @param fileName 原始文件名
      * @return 原始文件对象名
      */
-    public String generateOriginalObjectName(String fileName) {
+    public String resolveOriginalObjectName(String fileName) {
         // 1. 提取文件名，避免路径穿越片段进入对象名
         String simpleFileName = extractSimpleFileName(fileName);
 

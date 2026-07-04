@@ -1,4 +1,4 @@
-package com.nexarag.infra.parser;
+package com.nexarag.infra.enums;
 
 /**
  * 文档解析器类型。

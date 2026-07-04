@@ -1,4 +1,6 @@
-package com.nexarag.infra.storage;
+package com.nexarag.infra.storage.service;
+
+import com.nexarag.infra.storage.StoredFile;
 
 import java.io.InputStream;
 

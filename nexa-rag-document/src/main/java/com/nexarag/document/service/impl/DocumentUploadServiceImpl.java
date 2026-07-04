@@ -14,7 +14,7 @@ import com.nexarag.document.service.DocumentService;
 import com.nexarag.document.service.DocumentUploadService;
 import com.nexarag.document.service.ProcessConfigDefaults;
 import com.nexarag.document.vo.UploadDocumentResponse;
-import com.nexarag.infra.storage.FileStorageService;
+import com.nexarag.infra.storage.service.FileStorageService;
 import com.nexarag.infra.storage.StoredFile;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;

@@ -5,15 +5,15 @@ import org.junit.jupiter.api.Test;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * 存储对象名生成器测试。
+ * 对象名解析器测试。
  */
-class StorageObjectNameGeneratorTest {
+class ObjectNameResolverTest {
 
     @Test
-    void generateOriginalObjectNameShouldKeepExtensionAndRemoveUnsafePath() {
-        StorageObjectNameGenerator generator = new StorageObjectNameGenerator();
+    void resolveOriginalObjectNameShouldKeepExtensionAndRemoveUnsafePath() {
+        ObjectNameResolver resolver = new ObjectNameResolver();
 
-        String objectName = generator.generateOriginalObjectName("..\\合同 版本.pdf");
+        String objectName = resolver.resolveOriginalObjectName("..\\合同 版本.pdf");
 
         assertThat(objectName).startsWith("original/");
         assertThat(objectName).endsWith(".pdf");

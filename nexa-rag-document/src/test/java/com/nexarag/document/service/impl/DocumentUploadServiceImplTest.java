@@ -10,7 +10,7 @@ import com.nexarag.document.service.DocumentProcessTaskDispatcher;
 import com.nexarag.document.service.DocumentQueueInfo;
 import com.nexarag.document.service.ProcessConfigDefaults;
 import com.nexarag.document.vo.UploadDocumentResponse;
-import com.nexarag.infra.storage.FileStorageService;
+import com.nexarag.infra.storage.service.FileStorageService;
 import com.nexarag.infra.storage.StoredFile;
 import org.junit.jupiter.api.Test;
 import org.springframework.mock.web.MockMultipartFile;

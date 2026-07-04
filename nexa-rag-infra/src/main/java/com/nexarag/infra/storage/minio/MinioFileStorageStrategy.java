@@ -1,7 +1,12 @@
-package com.nexarag.infra.storage;
+package com.nexarag.infra.storage.minio;
 
 import com.nexarag.common.error.BaseErrorCode;
 import com.nexarag.common.exception.ServiceException;
+import com.nexarag.infra.enums.StorageType;
+import com.nexarag.infra.storage.FileStorageStrategy;
+import com.nexarag.infra.storage.ObjectNameResolver;
+import com.nexarag.infra.config.StorageProperties;
+import com.nexarag.infra.storage.StoredFile;
 import io.minio.BucketExistsArgs;
 import io.minio.GetObjectArgs;
 import io.minio.MakeBucketArgs;
@@ -10,25 +15,37 @@ import io.minio.PutObjectArgs;
 import io.minio.RemoveObjectArgs;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
 import java.io.InputStream;
 
 /**
- * MinIO 文件存储服务实现，负责保存、读取和删除文档对象。
+ * MinIO 文件存储策略，负责通过 MinIO 协议保存、读取和删除文档对象。
  */
 @Slf4j
 @Service
+@ConditionalOnProperty(prefix = "nexa.storage", name = "type", havingValue = "MINIO", matchIfMissing = true)
 @RequiredArgsConstructor
-public class MinioFileStorageService implements FileStorageService {
+public class MinioFileStorageStrategy implements FileStorageStrategy {
 
     private static final String CONTENT_TYPE_OCTET_STREAM = "application/octet-stream";
     private static final long UNKNOWN_PART_SIZE = -1L;
 
-    private final MinioFileStorageProperties properties;
-    private final StorageObjectNameGenerator objectNameGenerator;
+    private final StorageProperties properties;
+    private final ObjectNameResolver objectNameResolver;
     private volatile MinioClient minioClient;
+
+    /**
+     * 返回当前策略支持的存储类型。
+     *
+     * @return 存储类型
+     */
+    @Override
+    public StorageType storageType() {
+        return StorageType.MINIO;
+    }
 
     /**
      * 保存文件到 MinIO。
@@ -44,7 +61,7 @@ public class MinioFileStorageService implements FileStorageService {
         validateSaveArguments(fileName, inputStream, size);
 
         // 2. 生成原始文件对象名并确保存储桶可用
-        String objectName = objectNameGenerator.generateOriginalObjectName(fileName);
+        String objectName = objectNameResolver.resolveOriginalObjectName(fileName);
         MinioClient client = getMinioClient();
         ensureBucketExists(client);
 

@@ -7,7 +7,7 @@ import com.nexarag.document.dto.SplitConfigRequest;
 import com.nexarag.document.dto.UploadDocumentRequest;
 import com.nexarag.document.enums.FileType;
 import com.nexarag.document.enums.SplitStrategy;
-import com.nexarag.infra.parser.ParserType;
+import com.nexarag.infra.enums.ParserType;
 import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
