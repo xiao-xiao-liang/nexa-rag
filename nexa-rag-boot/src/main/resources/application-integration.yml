@@ -1,0 +1,32 @@
+spring:
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: jdbc:mysql://${NEXA_MYSQL_HOST:192.168.0.134}:${NEXA_MYSQL_PORT:3306}/${NEXA_MYSQL_DATABASE:nexa_rag}?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true
+    username: ${NEXA_MYSQL_USERNAME:root}
+    password: ${NEXA_MYSQL_PASSWORD:}
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    baseline-on-migrate: true
+    validate-on-migrate: true
+  data:
+    redis:
+      host: ${NEXA_REDIS_HOST:192.168.0.134}
+      port: ${NEXA_REDIS_PORT:6379}
+      password: ${NEXA_REDIS_PASSWORD:}
+      timeout: ${NEXA_REDIS_TIMEOUT:3s}
+
+nexa:
+  integration:
+    enabled: ${NEXA_INTEGRATION_ENABLED:false}
+    mysql:
+      validation-query: SELECT 1
+    elasticsearch:
+      scheme: ${NEXA_ELASTICSEARCH_SCHEME:http}
+      host: ${NEXA_ELASTICSEARCH_HOST:192.168.0.134}
+      port: ${NEXA_ELASTICSEARCH_PORT:9200}
+      username: ${NEXA_ELASTICSEARCH_USERNAME:elastic}
+      password: ${NEXA_ELASTICSEARCH_PASSWORD:}
+    milvus:
+      host: ${NEXA_MILVUS_HOST:192.168.0.134}
+      port: ${NEXA_MILVUS_PORT:19530}

@@ -40,6 +40,19 @@ class MyBatisPlusAutoFillHandlerTest {
         assertThat(entity.delFlag).isEqualTo(1);
     }
 
+    @Test
+    void updateFillShouldSetDeleteTimeWhenEntityMarkedDeleted() {
+        MyBatisPlusAutoFillHandler handler = new MyBatisPlusAutoFillHandler();
+        TestEntity entity = new TestEntity();
+        entity.setDelFlag(1);
+        MetaObject metaObject = SystemMetaObject.forObject(entity);
+
+        handler.updateFill(metaObject);
+
+        assertThat(entity.deleteTime).isNotNull();
+        assertThat(entity.updateTime).isNotNull();
+    }
+
     static class TestEntity {
 
         private LocalDateTime createTime;

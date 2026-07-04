@@ -19,3 +19,13 @@ NexaRAG 是一个基于 Spring Boot 的多模块 RAG 单体应用。
 ```powershell
 mvn clean test
 ```
+
+## 真实环境集成验证
+
+默认测试不会连接外部中间件。需要验证 MySQL、Redis、Elasticsearch、Milvus 时，显式开启集成测试并通过环境变量或 Maven 参数传入密码。
+
+```powershell
+mvn -pl nexa-rag-boot -am test "-Dtest=ExternalInfrastructureSmokeTest" "-Dsurefire.failIfNoSpecifiedTests=false" "-Dnexa.integration.enabled=true"
+```
+
+集成环境配置在 `nexa-rag-boot/src/main/resources/application-integration.yml` 中，密码均使用占位符读取，不在代码仓库保存明文。

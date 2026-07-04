@@ -2,11 +2,11 @@
 
 ## 阶段一未实现
 
-- [ ] 接入真实数据库环境后启用 Flyway。
-- [ ] 为 `delete_time` 逻辑删除自动填充设计统一实现。
-- [ ] 补充 MySQL、Redis、Elasticsearch、Milvus 等 Testcontainers 集成测试。
-- [ ] 处理 Mockito 在高版本 JDK 下动态 agent 警告。
-- [ ] 根据生产环境补充日志脱敏和 traceId 全链路验证。
+- [x] 接入真实数据库环境后启用 Flyway。
+- [x] 为 `delete_time` 逻辑删除自动填充设计统一实现。
+- [x] 补充 MySQL、Redis、Elasticsearch、Milvus 等集成冒烟测试。
+- [x] 处理 Mockito 在高版本 JDK 下动态 agent 警告。
+- [x] 根据生产环境补充日志脱敏和 traceId 全链路验证。
 
 ## 阶段二未实现
 

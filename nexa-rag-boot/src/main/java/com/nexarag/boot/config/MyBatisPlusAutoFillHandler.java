@@ -27,7 +27,13 @@ public class MyBatisPlusAutoFillHandler implements MetaObjectHandler {
     @Override
     public void updateFill(MetaObject metaObject) {
         // 1. 更新修改时间
-        fillStrategy(metaObject, "updateTime", LocalDateTime.now());
+        LocalDateTime now = LocalDateTime.now();
+        fillStrategy(metaObject, "updateTime", now);
+
+        // 2. 逻辑删除更新时统一记录删除时间
+        if (isLogicalDelete(metaObject)) {
+            fillStrategy(metaObject, "deleteTime", now);
+        }
     }
 
     /**
@@ -46,5 +52,17 @@ public class MyBatisPlusAutoFillHandler implements MetaObjectHandler {
         // 2. 记录删除时间和更新时间
         fillStrategy(metaObject, "deleteTime", now);
         fillStrategy(metaObject, "updateTime", now);
+    }
+
+    /**
+     * 判断当前更新是否为逻辑删除。
+     *
+     * @param metaObject 元对象
+     * @return true 表示逻辑删除更新
+     */
+    private boolean isLogicalDelete(MetaObject metaObject) {
+        Object delFlag = getFieldValByName("delFlag", metaObject);
+        Object deleteTime = getFieldValByName("deleteTime", metaObject);
+        return Integer.valueOf(1).equals(delFlag) && deleteTime == null;
     }
 }
