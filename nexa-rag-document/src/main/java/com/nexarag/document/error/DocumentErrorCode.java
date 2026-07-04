@@ -32,7 +32,12 @@ public enum DocumentErrorCode implements IErrorCode {
     /**
      * 文档重试次数已达上限。
      */
-    DOCUMENT_RETRY_LIMIT_EXCEEDED("D000005", "文档重试次数已达上限");
+    DOCUMENT_RETRY_LIMIT_EXCEEDED("D000005", "文档重试次数已达上限"),
+
+    /**
+     * 上传文件不合法。
+     */
+    DOCUMENT_UPLOAD_FILE_INVALID("D000006", "上传文件不合法");
 
     private final String code;
     private final String message;

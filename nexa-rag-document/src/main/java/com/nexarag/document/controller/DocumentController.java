@@ -5,15 +5,19 @@ import com.nexarag.common.web.Results;
 import com.nexarag.document.converter.DocumentConverter;
 import com.nexarag.document.dto.CreateDocumentRequest;
 import com.nexarag.document.dto.ProcessDocumentRequest;
+import com.nexarag.document.dto.UploadDocumentRequest;
 import com.nexarag.document.service.DocumentChunkService;
 import com.nexarag.document.service.DocumentService;
+import com.nexarag.document.service.DocumentUploadService;
 import com.nexarag.document.vo.DocumentChunkVO;
 import com.nexarag.document.vo.DocumentDetailVO;
 import com.nexarag.document.vo.DocumentProcessStatusVO;
 import com.nexarag.document.vo.DocumentSummaryVO;
 import com.nexarag.document.vo.PageVO;
+import com.nexarag.document.vo.UploadDocumentResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -21,7 +25,9 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 
@@ -35,6 +41,7 @@ public class DocumentController {
 
     private final DocumentService documentService;
     private final DocumentChunkService documentChunkService;
+    private final DocumentUploadService documentUploadService;
 
     /**
      * 创建文档记录。
@@ -45,6 +52,20 @@ public class DocumentController {
     @PostMapping
     public Result<DocumentDetailVO> createDocument(@Valid @RequestBody CreateDocumentRequest request) {
         return Results.success(DocumentConverter.toDetailVO(documentService.createDocument(request)));
+    }
+
+    /**
+     * 上传文档并自动提交处理流水线。
+     *
+     * @param file    上传文件
+     * @param request 上传文档请求
+     * @return 上传文档响应
+     */
+    @PostMapping(value = "/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public Result<UploadDocumentResponse> uploadDocument(@RequestPart("file") MultipartFile file,
+                                                         @Valid @RequestPart(value = "request", required = false)
+                                                         UploadDocumentRequest request) {
+        return Results.success(documentUploadService.upload(file, request));
     }
 
     /**

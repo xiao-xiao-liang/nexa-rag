@@ -25,6 +25,13 @@ nexa:
       queue-mode: pipeline
       max-concurrency: 2
       max-retry-count: 3
+  storage:
+    minio:
+      endpoint: ${NEXA_MINIO_ENDPOINT:http://127.0.0.1:9000}
+      access-key: ${NEXA_MINIO_ACCESS_KEY:}
+      secret-key: ${NEXA_MINIO_SECRET_KEY:}
+      bucket: ${NEXA_MINIO_BUCKET:nexa-rag}
+      create-bucket: true
   retrieval:
     rerank:
       type: score_fusion
