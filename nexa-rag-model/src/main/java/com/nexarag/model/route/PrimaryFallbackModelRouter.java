@@ -4,17 +4,16 @@ import com.nexarag.common.exception.ServiceException;
 import com.nexarag.model.config.ModelGovernanceProperties;
 import com.nexarag.model.config.ModelProfileProperties;
 import com.nexarag.model.config.ModelRouteProperties;
+import lombok.RequiredArgsConstructor;
+import org.springframework.util.StringUtils;
 
 /**
  * 主备模型路由器。
  */
+@RequiredArgsConstructor
 public class PrimaryFallbackModelRouter implements ModelRouter {
 
     private final ModelGovernanceProperties properties;
-
-    public PrimaryFallbackModelRouter(ModelGovernanceProperties properties) {
-        this.properties = properties;
-    }
 
     @Override
     public ModelRouteDecision route(ModelRouteContext context) {
@@ -25,7 +24,7 @@ public class PrimaryFallbackModelRouter implements ModelRouter {
 
         // 1. 根据上下文选择主模型或备用模型
         String profileName = context.useFallback() ? route.getFallback() : route.getPrimary();
-        if (profileName == null || profileName.isBlank()) {
+        if (!StringUtils.hasText(profileName)) {
             throw new ServiceException("模型路由未配置可用Profile: " + context.routeKey());
         }
 

@@ -24,18 +24,19 @@ public class ModelCallLogServiceImpl extends ServiceImpl<ModelCallLogMapper, Mod
                                          String modelProfile, String provider, String baseUrl,
                                          String modelName, ModelRequestType requestType) {
         // 1. 构建模型调用日志，禁止记录 apiKey 和完整 prompt
-        ModelCallLog log = new ModelCallLog();
-        log.setCallId(UUID.randomUUID().toString().replace("-", ""));
-        log.setTraceId(traceId);
-        log.setBizType(bizType);
-        log.setBizId(bizId);
-        log.setModelProfile(modelProfile);
-        log.setProvider(provider);
-        log.setBaseUrl(baseUrl);
-        log.setModelName(modelName);
-        log.setRequestType(requestType);
-        log.setStatus(ModelCallStatus.RUNNING);
-        log.setCreateTime(LocalDateTime.now());
+        ModelCallLog log = ModelCallLog.builder()
+                .callId(UUID.randomUUID().toString().replace("-", ""))
+                .traceId(traceId)
+                .bizType(bizType)
+                .bizId(bizId)
+                .modelProfile(modelProfile)
+                .provider(provider)
+                .baseUrl(baseUrl)
+                .modelName(modelName)
+                .requestType(requestType)
+                .status(ModelCallStatus.RUNNING)
+                .createTime(LocalDateTime.now())
+                .build();
 
         // 2. 保存运行日志
         this.save(log);

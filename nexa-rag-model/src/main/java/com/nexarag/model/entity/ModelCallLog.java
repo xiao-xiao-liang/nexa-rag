@@ -5,16 +5,17 @@ import com.baomidou.mybatisplus.annotation.TableName;
 import com.nexarag.model.enums.ModelBizType;
 import com.nexarag.model.enums.ModelCallStatus;
 import com.nexarag.model.enums.ModelRequestType;
-import lombok.Getter;
-import lombok.Setter;
+import lombok.*;
 
 import java.time.LocalDateTime;
 
 /**
  * 模型调用日志实体，对应 model_call_log 表。
  */
-@Getter
-@Setter
+@Data
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
 @TableName("model_call_log")
 public class ModelCallLog {
 

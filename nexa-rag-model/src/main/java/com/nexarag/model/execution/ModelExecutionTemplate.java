@@ -5,19 +5,16 @@ import com.nexarag.model.route.ModelRouteContext;
 import com.nexarag.model.route.ModelRouteDecision;
 import com.nexarag.model.route.ModelRouter;
 import com.nexarag.model.service.ModelCallLogService;
+import lombok.RequiredArgsConstructor;
 
 /**
  * 模型执行模板，统一处理路由和调用日志。
  */
+@RequiredArgsConstructor
 public class ModelExecutionTemplate {
 
     private final ModelRouter modelRouter;
     private final ModelCallLogService modelCallLogService;
-
-    public ModelExecutionTemplate(ModelRouter modelRouter, ModelCallLogService modelCallLogService) {
-        this.modelRouter = modelRouter;
-        this.modelCallLogService = modelCallLogService;
-    }
 
     /**
      * 执行模型调用。
