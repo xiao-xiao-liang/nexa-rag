@@ -3,13 +3,11 @@ package com.nexarag.document.service.impl;
 import com.nexarag.document.service.DocumentProcessTaskDispatcher;
 import com.nexarag.document.service.DocumentQueueInfo;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.stereotype.Service;
 
 /**
  * 本地占位文档任务分发器，当前批次只返回入队语义，真实 Redis 队列由下一批实现。
  */
 @Slf4j
-@Service
 public class LocalDocumentProcessTaskDispatcher implements DocumentProcessTaskDispatcher {
 
     /**
