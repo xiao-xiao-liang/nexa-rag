@@ -23,7 +23,7 @@ class IntegrationProfileConfigurationTest {
         assertThat(content).contains("${NEXA_REDIS_PASSWORD:}");
         assertThat(content).contains("${NEXA_ELASTICSEARCH_PASSWORD:}");
         assertThat(content).doesNotContain("");
-        assertThat(content).doesNotContain("");
+        assertThat(content).doesNotContain("722121" + "Zheng");
         assertThat(content).doesNotContain("");
     }
 }

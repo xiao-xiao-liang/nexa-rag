@@ -14,6 +14,12 @@ spring:
       base-url: ${OPENAI_BASE_URL:http://localhost:11434/v1}
   flyway:
     enabled: false
+  data:
+    redis:
+      host: ${NEXA_REDIS_HOST:192.168.0.134}
+      port: ${NEXA_REDIS_PORT:6379}
+      password: ${NEXA_REDIS_PASSWORD:}
+      timeout: ${NEXA_REDIS_TIMEOUT:3s}
 
 nexa:
   config-center:
@@ -23,8 +29,15 @@ nexa:
     pipeline:
       mode: local
       queue-mode: pipeline
+      worker-enabled: ${NEXA_DOCUMENT_PIPELINE_WORKER_ENABLED:false}
       max-concurrency: 2
       max-retry-count: 3
+      poll-interval-ms: ${NEXA_DOCUMENT_PIPELINE_POLL_INTERVAL_MS:1000}
+      lease-ttl-seconds: ${NEXA_DOCUMENT_PIPELINE_LEASE_TTL_SECONDS:300}
+      queue:
+        key-prefix: ${NEXA_DOCUMENT_PIPELINE_QUEUE_KEY_PREFIX:nexa:document:pipeline}
+        lease-ttl-seconds: ${NEXA_DOCUMENT_PIPELINE_LEASE_TTL_SECONDS:300}
+        retry-ttl-seconds: ${NEXA_DOCUMENT_PIPELINE_RETRY_TTL_SECONDS:86400}
   storage:
     minio:
       endpoint: ${NEXA_MINIO_ENDPOINT:http://127.0.0.1:9000}
