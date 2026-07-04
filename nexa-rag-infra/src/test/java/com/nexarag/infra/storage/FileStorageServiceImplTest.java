@@ -32,6 +32,21 @@ class FileStorageServiceImplTest {
     }
 
     @Test
+    void saveAsShouldDelegateToConfiguredStrategy() {
+        StorageProperties properties = new StorageProperties();
+        properties.setType(StorageType.MINIO);
+        RecordingStorageStrategy strategy = new RecordingStorageStrategy(StorageType.MINIO);
+        FileStorageServiceImpl storageService = new FileStorageServiceImpl(properties, List.of(strategy));
+
+        StoredFile storedFile = storageService.saveAs("parsed/1/content.md",
+                InputStream.nullInputStream(), 10L, "text/markdown");
+
+        assertThat(strategy.savedObjectName).isEqualTo("parsed/1/content.md");
+        assertThat(strategy.savedContentType).isEqualTo("text/markdown");
+        assertThat(storedFile.objectName()).isEqualTo("parsed/1/content.md");
+    }
+
+    @Test
     void saveShouldFailWhenConfiguredStrategyMissing() {
         StorageProperties properties = new StorageProperties();
         properties.setType(StorageType.OSS);
@@ -47,6 +62,8 @@ class FileStorageServiceImplTest {
 
         private final StorageType storageType;
         private String savedFileName;
+        private String savedObjectName;
+        private String savedContentType;
         private long savedSize;
 
         private RecordingStorageStrategy(StorageType storageType) {
@@ -63,6 +80,14 @@ class FileStorageServiceImplTest {
             this.savedFileName = fileName;
             this.savedSize = size;
             return new StoredFile("original/demo.pdf", "http://127.0.0.1:9000/nexa-rag/original/demo.pdf", size);
+        }
+
+        @Override
+        public StoredFile saveAs(String objectName, InputStream inputStream, long size, String contentType) {
+            this.savedObjectName = objectName;
+            this.savedSize = size;
+            this.savedContentType = contentType;
+            return new StoredFile(objectName, "http://127.0.0.1:9000/nexa-rag/" + objectName, size);
         }
 
         @Override

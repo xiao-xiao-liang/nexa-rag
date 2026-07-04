@@ -2,10 +2,10 @@ package com.nexarag.infra.storage.minio;
 
 import com.nexarag.common.error.BaseErrorCode;
 import com.nexarag.common.exception.ServiceException;
+import com.nexarag.infra.config.StorageProperties;
 import com.nexarag.infra.enums.StorageType;
 import com.nexarag.infra.storage.FileStorageStrategy;
 import com.nexarag.infra.storage.ObjectNameResolver;
-import com.nexarag.infra.config.StorageProperties;
 import com.nexarag.infra.storage.StoredFile;
 import io.minio.BucketExistsArgs;
 import io.minio.GetObjectArgs;
@@ -48,7 +48,7 @@ public class MinioFileStorageStrategy implements FileStorageStrategy {
     }
 
     /**
-     * 保存文件到 MinIO。
+     * 保存原始文件到 MinIO。
      *
      * @param fileName    文件名
      * @param inputStream 文件输入流
@@ -58,34 +58,38 @@ public class MinioFileStorageStrategy implements FileStorageStrategy {
     @Override
     public StoredFile save(String fileName, InputStream inputStream, long size) {
         // 1. 校验上传文件基础参数
-        validateSaveArguments(fileName, inputStream, size);
+        validateOriginalSaveArguments(fileName, inputStream, size);
 
-        // 2. 生成原始文件对象名并确保存储桶可用
+        // 2. 生成原始文件对象名
         String objectName = objectNameResolver.resolveOriginalObjectName(fileName);
-        MinioClient client = getMinioClient();
-        ensureBucketExists(client);
 
-        try {
-            // 3. 上传文件流到 MinIO
-            client.putObject(PutObjectArgs.builder()
-                    .bucket(properties.getBucket())
-                    .object(objectName)
-                    .stream(inputStream, size, UNKNOWN_PART_SIZE)
-                    .contentType(CONTENT_TYPE_OCTET_STREAM)
-                    .build());
-            log.info("文件保存到 MinIO 成功，bucket={}，objectName={}，size={}",
-                    properties.getBucket(), objectName, size);
-            return new StoredFile(objectName, buildObjectUrl(objectName), size);
-        } catch (Exception exception) {
-            throw new ServiceException("文件保存到 MinIO 失败，objectName=" + objectName,
-                    exception, BaseErrorCode.SERVICE_ERROR);
-        }
+        // 3. 按对象名保存原始文件
+        return saveObject(objectName, inputStream, size, CONTENT_TYPE_OCTET_STREAM);
+    }
+
+    /**
+     * 按指定对象名保存文件到 MinIO。
+     *
+     * @param objectName  对象名
+     * @param inputStream 文件输入流
+     * @param size        文件大小
+     * @param contentType 内容类型
+     * @return 已存储文件信息
+     */
+    @Override
+    public StoredFile saveAs(String objectName, InputStream inputStream, long size, String contentType) {
+        // 1. 校验指定对象保存参数
+        validateSaveAsArguments(objectName, inputStream, size);
+
+        // 2. 使用调用方指定对象名保存文件
+        String safeContentType = StringUtils.hasText(contentType) ? contentType : CONTENT_TYPE_OCTET_STREAM;
+        return saveObject(objectName, inputStream, size, safeContentType);
     }
 
     /**
      * 从 MinIO 读取文件。
      *
-     * @param objectName 对象名称
+     * @param objectName 对象名
      * @return 文件输入流
      */
     @Override
@@ -108,7 +112,7 @@ public class MinioFileStorageStrategy implements FileStorageStrategy {
     /**
      * 删除 MinIO 文件。
      *
-     * @param objectName 对象名称
+     * @param objectName 对象名
      */
     @Override
     public void delete(String objectName) {
@@ -128,10 +132,41 @@ public class MinioFileStorageStrategy implements FileStorageStrategy {
         }
     }
 
-    private void validateSaveArguments(String fileName, InputStream inputStream, long size) {
+    private StoredFile saveObject(String objectName, InputStream inputStream, long size, String contentType) {
+        MinioClient client = getMinioClient();
+        ensureBucketExists(client);
+        try {
+            // 1. 上传文件流到 MinIO
+            client.putObject(PutObjectArgs.builder()
+                    .bucket(properties.getBucket())
+                    .object(objectName)
+                    .stream(inputStream, size, UNKNOWN_PART_SIZE)
+                    .contentType(contentType)
+                    .build());
+            log.info("文件保存到 MinIO 成功，bucket={}，objectName={}，size={}，contentType={}",
+                    properties.getBucket(), objectName, size, contentType);
+            return new StoredFile(objectName, buildObjectUrl(objectName), size);
+        } catch (Exception exception) {
+            throw new ServiceException("文件保存到 MinIO 失败，objectName=" + objectName,
+                    exception, BaseErrorCode.SERVICE_ERROR);
+        }
+    }
+
+    private void validateOriginalSaveArguments(String fileName, InputStream inputStream, long size) {
         if (!StringUtils.hasText(fileName)) {
             throw new ServiceException("文件名不能为空");
         }
+        validateInputStreamAndSize(inputStream, size);
+    }
+
+    private void validateSaveAsArguments(String objectName, InputStream inputStream, long size) {
+        if (!StringUtils.hasText(objectName)) {
+            throw new ServiceException("MinIO 对象名不能为空");
+        }
+        validateInputStreamAndSize(inputStream, size);
+    }
+
+    private void validateInputStreamAndSize(InputStream inputStream, long size) {
         if (inputStream == null) {
             throw new ServiceException("文件输入流不能为空");
         }

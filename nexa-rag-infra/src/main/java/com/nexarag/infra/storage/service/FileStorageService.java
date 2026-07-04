@@ -10,7 +10,7 @@ import java.io.InputStream;
 public interface FileStorageService {
 
     /**
-     * 保存文件。
+     * 保存原始文件。
      *
      * @param fileName    文件名
      * @param inputStream 文件输入流
@@ -20,9 +20,20 @@ public interface FileStorageService {
     StoredFile save(String fileName, InputStream inputStream, long size);
 
     /**
+     * 按指定对象名保存文件。
+     *
+     * @param objectName  对象名
+     * @param inputStream 文件输入流
+     * @param size        文件大小
+     * @param contentType 内容类型
+     * @return 已存储文件信息
+     */
+    StoredFile saveAs(String objectName, InputStream inputStream, long size, String contentType);
+
+    /**
      * 读取文件。
      *
-     * @param objectName 对象名称
+     * @param objectName 对象名
      * @return 文件输入流
      */
     InputStream load(String objectName);
@@ -30,7 +41,7 @@ public interface FileStorageService {
     /**
      * 删除文件。
      *
-     * @param objectName 对象名称
+     * @param objectName 对象名
      */
     void delete(String objectName);
 }

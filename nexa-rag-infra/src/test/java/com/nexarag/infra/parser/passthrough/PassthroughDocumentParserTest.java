@@ -1,0 +1,46 @@
+package com.nexarag.infra.parser.passthrough;
+
+import com.nexarag.infra.parser.DocumentParseRequest;
+import com.nexarag.infra.parser.DocumentParseResult;
+import com.nexarag.infra.parser.ParsedContentTypes;
+import com.nexarag.infra.parser.ParserFileTypes;
+import org.junit.jupiter.api.Test;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+/**
+ * 透传文档解析器测试。
+ */
+class PassthroughDocumentParserTest {
+
+    @Test
+    void supportsShouldAcceptMarkdownAndExcel() {
+        PassthroughDocumentParser parser = new PassthroughDocumentParser();
+
+        assertThat(parser.supports(request(ParserFileTypes.MARKDOWN))).isTrue();
+        assertThat(parser.supports(request(ParserFileTypes.EXCEL))).isTrue();
+        assertThat(parser.supports(request(ParserFileTypes.PDF))).isFalse();
+    }
+
+    @Test
+    void parseShouldReturnOriginalFileAsParsedFile() {
+        PassthroughDocumentParser parser = new PassthroughDocumentParser();
+
+        DocumentParseResult result = parser.parse(request(ParserFileTypes.MARKDOWN));
+
+        assertThat(result.parsedObjectName()).isEqualTo("original/demo.md");
+        assertThat(result.parsedFileUrl()).isEqualTo("http://127.0.0.1:9000/nexa-rag/original/demo.md");
+        assertThat(result.contentType()).isEqualTo(ParsedContentTypes.TEXT_MARKDOWN);
+        assertThat(result.metadata()).containsEntry("passthrough", true);
+    }
+
+    private DocumentParseRequest request(String fileType) {
+        return DocumentParseRequest.builder()
+                .documentId(1L)
+                .fileType(fileType)
+                .originalFileName("demo.md")
+                .originalObjectName("original/demo.md")
+                .originalFileUrl("http://127.0.0.1:9000/nexa-rag/original/demo.md")
+                .build();
+    }
+}

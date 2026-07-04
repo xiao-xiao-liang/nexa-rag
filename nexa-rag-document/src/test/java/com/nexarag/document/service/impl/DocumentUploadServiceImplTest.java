@@ -42,6 +42,7 @@ class DocumentUploadServiceImplTest {
         assertThat(documentService.createdRequest.description()).isEqualTo("描述");
         assertThat(documentService.createdRequest.originalFileUrl())
                 .isEqualTo("http://127.0.0.1:9000/nexa-rag/original/demo.pdf");
+        assertThat(documentService.createdRequest.originalObjectName()).isEqualTo("original/demo.pdf");
         assertThat(documentService.submittedRequest.splitConfig()).isNotNull();
         assertThat(dispatcher.enqueuedDocumentId).isEqualTo(1L);
         assertThat(response.documentId()).isEqualTo(1L);
@@ -60,6 +61,11 @@ class DocumentUploadServiceImplTest {
             this.savedFileName = fileName;
             this.savedSize = size;
             return new StoredFile("original/demo.pdf", "http://127.0.0.1:9000/nexa-rag/original/demo.pdf", size);
+        }
+
+        @Override
+        public StoredFile saveAs(String objectName, InputStream inputStream, long size, String contentType) {
+            return new StoredFile(objectName, "http://127.0.0.1:9000/nexa-rag/" + objectName, size);
         }
 
         @Override
@@ -87,6 +93,7 @@ class DocumentUploadServiceImplTest {
                     .description(request.description())
                     .originalFileName(request.originalFileName())
                     .originalFileUrl(request.originalFileUrl())
+                    .originalObjectName(request.originalObjectName())
                     .fileSize(request.fileSize())
                     .fileType(FileType.fromFileName(request.originalFileName()))
                     .status(DocumentStatus.UPLOADED)

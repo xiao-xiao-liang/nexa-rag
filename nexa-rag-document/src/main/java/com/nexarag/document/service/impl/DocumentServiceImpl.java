@@ -52,6 +52,7 @@ public class DocumentServiceImpl extends ServiceImpl<DocumentMapper, Document> i
                 .title(request.title())
                 .description(request.description())
                 .originalFileName(request.originalFileName())
+                .originalObjectName(request.originalObjectName())
                 .originalFileUrl(request.originalFileUrl())
                 .fileSize(request.fileSize())
                 .fileType(fileType)

@@ -94,6 +94,7 @@ public class DocumentUploadServiceImpl implements DocumentUploadService {
                                                              String originalFileName,
                                                              StoredFile storedFile) {
         String title = StringUtils.hasText(request.title()) ? request.title() : originalFileName;
-        return new CreateDocumentRequest(title, request.description(), originalFileName, storedFile.url(), storedFile.size());
+        return new CreateDocumentRequest(title, request.description(), originalFileName,
+                storedFile.objectName(), storedFile.url(), storedFile.size());
     }
 }

@@ -1,9 +1,9 @@
 package com.nexarag.infra.storage.service;
 
 import com.nexarag.common.exception.ServiceException;
+import com.nexarag.infra.config.StorageProperties;
 import com.nexarag.infra.enums.StorageType;
 import com.nexarag.infra.storage.FileStorageStrategy;
-import com.nexarag.infra.config.StorageProperties;
 import com.nexarag.infra.storage.StoredFile;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -22,7 +22,7 @@ public class FileStorageServiceImpl implements FileStorageService {
     private final List<FileStorageStrategy> storageStrategies;
 
     /**
-     * 保存文件。
+     * 保存原始文件。
      *
      * @param fileName    文件名
      * @param inputStream 文件输入流
@@ -34,14 +34,32 @@ public class FileStorageServiceImpl implements FileStorageService {
         // 1. 根据配置选择具体存储策略
         FileStorageStrategy storageStrategy = getRequiredStrategy();
 
-        // 2. 委派给具体策略保存文件
+        // 2. 委派给具体策略保存原始文件
         return storageStrategy.save(fileName, inputStream, size);
+    }
+
+    /**
+     * 按指定对象名保存文件。
+     *
+     * @param objectName  对象名
+     * @param inputStream 文件输入流
+     * @param size        文件大小
+     * @param contentType 内容类型
+     * @return 已存储文件信息
+     */
+    @Override
+    public StoredFile saveAs(String objectName, InputStream inputStream, long size, String contentType) {
+        // 1. 根据配置选择具体存储策略
+        FileStorageStrategy storageStrategy = getRequiredStrategy();
+
+        // 2. 委派给具体策略按指定对象名保存文件
+        return storageStrategy.saveAs(objectName, inputStream, size, contentType);
     }
 
     /**
      * 读取文件。
      *
-     * @param objectName 对象名称
+     * @param objectName 对象名
      * @return 文件输入流
      */
     @Override
@@ -56,7 +74,7 @@ public class FileStorageServiceImpl implements FileStorageService {
     /**
      * 删除文件。
      *
-     * @param objectName 对象名称
+     * @param objectName 对象名
      */
     @Override
     public void delete(String objectName) {
