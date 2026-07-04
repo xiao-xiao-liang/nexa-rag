@@ -6,6 +6,12 @@ spring:
     name: nexa-rag
   main:
     banner-mode: console
+  mustache:
+    check-template-location: false
+  ai:
+    openai:
+      api-key: ${OPENAI_API_KEY:ollama}
+      base-url: ${OPENAI_BASE_URL:http://localhost:11434/v1}
   flyway:
     enabled: false
 
@@ -24,3 +30,40 @@ nexa:
       type: score_fusion
       vector-weight: 0.7
       keyword-weight: 0.3
+  model:
+    profiles:
+      chat-primary:
+        provider: OPENAI_COMPATIBLE
+        base-url: http://localhost:11434/v1
+        api-key: ollama
+        model-name: qwen2.5:7b
+        timeout-ms: 60000
+      chat-backup:
+        provider: OPENAI_COMPATIBLE
+        base-url: http://localhost:11434/v1
+        api-key: ollama
+        model-name: qwen2.5:7b
+        timeout-ms: 60000
+      embedding-primary:
+        provider: OPENAI_COMPATIBLE
+        base-url: http://localhost:11434/v1
+        api-key: ollama
+        model-name: nomic-embed-text
+        timeout-ms: 60000
+      rerank-primary:
+        provider: OPENAI_COMPATIBLE
+        base-url: http://localhost:11434/v1
+        api-key: ollama
+        model-name: qwen2.5:7b
+        timeout-ms: 60000
+    routes:
+      chat:
+        type: PRIMARY_FALLBACK
+        primary: chat-primary
+        fallback: chat-backup
+      embedding:
+        type: PRIMARY_FALLBACK
+        primary: embedding-primary
+      rerank:
+        type: PRIMARY_FALLBACK
+        primary: rerank-primary

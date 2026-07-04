@@ -47,6 +47,7 @@
         <resilience4j.version>2.4.0</resilience4j.version>
         <archunit.version>1.4.2</archunit.version>
         <lombok.version>1.18.46</lombok.version>
+        <jmustache.version>1.16</jmustache.version>
     </properties>
 
     <dependencyManagement>
@@ -88,6 +89,11 @@
                 <artifactId>archunit-junit5</artifactId>
                 <version>${archunit.version}</version>
                 <scope>test</scope>
+            </dependency>
+            <dependency>
+                <groupId>com.samskivert</groupId>
+                <artifactId>jmustache</artifactId>
+                <version>${jmustache.version}</version>
             </dependency>
         </dependencies>
     </dependencyManagement>
