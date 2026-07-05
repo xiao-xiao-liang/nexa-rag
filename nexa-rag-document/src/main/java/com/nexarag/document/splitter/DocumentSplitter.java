@@ -1,6 +1,5 @@
 package com.nexarag.document.splitter;
 
-import com.nexarag.document.dto.SplitConfigRequest;
 import com.nexarag.document.enums.SplitStrategy;
 
 import java.util.List;
@@ -18,11 +17,10 @@ public interface DocumentSplitter {
     SplitStrategy strategy();
 
     /**
-     * 切分文本内容。
+     * 按上下文切分文档内容。
      *
-     * @param content 文本内容
-     * @param config  切分配置
+     * @param context 文档切分上下文
      * @return 片段草稿列表
      */
-    List<ChunkDraft> split(String content, SplitConfigRequest config);
+    List<ChunkDraft> split(DocumentSplitContext context);
 }

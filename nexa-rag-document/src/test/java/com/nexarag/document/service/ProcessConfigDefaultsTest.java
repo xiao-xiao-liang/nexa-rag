@@ -55,7 +55,10 @@ class ProcessConfigDefaultsTest {
         ProcessDocumentRequest result = defaults.merge(FileType.TEXT,
                 new UploadDocumentRequest("测试文档", null, splitConfig, parseConfig, indexConfig));
 
-        assertThat(result.splitConfig()).isSameAs(splitConfig);
+        assertThat(result.splitConfig().splitStrategy()).isEqualTo(SplitStrategy.REGEX_TEXT);
+        assertThat(result.splitConfig().chunkSize()).isEqualTo(500);
+        assertThat(result.splitConfig().chunkOverlap()).isEqualTo(20);
+        assertThat(result.splitConfig().regex().separator()).isEqualTo("\n\n");
         assertThat(result.parseConfig()).isSameAs(parseConfig);
         assertThat(result.indexConfig()).isSameAs(indexConfig);
     }

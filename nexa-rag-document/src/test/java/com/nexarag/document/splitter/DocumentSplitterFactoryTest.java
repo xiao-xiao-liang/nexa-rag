@@ -1,7 +1,6 @@
 package com.nexarag.document.splitter;
 
 import com.nexarag.common.exception.ServiceException;
-import com.nexarag.document.dto.SplitConfigRequest;
 import com.nexarag.document.enums.SplitStrategy;
 import com.nexarag.document.error.DocumentErrorCode;
 import org.junit.jupiter.api.Test;
@@ -49,9 +48,9 @@ class DocumentSplitterFactoryTest {
     private record TestDocumentSplitter(SplitStrategy strategy) implements DocumentSplitter {
 
         @Override
-        public List<ChunkDraft> split(String content, SplitConfigRequest config) {
+        public List<ChunkDraft> split(DocumentSplitContext context) {
             // 1. 返回最小片段草稿用于满足接口契约
-            return List.of(new ChunkDraft(content, Map.of(), false));
+            return List.of(new ChunkDraft("测试内容", Map.of(), false));
         }
     }
 }

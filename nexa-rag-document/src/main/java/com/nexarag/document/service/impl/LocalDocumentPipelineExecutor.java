@@ -7,6 +7,7 @@ import com.nexarag.document.dto.ParseConfigRequest;
 import com.nexarag.document.dto.ProcessDocumentRequest;
 import com.nexarag.document.entity.Document;
 import com.nexarag.document.enums.DocumentStatus;
+import com.nexarag.document.service.DocumentChunkingService;
 import com.nexarag.document.service.DocumentPipelineExecutor;
 import com.nexarag.document.service.DocumentService;
 import com.nexarag.infra.parser.DocumentParseRequest;
@@ -31,6 +32,7 @@ public class LocalDocumentPipelineExecutor implements DocumentPipelineExecutor {
 
     private final DocumentService documentService;
     private final DocumentParseService documentParseService;
+    private final DocumentChunkingService documentChunkingService;
 
     /**
      * 执行文档入库流水线的解析阶段。
@@ -66,7 +68,11 @@ public class LocalDocumentPipelineExecutor implements DocumentPipelineExecutor {
                         com.nexarag.document.error.DocumentErrorCode.DOCUMENT_STATUS_INVALID);
             }
             log.error("文档解析失败且不再重试，documentId={}，status={}", documentId, failureDocument.getStatus(), exception);
+            return;
         }
+
+        // 5. 初版本地流水线在同一次任务中继续执行切分阶段
+        documentChunkingService.chunk(documentId);
     }
 
     private void markParsing(Document document) {

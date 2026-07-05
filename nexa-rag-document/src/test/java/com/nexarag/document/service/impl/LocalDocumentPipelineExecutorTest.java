@@ -3,6 +3,7 @@ package com.nexarag.document.service.impl;
 import com.nexarag.document.entity.Document;
 import com.nexarag.document.enums.DocumentStatus;
 import com.nexarag.document.enums.FileType;
+import com.nexarag.document.service.DocumentChunkingService;
 import com.nexarag.infra.parser.DocumentParseRequest;
 import com.nexarag.infra.parser.DocumentParseResult;
 import com.nexarag.infra.parser.DocumentParseService;
@@ -35,7 +36,9 @@ class LocalDocumentPipelineExecutorTest {
                 .processConfigJson("{\"parseConfig\":{\"enableOcr\":true,\"enableImageDescription\":false}}")
                 .build();
         RecordingDocumentParseService parseService = new RecordingDocumentParseService();
-        LocalDocumentPipelineExecutor executor = new LocalDocumentPipelineExecutor(documentService, parseService);
+        RecordingDocumentChunkingService chunkingService = new RecordingDocumentChunkingService();
+        LocalDocumentPipelineExecutor executor = new LocalDocumentPipelineExecutor(documentService, parseService,
+                chunkingService);
 
         executor.execute(1L);
 
@@ -45,6 +48,7 @@ class LocalDocumentPipelineExecutorTest {
         assertThat(documentService.existingDocument.getParsedObjectName()).isEqualTo("parsed/1/content.md");
         assertThat(documentService.existingDocument.getParsedContentType()).isEqualTo(ParsedContentTypes.TEXT_MARKDOWN);
         assertThat(documentService.existingDocument.getParsedFileUrl()).isEqualTo("http://127.0.0.1:9000/nexa-rag/parsed/1/content.md");
+        assertThat(chunkingService.documentId).isEqualTo(1L);
     }
 
     @Test
@@ -60,7 +64,9 @@ class LocalDocumentPipelineExecutorTest {
                 .maxRetryCount(3)
                 .build();
         FailingDocumentParseService parseService = new FailingDocumentParseService();
-        LocalDocumentPipelineExecutor executor = new LocalDocumentPipelineExecutor(documentService, parseService);
+        RecordingDocumentChunkingService chunkingService = new RecordingDocumentChunkingService();
+        LocalDocumentPipelineExecutor executor = new LocalDocumentPipelineExecutor(documentService, parseService,
+                chunkingService);
 
         assertThatThrownBy(() -> executor.execute(1L))
                 .isInstanceOf(RuntimeException.class)
@@ -68,6 +74,7 @@ class LocalDocumentPipelineExecutorTest {
 
         assertThat(documentService.failureStage).isEqualTo("PARSE");
         assertThat(documentService.savedStatuses).containsExactly(DocumentStatus.PARSING);
+        assertThat(chunkingService.documentId).isNull();
     }
 
     private static class RecordingDocumentParseService implements DocumentParseService {
@@ -92,6 +99,17 @@ class LocalDocumentPipelineExecutorTest {
         @Override
         public DocumentParseResult parse(DocumentParseRequest request) {
             throw new IllegalStateException("MinerU调用失败");
+        }
+    }
+
+    private static class RecordingDocumentChunkingService implements DocumentChunkingService {
+
+        private Long documentId;
+
+        @Override
+        public int chunk(Long documentId) {
+            this.documentId = documentId;
+            return 1;
         }
     }
 

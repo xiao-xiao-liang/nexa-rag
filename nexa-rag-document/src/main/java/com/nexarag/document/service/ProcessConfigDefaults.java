@@ -1,8 +1,12 @@
 package com.nexarag.document.service;
 
 import com.nexarag.document.dto.IndexConfigRequest;
+import com.nexarag.document.dto.ExcelSplitMode;
+import com.nexarag.document.dto.ExcelSplitOptions;
+import com.nexarag.document.dto.MarkdownSplitOptions;
 import com.nexarag.document.dto.ParseConfigRequest;
 import com.nexarag.document.dto.ProcessDocumentRequest;
+import com.nexarag.document.dto.RegexSplitOptions;
 import com.nexarag.document.dto.SplitConfigRequest;
 import com.nexarag.document.dto.UploadDocumentRequest;
 import com.nexarag.document.enums.FileType;
@@ -17,6 +21,8 @@ public class ProcessConfigDefaults {
 
     private static final int DEFAULT_CHUNK_SIZE = 1000;
     private static final int DEFAULT_CHUNK_OVERLAP = 100;
+    private static final int DEFAULT_MARKDOWN_TITLE_LEVEL = 3;
+    private static final String DEFAULT_TEXT_SEPARATOR = "\n\n";
 
     /**
      * 合并上传请求配置和文件类型默认配置。
@@ -46,11 +52,6 @@ public class ProcessConfigDefaults {
         if (splitConfig == null) {
             return defaultConfig;
         }
-        if (splitConfig.splitStrategy() != null
-                && splitConfig.chunkSize() != null
-                && splitConfig.chunkOverlap() != null) {
-            return splitConfig;
-        }
         SplitStrategy splitStrategy = splitConfig.splitStrategy() == null
                 ? defaultConfig.splitStrategy()
                 : splitConfig.splitStrategy();
@@ -58,7 +59,10 @@ public class ProcessConfigDefaults {
         Integer chunkOverlap = splitConfig.chunkOverlap() == null
                 ? defaultConfig.chunkOverlap()
                 : splitConfig.chunkOverlap();
-        return new SplitConfigRequest(splitStrategy, chunkSize, chunkOverlap);
+        MarkdownSplitOptions markdown = mergeMarkdownOptions(splitConfig.markdown(), defaultConfig.markdown());
+        RegexSplitOptions regex = mergeRegexOptions(splitConfig.regex(), defaultConfig.regex());
+        ExcelSplitOptions excel = mergeExcelOptions(splitConfig.excel(), defaultConfig.excel());
+        return new SplitConfigRequest(splitStrategy, chunkSize, chunkOverlap, markdown, regex, excel);
     }
 
     private SplitConfigRequest defaultSplitConfig(FileType fileType) {
@@ -67,7 +71,60 @@ public class ProcessConfigDefaults {
             case PPT, TEXT -> SplitStrategy.REGEX_TEXT;
             case PDF, WORD, MARKDOWN, UNKNOWN -> SplitStrategy.PARENT_MARKDOWN;
         };
-        return new SplitConfigRequest(splitStrategy, DEFAULT_CHUNK_SIZE, DEFAULT_CHUNK_OVERLAP);
+        return new SplitConfigRequest(splitStrategy, DEFAULT_CHUNK_SIZE, DEFAULT_CHUNK_OVERLAP,
+                defaultMarkdownOptions(), defaultRegexOptions(), defaultExcelOptions());
+    }
+
+    private MarkdownSplitOptions mergeMarkdownOptions(MarkdownSplitOptions options, MarkdownSplitOptions defaults) {
+        if (options == null) {
+            return defaults;
+        }
+        Integer titleLevel = options.titleLevel() == null ? defaults.titleLevel() : options.titleLevel();
+        Boolean stripHeaders = options.stripHeaders() == null ? defaults.stripHeaders() : options.stripHeaders();
+        Boolean preserveCodeBlock = options.preserveCodeBlock() == null
+                ? defaults.preserveCodeBlock()
+                : options.preserveCodeBlock();
+        Boolean createParentForOversized = options.createParentForOversized() == null
+                ? defaults.createParentForOversized()
+                : options.createParentForOversized();
+        return new MarkdownSplitOptions(titleLevel, stripHeaders, preserveCodeBlock, createParentForOversized);
+    }
+
+    private RegexSplitOptions mergeRegexOptions(RegexSplitOptions options, RegexSplitOptions defaults) {
+        if (options == null) {
+            return defaults;
+        }
+        String separator = options.separator() == null ? defaults.separator() : options.separator();
+        String regex = options.regex() == null ? defaults.regex() : options.regex();
+        Boolean keepSeparator = options.keepSeparator() == null ? defaults.keepSeparator() : options.keepSeparator();
+        return new RegexSplitOptions(separator, regex, keepSeparator);
+    }
+
+    private ExcelSplitOptions mergeExcelOptions(ExcelSplitOptions options, ExcelSplitOptions defaults) {
+        if (options == null) {
+            return defaults;
+        }
+        ExcelSplitMode mode = options.mode() == null ? defaults.mode() : options.mode();
+        Boolean firstRowAsHeader = options.firstRowAsHeader() == null
+                ? defaults.firstRowAsHeader()
+                : options.firstRowAsHeader();
+        String charset = options.charset() == null ? defaults.charset() : options.charset();
+        Integer maxRowsPerChunk = options.maxRowsPerChunk() == null
+                ? defaults.maxRowsPerChunk()
+                : options.maxRowsPerChunk();
+        return new ExcelSplitOptions(mode, firstRowAsHeader, charset, maxRowsPerChunk);
+    }
+
+    private MarkdownSplitOptions defaultMarkdownOptions() {
+        return new MarkdownSplitOptions(DEFAULT_MARKDOWN_TITLE_LEVEL, false, true, true);
+    }
+
+    private RegexSplitOptions defaultRegexOptions() {
+        return new RegexSplitOptions(DEFAULT_TEXT_SEPARATOR, null, false);
+    }
+
+    private ExcelSplitOptions defaultExcelOptions() {
+        return new ExcelSplitOptions(ExcelSplitMode.KEY_VALUE, true, null, null);
     }
 
     private ParseConfigRequest mergeParseConfig(FileType fileType, ParseConfigRequest parseConfig) {

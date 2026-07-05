@@ -1,0 +1,37 @@
+package com.nexarag.document.splitter.text;
+
+import com.nexarag.document.dto.RegexSplitOptions;
+import com.nexarag.document.dto.SplitConfigRequest;
+import com.nexarag.document.enums.FileType;
+import com.nexarag.document.enums.SplitStrategy;
+import com.nexarag.document.splitter.ChunkDraft;
+import com.nexarag.document.splitter.DocumentChunkIdGenerator;
+import com.nexarag.document.splitter.DocumentSplitContext;
+import com.nexarag.document.splitter.support.TextWindowSplitter;
+import org.junit.jupiter.api.Test;
+
+import java.util.List;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+/**
+ * 正则文本切分器测试。
+ */
+class RegexTextDocumentSplitterTest {
+
+    @Test
+    void splitShouldSplitBySeparatorAndMergeSmallParts() {
+        RegexTextDocumentSplitter splitter = new RegexTextDocumentSplitter(new TextWindowSplitter(),
+                new DocumentChunkIdGenerator());
+        DocumentSplitContext context = new DocumentSplitContext(1L, "测试", "demo.txt", FileType.TEXT,
+                "original/demo.txt", null, "parsed/demo.txt", null, "text/plain", "第一段\n\n第二段\n\n第三段", null,
+                new SplitConfigRequest(SplitStrategy.REGEX_TEXT, 8, 2, null,
+                        new RegexSplitOptions("\n\n", null, false), null));
+
+        List<ChunkDraft> drafts = splitter.split(context);
+
+        assertThat(drafts).hasSize(2);
+        assertThat(drafts).allSatisfy(draft -> assertThat(draft.skipIndex()).isFalse());
+        assertThat(drafts.getFirst().text()).contains("第一段", "第二段");
+    }
+}
