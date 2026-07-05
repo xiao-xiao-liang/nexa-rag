@@ -6,6 +6,7 @@ import com.nexarag.model.prompt.PromptTemplateService;
 import com.nexarag.model.execution.ModelExecutionTemplate;
 import com.nexarag.model.route.ModelRouter;
 import com.nexarag.model.route.PrimaryFallbackModelRouter;
+import com.nexarag.model.security.ModelSecretEncryptor;
 import com.nexarag.model.service.ModelCallLogService;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
@@ -15,7 +16,7 @@ import org.springframework.context.annotation.Configuration;
  * 模型模块配置入口。
  */
 @Configuration
-@EnableConfigurationProperties(ModelGovernanceProperties.class)
+@EnableConfigurationProperties({ModelGovernanceProperties.class, ModelSecretProperties.class})
 public class ModelConfiguration {
 
     /**
@@ -61,5 +62,16 @@ public class ModelConfiguration {
     public ModelExecutionTemplate modelExecutionTemplate(ModelRouter modelRouter,
                                                          ModelCallLogService modelCallLogService) {
         return new ModelExecutionTemplate(modelRouter, modelCallLogService);
+    }
+
+    /**
+     * 注册模型密钥加密器。
+     *
+     * @param properties 模型密钥配置
+     * @return 模型密钥加密器
+     */
+    @Bean
+    public ModelSecretEncryptor modelSecretEncryptor(ModelSecretProperties properties) {
+        return new ModelSecretEncryptor(properties.getMasterKey());
     }
 }
