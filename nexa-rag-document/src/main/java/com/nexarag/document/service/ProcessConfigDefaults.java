@@ -7,7 +7,6 @@ import com.nexarag.document.dto.SplitConfigRequest;
 import com.nexarag.document.dto.UploadDocumentRequest;
 import com.nexarag.document.enums.FileType;
 import com.nexarag.document.enums.SplitStrategy;
-import com.nexarag.infra.enums.ParserType;
 import org.springframework.stereotype.Component;
 
 /**
@@ -76,24 +75,20 @@ public class ProcessConfigDefaults {
         if (parseConfig == null) {
             return defaultConfig;
         }
-        if (parseConfig.parserType() != null
-                && parseConfig.enableOcr() != null
-                && parseConfig.enableImageDescription() != null) {
+        if (parseConfig.enableOcr() != null && parseConfig.enableImageDescription() != null) {
             return parseConfig;
         }
-        ParserType parserType = parseConfig.parserType() == null ? defaultConfig.parserType() : parseConfig.parserType();
         Boolean enableOcr = parseConfig.enableOcr() == null ? defaultConfig.enableOcr() : parseConfig.enableOcr();
         Boolean enableImageDescription = parseConfig.enableImageDescription() == null
                 ? defaultConfig.enableImageDescription()
                 : parseConfig.enableImageDescription();
-        return new ParseConfigRequest(parserType, enableOcr, enableImageDescription);
+        return new ParseConfigRequest(enableOcr, enableImageDescription);
     }
 
     private ParseConfigRequest defaultParseConfig(FileType fileType) {
         return switch (fileType) {
-            case PDF, WORD -> new ParseConfigRequest(ParserType.MINERU, true, false);
-            case PPT, TEXT -> new ParseConfigRequest(ParserType.TIKA, false, false);
-            case MARKDOWN, EXCEL, UNKNOWN -> new ParseConfigRequest(null, false, false);
+            case PDF, WORD -> new ParseConfigRequest(true, false);
+            case EXCEL, PPT, MARKDOWN, TEXT, UNKNOWN -> new ParseConfigRequest(false, false);
         };
     }
 

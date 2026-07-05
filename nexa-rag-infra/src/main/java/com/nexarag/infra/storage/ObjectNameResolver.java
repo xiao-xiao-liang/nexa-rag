@@ -1,5 +1,6 @@
 package com.nexarag.infra.storage;
 
+import com.nexarag.common.exception.ServiceException;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 
@@ -9,12 +10,14 @@ import java.util.Locale;
 import java.util.UUID;
 
 /**
- * 对象名解析器，负责生成安全且可按日期归档的存储对象路径。
+ * 对象名解析器，负责生成安全且可按用途归档的存储对象路径。
  */
 @Component
 public class ObjectNameResolver {
 
     private static final DateTimeFormatter DATE_PATH_FORMATTER = DateTimeFormatter.ofPattern("yyyy/MM/dd");
+    private static final String DEFAULT_FILE_NAME = "file";
+    private static final String DEFAULT_PARSED_EXTENSION = ".txt";
 
     /**
      * 生成原始上传文件的对象名。
@@ -34,9 +37,53 @@ public class ObjectNameResolver {
         return "original/" + datePath + "/" + UUID.randomUUID() + extension;
     }
 
+    /**
+     * 生成解析后主文件对象名。
+     *
+     * @param documentId       文档ID
+     * @param originalFileName 原始文件名
+     * @param extension        解析产物扩展名
+     * @return 解析后主文件对象名
+     */
+    public String resolveParsedObjectName(Long documentId, String originalFileName, String extension) {
+        // 1. 校验文档ID，解析产物必须按文档隔离
+        validateDocumentId(documentId);
+
+        // 2. 规范化扩展名，避免非法字符进入对象名
+        String safeExtension = normalizeExtension(extension);
+
+        // 3. 返回稳定解析产物路径，便于重处理覆盖和清理
+        return "parsed/" + documentId + "/content" + safeExtension;
+    }
+
+    /**
+     * 生成解析后资源文件对象名。
+     *
+     * @param documentId    文档ID
+     * @param assetFileName 资源文件名
+     * @return 解析后资源文件对象名
+     */
+    public String resolveParsedAssetObjectName(Long documentId, String assetFileName) {
+        // 1. 校验文档ID，解析资源必须按文档隔离
+        validateDocumentId(documentId);
+
+        // 2. 提取安全扩展名，资源文件名主体使用 UUID 防碰撞
+        String simpleFileName = extractSimpleFileName(assetFileName);
+        String extension = extractExtension(simpleFileName);
+
+        // 3. 返回资源对象名
+        return "parsed/" + documentId + "/assets/" + UUID.randomUUID() + extension;
+    }
+
+    private void validateDocumentId(Long documentId) {
+        if (documentId == null) {
+            throw new ServiceException("文档ID不能为空");
+        }
+    }
+
     private String extractSimpleFileName(String fileName) {
         if (!StringUtils.hasText(fileName)) {
-            return "file";
+            return DEFAULT_FILE_NAME;
         }
         String normalizedFileName = fileName.replace('\\', '/');
         int lastSlashIndex = normalizedFileName.lastIndexOf('/');
@@ -53,5 +100,19 @@ public class ObjectNameResolver {
         }
         String extension = fileName.substring(lastDotIndex).toLowerCase(Locale.ROOT);
         return extension.replaceAll("[^a-z0-9.]", "");
+    }
+
+    private String normalizeExtension(String extension) {
+        if (!StringUtils.hasText(extension)) {
+            return DEFAULT_PARSED_EXTENSION;
+        }
+        String safeExtension = extension.toLowerCase(Locale.ROOT).replaceAll("[^a-z0-9.]", "");
+        if (!safeExtension.startsWith(".")) {
+            safeExtension = "." + safeExtension;
+        }
+        if (".".equals(safeExtension)) {
+            return DEFAULT_PARSED_EXTENSION;
+        }
+        return safeExtension;
     }
 }

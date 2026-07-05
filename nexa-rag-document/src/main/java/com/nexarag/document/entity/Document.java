@@ -64,9 +64,24 @@ public class Document {
     private String originalFileUrl;
 
     /**
+     * 原始文件对象名。
+     */
+    private String originalObjectName;
+
+    /**
      * 解析后文件地址。
      */
     private String parsedFileUrl;
+
+    /**
+     * 解析后文件对象名。
+     */
+    private String parsedObjectName;
+
+    /**
+     * 解析后内容类型。
+     */
+    private String parsedContentType;
 
     /**
      * 文档处理状态。

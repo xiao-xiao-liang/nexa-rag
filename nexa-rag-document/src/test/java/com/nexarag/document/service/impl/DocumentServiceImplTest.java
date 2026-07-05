@@ -28,10 +28,11 @@ class DocumentServiceImplTest {
         TestableDocumentServiceImpl documentService = new TestableDocumentServiceImpl();
 
         Document document = documentService.createDocument(new CreateDocumentRequest(
-                "测试文档", "描述", "demo.pdf", "minio://demo.pdf", 100L));
+                "测试文档", "描述", "demo.pdf", "original/demo.pdf", "minio://demo.pdf", 100L));
 
         assertThat(document.getStatus()).isEqualTo(DocumentStatus.UPLOADED);
         assertThat(document.getOriginalFileName()).isEqualTo("demo.pdf");
+        assertThat(document.getOriginalObjectName()).isEqualTo("original/demo.pdf");
         assertThat(documentService.savedDocument).isSameAs(document);
     }
 

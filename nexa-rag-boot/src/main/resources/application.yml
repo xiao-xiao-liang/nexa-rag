@@ -45,6 +45,22 @@ nexa:
     secret-key: ${NEXA_STORAGE_SECRET_KEY:liang123}
     bucket: ${NEXA_STORAGE_BUCKET:nexa-rag}
     create-bucket: true
+  parser:
+    mineru:
+      enabled: ${NEXA_PARSER_MINERU_ENABLED:true}
+      mode: ${NEXA_PARSER_MINERU_MODE:local}
+      local-endpoint: ${NEXA_PARSER_MINERU_LOCAL_ENDPOINT:http://127.0.0.1:8000}
+      local-parse-path: ${NEXA_PARSER_MINERU_LOCAL_PARSE_PATH:/file_parse}
+      official-endpoint: ${NEXA_PARSER_MINERU_OFFICIAL_ENDPOINT:}
+      api-key: ${NEXA_MINERU_API_KEY:}
+      connect-timeout: ${NEXA_PARSER_MINERU_CONNECT_TIMEOUT:3s}
+      read-timeout: ${NEXA_PARSER_MINERU_READ_TIMEOUT:120s}
+      poll-interval: ${NEXA_PARSER_MINERU_POLL_INTERVAL:2s}
+      max-poll-count: ${NEXA_PARSER_MINERU_MAX_POLL_COUNT:60}
+    tika:
+      enabled: ${NEXA_PARSER_TIKA_ENABLED:true}
+    passthrough:
+      enabled: ${NEXA_PARSER_PASSTHROUGH_ENABLED:true}
   retrieval:
     rerank:
       type: score_fusion
