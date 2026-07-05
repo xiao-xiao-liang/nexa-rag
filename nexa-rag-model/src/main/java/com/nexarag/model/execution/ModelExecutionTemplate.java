@@ -26,6 +26,23 @@ public class ModelExecutionTemplate {
     public <T> T execute(ModelExecutionCommand<T> command) {
         long start = System.currentTimeMillis();
         ModelRouteDecision decision = modelRouter.route(new ModelRouteContext(command.routeKey(), false));
+        return execute(command, decision, start);
+    }
+
+    /**
+     * 按指定路由决策直接执行模型调用。
+     *
+     * @param command  模型执行命令
+     * @param decision 指定路由决策
+     * @param <T>      模型响应类型
+     * @return 模型响应
+     */
+    public <T> T execute(ModelExecutionCommand<T> command, ModelRouteDecision decision) {
+        long start = System.currentTimeMillis();
+        return execute(command, decision, start);
+    }
+
+    private <T> T execute(ModelExecutionCommand<T> command, ModelRouteDecision decision, long start) {
         ModelCallLog log = modelCallLogService.createRunningLog(
                 command.traceId(),
                 command.bizType(),

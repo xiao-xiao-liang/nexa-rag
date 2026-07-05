@@ -11,6 +11,7 @@ import com.nexarag.model.gateway.embedding.EmbeddingModelResponse;
 import com.nexarag.model.gateway.rerank.RerankModelRequest;
 import com.nexarag.model.gateway.rerank.RerankModelResponse;
 import com.nexarag.model.provider.ModelProviderDispatcher;
+import com.nexarag.model.route.ModelRouteDecision;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -48,6 +49,19 @@ public class ModelGateway {
     }
 
     /**
+     * 按指定路由决策调用向量化模型。
+     *
+     * @param decision 指定路由决策
+     * @param request  向量化模型请求
+     * @return 向量化模型响应
+     */
+    public EmbeddingModelResponse embedding(ModelRouteDecision decision, EmbeddingModelRequest request) {
+        // 1. 用指定路由决策执行，主要用于模型配置连接测试
+        return executionTemplate.execute(ModelExecutionCommand.ofEmbedding(request,
+                ignored -> providerDispatcher.embedding(decision, request)), decision);
+    }
+
+    /**
      * 调用重排序模型。
      *
      * @param request 重排序模型请求
@@ -57,5 +71,18 @@ public class ModelGateway {
         // 1. 交给执行模板统一处理路由、日志和后续治理能力
         return executionTemplate.execute(ModelExecutionCommand.ofRerank(request,
                 decision -> providerDispatcher.rerank(decision, request)));
+    }
+
+    /**
+     * 按指定路由决策调用重排序模型。
+     *
+     * @param decision 指定路由决策
+     * @param request  重排序模型请求
+     * @return 重排序模型响应
+     */
+    public RerankModelResponse rerank(ModelRouteDecision decision, RerankModelRequest request) {
+        // 1. 用指定路由决策执行，主要用于模型配置连接测试
+        return executionTemplate.execute(ModelExecutionCommand.ofRerank(request,
+                ignored -> providerDispatcher.rerank(decision, request)), decision);
     }
 }
