@@ -28,5 +28,10 @@ public enum ModelBizType {
     /**
      * 工作流业务。
      */
-    WORKFLOW
+    WORKFLOW,
+
+    /**
+     * 模型连接测试业务。
+     */
+    MODEL_TEST
 }

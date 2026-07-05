@@ -23,5 +23,20 @@ public enum ModelRequestType {
     /**
      * 视觉模型请求。
      */
-    VISION
+    VISION,
+
+    /**
+     * 向量化模型连接测试请求。
+     */
+    EMBEDDING_TEST,
+
+    /**
+     * 重排序模型连接测试请求。
+     */
+    RERANK_TEST,
+
+    /**
+     * 聊天模型连接测试请求。
+     */
+    CHAT_TEST
 }
