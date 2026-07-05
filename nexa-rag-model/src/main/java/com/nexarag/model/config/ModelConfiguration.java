@@ -16,7 +16,11 @@ import org.springframework.context.annotation.Configuration;
  * 模型模块配置入口。
  */
 @Configuration
-@EnableConfigurationProperties({ModelGovernanceProperties.class, ModelSecretProperties.class})
+@EnableConfigurationProperties({
+        ModelGovernanceProperties.class,
+        ModelSecretProperties.class,
+        ModelRegistryRefreshProperties.class
+})
 public class ModelConfiguration {
 
     /**
