@@ -1,6 +1,7 @@
 package com.nexarag.model.gateway.embedding;
 
 import com.nexarag.model.enums.ModelBizType;
+import lombok.Builder;
 
 import java.util.List;
 
@@ -13,6 +14,7 @@ import java.util.List;
  * @param routeKey 路由Key
  * @param texts    待向量化文本
  */
+@Builder
 public record EmbeddingModelRequest(String traceId, ModelBizType bizType, String bizId,
                                     String routeKey, List<String> texts) {
 }

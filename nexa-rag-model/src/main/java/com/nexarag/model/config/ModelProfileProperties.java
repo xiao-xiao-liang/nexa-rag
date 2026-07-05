@@ -11,9 +11,9 @@ import lombok.Setter;
 public class ModelProfileProperties {
 
     /**
-     * 模型厂商，例如 OPENAI、OPENAI_COMPATIBLE、OLLAMA。
+     * 模型厂商，例如 OPENAI、OLLAMA、DASHSCOPE。
      */
-    private String provider = "OPENAI_COMPATIBLE";
+    private String provider = "OPENAI";
 
     /**
      * 模型服务地址。

@@ -1,6 +1,7 @@
 package com.nexarag.model.gateway.chat;
 
 import com.nexarag.model.enums.ModelBizType;
+import lombok.Builder;
 
 import java.util.List;
 import java.util.Map;
@@ -15,6 +16,7 @@ import java.util.Map;
  * @param messages 消息列表
  * @param options  调用选项
  */
+@Builder
 public record ChatModelRequest(String traceId, ModelBizType bizType, String bizId, String routeKey,
                                List<ChatMessage> messages, Map<String, Object> options) {
 

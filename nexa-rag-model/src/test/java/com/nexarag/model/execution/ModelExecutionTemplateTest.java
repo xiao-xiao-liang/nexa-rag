@@ -29,7 +29,7 @@ class ModelExecutionTemplateTest {
         ModelCallLogService logService = mock(ModelCallLogService.class);
 
         ModelProfileProperties profile = new ModelProfileProperties();
-        profile.setProvider("OPENAI_COMPATIBLE");
+        profile.setProvider("OPENAI");
         profile.setBaseUrl("http://localhost:11434/v1");
         profile.setModelName("qwen2.5:7b");
         when(router.route(any(ModelRouteContext.class)))

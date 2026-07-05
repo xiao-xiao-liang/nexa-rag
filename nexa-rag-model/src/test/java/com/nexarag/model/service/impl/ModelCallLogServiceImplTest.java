@@ -38,7 +38,7 @@ class ModelCallLogServiceImplTest {
                 ModelBizType.CHAT,
                 "conversation-1",
                 "chat-primary",
-                "OPENAI_COMPATIBLE",
+                "OPENAI",
                 "http://localhost:11434/v1",
                 "qwen2.5:7b",
                 ModelRequestType.CHAT

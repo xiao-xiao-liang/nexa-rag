@@ -1,0 +1,68 @@
+package com.nexarag.model.provider;
+
+import com.nexarag.common.error.BaseErrorCode;
+import com.nexarag.common.exception.ServiceException;
+import com.nexarag.model.enums.ModelProvider;
+import com.nexarag.model.enums.ModelType;
+import com.nexarag.model.gateway.embedding.EmbeddingModelRequest;
+import com.nexarag.model.gateway.embedding.EmbeddingModelResponse;
+import com.nexarag.model.gateway.rerank.RerankModelRequest;
+import com.nexarag.model.gateway.rerank.RerankModelResponse;
+import com.nexarag.model.route.ModelRouteDecision;
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Component;
+
+import java.util.List;
+
+/**
+ * 模型厂商分发器，按厂商和模型类型选择对应 Provider 适配器。
+ */
+@Component
+@RequiredArgsConstructor
+public class ModelProviderDispatcher {
+
+    private final List<ModelProviderAdapter> providerAdapters;
+
+    /**
+     * 分发向量化模型调用。
+     *
+     * @param decision 路由决策
+     * @param request  向量化请求
+     * @return 向量化响应
+     */
+    public EmbeddingModelResponse embedding(ModelRouteDecision decision, EmbeddingModelRequest request) {
+        // 1. 按路由决策中的厂商选择 Embedding 适配器
+        return select(decision, ModelType.EMBEDDING).embedding(decision, request);
+    }
+
+    /**
+     * 分发重排序模型调用。
+     *
+     * @param decision 路由决策
+     * @param request  重排序请求
+     * @return 重排序响应
+     */
+    public RerankModelResponse rerank(ModelRouteDecision decision, RerankModelRequest request) {
+        // 1. 按路由决策中的厂商选择 Rerank 适配器
+        return select(decision, ModelType.RERANK).rerank(decision, request);
+    }
+
+    private ModelProviderAdapter select(ModelRouteDecision decision, ModelType modelType) {
+        ModelProvider provider = parseProvider(decision.profile().getProvider());
+        return providerAdapters.stream()
+                .filter(adapter -> adapter.supports(provider, modelType))
+                .findFirst()
+                .orElseThrow(() -> new ServiceException("未找到模型厂商适配器，provider="
+                        + provider + "，modelType=" + modelType, BaseErrorCode.SERVICE_ERROR));
+    }
+
+    private ModelProvider parseProvider(String provider) {
+        try {
+            // 1. 将配置中的厂商字符串转换为受控枚举
+            return ModelProvider.valueOf(provider);
+        } catch (IllegalArgumentException exception) {
+            throw new ServiceException("不支持的模型厂商，provider=" + provider,
+                    exception, BaseErrorCode.SERVICE_ERROR);
+        }
+    }
+}

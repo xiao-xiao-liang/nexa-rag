@@ -1,6 +1,7 @@
 package com.nexarag.model.gateway.rerank;
 
 import com.nexarag.model.enums.ModelBizType;
+import lombok.Builder;
 
 import java.util.List;
 
@@ -14,6 +15,7 @@ import java.util.List;
  * @param query      查询文本
  * @param candidates 候选内容
  */
+@Builder
 public record RerankModelRequest(String traceId, ModelBizType bizType, String bizId,
                                  String routeKey, String query, List<RerankCandidate> candidates) {
 }
