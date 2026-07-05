@@ -42,8 +42,11 @@
 ## 阶段三未实现
 
 - [ ] 实现 OpenAI-compatible 聊天模型真实调用。
-- [ ] 实现 OpenAI-compatible Embedding 模型真实调用。
-- [ ] 实现 Rerank 模型真实调用。
+- [ ] 实现 Chat 模型连接测试。
+- [ ] 将 `ModelRouter` 从本地配置路由切换为 `model_config`、`model_route` 注册表快照路由。
+- [ ] 将 `ModelClientFactory` 缓存 Key 从 Profile 维度切换为 `config_id + version`。
+- [ ] 补齐模型配置、模型路由、路由配置的完整 REST CRUD 接口。
+- [ ] 接入模型注册表刷新消息的真实 MQ、Redis Pub/Sub 客户端。
 - [ ] 接入 Resilience4j 熔断、限流、重试、并发隔离和超时控制。
 - [ ] 实现主模型失败或熔断后的备用模型 fallback 执行。
 - [ ] 实现权重路由。
@@ -53,6 +56,17 @@
 - [ ] 实现 Nacos 动态配置源。
 - [ ] 实现 Nacos Prompt 模板覆盖本地模板。
 - [ ] 为各业务模块补充正式 Prompt Markdown 模板。
+
+## 阶段三已完成
+
+- [x] 新增模型注册表、模型配置、模型路由和路由配置基础表结构。
+- [x] 新增模型密钥加密器。
+- [x] 新增模型注册表快照和刷新消息抽象。
+- [x] 新增模型厂商推荐值 REST 接口。
+- [x] 统一 `ModelGateway`，提供 Chat、Embedding、Rerank 三类入口。
+- [x] 接入 OpenAI-compatible Embedding 模型真实调用初版。
+- [x] 接入 DashScope `qwen3-rerank` 重排序模型真实调用初版。
+- [x] 新增 Embedding、Rerank 模型连接测试初版。
 
 ## 后续阶段
 
