@@ -8,5 +8,15 @@ public enum ModelRouteStrategy {
     /**
      * 主备路由策略。
      */
-    PRIMARY_BACKUP
+    PRIMARY_BACKUP,
+
+    /**
+     * 权重路由策略。
+     */
+    WEIGHT,
+
+    /**
+     * 规则路由策略。
+     */
+    RULE
 }
