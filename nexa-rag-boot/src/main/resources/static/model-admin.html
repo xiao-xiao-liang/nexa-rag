@@ -1,0 +1,432 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>NexaRAG 模型管理</title>
+    <style>
+        :root {
+            color-scheme: light;
+            --bg: #f7f8fa;
+            --panel: #ffffff;
+            --border: #d9dee7;
+            --text: #1f2937;
+            --muted: #667085;
+            --primary: #1f6feb;
+            --success: #157347;
+            --danger: #b42318;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            background: var(--bg);
+            color: var(--text);
+            font-family: "Microsoft YaHei", Arial, sans-serif;
+            font-size: 14px;
+        }
+
+        header {
+            position: sticky;
+            top: 0;
+            z-index: 1;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 14px 24px;
+            background: var(--panel);
+            border-bottom: 1px solid var(--border);
+        }
+
+        h1 {
+            margin: 0;
+            font-size: 20px;
+            font-weight: 700;
+        }
+
+        main {
+            display: grid;
+            grid-template-columns: minmax(320px, 440px) 1fr;
+            gap: 16px;
+            padding: 16px;
+        }
+
+        section {
+            background: var(--panel);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 16px;
+        }
+
+        h2 {
+            margin: 0 0 12px;
+            font-size: 16px;
+        }
+
+        label {
+            display: grid;
+            gap: 6px;
+            margin-bottom: 10px;
+            color: var(--muted);
+            font-size: 12px;
+        }
+
+        input,
+        select,
+        textarea {
+            width: 100%;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 9px 10px;
+            color: var(--text);
+            font: inherit;
+            background: #ffffff;
+        }
+
+        textarea {
+            min-height: 92px;
+            resize: vertical;
+            font-family: Consolas, monospace;
+        }
+
+        button {
+            border: 0;
+            border-radius: 6px;
+            padding: 9px 12px;
+            color: #ffffff;
+            background: var(--primary);
+            font: inherit;
+            cursor: pointer;
+        }
+
+        button.secondary {
+            color: var(--text);
+            background: #eef2f7;
+        }
+
+        button.success {
+            background: var(--success);
+        }
+
+        button.danger {
+            background: var(--danger);
+        }
+
+        .stack {
+            display: grid;
+            gap: 16px;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 10px;
+        }
+
+        .actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-top: 8px;
+        }
+
+        .result {
+            min-height: 260px;
+            max-height: 620px;
+            overflow: auto;
+            white-space: pre-wrap;
+            word-break: break-word;
+            background: #111827;
+            color: #e5e7eb;
+            border-radius: 8px;
+            padding: 14px;
+            font-family: Consolas, monospace;
+        }
+
+        @media (max-width: 960px) {
+            main {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+<header>
+    <h1>NexaRAG 模型管理</h1>
+    <div class="actions">
+        <button class="secondary" onclick="loadProviders()">厂商列表</button>
+        <button class="secondary" onclick="loadConfigs()">配置列表</button>
+        <button class="secondary" onclick="loadRoutes()">路由列表</button>
+        <button class="success" onclick="refreshRegistry()">刷新注册表</button>
+    </div>
+</header>
+<main>
+    <div class="stack">
+        <section>
+            <h2>模型配置</h2>
+            <label>配置ID<input id="configId" placeholder="更新、删除、测试时填写"></label>
+            <label>配置Key<input id="configKey" value="chat.default"></label>
+            <div class="grid">
+                <label>模型类型
+                    <select id="modelType">
+                        <option>CHAT</option>
+                        <option>EMBEDDING</option>
+                        <option>RERANK</option>
+                    </select>
+                </label>
+                <label>厂商
+                    <select id="provider">
+                        <option>OPENAI</option>
+                        <option>OLLAMA</option>
+                        <option>DASHSCOPE</option>
+                        <option>DEEPSEEK</option>
+                        <option>MOONSHOT</option>
+                        <option>ZHIPU</option>
+                    </select>
+                </label>
+            </div>
+            <label>Base URL<input id="baseUrl" value="http://localhost:11434/v1"></label>
+            <label>接口路径<input id="endpointPath" value="/chat/completions"></label>
+            <label>API Key<input id="apiKey" type="password"></label>
+            <label>模型名称<input id="modelName" value="qwen2.5:7b"></label>
+            <div class="grid">
+                <label>超时毫秒<input id="timeoutMs" type="number" value="60000"></label>
+                <label>最大重试<input id="maxRetries" type="number" value="0"></label>
+            </div>
+            <div class="actions">
+                <button onclick="createConfig()">创建</button>
+                <button onclick="updateConfig()">更新</button>
+                <button class="danger" onclick="deleteConfig()">删除</button>
+                <button class="secondary" onclick="testConfig()">测试配置</button>
+            </div>
+        </section>
+
+        <section>
+            <h2>治理配置</h2>
+            <div class="grid">
+                <label>启用治理
+                    <select id="governanceEnabled">
+                        <option value="true">true</option>
+                        <option value="false">false</option>
+                    </select>
+                </label>
+                <label>启用重试
+                    <select id="retryEnabled">
+                        <option value="true">true</option>
+                        <option value="false">false</option>
+                    </select>
+                </label>
+                <label>最大尝试<input id="maxAttempts" type="number" value="2"></label>
+                <label>重试等待毫秒<input id="retryWaitMs" type="number" value="100"></label>
+                <label>启用熔断
+                    <select id="circuitEnabled">
+                        <option value="false">false</option>
+                        <option value="true">true</option>
+                    </select>
+                </label>
+                <label>失败率阈值<input id="failureRateThreshold" type="number" value="50"></label>
+                <label>启用限流
+                    <select id="rateLimitEnabled">
+                        <option value="false">false</option>
+                        <option value="true">true</option>
+                    </select>
+                </label>
+                <label>周期调用数<input id="limitForPeriod" type="number" value="100"></label>
+                <label>启用隔离
+                    <select id="bulkheadEnabled">
+                        <option value="false">false</option>
+                        <option value="true">true</option>
+                    </select>
+                </label>
+                <label>最大并发<input id="maxConcurrentCalls" type="number" value="20"></label>
+            </div>
+            <div class="actions">
+                <button class="secondary" onclick="getGovernance()">读取治理</button>
+                <button onclick="saveGovernance()">保存治理</button>
+            </div>
+        </section>
+
+        <section>
+            <h2>路由与 Chat</h2>
+            <label>路由ID<input id="routeId" placeholder="测试路由时填写"></label>
+            <label>路由Key<input id="routeKey" value="chat.default"></label>
+            <label>Chat 消息 JSON<textarea id="chatMessages">[{"role":"USER","content":"你好"}]</textarea></label>
+            <div class="actions">
+                <button class="secondary" onclick="testRoute()">测试路由</button>
+                <button onclick="chat()">同步 Chat</button>
+                <button onclick="streamChat()">流式 Chat</button>
+            </div>
+        </section>
+    </div>
+
+    <section>
+        <h2>响应</h2>
+        <pre id="result" class="result"></pre>
+    </section>
+</main>
+<script>
+    const result = document.getElementById('result');
+
+    function value(id) {
+        return document.getElementById(id).value;
+    }
+
+    function numberValue(id) {
+        const raw = value(id);
+        return raw === '' ? null : Number(raw);
+    }
+
+    function boolValue(id) {
+        return value(id) === 'true';
+    }
+
+    function show(data) {
+        result.textContent = typeof data === 'string' ? data : JSON.stringify(data, null, 2);
+    }
+
+    async function api(path, options = {}) {
+        const response = await fetch(path, {
+            headers: {'Content-Type': 'application/json'},
+            ...options
+        });
+        const contentType = response.headers.get('content-type') || '';
+        if (contentType.includes('application/json')) {
+            return response.json();
+        }
+        return response.text();
+    }
+
+    function readConfigRequest() {
+        return {
+            configKey: value('configKey'),
+            modelType: value('modelType'),
+            provider: value('provider'),
+            baseUrl: value('baseUrl'),
+            endpointPath: value('endpointPath'),
+            apiKey: value('apiKey'),
+            modelName: value('modelName'),
+            timeoutMs: numberValue('timeoutMs'),
+            maxRetries: numberValue('maxRetries')
+        };
+    }
+
+    function readGovernanceRequest() {
+        return {
+            enabled: boolValue('governanceEnabled'),
+            retryEnabled: boolValue('retryEnabled'),
+            maxAttempts: numberValue('maxAttempts'),
+            retryWaitMs: numberValue('retryWaitMs'),
+            circuitEnabled: boolValue('circuitEnabled'),
+            failureRateThreshold: numberValue('failureRateThreshold'),
+            slowCallRateThreshold: 100,
+            slowCallDurationMs: 3000,
+            minimumNumberOfCalls: 10,
+            slidingWindowSize: 20,
+            waitDurationInOpenStateMs: 30000,
+            rateLimitEnabled: boolValue('rateLimitEnabled'),
+            limitForPeriod: numberValue('limitForPeriod'),
+            limitRefreshPeriodMs: 1000,
+            timeoutDurationMs: 0,
+            bulkheadEnabled: boolValue('bulkheadEnabled'),
+            maxConcurrentCalls: numberValue('maxConcurrentCalls'),
+            maxWaitDurationMs: 0
+        };
+    }
+
+    function readChatRequest() {
+        return {
+            routeKey: value('routeKey'),
+            messages: JSON.parse(value('chatMessages')),
+            options: {}
+        };
+    }
+
+    async function loadProviders() {
+        show(await api('/api/model/providers'));
+    }
+
+    async function loadConfigs() {
+        show(await api('/api/model/configs'));
+    }
+
+    async function createConfig() {
+        show(await api('/api/model/configs', {
+            method: 'POST',
+            body: JSON.stringify(readConfigRequest())
+        }));
+    }
+
+    async function updateConfig() {
+        show(await api(`/api/model/configs/${value('configId')}`, {
+            method: 'PUT',
+            body: JSON.stringify(readConfigRequest())
+        }));
+    }
+
+    async function deleteConfig() {
+        show(await api(`/api/model/configs/${value('configId')}`, {method: 'DELETE'}));
+    }
+
+    async function testConfig() {
+        show(await api(`/api/model/configs/${value('configId')}/test`, {
+            method: 'POST',
+            body: '{}'
+        }));
+    }
+
+    async function getGovernance() {
+        show(await api(`/api/model/configs/${value('configId')}/governance`));
+    }
+
+    async function saveGovernance() {
+        show(await api(`/api/model/configs/${value('configId')}/governance`, {
+            method: 'PUT',
+            body: JSON.stringify(readGovernanceRequest())
+        }));
+    }
+
+    async function loadRoutes() {
+        show(await api('/api/model/routes'));
+    }
+
+    async function testRoute() {
+        show(await api(`/api/model/routes/${value('routeId')}/test`, {
+            method: 'POST',
+            body: '{}'
+        }));
+    }
+
+    async function refreshRegistry() {
+        show(await api('/api/model/registry/refresh', {method: 'POST'}));
+    }
+
+    async function chat() {
+        show(await api('/api/model/chat', {
+            method: 'POST',
+            body: JSON.stringify(readChatRequest())
+        }));
+    }
+
+    async function streamChat() {
+        result.textContent = '';
+        const response = await fetch('/api/model/chat/stream', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json', 'Accept': 'application/x-ndjson'},
+            body: JSON.stringify(readChatRequest())
+        });
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder('utf-8');
+        while (true) {
+            const {done, value} = await reader.read();
+            if (done) {
+                break;
+            }
+            result.textContent += decoder.decode(value, {stream: true});
+        }
+    }
+</script>
+</body>
+</html>
