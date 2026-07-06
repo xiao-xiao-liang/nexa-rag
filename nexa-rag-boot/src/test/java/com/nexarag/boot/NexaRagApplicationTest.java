@@ -3,6 +3,11 @@ package com.nexarag.boot;
 import com.nexarag.document.mapper.DocumentChunkMapper;
 import com.nexarag.document.mapper.DocumentMapper;
 import com.nexarag.model.mapper.ModelCallLogMapper;
+import com.nexarag.model.mapper.ModelConfigMapper;
+import com.nexarag.model.mapper.ModelGovernanceConfigMapper;
+import com.nexarag.model.mapper.ModelRegistryVersionMapper;
+import com.nexarag.model.mapper.ModelRouteConfigMapper;
+import com.nexarag.model.mapper.ModelRouteMapper;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
@@ -23,6 +28,21 @@ class NexaRagApplicationTest {
 
     @MockitoBean
     private ModelCallLogMapper modelCallLogMapper;
+
+    @MockitoBean
+    private ModelConfigMapper modelConfigMapper;
+
+    @MockitoBean
+    private ModelRegistryVersionMapper modelRegistryVersionMapper;
+
+    @MockitoBean
+    private ModelGovernanceConfigMapper modelGovernanceConfigMapper;
+
+    @MockitoBean
+    private ModelRouteMapper modelRouteMapper;
+
+    @MockitoBean
+    private ModelRouteConfigMapper modelRouteConfigMapper;
 
     @Test
     void contextLoads() {

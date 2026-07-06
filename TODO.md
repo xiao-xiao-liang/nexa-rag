@@ -41,21 +41,22 @@
 
 ## 阶段三未实现
 
-- [ ] 实现 OpenAI-compatible 聊天模型真实调用。
-- [ ] 实现 Chat 模型连接测试。
 - [ ] 将 `ModelRouter` 从本地配置路由切换为 `model_config`、`model_route` 注册表快照路由。
 - [ ] 将 `ModelClientFactory` 缓存 Key 从 Profile 维度切换为 `config_id + version`。
+- [ ] 将 `ModelGovernanceResolver` 接入 `model_governance_config` 表，并合并本地默认配置。
 - [ ] 补齐模型配置、模型路由、路由配置的完整 REST CRUD 接口。
 - [ ] 接入模型注册表刷新消息的真实 MQ、Redis Pub/Sub 客户端。
-- [ ] 接入 Resilience4j 熔断、限流、重试、并发隔离和超时控制。
-- [ ] 实现主模型失败或熔断后的备用模型 fallback 执行。
-- [ ] 实现权重路由。
+- [ ] 接入 Resilience4j TimeLimiter。
 - [ ] 实现规则路由。
+- [ ] 实现动态权重路由。
 - [ ] 实现 Token 精确统计。
+- [ ] 实现流式 Chat Token 精确统计。
 - [ ] 实现模型调用日志归档或聚合统计。
 - [ ] 实现 Nacos 动态配置源。
 - [ ] 实现 Nacos Prompt 模板覆盖本地模板。
 - [ ] 为各业务模块补充正式 Prompt Markdown 模板。
+- [ ] 实现正式 Vue/React 模型管理页面。
+- [ ] 接入 document 和 retrieval 业务链路。
 
 ## 阶段三已完成
 
@@ -67,6 +68,15 @@
 - [x] 接入 OpenAI-compatible Embedding 模型真实调用初版。
 - [x] 接入 DashScope `qwen3-rerank` 重排序模型真实调用初版。
 - [x] 新增 Embedding、Rerank 模型连接测试初版。
+- [x] 实现 OpenAI-compatible 聊天模型真实调用。
+- [x] 实现 Chat 模型连接测试。
+- [x] 新增裸 Chat 同步和流式调用 REST 接口。
+- [x] 新增模型治理配置表、服务和 REST 接口。
+- [x] 接入 Resilience4j 熔断、限流、重试和并发隔离。
+- [x] 实现主模型失败后的备用模型 fallback 执行。
+- [x] 实现静态权重路由候选排序能力。
+- [x] 增强模型调用日志，记录尝试次数和 fallback 来源。
+- [x] 新增临时 HTML 模型管理页面。
 
 ## 后续阶段
 

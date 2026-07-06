@@ -4,11 +4,15 @@ import com.nexarag.model.config.ModelProfileProperties;
 import com.nexarag.model.entity.ModelCallLog;
 import com.nexarag.model.enums.ModelBizType;
 import com.nexarag.model.enums.ModelRequestType;
+import com.nexarag.model.enums.ModelRouteStrategy;
 import com.nexarag.model.route.ModelRouteContext;
 import com.nexarag.model.route.ModelRouteDecision;
+import com.nexarag.model.route.ModelRoutePlan;
 import com.nexarag.model.route.ModelRouter;
 import com.nexarag.model.service.ModelCallLogService;
 import org.junit.jupiter.api.Test;
+
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -32,12 +36,14 @@ class ModelExecutionTemplateTest {
         profile.setProvider("OPENAI");
         profile.setBaseUrl("http://localhost:11434/v1");
         profile.setModelName("qwen2.5:7b");
-        when(router.route(any(ModelRouteContext.class)))
-                .thenReturn(new ModelRouteDecision("chat-primary", profile, false));
+        when(router.plan(any(ModelRouteContext.class)))
+                .thenReturn(new ModelRoutePlan("chat", ModelRouteStrategy.PRIMARY_BACKUP,
+                        List.of(new ModelRouteDecision("chat-primary", profile, false))));
 
         ModelCallLog log = new ModelCallLog();
         log.setCallId("call-1");
-        when(logService.createRunningLog(any(), any(), any(), any(), any(), any(), any(), any())).thenReturn(log);
+        when(logService.createRunningLog(any(), any(), any(), any(), any(), any(), any(), any(),
+                any(), any(), any())).thenReturn(log);
 
         ModelExecutionTemplate template = new ModelExecutionTemplate(router, logService);
 
