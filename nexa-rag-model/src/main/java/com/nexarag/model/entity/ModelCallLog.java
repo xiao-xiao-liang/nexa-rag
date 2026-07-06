@@ -91,6 +91,21 @@ public class ModelCallLog {
     private Long durationMs;
 
     /**
+     * 第几次尝试。
+     */
+    private Integer attemptNo;
+
+    /**
+     * 降级来源调用ID。
+     */
+    private String fallbackFromCallId;
+
+    /**
+     * 降级原因。
+     */
+    private String fallbackReason;
+
+    /**
      * 降级来源模型。
      */
     private String fallbackFrom;

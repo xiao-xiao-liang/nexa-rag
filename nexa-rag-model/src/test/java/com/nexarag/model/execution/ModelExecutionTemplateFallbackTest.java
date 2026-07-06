@@ -3,6 +3,7 @@ package com.nexarag.model.execution;
 import com.nexarag.model.config.ModelProfileProperties;
 import com.nexarag.model.entity.ModelCallLog;
 import com.nexarag.model.enums.ModelBizType;
+import com.nexarag.model.enums.ModelRequestType;
 import com.nexarag.model.enums.ModelRouteStrategy;
 import com.nexarag.model.gateway.chat.ChatModelRequest;
 import com.nexarag.model.gateway.chat.ChatModelResponse;
@@ -22,6 +23,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.nullable;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -44,8 +46,10 @@ class ModelExecutionTemplateFallbackTest {
         when(modelRouter.plan(any(ModelRouteContext.class))).thenReturn(new ModelRoutePlan(
                 "chat.default", ModelRouteStrategy.PRIMARY_BACKUP, List.of(primary, backup)
         ));
-        when(modelCallLogService.createRunningLog(anyString(), eq(ModelBizType.CHAT), anyString(), anyString(),
-                anyString(), anyString(), anyString(), any())).thenAnswer(invocation -> ModelCallLog.builder()
+        when(modelCallLogService.createRunningLog(nullable(String.class), eq(ModelBizType.CHAT),
+                nullable(String.class), nullable(String.class), nullable(String.class), nullable(String.class),
+                nullable(String.class), any(ModelRequestType.class), any(Integer.class), nullable(String.class),
+                nullable(String.class))).thenAnswer(invocation -> ModelCallLog.builder()
                         .callId(invocation.getArgument(3))
                         .build());
 

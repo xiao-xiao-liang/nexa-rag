@@ -49,4 +49,28 @@ class ModelCallLogServiceImplTest {
         assertThat(log.getStatus()).isEqualTo(ModelCallStatus.RUNNING);
         assertThat(log.getModelProfile()).isEqualTo("chat-primary");
     }
+
+    @Test
+    void createRunningLogShouldRecordAttemptAndFallbackInfo() {
+        ReflectionTestUtils.setField(modelCallLogService, "baseMapper", modelCallLogMapper);
+        when(modelCallLogMapper.insert(any(ModelCallLog.class))).thenReturn(1);
+
+        ModelCallLog log = modelCallLogService.createRunningLog(
+                "trace-1",
+                ModelBizType.CHAT,
+                "conversation-1",
+                "chat-backup",
+                "OPENAI",
+                "http://localhost:11434/v1",
+                "gpt-4.1-mini",
+                ModelRequestType.CHAT,
+                2,
+                "call-primary",
+                "PRIMARY_FAILED"
+        );
+
+        assertThat(log.getAttemptNo()).isEqualTo(2);
+        assertThat(log.getFallbackFromCallId()).isEqualTo("call-primary");
+        assertThat(log.getFallbackReason()).isEqualTo("PRIMARY_FAILED");
+    }
 }

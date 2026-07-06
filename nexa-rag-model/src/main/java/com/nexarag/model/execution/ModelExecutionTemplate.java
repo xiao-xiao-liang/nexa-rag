@@ -90,13 +90,19 @@ public class ModelExecutionTemplate {
 
     private <T> T executePlan(ModelExecutionCommand<T> command, ModelRoutePlan plan) {
         Exception lastException = null;
-        for (ModelRouteDecision decision : plan.candidates()) {
+        String fallbackFromCallId = null;
+        String fallbackReason = null;
+        for (int index = 0; index < plan.candidates().size(); index++) {
+            ModelRouteDecision decision = plan.candidates().get(index);
             long start = System.currentTimeMillis();
             try {
                 // 1. 按候选模型执行调用，失败后进入下一个候选
-                return execute(command, decision, start);
+                return execute(command, decision, start, index + 1, fallbackFromCallId, fallbackReason);
             } catch (Exception exception) {
-                lastException = exception;
+                ModelExecutionAttemptException attemptException = unwrapAttemptException(exception);
+                lastException = attemptException.originalException();
+                fallbackFromCallId = attemptException.callId();
+                fallbackReason = attemptException.reason();
             }
         }
         if (lastException instanceof RuntimeException runtimeException) {
@@ -107,6 +113,11 @@ public class ModelExecutionTemplate {
     }
 
     private <T> T execute(ModelExecutionCommand<T> command, ModelRouteDecision decision, long start) {
+        return execute(command, decision, start, 1, null, null);
+    }
+
+    private <T> T execute(ModelExecutionCommand<T> command, ModelRouteDecision decision, long start,
+                          Integer attemptNo, String fallbackFromCallId, String fallbackReason) {
         ModelCallLog log = modelCallLogService.createRunningLog(
                 command.traceId(),
                 command.bizType(),
@@ -115,7 +126,10 @@ public class ModelExecutionTemplate {
                 decision.profile().getProvider(),
                 decision.profile().getBaseUrl(),
                 decision.profile().getModelName(),
-                command.requestType()
+                command.requestType(),
+                attemptNo,
+                fallbackFromCallId,
+                fallbackReason
         );
 
         try {
@@ -139,7 +153,7 @@ public class ModelExecutionTemplate {
             long durationMs = Math.max(0, System.currentTimeMillis() - start);
             modelCallLogService.markFailed(log.getCallId(), exception.getClass().getSimpleName(),
                     exception.getMessage(), durationMs);
-            throw exception;
+            throw new ModelExecutionAttemptException(exception, log.getCallId(), exception.getClass().getSimpleName());
         }
     }
 
@@ -152,7 +166,10 @@ public class ModelExecutionTemplate {
                 decision.profile().getProvider(),
                 decision.profile().getBaseUrl(),
                 decision.profile().getModelName(),
-                command.requestType()
+                command.requestType(),
+                1,
+                null,
+                null
         );
 
         try {
@@ -191,5 +208,41 @@ public class ModelExecutionTemplate {
             throw new ServiceException("模型路由没有可用候选: " + routeKey);
         }
         return plan.candidates().getFirst();
+    }
+
+    private ModelExecutionAttemptException unwrapAttemptException(Exception exception) {
+        if (exception instanceof ModelExecutionAttemptException attemptException) {
+            return attemptException;
+        }
+        return new ModelExecutionAttemptException(exception, null, exception.getClass().getSimpleName());
+    }
+
+    /**
+     * 模型单次候选调用异常，携带当前调用日志ID供后续 fallback 记录使用。
+     */
+    private static class ModelExecutionAttemptException extends RuntimeException {
+
+        private final Exception originalException;
+        private final String callId;
+        private final String reason;
+
+        private ModelExecutionAttemptException(Exception originalException, String callId, String reason) {
+            super(originalException);
+            this.originalException = originalException;
+            this.callId = callId;
+            this.reason = reason;
+        }
+
+        private Exception originalException() {
+            return originalException;
+        }
+
+        private String callId() {
+            return callId;
+        }
+
+        private String reason() {
+            return reason;
+        }
     }
 }

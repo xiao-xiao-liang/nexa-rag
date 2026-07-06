@@ -28,6 +28,27 @@ public interface ModelCallLogService extends IService<ModelCallLog> {
                                   String modelName, ModelRequestType requestType);
 
     /**
+     * 创建运行中的模型调用日志。
+     *
+     * @param traceId            链路追踪ID
+     * @param bizType            业务类型
+     * @param bizId              业务ID
+     * @param modelProfile       模型配置名称
+     * @param provider           模型厂商
+     * @param baseUrl            模型服务地址
+     * @param modelName          模型名称
+     * @param requestType        请求类型
+     * @param attemptNo          第几次尝试
+     * @param fallbackFromCallId 降级来源调用ID
+     * @param fallbackReason     降级原因
+     * @return 模型调用日志
+     */
+    ModelCallLog createRunningLog(String traceId, ModelBizType bizType, String bizId,
+                                  String modelProfile, String provider, String baseUrl,
+                                  String modelName, ModelRequestType requestType,
+                                  Integer attemptNo, String fallbackFromCallId, String fallbackReason);
+
+    /**
      * 标记模型调用成功。
      *
      * @param callId           模型调用ID

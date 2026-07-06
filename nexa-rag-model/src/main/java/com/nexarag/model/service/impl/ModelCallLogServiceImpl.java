@@ -23,6 +23,15 @@ public class ModelCallLogServiceImpl extends ServiceImpl<ModelCallLogMapper, Mod
     public ModelCallLog createRunningLog(String traceId, ModelBizType bizType, String bizId,
                                          String modelProfile, String provider, String baseUrl,
                                          String modelName, ModelRequestType requestType) {
+        return createRunningLog(traceId, bizType, bizId, modelProfile, provider, baseUrl, modelName,
+                requestType, 1, null, null);
+    }
+
+    @Override
+    public ModelCallLog createRunningLog(String traceId, ModelBizType bizType, String bizId,
+                                         String modelProfile, String provider, String baseUrl,
+                                         String modelName, ModelRequestType requestType,
+                                         Integer attemptNo, String fallbackFromCallId, String fallbackReason) {
         // 1. 构建模型调用日志，禁止记录 apiKey 和完整 prompt
         ModelCallLog log = ModelCallLog.builder()
                 .callId(UUID.randomUUID().toString().replace("-", ""))
@@ -35,6 +44,9 @@ public class ModelCallLogServiceImpl extends ServiceImpl<ModelCallLogMapper, Mod
                 .modelName(modelName)
                 .requestType(requestType)
                 .status(ModelCallStatus.RUNNING)
+                .attemptNo(attemptNo == null || attemptNo <= 0 ? 1 : attemptNo)
+                .fallbackFromCallId(fallbackFromCallId)
+                .fallbackReason(fallbackReason)
                 .createTime(LocalDateTime.now())
                 .build();
 
