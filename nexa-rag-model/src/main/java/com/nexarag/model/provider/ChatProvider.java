@@ -5,6 +5,7 @@ import com.nexarag.model.enums.ModelProvider;
 import com.nexarag.model.enums.ModelType;
 import com.nexarag.model.gateway.chat.ChatModelRequest;
 import com.nexarag.model.gateway.chat.ChatModelResponse;
+import com.nexarag.model.gateway.chat.ChatModelStreamResponse;
 import com.nexarag.model.route.ModelRouteDecision;
 import lombok.RequiredArgsConstructor;
 import org.springframework.ai.chat.messages.AssistantMessage;
@@ -17,6 +18,8 @@ import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.ai.chat.prompt.Prompt;
 import org.springframework.stereotype.Component;
 import org.springframework.util.CollectionUtils;
+import org.springframework.util.StringUtils;
+import reactor.core.publisher.Flux;
 
 import java.util.List;
 import java.util.Locale;
@@ -50,6 +53,24 @@ public class ChatProvider implements ModelProviderAdapter {
                 .completionTokens(completionTokens(usage))
                 .totalTokens(totalTokens(usage))
                 .build();
+    }
+
+    /**
+     * 流式调用聊天模型。
+     *
+     * @param decision 路由决策
+     * @param request  聊天请求
+     * @return Chat 模型流式响应分片
+     */
+    public Flux<ChatModelStreamResponse> streamChat(ModelRouteDecision decision, ChatModelRequest request) {
+        // 1. 将统一网关消息转换为 Spring AI Prompt
+        Prompt prompt = new Prompt(messages(request.messages()));
+
+        // 2. 将 Spring AI 流式响应转换为模型网关统一分片
+        return chatClientFactory.getChatClient(decision)
+                .stream(prompt)
+                .map(response -> ChatModelStreamResponse.message(content(response)))
+                .filter(chunk -> StringUtils.hasText(chunk.content()));
     }
 
     private List<Message> messages(List<ChatModelRequest.ChatMessage> messages) {

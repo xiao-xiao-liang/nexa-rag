@@ -6,6 +6,7 @@ import com.nexarag.model.execution.ModelExecutionCommand;
 import com.nexarag.model.execution.ModelExecutionTemplate;
 import com.nexarag.model.gateway.chat.ChatModelRequest;
 import com.nexarag.model.gateway.chat.ChatModelResponse;
+import com.nexarag.model.gateway.chat.ChatModelStreamResponse;
 import com.nexarag.model.gateway.embedding.EmbeddingModelRequest;
 import com.nexarag.model.gateway.embedding.EmbeddingModelResponse;
 import com.nexarag.model.gateway.rerank.RerankCandidate;
@@ -14,6 +15,8 @@ import com.nexarag.model.gateway.rerank.RerankModelResponse;
 import com.nexarag.model.provider.ModelProviderDispatcher;
 import com.nexarag.model.route.ModelRouteDecision;
 import org.junit.jupiter.api.Test;
+import reactor.core.publisher.Flux;
+import reactor.test.StepVerifier;
 
 import java.util.List;
 import java.util.Map;
@@ -121,6 +124,37 @@ class ModelGatewayTest {
 
         assertThat(actual).isSameAs(expected);
         verify(providerDispatcher).chat(decision, request);
+    }
+
+    @Test
+    void streamChatShouldDelegateToDispatcherThroughExecutionTemplate() {
+        ModelExecutionTemplate executionTemplate = mock(ModelExecutionTemplate.class);
+        ModelProviderDispatcher providerDispatcher = mock(ModelProviderDispatcher.class);
+        ModelGateway modelGateway = new ModelGateway(executionTemplate, providerDispatcher);
+        ModelRouteDecision decision = routeDecision();
+        ChatModelRequest request = ChatModelRequest.builder()
+                .traceId("trace-1")
+                .bizType(ModelBizType.CHAT)
+                .bizId("conversation-1")
+                .routeKey("chat")
+                .messages(List.of(new ChatModelRequest.ChatMessage("USER", "你好")))
+                .options(Map.of())
+                .build();
+
+        when(executionTemplate.executeStream(any())).thenAnswer(invocation -> {
+            ModelExecutionCommand<Flux<ChatModelStreamResponse>> command = invocation.getArgument(0);
+            return command.executor().apply(decision);
+        });
+        when(providerDispatcher.streamChat(decision, request)).thenReturn(Flux.just(
+                ChatModelStreamResponse.message("你"),
+                ChatModelStreamResponse.message("好")
+        ));
+
+        StepVerifier.create(modelGateway.streamChat(request))
+                .expectNextMatches(chunk -> "你".equals(chunk.content()))
+                .expectNextMatches(chunk -> "好".equals(chunk.content()))
+                .verifyComplete();
+        verify(providerDispatcher).streamChat(decision, request);
     }
 
     private ModelRouteDecision routeDecision() {

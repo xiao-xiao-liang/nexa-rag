@@ -6,6 +6,7 @@ import com.nexarag.model.enums.ModelProvider;
 import com.nexarag.model.enums.ModelType;
 import com.nexarag.model.gateway.chat.ChatModelRequest;
 import com.nexarag.model.gateway.chat.ChatModelResponse;
+import com.nexarag.model.gateway.chat.ChatModelStreamResponse;
 import com.nexarag.model.gateway.embedding.EmbeddingModelRequest;
 import com.nexarag.model.gateway.embedding.EmbeddingModelResponse;
 import com.nexarag.model.gateway.rerank.RerankModelRequest;
@@ -13,6 +14,7 @@ import com.nexarag.model.gateway.rerank.RerankModelResponse;
 import com.nexarag.model.route.ModelRouteDecision;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
+import reactor.core.publisher.Flux;
 
 import java.util.List;
 
@@ -35,6 +37,18 @@ public class ModelProviderDispatcher {
     public ChatModelResponse chat(ModelRouteDecision decision, ChatModelRequest request) {
         // 1. 按路由决策中的厂商选择 Chat 适配器
         return select(decision, ModelType.CHAT).chat(decision, request);
+    }
+
+    /**
+     * 分发流式聊天模型调用。
+     *
+     * @param decision 路由决策
+     * @param request  聊天请求
+     * @return Chat 模型流式响应分片
+     */
+    public Flux<ChatModelStreamResponse> streamChat(ModelRouteDecision decision, ChatModelRequest request) {
+        // 1. 按路由决策中的厂商选择 Chat 流式适配器
+        return select(decision, ModelType.CHAT).streamChat(decision, request);
     }
 
     /**

@@ -6,11 +6,13 @@ import com.nexarag.model.enums.ModelProvider;
 import com.nexarag.model.enums.ModelType;
 import com.nexarag.model.gateway.chat.ChatModelRequest;
 import com.nexarag.model.gateway.chat.ChatModelResponse;
+import com.nexarag.model.gateway.chat.ChatModelStreamResponse;
 import com.nexarag.model.gateway.embedding.EmbeddingModelRequest;
 import com.nexarag.model.gateway.embedding.EmbeddingModelResponse;
 import com.nexarag.model.gateway.rerank.RerankModelRequest;
 import com.nexarag.model.gateway.rerank.RerankModelResponse;
 import com.nexarag.model.route.ModelRouteDecision;
+import reactor.core.publisher.Flux;
 
 /**
  * 模型厂商适配器，屏蔽不同模型厂商客户端的调用差异。
@@ -36,6 +38,18 @@ public interface ModelProviderAdapter {
     default ChatModelResponse chat(ModelRouteDecision decision, ChatModelRequest request) {
         // 1. 默认实现用于防止适配器声明错误时静默失败
         throw new ServiceException("当前模型厂商暂未支持 Chat 调用", BaseErrorCode.SERVICE_ERROR);
+    }
+
+    /**
+     * 流式调用聊天模型。
+     *
+     * @param decision 路由决策
+     * @param request  聊天请求
+     * @return Chat 模型流式响应分片
+     */
+    default Flux<ChatModelStreamResponse> streamChat(ModelRouteDecision decision, ChatModelRequest request) {
+        // 1. 默认实现用于防止适配器声明错误时静默失败
+        return Flux.error(new ServiceException("当前模型厂商暂未支持流式 Chat 调用", BaseErrorCode.SERVICE_ERROR));
     }
 
     /**

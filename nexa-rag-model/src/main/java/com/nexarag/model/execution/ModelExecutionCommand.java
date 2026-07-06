@@ -4,6 +4,7 @@ import com.nexarag.model.enums.ModelBizType;
 import com.nexarag.model.enums.ModelRequestType;
 import com.nexarag.model.gateway.chat.ChatModelRequest;
 import com.nexarag.model.gateway.chat.ChatModelResponse;
+import com.nexarag.model.gateway.chat.ChatModelStreamResponse;
 import com.nexarag.model.gateway.embedding.EmbeddingModelRequest;
 import com.nexarag.model.gateway.embedding.EmbeddingModelResponse;
 import com.nexarag.model.gateway.rerank.RerankModelRequest;
@@ -12,6 +13,8 @@ import com.nexarag.model.route.ModelRouteDecision;
 
 import java.util.function.Function;
 import java.util.function.ToIntFunction;
+
+import reactor.core.publisher.Flux;
 
 /**
  * 模型执行命令。
@@ -83,6 +86,30 @@ public record ModelExecutionCommand<T>(
                 response -> safeToken(response.promptTokens()),
                 response -> safeToken(response.completionTokens()),
                 response -> safeToken(response.totalTokens())
+        );
+    }
+
+    /**
+     * 构造流式聊天模型执行命令。
+     *
+     * @param request  聊天请求
+     * @param executor 实际调用逻辑
+     * @return 流式聊天模型执行命令
+     */
+    public static ModelExecutionCommand<Flux<ChatModelStreamResponse>> ofChatStream(
+            ChatModelRequest request,
+            Function<ModelRouteDecision, Flux<ChatModelStreamResponse>> executor) {
+        // 1. 流式 Chat 暂不做 Token 精确统计，后续由专门的流式统计能力补齐
+        return new ModelExecutionCommand<>(
+                request.traceId(),
+                request.bizType(),
+                request.bizId(),
+                request.routeKey(),
+                ModelRequestType.CHAT,
+                executor,
+                response -> 0,
+                response -> 0,
+                response -> 0
         );
     }
 

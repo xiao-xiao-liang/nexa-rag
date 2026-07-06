@@ -4,6 +4,7 @@ import com.nexarag.model.execution.ModelExecutionCommand;
 import com.nexarag.model.execution.ModelExecutionTemplate;
 import com.nexarag.model.gateway.chat.ChatModelRequest;
 import com.nexarag.model.gateway.chat.ChatModelResponse;
+import com.nexarag.model.gateway.chat.ChatModelStreamResponse;
 import com.nexarag.model.gateway.embedding.EmbeddingModelRequest;
 import com.nexarag.model.gateway.embedding.EmbeddingModelResponse;
 import com.nexarag.model.gateway.rerank.RerankModelRequest;
@@ -12,6 +13,7 @@ import com.nexarag.model.provider.ModelProviderDispatcher;
 import com.nexarag.model.route.ModelRouteDecision;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import reactor.core.publisher.Flux;
 
 /**
  * 统一模型网关，向业务模块提供 Chat、Embedding、Rerank 三类模型调用入口。
@@ -46,6 +48,18 @@ public class ModelGateway {
         // 1. 用指定路由决策执行，主要用于模型配置连接测试
         return executionTemplate.execute(ModelExecutionCommand.ofChat(request,
                 ignored -> providerDispatcher.chat(decision, request)), decision);
+    }
+
+    /**
+     * 流式调用聊天模型。
+     *
+     * @param request 聊天模型请求
+     * @return Chat 模型流式响应分片
+     */
+    public Flux<ChatModelStreamResponse> streamChat(ChatModelRequest request) {
+        // 1. 交给执行模板统一处理路由、日志和后续治理能力
+        return executionTemplate.executeStream(ModelExecutionCommand.ofChatStream(request,
+                decision -> providerDispatcher.streamChat(decision, request)));
     }
 
     /**
