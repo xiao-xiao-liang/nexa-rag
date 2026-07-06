@@ -3,11 +3,14 @@ package com.nexarag.model.controller;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nexarag.model.dto.ModelConfigResponse;
 import com.nexarag.model.dto.ModelConfigUpdateRequest;
+import com.nexarag.model.dto.ModelGovernanceConfigResponse;
 import com.nexarag.model.entity.ModelConfig;
+import com.nexarag.model.entity.ModelGovernanceConfig;
 import com.nexarag.model.enums.ModelProvider;
 import com.nexarag.model.enums.ModelType;
 import com.nexarag.model.service.ModelConfigService;
 import com.nexarag.model.service.ModelConnectionTestService;
+import com.nexarag.model.service.ModelGovernanceConfigService;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -51,6 +54,9 @@ class ModelConfigControllerTest {
 
     @MockitoBean
     private ModelConnectionTestService modelConnectionTestService;
+
+    @MockitoBean
+    private ModelGovernanceConfigService modelGovernanceConfigService;
 
     @Test
     void listConfigsShouldReturnConfigResponses() throws Exception {
@@ -133,6 +139,39 @@ class ModelConfigControllerTest {
         verify(modelConfigService).deleteConfig(eq(1L));
     }
 
+    @Test
+    void getGovernanceShouldReturnGovernanceConfig() throws Exception {
+        ModelGovernanceConfig config = governanceConfig();
+        when(modelGovernanceConfigService.getByConfigId(1L)).thenReturn(config);
+        when(modelGovernanceConfigService.toResponse(config)).thenReturn(governanceResponse());
+
+        mockMvc.perform(get("/api/model/configs/{configId}/governance", 1L))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("0"))
+                .andExpect(jsonPath("$.data.configId").value(1L))
+                .andExpect(jsonPath("$.data.maxAttempts").value(2));
+    }
+
+    @Test
+    void saveGovernanceShouldReturnSavedGovernanceConfig() throws Exception {
+        ModelGovernanceConfig config = governanceConfig();
+        when(modelGovernanceConfigService.saveByConfigId(eq(1L), any())).thenReturn(config);
+        when(modelGovernanceConfigService.toResponse(config)).thenReturn(governanceResponse());
+
+        mockMvc.perform(put("/api/model/configs/{configId}/governance", 1L)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "enabled", true,
+                                "retryEnabled", true,
+                                "maxAttempts", 2,
+                                "retryWaitMs", 100
+                        ))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("0"))
+                .andExpect(jsonPath("$.data.retryEnabled").value(true))
+                .andExpect(jsonPath("$.data.maxAttempts").value(2));
+    }
+
     private ModelConfigResponse configResponse() {
         return ModelConfigResponse.builder()
                 .configId(1L)
@@ -146,6 +185,28 @@ class ModelConfigControllerTest {
                 .timeoutMs(30000)
                 .maxRetries(0)
                 .version(1L)
+                .build();
+    }
+
+    private ModelGovernanceConfig governanceConfig() {
+        return ModelGovernanceConfig.builder()
+                .governanceId(100L)
+                .configId(1L)
+                .enabled(true)
+                .retryEnabled(true)
+                .maxAttempts(2)
+                .retryWaitMs(100)
+                .build();
+    }
+
+    private ModelGovernanceConfigResponse governanceResponse() {
+        return ModelGovernanceConfigResponse.builder()
+                .governanceId(100L)
+                .configId(1L)
+                .enabled(true)
+                .retryEnabled(true)
+                .maxAttempts(2)
+                .retryWaitMs(100)
                 .build();
     }
 }

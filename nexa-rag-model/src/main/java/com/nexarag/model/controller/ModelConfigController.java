@@ -7,8 +7,12 @@ import com.nexarag.model.dto.ModelConnectionTestResponse;
 import com.nexarag.model.dto.ModelConfigCreateRequest;
 import com.nexarag.model.dto.ModelConfigResponse;
 import com.nexarag.model.dto.ModelConfigUpdateRequest;
+import com.nexarag.model.dto.ModelGovernanceConfigRequest;
+import com.nexarag.model.dto.ModelGovernanceConfigResponse;
+import com.nexarag.model.entity.ModelGovernanceConfig;
 import com.nexarag.model.service.ModelConfigService;
 import com.nexarag.model.service.ModelConnectionTestService;
+import com.nexarag.model.service.ModelGovernanceConfigService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -31,6 +35,7 @@ public class ModelConfigController {
 
     private final ModelConfigService modelConfigService;
     private final ModelConnectionTestService modelConnectionTestService;
+    private final ModelGovernanceConfigService modelGovernanceConfigService;
 
     /**
      * 查询模型配置列表。
@@ -108,5 +113,34 @@ public class ModelConfigController {
                                                           ModelConnectionTestRequest request) {
         // 1. 委托模型连接测试服务执行配置测试
         return Results.success(modelConnectionTestService.testConfig(configId, request));
+    }
+
+    /**
+     * 查询模型治理配置。
+     *
+     * @param configId 模型配置ID
+     * @return 模型治理配置
+     */
+    @GetMapping("/{configId}/governance")
+    public Result<ModelGovernanceConfigResponse> getGovernance(@PathVariable Long configId) {
+        // 1. 查询模型治理配置并转换为响应对象
+        ModelGovernanceConfig config = modelGovernanceConfigService.getByConfigId(configId);
+        return Results.success(modelGovernanceConfigService.toResponse(config));
+    }
+
+    /**
+     * 保存模型治理配置。
+     *
+     * @param configId 模型配置ID
+     * @param request  模型治理配置保存请求
+     * @return 保存后的模型治理配置
+     */
+    @PutMapping("/{configId}/governance")
+    public Result<ModelGovernanceConfigResponse> saveGovernance(@PathVariable Long configId,
+                                                                @RequestBody
+                                                                ModelGovernanceConfigRequest request) {
+        // 1. 保存模型治理配置并转换为响应对象
+        ModelGovernanceConfig config = modelGovernanceConfigService.saveByConfigId(configId, request);
+        return Results.success(modelGovernanceConfigService.toResponse(config));
     }
 }
