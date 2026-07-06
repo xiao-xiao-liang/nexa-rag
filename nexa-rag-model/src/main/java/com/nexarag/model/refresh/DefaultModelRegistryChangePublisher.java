@@ -34,7 +34,12 @@ public class DefaultModelRegistryChangePublisher implements ModelRegistryChangeP
             return;
         }
 
-        // 2. 发布模型注册表刷新消息
-        client.publish(properties.getRefreshTopic(), message);
+        try {
+            // 2. 发布模型注册表刷新消息
+            client.publish(properties.getRefreshTopic(), message);
+        } catch (Exception exception) {
+            log.warn("发布模型注册表刷新消息失败，本次仅更新版本号，channel={}，topic={}，versionNo={}",
+                    channel, properties.getRefreshTopic(), versionNo, exception);
+        }
     }
 }

@@ -39,6 +39,16 @@ class ModelRegistryChangePublisherTest {
         assertThatCode(() -> publisher.publish(4L)).doesNotThrowAnyException();
     }
 
+    @Test
+    void publishShouldNotBlockWhenMessageClientThrowsException() {
+        ModelRegistryRefreshProperties properties = new ModelRegistryRefreshProperties();
+        properties.setRefreshChannel(ModelRefreshChannel.PUB_SUB);
+        DefaultModelRegistryChangePublisher publisher =
+                new DefaultModelRegistryChangePublisher(properties, List.of(new FailingMessageClient()));
+
+        assertThatCode(() -> publisher.publish(5L)).doesNotThrowAnyException();
+    }
+
     private static class RecordingMessageClient implements ModelRefreshMessageClient {
 
         private String topic;
@@ -53,6 +63,19 @@ class ModelRegistryChangePublisherTest {
         public void publish(String topic, ModelRegistryChangedMessage message) {
             this.topic = topic;
             this.message = message;
+        }
+    }
+
+    private static class FailingMessageClient implements ModelRefreshMessageClient {
+
+        @Override
+        public ModelRefreshChannel channel() {
+            return ModelRefreshChannel.PUB_SUB;
+        }
+
+        @Override
+        public void publish(String topic, ModelRegistryChangedMessage message) {
+            throw new IllegalStateException("模拟发布失败");
         }
     }
 }
