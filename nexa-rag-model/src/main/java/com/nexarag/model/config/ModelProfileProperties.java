@@ -1,6 +1,9 @@
 package com.nexarag.model.config;
 
+import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Getter;
+import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 /**
@@ -8,11 +11,15 @@ import lombok.Setter;
  */
 @Getter
 @Setter
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
 public class ModelProfileProperties {
 
     /**
      * 模型厂商，例如 OPENAI、OLLAMA、DASHSCOPE。
      */
+    @Builder.Default
     private String provider = "OPENAI";
 
     /**
@@ -21,7 +28,12 @@ public class ModelProfileProperties {
     private String baseUrl;
 
     /**
-     * API Key，禁止写入日志和数据库。
+     * 模型接口路径，和 baseUrl 拼接后得到实际调用地址。
+     */
+    private String endpointPath;
+
+    /**
+     * API Key，禁止写入日志和明文持久化。
      */
     private String apiKey;
 
@@ -33,6 +45,7 @@ public class ModelProfileProperties {
     /**
      * 请求超时时间，单位毫秒。
      */
+    @Builder.Default
     private long timeoutMs = 60000;
 
     /**

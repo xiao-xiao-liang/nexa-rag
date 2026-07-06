@@ -24,6 +24,16 @@ class ModelSecretEncryptorTest {
     }
 
     @Test
+    void shouldAcceptBase64EncodedMasterKey() {
+        ModelSecretEncryptor encryptor = new ModelSecretEncryptor("=");
+
+        String cipher = encryptor.encrypt("sk-test-abcdef");
+        String raw = encryptor.decrypt(cipher);
+
+        assertThat(raw).isEqualTo("sk-test-abcdef");
+    }
+
+    @Test
     void shouldRejectBlankMasterKey() {
         assertThatThrownBy(() -> new ModelSecretEncryptor(""))
                 .isInstanceOf(IllegalArgumentException.class)

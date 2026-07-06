@@ -12,7 +12,8 @@ import java.time.LocalDateTime;
 @Builder
 public record ModelConfigResponse(Long configId, String configKey, ModelType modelType,
                                   ModelProvider provider, String baseUrl, String apiKeyMask,
-                                  String modelName, Boolean enabled, Integer timeoutMs,
-                                  Integer maxRetries, Long version, String extraConfig,
-                                  String remark, LocalDateTime createTime, LocalDateTime updateTime) {
+                                  String modelName, String endpointPath,
+                                  Boolean enabled, Integer timeoutMs, Integer maxRetries, Long version,
+                                  String extraConfig, String remark, LocalDateTime createTime,
+                                  LocalDateTime updateTime) {
 }

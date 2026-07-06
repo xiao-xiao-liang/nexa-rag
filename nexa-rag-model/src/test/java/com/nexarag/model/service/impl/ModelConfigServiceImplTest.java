@@ -24,6 +24,7 @@ class ModelConfigServiceImplTest {
                 .modelType(ModelType.EMBEDDING)
                 .provider(ModelProvider.OPENAI)
                 .baseUrl("https://api.openai.com/v1")
+                .endpointPath("/embeddings")
                 .apiKey("sk-test-abcdef")
                 .modelName("text-embedding-3-small")
                 .timeoutMs(30000)
@@ -34,7 +35,67 @@ class ModelConfigServiceImplTest {
         assertThat(config.getApiKeyCipher()).isNotBlank();
         assertThat(service.encryptor.decrypt(config.getApiKeyCipher())).isEqualTo("sk-test-abcdef");
         assertThat(config.getApiKeyMask()).isEqualTo("sk-****cdef");
+        assertThat(config.getEndpointPath()).isEqualTo("/embeddings");
         assertThat(service.savedConfig).isSameAs(config);
+        assertThat(service.registryBumpCount).isEqualTo(1);
+    }
+
+    @Test
+    void updateConfigShouldEncryptApiKeyWhenExistingSecretIsMissing() {
+        TestableModelConfigServiceImpl service = new TestableModelConfigServiceImpl();
+        service.existingConfig = ModelConfig.builder()
+                .configId(1L)
+                .configKey("chat.openai")
+                .modelType(ModelType.CHAT)
+                .provider(ModelProvider.OPENAI)
+                .baseUrl("https://api.openai.com/v1")
+                .apiKeyCipher(null)
+                .apiKeyMask(null)
+                .modelName("gpt-4o-mini")
+                .timeoutMs(30000)
+                .maxRetries(0)
+                .version(1L)
+                .build();
+
+        ModelConfig config = service.updateConfig(1L, ModelConfigUpdateRequest.builder()
+                .apiKey("sk-new-secret")
+                .timeoutMs(50000)
+                .maxRetries(3)
+                .build());
+
+        assertThat(config.getApiKeyCipher()).isNotBlank();
+        assertThat(service.encryptor.decrypt(config.getApiKeyCipher())).isEqualTo("sk-new-secret");
+        assertThat(config.getApiKeyMask()).isEqualTo("sk-****cret");
+        assertThat(config.getTimeoutMs()).isEqualTo(50000);
+        assertThat(config.getMaxRetries()).isEqualTo(3);
+        assertThat(service.updatedConfig).isSameAs(config);
+    }
+
+    @Test
+    void createConfigShouldNormalizeEndpointPathByModelType() {
+        TestableModelConfigServiceImpl service = new TestableModelConfigServiceImpl();
+
+        ModelConfig chatConfig = service.createConfig(ModelConfigCreateRequest.builder()
+                .configKey("chat.openai")
+                .modelType(ModelType.CHAT)
+                .provider(ModelProvider.OPENAI)
+                .baseUrl("https://api.openai.com/v1")
+                .apiKey("sk-chat")
+                .modelName("gpt-4o-mini")
+                .build());
+
+        assertThat(chatConfig.getEndpointPath()).isEqualTo("/chat/completions");
+
+        ModelConfig embeddingConfig = service.createConfig(ModelConfigCreateRequest.builder()
+                .configKey("embedding.openai")
+                .modelType(ModelType.EMBEDDING)
+                .provider(ModelProvider.OPENAI)
+                .baseUrl("https://api.openai.com/v1")
+                .apiKey("sk-embedding")
+                .modelName("text-embedding-3-small")
+                .build());
+
+        assertThat(embeddingConfig.getEndpointPath()).isEqualTo("/embeddings");
     }
 
     @Test
@@ -46,6 +107,7 @@ class ModelConfigServiceImplTest {
                 .modelType(ModelType.EMBEDDING)
                 .provider(ModelProvider.OPENAI)
                 .baseUrl("https://api.openai.com/v1")
+                .endpointPath("/embeddings")
                 .apiKeyCipher("cipher-old")
                 .apiKeyMask("sk-****1111")
                 .modelName("text-embedding-3-small")
@@ -56,6 +118,7 @@ class ModelConfigServiceImplTest {
 
         ModelConfig config = service.updateConfig(1L, ModelConfigUpdateRequest.builder()
                 .baseUrl("https://api.openai.com/v1")
+                .endpointPath("/v1/embeddings")
                 .modelName("text-embedding-3-large")
                 .timeoutMs(60000)
                 .maxRetries(1)
@@ -64,8 +127,54 @@ class ModelConfigServiceImplTest {
         assertThat(config.getApiKeyCipher()).isEqualTo("cipher-old");
         assertThat(config.getApiKeyMask()).isEqualTo("sk-****1111");
         assertThat(config.getModelName()).isEqualTo("text-embedding-3-large");
+        assertThat(config.getEndpointPath()).isEqualTo("/v1/embeddings");
         assertThat(config.getVersion()).isEqualTo(2L);
         assertThat(service.updatedConfig).isSameAs(config);
+        assertThat(service.registryBumpCount).isEqualTo(1);
+    }
+
+    @Test
+    void updateConfigShouldSwitchApiPathByModelType() {
+        TestableModelConfigServiceImpl service = new TestableModelConfigServiceImpl();
+        service.existingConfig = ModelConfig.builder()
+                .configId(1L)
+                .configKey("chat.openai")
+                .modelType(ModelType.CHAT)
+                .provider(ModelProvider.OPENAI)
+                .baseUrl("https://api.openai.com/v1")
+                .endpointPath(null)
+                .modelName("gpt-4o-mini")
+                .timeoutMs(30000)
+                .maxRetries(0)
+                .version(1L)
+                .build();
+
+        ModelConfig config = service.updateConfig(1L, ModelConfigUpdateRequest.builder()
+                .modelType(ModelType.EMBEDDING)
+                .modelName("text-embedding-3-small")
+                .build());
+
+        assertThat(config.getModelType()).isEqualTo(ModelType.EMBEDDING);
+        assertThat(config.getEndpointPath()).isEqualTo("/embeddings");
+    }
+
+    @Test
+    void deleteConfigShouldRemoveAndBumpRegistryVersion() {
+        TestableModelConfigServiceImpl service = new TestableModelConfigServiceImpl();
+        service.existingConfig = ModelConfig.builder()
+                .configId(1L)
+                .configKey("embedding.openai")
+                .modelType(ModelType.EMBEDDING)
+                .provider(ModelProvider.OPENAI)
+                .baseUrl("https://api.openai.com/v1")
+                .modelName("text-embedding-3-small")
+                .version(1L)
+                .build();
+
+        service.deleteConfig(1L);
+
+        assertThat(service.removedConfigId).isEqualTo(1L);
+        assertThat(service.registryBumpCount).isEqualTo(1);
     }
 
     private static class TestableModelConfigServiceImpl extends ModelConfigServiceImpl {
@@ -74,9 +183,11 @@ class ModelConfigServiceImplTest {
         private ModelConfig savedConfig;
         private ModelConfig updatedConfig;
         private ModelConfig existingConfig;
+        private Long removedConfigId;
+        private int registryBumpCount;
 
         private TestableModelConfigServiceImpl() {
-            super(new ModelSecretEncryptor("0123456789abcdef0123456789abcdef"));
+            super(new ModelSecretEncryptor("0123456789abcdef0123456789abcdef"), null, null);
         }
 
         @Override
@@ -99,6 +210,18 @@ class ModelConfigServiceImplTest {
         protected boolean updateConfigById(ModelConfig config) {
             this.updatedConfig = config;
             return true;
+        }
+
+        @Override
+        protected boolean removeConfigById(Long configId) {
+            this.removedConfigId = configId;
+            return true;
+        }
+
+        @Override
+        protected long bumpRegistryVersionAndPublish() {
+            this.registryBumpCount++;
+            return registryBumpCount;
         }
     }
 }

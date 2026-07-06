@@ -1,6 +1,8 @@
 package com.nexarag.model.registry;
 
-import com.nexarag.model.client.ModelClientFactory;
+import com.nexarag.model.client.ChatClientFactory;
+import com.nexarag.model.client.EmbeddingClientFactory;
+import com.nexarag.model.client.RerankClientFactory;
 import com.nexarag.model.entity.ModelConfig;
 import com.nexarag.model.entity.ModelRegistryVersion;
 import com.nexarag.model.entity.ModelRoute;
@@ -30,7 +32,9 @@ public class ModelRegistryRefresher {
     private final ModelRouteService modelRouteService;
     private final ModelRouteConfigService modelRouteConfigService;
     private final ModelRegistryVersionMapper modelRegistryVersionMapper;
-    private final ModelClientFactory modelClientFactory;
+    private final ChatClientFactory chatClientFactory;
+    private final EmbeddingClientFactory embeddingClientFactory;
+    private final RerankClientFactory rerankClientFactory;
 
     /**
      * 远端版本更新时刷新模型注册表。
@@ -64,7 +68,9 @@ public class ModelRegistryRefresher {
 
         // 3. 原子替换快照并清理客户端缓存
         modelRegistry.replace(snapshot);
-        modelClientFactory.clear();
+        chatClientFactory.clear();
+        embeddingClientFactory.clear();
+        rerankClientFactory.clear();
         return true;
     }
 

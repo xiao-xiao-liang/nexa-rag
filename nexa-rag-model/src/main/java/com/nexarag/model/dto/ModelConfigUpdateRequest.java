@@ -9,7 +9,8 @@ import lombok.Builder;
  */
 @Builder
 public record ModelConfigUpdateRequest(String configKey, ModelType modelType, ModelProvider provider,
-                                       String baseUrl, String apiKey, String modelName,
+                                       String baseUrl, String endpointPath,
+                                       String apiKey, String modelName,
                                        Boolean enabled, Integer timeoutMs, Integer maxRetries,
                                        String extraConfig, String remark) {
 }

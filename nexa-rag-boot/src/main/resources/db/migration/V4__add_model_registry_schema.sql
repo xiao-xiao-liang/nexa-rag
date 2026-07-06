@@ -4,6 +4,7 @@ CREATE TABLE IF NOT EXISTS model_config (
     model_type VARCHAR(32) NOT NULL COMMENT '模型类型',
     provider VARCHAR(64) NOT NULL COMMENT '模型厂商',
     base_url VARCHAR(512) NOT NULL COMMENT '模型服务地址',
+    endpoint_path VARCHAR(256) NULL COMMENT '模型接口路径',
     api_key_cipher VARCHAR(1024) NULL COMMENT '加密后的API Key',
     api_key_mask VARCHAR(128) NULL COMMENT 'API Key脱敏值',
     model_name VARCHAR(128) NOT NULL COMMENT '模型名称',

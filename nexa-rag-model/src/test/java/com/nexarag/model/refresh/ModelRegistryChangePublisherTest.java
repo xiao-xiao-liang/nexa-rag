@@ -7,6 +7,7 @@ import org.junit.jupiter.api.Test;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 
 /**
  * 模型注册表刷新消息发布器测试。
@@ -27,6 +28,15 @@ class ModelRegistryChangePublisherTest {
         assertThat(client.topic).isEqualTo("nexa.model.registry.changed");
         assertThat(client.message.versionNo()).isEqualTo(3L);
         assertThat(client.message.channel()).isEqualTo(ModelRefreshChannel.PUB_SUB);
+    }
+
+    @Test
+    void publishShouldNotBlockWhenMessageClientMissing() {
+        ModelRegistryRefreshProperties properties = new ModelRegistryRefreshProperties();
+        DefaultModelRegistryChangePublisher publisher =
+                new DefaultModelRegistryChangePublisher(properties, List.of());
+
+        assertThatCode(() -> publisher.publish(4L)).doesNotThrowAnyException();
     }
 
     private static class RecordingMessageClient implements ModelRefreshMessageClient {

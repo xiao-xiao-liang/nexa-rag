@@ -27,14 +27,14 @@ public class ModelSecretEncryptor {
     /**
      * 创建模型密钥加密器。
      *
-     * @param masterKey AES 主密钥，长度必须为 16、24 或 32 字节
+     * @param masterKey AES 主密钥，支持 Base64 编码密钥或 16、24、32 字节原始字符串密钥
      * @throws IllegalArgumentException 主密钥为空或长度非法时抛出
      */
     public ModelSecretEncryptor(String masterKey) {
         if (masterKey == null || masterKey.isBlank()) {
             throw new IllegalArgumentException("模型密钥主密钥不能为空");
         }
-        byte[] keyBytes = masterKey.getBytes(StandardCharsets.UTF_8);
+        byte[] keyBytes = resolveKeyBytes(masterKey);
         if (!isValidAesKeyLength(keyBytes.length)) {
             throw new IllegalArgumentException("模型密钥主密钥长度必须为16、24或32字节");
         }
@@ -120,5 +120,22 @@ public class ModelSecretEncryptor {
         return keyLength == AES_128_KEY_LENGTH
                 || keyLength == AES_192_KEY_LENGTH
                 || keyLength == AES_256_KEY_LENGTH;
+    }
+
+    private byte[] resolveKeyBytes(String masterKey) {
+        String normalizedMasterKey = masterKey.trim();
+
+        // 1. 优先兼容配置文件中更适合保存的 Base64 编码密钥
+        try {
+            byte[] decodedKeyBytes = Base64.getDecoder().decode(normalizedMasterKey);
+            if (isValidAesKeyLength(decodedKeyBytes.length)) {
+                return decodedKeyBytes;
+            }
+        } catch (IllegalArgumentException ignored) {
+            // 2. 非 Base64 格式时回退到原始字符串密钥，兼容旧配置
+        }
+
+        // 3. 使用原始字符串字节作为密钥
+        return normalizedMasterKey.getBytes(StandardCharsets.UTF_8);
     }
 }

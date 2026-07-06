@@ -54,6 +54,11 @@ public class ModelConfig {
     private String baseUrl;
 
     /**
+     * 模型接口路径，和 base_url 拼接后得到实际调用地址。
+     */
+    private String endpointPath;
+
+    /**
      * 加密后的 API Key。
      */
     private String apiKeyCipher;

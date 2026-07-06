@@ -6,6 +6,8 @@ import com.nexarag.model.dto.ModelConfigResponse;
 import com.nexarag.model.dto.ModelConfigUpdateRequest;
 import com.nexarag.model.entity.ModelConfig;
 
+import java.util.List;
+
 /**
  * 模型配置服务，负责模型配置的创建、更新和脱敏响应转换。
  */
@@ -35,4 +37,18 @@ public interface ModelConfigService extends IService<ModelConfig> {
      * @return 模型配置脱敏响应
      */
     ModelConfigResponse getConfigResponse(Long configId);
+
+    /**
+     * 查询模型配置响应列表。
+     *
+     * @return 模型配置脱敏响应列表
+     */
+    List<ModelConfigResponse> listConfigResponses();
+
+    /**
+     * 删除模型配置。
+     *
+     * @param configId 模型配置ID
+     */
+    void deleteConfig(Long configId);
 }
