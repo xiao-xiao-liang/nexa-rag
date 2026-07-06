@@ -1,21 +1,52 @@
 package com.nexarag.model.execution;
 
+import com.nexarag.common.exception.ServiceException;
 import com.nexarag.model.entity.ModelCallLog;
+import com.nexarag.model.governance.ModelGovernanceExecutor;
+import com.nexarag.model.governance.ModelGovernanceResolver;
 import com.nexarag.model.route.ModelRouteContext;
 import com.nexarag.model.route.ModelRouteDecision;
+import com.nexarag.model.route.ModelRoutePlan;
 import com.nexarag.model.route.ModelRouter;
 import com.nexarag.model.service.ModelCallLogService;
-import lombok.RequiredArgsConstructor;
 import reactor.core.publisher.Flux;
 
 /**
  * 模型执行模板，统一处理路由和调用日志。
  */
-@RequiredArgsConstructor
 public class ModelExecutionTemplate {
 
     private final ModelRouter modelRouter;
     private final ModelCallLogService modelCallLogService;
+    private final ModelGovernanceExecutor modelGovernanceExecutor;
+    private final ModelGovernanceResolver modelGovernanceResolver;
+
+    /**
+     * 创建模型执行模板。
+     *
+     * @param modelRouter         模型路由器
+     * @param modelCallLogService 模型调用日志服务
+     */
+    public ModelExecutionTemplate(ModelRouter modelRouter, ModelCallLogService modelCallLogService) {
+        this(modelRouter, modelCallLogService, new ModelGovernanceExecutor(), new ModelGovernanceResolver());
+    }
+
+    /**
+     * 创建模型执行模板。
+     *
+     * @param modelRouter             模型路由器
+     * @param modelCallLogService     模型调用日志服务
+     * @param modelGovernanceExecutor 模型治理执行器
+     * @param modelGovernanceResolver 模型治理配置解析器
+     */
+    public ModelExecutionTemplate(ModelRouter modelRouter, ModelCallLogService modelCallLogService,
+                                  ModelGovernanceExecutor modelGovernanceExecutor,
+                                  ModelGovernanceResolver modelGovernanceResolver) {
+        this.modelRouter = modelRouter;
+        this.modelCallLogService = modelCallLogService;
+        this.modelGovernanceExecutor = modelGovernanceExecutor;
+        this.modelGovernanceResolver = modelGovernanceResolver;
+    }
 
     /**
      * 执行模型调用。
@@ -25,9 +56,9 @@ public class ModelExecutionTemplate {
      * @return 模型响应
      */
     public <T> T execute(ModelExecutionCommand<T> command) {
-        long start = System.currentTimeMillis();
-        ModelRouteDecision decision = modelRouter.route(new ModelRouteContext(command.routeKey(), false));
-        return execute(command, decision, start);
+        // 1. 获取候选模型链并逐个尝试
+        ModelRoutePlan plan = modelRouter.plan(new ModelRouteContext(command.routeKey(), false));
+        return executePlan(command, plan);
     }
 
     /**
@@ -52,8 +83,27 @@ public class ModelExecutionTemplate {
      */
     public <T> Flux<T> executeStream(ModelExecutionCommand<Flux<T>> command) {
         long start = System.currentTimeMillis();
-        ModelRouteDecision decision = modelRouter.route(new ModelRouteContext(command.routeKey(), false));
+        ModelRoutePlan plan = modelRouter.plan(new ModelRouteContext(command.routeKey(), false));
+        ModelRouteDecision decision = firstCandidate(plan, command.routeKey());
         return executeStream(command, decision, start);
+    }
+
+    private <T> T executePlan(ModelExecutionCommand<T> command, ModelRoutePlan plan) {
+        Exception lastException = null;
+        for (ModelRouteDecision decision : plan.candidates()) {
+            long start = System.currentTimeMillis();
+            try {
+                // 1. 按候选模型执行调用，失败后进入下一个候选
+                return execute(command, decision, start);
+            } catch (Exception exception) {
+                lastException = exception;
+            }
+        }
+        if (lastException instanceof RuntimeException runtimeException) {
+            throw runtimeException;
+        }
+        throw new ServiceException("模型路由全部候选调用失败: " + command.routeKey(), lastException,
+                com.nexarag.common.error.BaseErrorCode.SERVICE_ERROR);
     }
 
     private <T> T execute(ModelExecutionCommand<T> command, ModelRouteDecision decision, long start) {
@@ -70,7 +120,9 @@ public class ModelExecutionTemplate {
 
         try {
             // 1. 执行业务传入的模型调用逻辑
-            T response = command.executor().apply(decision);
+            T response = modelGovernanceExecutor.execute(decision.profileName(),
+                    modelGovernanceResolver.resolve(decision),
+                    () -> command.executor().apply(decision));
 
             // 2. 记录成功结果
             long durationMs = Math.max(0, System.currentTimeMillis() - start);
@@ -132,5 +184,12 @@ public class ModelExecutionTemplate {
         long durationMs = Math.max(0, System.currentTimeMillis() - start);
         modelCallLogService.markFailed(log.getCallId(), exception.getClass().getSimpleName(),
                 exception.getMessage(), durationMs);
+    }
+
+    private ModelRouteDecision firstCandidate(ModelRoutePlan plan, String routeKey) {
+        if (plan.candidates() == null || plan.candidates().isEmpty()) {
+            throw new ServiceException("模型路由没有可用候选: " + routeKey);
+        }
+        return plan.candidates().getFirst();
     }
 }

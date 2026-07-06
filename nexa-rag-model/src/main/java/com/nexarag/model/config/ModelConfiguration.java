@@ -4,6 +4,8 @@ import com.nexarag.model.prompt.LocalPromptTemplateRepository;
 import com.nexarag.model.prompt.PromptTemplateRepository;
 import com.nexarag.model.prompt.PromptTemplateService;
 import com.nexarag.model.execution.ModelExecutionTemplate;
+import com.nexarag.model.governance.ModelGovernanceExecutor;
+import com.nexarag.model.governance.ModelGovernanceResolver;
 import com.nexarag.model.route.ModelRouter;
 import com.nexarag.model.route.PrimaryFallbackModelRouter;
 import com.nexarag.model.security.ModelSecretEncryptor;
@@ -60,12 +62,16 @@ public class ModelConfiguration {
      *
      * @param modelRouter         模型路由器
      * @param modelCallLogService 模型调用日志服务
+     * @param executor            模型治理执行器
+     * @param resolver            模型治理配置解析器
      * @return 模型执行模板
      */
     @Bean
     public ModelExecutionTemplate modelExecutionTemplate(ModelRouter modelRouter,
-                                                         ModelCallLogService modelCallLogService) {
-        return new ModelExecutionTemplate(modelRouter, modelCallLogService);
+                                                         ModelCallLogService modelCallLogService,
+                                                         ModelGovernanceExecutor executor,
+                                                         ModelGovernanceResolver resolver) {
+        return new ModelExecutionTemplate(modelRouter, modelCallLogService, executor, resolver);
     }
 
     /**
