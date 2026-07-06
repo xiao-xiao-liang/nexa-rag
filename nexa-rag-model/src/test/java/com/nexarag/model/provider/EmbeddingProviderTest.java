@@ -1,6 +1,6 @@
-package com.nexarag.model.provider.openai;
+package com.nexarag.model.provider;
 
-import com.nexarag.model.client.ModelClientFactory;
+import com.nexarag.model.client.EmbeddingClientFactory;
 import com.nexarag.model.config.ModelProfileProperties;
 import com.nexarag.model.enums.ModelBizType;
 import com.nexarag.model.enums.ModelProvider;
@@ -22,15 +22,15 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 /**
- * OpenAI 兼容 Embedding Provider 测试。
+ * Embedding Provider 测试。
  */
-class OpenAiEmbeddingProviderTest {
+class EmbeddingProviderTest {
 
     @Test
     void embeddingShouldMapSpringAiResponse() {
-        ModelClientFactory modelClientFactory = mock(ModelClientFactory.class);
+        EmbeddingClientFactory embeddingClientFactory = mock(EmbeddingClientFactory.class);
         OpenAiEmbeddingModel embeddingModel = mock(OpenAiEmbeddingModel.class);
-        OpenAiEmbeddingProvider provider = new OpenAiEmbeddingProvider(modelClientFactory);
+        EmbeddingProvider provider = new EmbeddingProvider(embeddingClientFactory);
         ModelRouteDecision decision = routeDecision();
         EmbeddingModelRequest request = EmbeddingModelRequest.builder()
                 .traceId("trace-1")
@@ -40,7 +40,7 @@ class OpenAiEmbeddingProviderTest {
                 .texts(List.of("片段"))
                 .build();
 
-        when(modelClientFactory.getOpenAiEmbeddingClient(decision)).thenReturn(embeddingModel);
+        when(embeddingClientFactory.getEmbeddingClient(decision)).thenReturn(embeddingModel);
         when(embeddingModel.call(any(EmbeddingRequest.class))).thenReturn(new EmbeddingResponse(List.of(
                 new Embedding(new float[]{0.1f, 0.2f}, 0)
         )));
@@ -55,11 +55,11 @@ class OpenAiEmbeddingProviderTest {
 
     @Test
     void shouldSupportOpenAiCompatibleEmbeddingProviders() {
-        OpenAiEmbeddingProvider provider = new OpenAiEmbeddingProvider(mock(ModelClientFactory.class));
+        EmbeddingProvider provider = new EmbeddingProvider(mock(EmbeddingClientFactory.class));
 
         assertThat(provider.supports(ModelProvider.OPENAI, ModelType.EMBEDDING)).isTrue();
         assertThat(provider.supports(ModelProvider.OLLAMA, ModelType.EMBEDDING)).isTrue();
-        assertThat(provider.supports(ModelProvider.DASHSCOPE, ModelType.EMBEDDING)).isFalse();
+        assertThat(provider.supports(ModelProvider.DASHSCOPE, ModelType.EMBEDDING)).isTrue();
         assertThat(provider.supports(ModelProvider.OPENAI, ModelType.RERANK)).isFalse();
     }
 

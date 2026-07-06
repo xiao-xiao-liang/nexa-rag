@@ -4,6 +4,8 @@ import com.nexarag.common.error.BaseErrorCode;
 import com.nexarag.common.exception.ServiceException;
 import com.nexarag.model.enums.ModelProvider;
 import com.nexarag.model.enums.ModelType;
+import com.nexarag.model.gateway.chat.ChatModelRequest;
+import com.nexarag.model.gateway.chat.ChatModelResponse;
 import com.nexarag.model.gateway.embedding.EmbeddingModelRequest;
 import com.nexarag.model.gateway.embedding.EmbeddingModelResponse;
 import com.nexarag.model.gateway.rerank.RerankModelRequest;
@@ -23,6 +25,18 @@ public interface ModelProviderAdapter {
      * @return 支持返回 true，否则返回 false
      */
     boolean supports(ModelProvider provider, ModelType modelType);
+
+    /**
+     * 调用聊天模型。
+     *
+     * @param decision 路由决策
+     * @param request  聊天请求
+     * @return 聊天响应
+     */
+    default ChatModelResponse chat(ModelRouteDecision decision, ChatModelRequest request) {
+        // 1. 默认实现用于防止适配器声明错误时静默失败
+        throw new ServiceException("当前模型厂商暂未支持 Chat 调用", BaseErrorCode.SERVICE_ERROR);
+    }
 
     /**
      * 调用向量化模型。

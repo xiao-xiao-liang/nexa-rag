@@ -1,7 +1,5 @@
 package com.nexarag.model.gateway;
 
-import com.nexarag.common.error.BaseErrorCode;
-import com.nexarag.common.exception.ServiceException;
 import com.nexarag.model.execution.ModelExecutionCommand;
 import com.nexarag.model.execution.ModelExecutionTemplate;
 import com.nexarag.model.gateway.chat.ChatModelRequest;
@@ -32,8 +30,22 @@ public class ModelGateway {
      * @return 聊天模型响应
      */
     public ChatModelResponse chat(ChatModelRequest request) {
-        // 1. Chat 调用链路后续接入，初版先给出清晰异常
-        throw new ServiceException("Chat 模型调用暂未支持", BaseErrorCode.SERVICE_ERROR);
+        // 1. 交给执行模板统一处理路由、日志和后续治理能力
+        return executionTemplate.execute(ModelExecutionCommand.ofChat(request,
+                decision -> providerDispatcher.chat(decision, request)));
+    }
+
+    /**
+     * 按指定路由决策调用聊天模型。
+     *
+     * @param decision 指定路由决策
+     * @param request  聊天模型请求
+     * @return 聊天模型响应
+     */
+    public ChatModelResponse chat(ModelRouteDecision decision, ChatModelRequest request) {
+        // 1. 用指定路由决策执行，主要用于模型配置连接测试
+        return executionTemplate.execute(ModelExecutionCommand.ofChat(request,
+                ignored -> providerDispatcher.chat(decision, request)), decision);
     }
 
     /**

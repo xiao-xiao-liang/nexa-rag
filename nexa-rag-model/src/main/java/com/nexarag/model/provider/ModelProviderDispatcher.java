@@ -4,6 +4,8 @@ import com.nexarag.common.error.BaseErrorCode;
 import com.nexarag.common.exception.ServiceException;
 import com.nexarag.model.enums.ModelProvider;
 import com.nexarag.model.enums.ModelType;
+import com.nexarag.model.gateway.chat.ChatModelRequest;
+import com.nexarag.model.gateway.chat.ChatModelResponse;
 import com.nexarag.model.gateway.embedding.EmbeddingModelRequest;
 import com.nexarag.model.gateway.embedding.EmbeddingModelResponse;
 import com.nexarag.model.gateway.rerank.RerankModelRequest;
@@ -22,6 +24,18 @@ import java.util.List;
 public class ModelProviderDispatcher {
 
     private final List<ModelProviderAdapter> providerAdapters;
+
+    /**
+     * 分发聊天模型调用。
+     *
+     * @param decision 路由决策
+     * @param request  聊天请求
+     * @return 聊天响应
+     */
+    public ChatModelResponse chat(ModelRouteDecision decision, ChatModelRequest request) {
+        // 1. 按路由决策中的厂商选择 Chat 适配器
+        return select(decision, ModelType.CHAT).chat(decision, request);
+    }
 
     /**
      * 分发向量化模型调用。

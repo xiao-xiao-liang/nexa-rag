@@ -3,6 +3,7 @@ package com.nexarag.model.service.impl;
 import com.nexarag.common.error.BaseErrorCode;
 import com.nexarag.common.exception.AbstractException;
 import com.nexarag.common.exception.ClientException;
+import com.nexarag.common.exception.ServiceException;
 import com.nexarag.model.config.ModelProfileProperties;
 import com.nexarag.model.dto.ModelConnectionTestRequest;
 import com.nexarag.model.dto.ModelConnectionTestResponse;
@@ -12,6 +13,8 @@ import com.nexarag.model.enums.ModelBizType;
 import com.nexarag.model.enums.ModelProvider;
 import com.nexarag.model.enums.ModelType;
 import com.nexarag.model.gateway.ModelGateway;
+import com.nexarag.model.gateway.chat.ChatModelRequest;
+import com.nexarag.model.gateway.chat.ChatModelResponse;
 import com.nexarag.model.gateway.embedding.EmbeddingModelRequest;
 import com.nexarag.model.gateway.embedding.EmbeddingModelResponse;
 import com.nexarag.model.gateway.rerank.RerankCandidate;
@@ -24,7 +27,6 @@ import com.nexarag.model.service.ModelConnectionTestService;
 import com.nexarag.model.service.ModelRouteService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
-import org.springframework.util.CollectionUtils;
 import org.springframework.util.StringUtils;
 
 import java.util.List;
@@ -41,6 +43,7 @@ import java.util.stream.IntStream;
 public class ModelConnectionTestServiceImpl implements ModelConnectionTestService {
 
     private static final String DEFAULT_EMBEDDING_INPUT = "你好，NexaRAG";
+    private static final String DEFAULT_CHAT_PROMPT = "你好";
     private static final String DEFAULT_RERANK_QUERY = "什么是 RAG？";
     private static final List<String> DEFAULT_RERANK_DOCUMENTS = List.of(
             "RAG 是检索增强生成。",
@@ -59,10 +62,9 @@ public class ModelConnectionTestServiceImpl implements ModelConnectionTestServic
         try {
             // 1. 根据配置类型选择对应测试调用
             return switch (config.getModelType()) {
-                case EMBEDDING -> testConfigEmbedding(config, request, start);
-                case RERANK -> testConfigRerank(config, request, start);
-                case CHAT -> unsupported(config.getProvider(), config.getModelType(), config.getModelName(),
-                        config.getBaseUrl(), start);
+                case CHAT -> testConfigChat(config, start);
+                case EMBEDDING -> testConfigEmbedding(config, start);
+                case RERANK -> testConfigRerank(config, start);
             };
         } catch (Exception exception) {
             // 2. 将异常转换为连接测试失败响应，避免测试接口直接抛出 500
@@ -78,9 +80,9 @@ public class ModelConnectionTestServiceImpl implements ModelConnectionTestServic
         try {
             // 1. 根据路由类型选择对应测试调用
             return switch (route.getModelType()) {
-                case EMBEDDING -> testRouteEmbedding(route, request, start);
-                case RERANK -> testRouteRerank(route, request, start);
-                case CHAT -> unsupported(null, route.getModelType(), null, null, start);
+                case CHAT -> testRouteChat(route, start);
+                case EMBEDDING -> testRouteEmbedding(route, start);
+                case RERANK -> testRouteRerank(route, start);
             };
         } catch (Exception exception) {
             // 2. 将异常转换为连接测试失败响应，避免测试接口直接抛出 500
@@ -88,64 +90,88 @@ public class ModelConnectionTestServiceImpl implements ModelConnectionTestServic
         }
     }
 
-    private ModelConnectionTestResponse testConfigEmbedding(ModelConfig config, ModelConnectionTestRequest request,
-                                                            long start) {
+    private ModelConnectionTestResponse testConfigChat(ModelConfig config, long start) {
+        ChatModelResponse response = modelGateway.chat(toDecision(config), chatRequest("config:" + config.getConfigId()));
+        validateChatResponse(response);
+        return success(config.getProvider(), config.getModelType(), config.getModelName(), config.getBaseUrl(),
+                start, null, null);
+    }
+
+    private ModelConnectionTestResponse testConfigEmbedding(ModelConfig config, long start) {
         EmbeddingModelResponse response = modelGateway.embedding(toDecision(config),
-                embeddingRequest("config:" + config.getConfigId(), request));
-        Integer vectorDimension = response.embeddings().isEmpty() ? 0 : response.embeddings().getFirst().length;
+                embeddingRequest("config:" + config.getConfigId()));
+        Integer vectorDimension = vectorDimension(response);
         return success(config.getProvider(), config.getModelType(), config.getModelName(), config.getBaseUrl(),
                 start, vectorDimension, null);
     }
 
-    private ModelConnectionTestResponse testConfigRerank(ModelConfig config, ModelConnectionTestRequest request,
-                                                         long start) {
+    private ModelConnectionTestResponse testConfigRerank(ModelConfig config, long start) {
         RerankModelResponse response = modelGateway.rerank(toDecision(config),
-                rerankRequest("config:" + config.getConfigId(), request));
+                rerankRequest("config:" + config.getConfigId()));
+        Integer rerankCount = rerankCount(response);
         return success(config.getProvider(), config.getModelType(), config.getModelName(), config.getBaseUrl(),
-                start, null, response.scores().size());
+                start, null, rerankCount);
     }
 
-    private ModelConnectionTestResponse testRouteEmbedding(ModelRoute route, ModelConnectionTestRequest request,
-                                                           long start) {
-        EmbeddingModelResponse response = modelGateway.embedding(embeddingRequest(route.getRouteKey(), request));
-        Integer vectorDimension = response.embeddings().isEmpty() ? 0 : response.embeddings().getFirst().length;
+    private ModelConnectionTestResponse testRouteChat(ModelRoute route, long start) {
+        ChatModelResponse response = modelGateway.chat(chatRequest(route.getRouteKey()));
+        validateChatResponse(response);
+        return success(null, route.getModelType(), null, null, start, null, null);
+    }
+
+    private ModelConnectionTestResponse testRouteEmbedding(ModelRoute route, long start) {
+        EmbeddingModelResponse response = modelGateway.embedding(embeddingRequest(route.getRouteKey()));
+        Integer vectorDimension = vectorDimension(response);
         return success(null, route.getModelType(), null, null, start, vectorDimension, null);
     }
 
-    private ModelConnectionTestResponse testRouteRerank(ModelRoute route, ModelConnectionTestRequest request,
-                                                        long start) {
-        RerankModelResponse response = modelGateway.rerank(rerankRequest(route.getRouteKey(), request));
-        return success(null, route.getModelType(), null, null, start, null, response.scores().size());
+    private ModelConnectionTestResponse testRouteRerank(ModelRoute route, long start) {
+        RerankModelResponse response = modelGateway.rerank(rerankRequest(route.getRouteKey()));
+        Integer rerankCount = rerankCount(response);
+        return success(null, route.getModelType(), null, null, start, null, rerankCount);
     }
 
-    private EmbeddingModelRequest embeddingRequest(String routeKey, ModelConnectionTestRequest request) {
+    private ChatModelRequest chatRequest(String routeKey) {
+        return ChatModelRequest.builder()
+                .traceId(UUID.randomUUID().toString())
+                .bizType(ModelBizType.MODEL_TEST)
+                .bizId(routeKey)
+                .routeKey(routeKey)
+                .messages(List.of(new ChatModelRequest.ChatMessage("USER", DEFAULT_CHAT_PROMPT)))
+                .options(Map.of())
+                .build();
+    }
+
+    private EmbeddingModelRequest embeddingRequest(String routeKey) {
         return EmbeddingModelRequest.builder()
                 .traceId(UUID.randomUUID().toString())
                 .bizType(ModelBizType.MODEL_TEST)
                 .bizId(routeKey)
                 .routeKey(routeKey)
-                .texts(List.of(input(request)))
+                .texts(List.of(DEFAULT_EMBEDDING_INPUT))
                 .build();
     }
 
-    private RerankModelRequest rerankRequest(String routeKey, ModelConnectionTestRequest request) {
+    private RerankModelRequest rerankRequest(String routeKey) {
         return RerankModelRequest.builder()
                 .traceId(UUID.randomUUID().toString())
                 .bizType(ModelBizType.MODEL_TEST)
                 .bizId(routeKey)
                 .routeKey(routeKey)
-                .query(query(request))
-                .candidates(candidates(request))
+                .query(DEFAULT_RERANK_QUERY)
+                .candidates(candidates())
                 .build();
     }
 
     private ModelRouteDecision toDecision(ModelConfig config) {
-        ModelProfileProperties profile = new ModelProfileProperties();
-        profile.setProvider(config.getProvider().name());
-        profile.setBaseUrl(config.getBaseUrl());
-        profile.setApiKey(decryptApiKey(config));
-        profile.setModelName(config.getModelName());
-        profile.setTimeoutMs(config.getTimeoutMs() == null ? 60000L : config.getTimeoutMs());
+        ModelProfileProperties profile = ModelProfileProperties.builder()
+                .provider(config.getProvider().name())
+                .baseUrl(config.getBaseUrl())
+                .endpointPath(config.getEndpointPath())
+                .apiKey(decryptApiKey(config))
+                .modelName(config.getModelName())
+                .timeoutMs(config.getTimeoutMs() == null ? 60000L : config.getTimeoutMs())
+                .build();
         return new ModelRouteDecision(config.getConfigKey(), profile, false);
     }
 
@@ -156,26 +182,32 @@ public class ModelConnectionTestServiceImpl implements ModelConnectionTestServic
         return modelSecretEncryptor.decrypt(config.getApiKeyCipher());
     }
 
-    private List<RerankCandidate> candidates(ModelConnectionTestRequest request) {
-        List<String> documents = request == null || CollectionUtils.isEmpty(request.documents())
-                ? DEFAULT_RERANK_DOCUMENTS : request.documents();
-        return IntStream.range(0, documents.size())
-                .mapToObj(index -> new RerankCandidate("doc-" + (index + 1), documents.get(index), Map.of()))
+    private List<RerankCandidate> candidates() {
+        return IntStream.range(0, DEFAULT_RERANK_DOCUMENTS.size())
+                .mapToObj(index -> new RerankCandidate("doc-" + (index + 1),
+                        DEFAULT_RERANK_DOCUMENTS.get(index), Map.of()))
                 .toList();
     }
 
-    private String input(ModelConnectionTestRequest request) {
-        if (request == null || !StringUtils.hasText(request.input())) {
-            return DEFAULT_EMBEDDING_INPUT;
+    private void validateChatResponse(ChatModelResponse response) {
+        if (response == null || !StringUtils.hasText(response.content())) {
+            throw new ServiceException("Chat 模型连接测试未返回有效内容", BaseErrorCode.SERVICE_ERROR);
         }
-        return request.input();
     }
 
-    private String query(ModelConnectionTestRequest request) {
-        if (request == null || !StringUtils.hasText(request.query())) {
-            return DEFAULT_RERANK_QUERY;
+    private Integer vectorDimension(EmbeddingModelResponse response) {
+        if (response == null || response.embeddings() == null || response.embeddings().isEmpty()
+                || response.embeddings().getFirst() == null || response.embeddings().getFirst().length == 0) {
+            throw new ServiceException("Embedding 模型连接测试未返回有效向量", BaseErrorCode.SERVICE_ERROR);
         }
-        return request.query();
+        return response.embeddings().getFirst().length;
+    }
+
+    private Integer rerankCount(RerankModelResponse response) {
+        if (response == null || response.scores() == null || response.scores().isEmpty()) {
+            throw new ServiceException("Rerank 模型连接测试未返回有效分数", BaseErrorCode.SERVICE_ERROR);
+        }
+        return response.scores().size();
     }
 
     private ModelConfig getRequiredConfig(Long configId) {
@@ -206,20 +238,6 @@ public class ModelConnectionTestServiceImpl implements ModelConnectionTestServic
                 .durationMs(durationMs(start))
                 .vectorDimension(vectorDimension)
                 .rerankCount(rerankCount)
-                .build();
-    }
-
-    private ModelConnectionTestResponse unsupported(ModelProvider provider, ModelType modelType, String modelName,
-                                                    String baseUrl, long start) {
-        return ModelConnectionTestResponse.builder()
-                .success(false)
-                .provider(provider)
-                .modelType(modelType)
-                .modelName(modelName)
-                .baseUrl(baseUrl)
-                .durationMs(durationMs(start))
-                .errorCode(BaseErrorCode.SERVICE_ERROR.code())
-                .errorMessage("Chat 模型连接测试暂未支持")
                 .build();
     }
 

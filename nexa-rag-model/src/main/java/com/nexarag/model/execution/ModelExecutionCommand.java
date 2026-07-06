@@ -2,6 +2,8 @@ package com.nexarag.model.execution;
 
 import com.nexarag.model.enums.ModelBizType;
 import com.nexarag.model.enums.ModelRequestType;
+import com.nexarag.model.gateway.chat.ChatModelRequest;
+import com.nexarag.model.gateway.chat.ChatModelResponse;
 import com.nexarag.model.gateway.embedding.EmbeddingModelRequest;
 import com.nexarag.model.gateway.embedding.EmbeddingModelResponse;
 import com.nexarag.model.gateway.rerank.RerankModelRequest;
@@ -56,6 +58,30 @@ public record ModelExecutionCommand<T>(
                 executor,
                 response -> 0,
                 response -> 0,
+                response -> safeToken(response.totalTokens())
+        );
+    }
+
+    /**
+     * 构造聊天模型执行命令。
+     *
+     * @param request  聊天请求
+     * @param executor 实际调用逻辑
+     * @return 聊天模型执行命令
+     */
+    public static ModelExecutionCommand<ChatModelResponse> ofChat(
+            ChatModelRequest request,
+            Function<ModelRouteDecision, ChatModelResponse> executor) {
+        // 1. Chat 同时统计输入、输出和总 Token，便于后续监控和计费
+        return new ModelExecutionCommand<>(
+                request.traceId(),
+                request.bizType(),
+                request.bizId(),
+                request.routeKey(),
+                ModelRequestType.CHAT,
+                executor,
+                response -> safeToken(response.promptTokens()),
+                response -> safeToken(response.completionTokens()),
                 response -> safeToken(response.totalTokens())
         );
     }

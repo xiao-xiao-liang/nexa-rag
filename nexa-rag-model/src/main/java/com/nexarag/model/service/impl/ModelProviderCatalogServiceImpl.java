@@ -61,9 +61,13 @@ public class ModelProviderCatalogServiceImpl implements ModelProviderCatalogServ
         return ModelProviderCatalogResponse.builder()
                 .provider(ModelProvider.DASHSCOPE)
                 .displayName("DashScope")
-                .supportedTypes(List.of(ModelType.RERANK))
+                .supportedTypes(List.of(ModelType.CHAT, ModelType.EMBEDDING, ModelType.RERANK))
                 .defaultBaseUrl("https://dashscope.aliyuncs.com")
-                .recommendedModels(Map.of(ModelType.RERANK, List.of("qwen3-rerank")))
+                .recommendedModels(Map.of(
+                        ModelType.CHAT, List.of("qwen-plus", "qwen-max"),
+                        ModelType.EMBEDDING, List.of("text-embedding-v4"),
+                        ModelType.RERANK, List.of("qwen3-rerank")
+                ))
                 .apiKeyRequired(true)
                 .build();
     }

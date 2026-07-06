@@ -1,0 +1,92 @@
+package com.nexarag.model.provider;
+
+import com.nexarag.model.client.ChatClientFactory;
+import com.nexarag.model.enums.ModelProvider;
+import com.nexarag.model.enums.ModelType;
+import com.nexarag.model.gateway.chat.ChatModelRequest;
+import com.nexarag.model.gateway.chat.ChatModelResponse;
+import com.nexarag.model.route.ModelRouteDecision;
+import lombok.RequiredArgsConstructor;
+import org.springframework.ai.chat.messages.AssistantMessage;
+import org.springframework.ai.chat.messages.Message;
+import org.springframework.ai.chat.messages.SystemMessage;
+import org.springframework.ai.chat.messages.UserMessage;
+import org.springframework.ai.chat.metadata.ChatResponseMetadata;
+import org.springframework.ai.chat.metadata.Usage;
+import org.springframework.ai.chat.model.ChatResponse;
+import org.springframework.ai.chat.prompt.Prompt;
+import org.springframework.stereotype.Component;
+import org.springframework.util.CollectionUtils;
+
+import java.util.List;
+import java.util.Locale;
+
+/**
+ * Chat Provider，负责基于 Spring AI OpenAI 兼容协议调用聊天模型。
+ */
+@Component
+@RequiredArgsConstructor
+public class ChatProvider implements ModelProviderAdapter {
+
+    private final ChatClientFactory chatClientFactory;
+
+    @Override
+    public boolean supports(ModelProvider provider, ModelType modelType) {
+        return ModelType.CHAT == modelType && provider.isOpenAiCompatible();
+    }
+
+    @Override
+    public ChatModelResponse chat(ModelRouteDecision decision, ChatModelRequest request) {
+        // 1. 将统一网关消息转换为 Spring AI Prompt
+        Prompt prompt = new Prompt(messages(request.messages()));
+        ChatResponse response = chatClientFactory.getChatClient(decision).call(prompt);
+
+        // 2. 将 Spring AI 响应转换为模型网关统一响应
+        Usage usage = usage(response.getMetadata());
+        return ChatModelResponse.builder()
+                .content(content(response))
+                .modelProfile(decision.profileName())
+                .promptTokens(promptTokens(usage))
+                .completionTokens(completionTokens(usage))
+                .totalTokens(totalTokens(usage))
+                .build();
+    }
+
+    private List<Message> messages(List<ChatModelRequest.ChatMessage> messages) {
+        if (CollectionUtils.isEmpty(messages)) {
+            return List.of(new UserMessage("你好"));
+        }
+        return messages.stream()
+                .map(this::message)
+                .toList();
+    }
+
+    private Message message(ChatModelRequest.ChatMessage message) {
+        String role = message.role() == null ? "USER" : message.role().toUpperCase(Locale.ROOT);
+        return switch (role) {
+            case "SYSTEM" -> new SystemMessage(message.content());
+            case "ASSISTANT" -> new AssistantMessage(message.content());
+            default -> new UserMessage(message.content());
+        };
+    }
+
+    private String content(ChatResponse response) {
+        return response == null ? "" : response.getResult().getOutput().getText();
+    }
+
+    private Usage usage(ChatResponseMetadata metadata) {
+        return metadata == null ? null : metadata.getUsage();
+    }
+
+    private Integer promptTokens(Usage usage) {
+        return usage == null || usage.getPromptTokens() == null ? 0 : usage.getPromptTokens();
+    }
+
+    private Integer completionTokens(Usage usage) {
+        return usage == null || usage.getCompletionTokens() == null ? 0 : usage.getCompletionTokens();
+    }
+
+    private Integer totalTokens(Usage usage) {
+        return usage == null || usage.getTotalTokens() == null ? 0 : usage.getTotalTokens();
+    }
+}

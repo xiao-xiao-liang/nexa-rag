@@ -1,11 +1,11 @@
 package com.nexarag.model.gateway;
 
-import com.nexarag.common.exception.ServiceException;
 import com.nexarag.model.config.ModelProfileProperties;
 import com.nexarag.model.enums.ModelBizType;
 import com.nexarag.model.execution.ModelExecutionCommand;
 import com.nexarag.model.execution.ModelExecutionTemplate;
 import com.nexarag.model.gateway.chat.ChatModelRequest;
+import com.nexarag.model.gateway.chat.ChatModelResponse;
 import com.nexarag.model.gateway.embedding.EmbeddingModelRequest;
 import com.nexarag.model.gateway.embedding.EmbeddingModelResponse;
 import com.nexarag.model.gateway.rerank.RerankCandidate;
@@ -19,7 +19,6 @@ import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
@@ -91,9 +90,11 @@ class ModelGatewayTest {
     }
 
     @Test
-    void chatShouldThrowUnsupportedException() {
-        ModelGateway modelGateway = new ModelGateway(mock(ModelExecutionTemplate.class),
-                mock(ModelProviderDispatcher.class));
+    void chatShouldDelegateToDispatcherThroughExecutionTemplate() {
+        ModelExecutionTemplate executionTemplate = mock(ModelExecutionTemplate.class);
+        ModelProviderDispatcher providerDispatcher = mock(ModelProviderDispatcher.class);
+        ModelGateway modelGateway = new ModelGateway(executionTemplate, providerDispatcher);
+        ModelRouteDecision decision = routeDecision();
         ChatModelRequest request = ChatModelRequest.builder()
                 .traceId("trace-1")
                 .bizType(ModelBizType.CHAT)
@@ -102,10 +103,24 @@ class ModelGatewayTest {
                 .messages(List.of(new ChatModelRequest.ChatMessage("USER", "你好")))
                 .options(Map.of())
                 .build();
+        ChatModelResponse expected = ChatModelResponse.builder()
+                .content("你好")
+                .modelProfile("chat-primary")
+                .promptTokens(1)
+                .completionTokens(2)
+                .totalTokens(3)
+                .build();
 
-        assertThatThrownBy(() -> modelGateway.chat(request))
-                .isInstanceOf(ServiceException.class)
-                .hasMessageContaining("Chat 模型调用暂未支持");
+        when(executionTemplate.execute(any())).thenAnswer(invocation -> {
+            ModelExecutionCommand<ChatModelResponse> command = invocation.getArgument(0);
+            return command.executor().apply(decision);
+        });
+        when(providerDispatcher.chat(decision, request)).thenReturn(expected);
+
+        ChatModelResponse actual = modelGateway.chat(request);
+
+        assertThat(actual).isSameAs(expected);
+        verify(providerDispatcher).chat(decision, request);
     }
 
     private ModelRouteDecision routeDecision() {
