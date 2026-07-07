@@ -51,6 +51,10 @@
 - [ ] 实现 Token 精确统计。
 - [ ] 实现流式 Chat Token 精确统计。
 - [ ] 实现模型调用日志归档或聚合统计。
+- [ ] 设计 `model_call_trace` 聚合表，用于表达一次业务模型调用的整体结果，包括 fallback 成功、最终状态、attempt_count、final_call_id、总耗时等。
+- [ ] 实现模型注册表刷新失败自动重试和告警。
+- [ ] 实现多实例模型注册表刷新状态观测。
+- [ ] 调研并实现 OpenAI、DeepSeek、智谱、火山、百度、腾讯等厂商的 Token 用量统计适配器。
 - [ ] 实现 Nacos 动态配置源。
 - [ ] 实现 Nacos Prompt 模板覆盖本地模板。
 - [ ] 为各业务模块补充正式 Prompt Markdown 模板。
