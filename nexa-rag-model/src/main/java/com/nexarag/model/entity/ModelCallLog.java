@@ -5,7 +5,11 @@ import com.baomidou.mybatisplus.annotation.TableName;
 import com.nexarag.model.enums.ModelBizType;
 import com.nexarag.model.enums.ModelCallStatus;
 import com.nexarag.model.enums.ModelRequestType;
-import lombok.*;
+import com.nexarag.model.enums.TokenUsageSource;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
 
 import java.time.LocalDateTime;
 
@@ -86,9 +90,34 @@ public class ModelCallLog {
     private Integer totalTokens;
 
     /**
+     * Token 用量统计来源。
+     */
+    private TokenUsageSource tokenUsageSource;
+
+    /**
      * 耗时毫秒。
      */
     private Long durationMs;
+
+    /**
+     * 首个 Token 或首个分片耗时，单位毫秒。
+     */
+    private Long firstTokenLatencyMs;
+
+    /**
+     * 流式响应分片数量。
+     */
+    private Integer chunkCount;
+
+    /**
+     * 输出字符数。
+     */
+    private Integer outputCharCount;
+
+    /**
+     * 估算输出 Token 数。
+     */
+    private Integer estimatedOutputTokens;
 
     /**
      * 第几次尝试。

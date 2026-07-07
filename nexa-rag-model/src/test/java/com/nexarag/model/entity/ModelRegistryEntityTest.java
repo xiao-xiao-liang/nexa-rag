@@ -1,11 +1,14 @@
 package com.nexarag.model.entity;
 
 import com.nexarag.model.enums.ModelBizType;
+import com.nexarag.model.enums.ModelCallStatus;
+import com.nexarag.model.enums.ModelGovernanceBindingMode;
 import com.nexarag.model.enums.ModelProvider;
 import com.nexarag.model.enums.ModelRequestType;
 import com.nexarag.model.enums.ModelRouteRole;
 import com.nexarag.model.enums.ModelRouteStrategy;
 import com.nexarag.model.enums.ModelType;
+import com.nexarag.model.enums.TokenUsageSource;
 import org.junit.jupiter.api.Test;
 
 import java.time.LocalDateTime;
@@ -51,5 +54,43 @@ class ModelRegistryEntityTest {
         assertThat(config.getConfigId()).isEqualTo(1L);
         assertThat(config.getProvider()).isEqualTo(ModelProvider.OLLAMA);
         assertThat(config.getModelType()).isEqualTo(ModelType.EMBEDDING);
+    }
+
+    @Test
+    void governanceConfigShouldSupportConfigAndRouteBinding() {
+        ModelGovernanceConfig configBinding = ModelGovernanceConfig.builder()
+                .bindingMode(ModelGovernanceBindingMode.CONFIG)
+                .configId(1001L)
+                .enabled(Boolean.TRUE)
+                .build();
+
+        ModelGovernanceConfig routeBinding = ModelGovernanceConfig.builder()
+                .bindingMode(ModelGovernanceBindingMode.ROUTE)
+                .routeKey("chat")
+                .enabled(Boolean.TRUE)
+                .build();
+
+        assertThat(configBinding.getBindingMode()).isEqualTo(ModelGovernanceBindingMode.CONFIG);
+        assertThat(configBinding.getConfigId()).isEqualTo(1001L);
+        assertThat(routeBinding.getBindingMode()).isEqualTo(ModelGovernanceBindingMode.ROUTE);
+        assertThat(routeBinding.getRouteKey()).isEqualTo("chat");
+    }
+
+    @Test
+    void modelCallLogShouldSupportTimeoutCancelAndTokenUsageSource() {
+        ModelCallLog timeoutLog = ModelCallLog.builder()
+                .status(ModelCallStatus.TIMEOUT)
+                .tokenUsageSource(TokenUsageSource.PROVIDER_USAGE)
+                .firstTokenLatencyMs(1200L)
+                .chunkCount(3)
+                .outputCharCount(128)
+                .estimatedOutputTokens(32)
+                .build();
+
+        assertThat(timeoutLog.getStatus()).isEqualTo(ModelCallStatus.TIMEOUT);
+        assertThat(ModelCallStatus.valueOf("CANCELED")).isEqualTo(ModelCallStatus.CANCELED);
+        assertThat(timeoutLog.getTokenUsageSource()).isEqualTo(TokenUsageSource.PROVIDER_USAGE);
+        assertThat(timeoutLog.getFirstTokenLatencyMs()).isEqualTo(1200L);
+        assertThat(timeoutLog.getChunkCount()).isEqualTo(3);
     }
 }

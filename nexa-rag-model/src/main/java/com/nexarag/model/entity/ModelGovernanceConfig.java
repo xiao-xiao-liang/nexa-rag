@@ -5,6 +5,7 @@ import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableLogic;
 import com.baomidou.mybatisplus.annotation.TableName;
+import com.nexarag.model.enums.ModelGovernanceBindingMode;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
@@ -31,9 +32,19 @@ public class ModelGovernanceConfig {
     private Long governanceId;
 
     /**
+     * 治理配置绑定模式。
+     */
+    private ModelGovernanceBindingMode bindingMode;
+
+    /**
      * 模型配置ID。
      */
     private Long configId;
+
+    /**
+     * 模型路由 key，ROUTE 绑定模式使用。
+     */
+    private String routeKey;
 
     /**
      * 是否启用治理配置。
@@ -114,6 +125,26 @@ public class ModelGovernanceConfig {
      * 是否启用并发隔离。
      */
     private Boolean bulkheadEnabled;
+
+    /**
+     * 是否启用同步调用超时保护。
+     */
+    private Boolean timeLimiterEnabled;
+
+    /**
+     * 同步调用超时时间，单位毫秒。
+     */
+    private Integer timeLimiterTimeoutMs;
+
+    /**
+     * 流式调用首个分片超时时间，单位毫秒。
+     */
+    private Integer streamFirstChunkTimeoutMs;
+
+    /**
+     * 流式调用最大持续时间，单位毫秒。
+     */
+    private Integer streamMaxDurationMs;
 
     /**
      * 最大并发调用数。

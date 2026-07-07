@@ -21,7 +21,20 @@ public enum ModelCallStatus {
     FAILED,
 
     /**
-     * 主模型失败后备用模型调用成功。
+     * 调用超时。
      */
+    TIMEOUT,
+
+    /**
+     * 调用被取消。
+     */
+    CANCELED,
+
+    /**
+     * 主模型失败后备用模型调用成功。
+     *
+     * @deprecated 明细日志不再使用该状态，fallback 信息通过 attempt 和 fallback 字段表达。
+     */
+    @Deprecated
     FALLBACK_SUCCESS
 }
