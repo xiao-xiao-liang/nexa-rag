@@ -3,8 +3,8 @@ package com.nexarag.model.refresh;
 import com.nexarag.model.config.ModelRegistryRefreshProperties;
 import com.nexarag.model.enums.ModelRefreshChannel;
 import com.nexarag.model.registry.ModelRegistryRefresher;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -14,12 +14,26 @@ import java.util.List;
  */
 @Slf4j
 @Service
-@RequiredArgsConstructor
 public class DefaultModelRegistryChangePublisher implements ModelRegistryChangePublisher {
 
     private final ModelRegistryRefreshProperties properties;
     private final List<ModelRefreshMessageClient> messageClients;
     private final ModelRegistryRefresher modelRegistryRefresher;
+
+    /**
+     * 创建默认模型注册表变更发布器。
+     *
+     * @param properties             模型注册表刷新配置
+     * @param messageClients         模型刷新消息客户端列表
+     * @param modelRegistryRefresher 模型注册表刷新器，延迟注入用于打破服务启动期循环依赖
+     */
+    public DefaultModelRegistryChangePublisher(ModelRegistryRefreshProperties properties,
+                                               List<ModelRefreshMessageClient> messageClients,
+                                               @Lazy ModelRegistryRefresher modelRegistryRefresher) {
+        this.properties = properties;
+        this.messageClients = messageClients;
+        this.modelRegistryRefresher = modelRegistryRefresher;
+    }
 
     @Override
     public void publish(long versionNo) {
