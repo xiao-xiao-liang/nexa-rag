@@ -2,6 +2,8 @@ package com.nexarag.model.execution;
 
 import com.nexarag.common.exception.ServiceException;
 import com.nexarag.model.entity.ModelCallLog;
+import com.nexarag.model.enums.TokenUsageSource;
+import com.nexarag.model.gateway.chat.ChatModelStreamResponse;
 import com.nexarag.model.governance.ModelGovernanceExecutor;
 import com.nexarag.model.governance.ModelGovernanceResolver;
 import com.nexarag.model.route.ModelRouteContext;
@@ -10,6 +12,11 @@ import com.nexarag.model.route.ModelRoutePlan;
 import com.nexarag.model.route.ModelRouter;
 import com.nexarag.model.service.ModelCallLogService;
 import reactor.core.publisher.Flux;
+import reactor.core.publisher.Signal;
+
+import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 
 /**
  * 模型执行模板，统一处理路由和调用日志。
@@ -82,10 +89,8 @@ public class ModelExecutionTemplate {
      * @return 流式响应分片
      */
     public <T> Flux<T> executeStream(ModelExecutionCommand<Flux<T>> command) {
-        long start = System.currentTimeMillis();
         ModelRoutePlan plan = modelRouter.plan(new ModelRouteContext(command.routeKey(), false));
-        ModelRouteDecision decision = firstCandidate(plan, command.routeKey());
-        return executeStream(command, decision, start);
+        return executeStreamPlan(command, plan);
     }
 
     private <T> T executePlan(ModelExecutionCommand<T> command, ModelRoutePlan plan) {
@@ -157,7 +162,17 @@ public class ModelExecutionTemplate {
         }
     }
 
-    private <T> Flux<T> executeStream(ModelExecutionCommand<Flux<T>> command, ModelRouteDecision decision, long start) {
+    private <T> Flux<T> executeStreamPlan(ModelExecutionCommand<Flux<T>> command, ModelRoutePlan plan) {
+        if (plan.candidates() == null || plan.candidates().isEmpty()) {
+            throw new ServiceException("模型路由没有可用候选: " + command.routeKey());
+        }
+        return attemptStreamBeforeFirstChunk(command, plan, 0, null, null);
+    }
+
+    private <T> Flux<T> attemptStreamBeforeFirstChunk(ModelExecutionCommand<Flux<T>> command, ModelRoutePlan plan,
+                                                       int index, String fallbackFromCallId, String fallbackReason) {
+        ModelRouteDecision decision = plan.candidates().get(index);
+        long start = System.currentTimeMillis();
         ModelCallLog log = modelCallLogService.createRunningLog(
                 command.traceId(),
                 command.bizType(),
@@ -167,30 +182,84 @@ public class ModelExecutionTemplate {
                 decision.profile().getBaseUrl(),
                 decision.profile().getModelName(),
                 command.requestType(),
-                1,
-                null,
-                null
+                index + 1,
+                fallbackFromCallId,
+                fallbackReason
         );
 
         try {
-            // 1. 执行业务传入的流式模型调用逻辑
+            // 1. 执行业务传入的流式模型调用逻辑，并在首个信号处决定是否 fallback
             return command.executor().apply(decision)
-                    .doOnComplete(() -> markStreamSuccess(command, log, start))
-                    .doOnError(exception -> markStreamFailed(log, start, exception));
+                    .switchOnFirst((signal, flux) -> handleFirstStreamSignal(command, plan, index, log, start,
+                            signal, flux));
         } catch (Exception exception) {
-            // 2. 处理流创建阶段直接抛出的异常
+            // 2. 处理流创建阶段直接抛出的异常，首个分片前允许继续尝试下一个候选
             markStreamFailed(log, start, exception);
-            throw exception;
+            if (hasNextCandidate(plan, index)) {
+                return attemptStreamBeforeFirstChunk(command, plan, index + 1, log.getCallId(),
+                        exception.getClass().getSimpleName());
+            }
+            return Flux.error(exception);
         }
     }
 
-    private <T> void markStreamSuccess(ModelExecutionCommand<Flux<T>> command, ModelCallLog log, long start) {
+    private <T> Flux<T> handleFirstStreamSignal(ModelExecutionCommand<Flux<T>> command, ModelRoutePlan plan,
+                                                int index, ModelCallLog log, long start, Signal<? extends T> signal,
+                                                Flux<T> flux) {
+        if (signal.hasValue()) {
+            // 1. 首个分片已经产生，锁定当前候选，后续错误不再 fallback
+            return observeLockedStream(command, log, start, flux);
+        }
+        if (signal.isOnComplete()) {
+            // 2. 流在首个分片前正常结束，按空响应成功处理
+            markStreamSuccess(log, start, null, 0, 0);
+            return Flux.empty();
+        }
+
+        // 3. 首个分片前失败，记录当前候选失败并尝试下一个候选
+        Throwable exception = signal.getThrowable();
+        markStreamFailed(log, start, exception);
+        if (hasNextCandidate(plan, index)) {
+            return attemptStreamBeforeFirstChunk(command, plan, index + 1, log.getCallId(),
+                    exception == null ? null : exception.getClass().getSimpleName());
+        }
+        return Flux.error(exception);
+    }
+
+    private <T> Flux<T> observeLockedStream(ModelExecutionCommand<Flux<T>> command, ModelCallLog log, long start,
+                                            Flux<T> flux) {
+        AtomicInteger chunkCount = new AtomicInteger();
+        AtomicInteger outputCharCount = new AtomicInteger();
+        AtomicLong firstTokenLatencyMs = new AtomicLong(-1L);
+
+        return flux
+                .doOnNext(chunk -> {
+                    // 1. 记录首个分片耗时和流式输出规模
+                    chunkCount.incrementAndGet();
+                    if (firstTokenLatencyMs.compareAndSet(-1L, Math.max(0, System.currentTimeMillis() - start))) {
+                        // 首个分片耗时已记录
+                    }
+                    outputCharCount.addAndGet(outputCharCount(chunk));
+                })
+                .doOnComplete(() -> markStreamSuccess(log, start, firstTokenLatencyMs.get(),
+                        chunkCount.get(), outputCharCount.get()))
+                .doOnCancel(() -> markStreamCanceled(log, start))
+                .doOnError(exception -> markStreamFailed(log, start, exception));
+    }
+
+    private void markStreamSuccess(ModelCallLog log, long start, Long firstTokenLatencyMs,
+                                   Integer chunkCount, Integer outputCharCount) {
         // 1. 流式 Chat 暂记 Token 为 0，精确统计后续单独实现
         long durationMs = Math.max(0, System.currentTimeMillis() - start);
-        modelCallLogService.markSuccess(
+        modelCallLogService.markStreamSuccess(
                 log.getCallId(),
                 0,
                 0,
+                0,
+                TokenUsageSource.ESTIMATED,
+                firstTokenLatencyMs == null || firstTokenLatencyMs < 0 ? null : firstTokenLatencyMs,
+                chunkCount,
+                outputCharCount,
                 0,
                 durationMs
         );
@@ -199,8 +268,20 @@ public class ModelExecutionTemplate {
     private void markStreamFailed(ModelCallLog log, long start, Throwable exception) {
         // 1. 记录流式调用失败信息
         long durationMs = Math.max(0, System.currentTimeMillis() - start);
-        modelCallLogService.markFailed(log.getCallId(), exception.getClass().getSimpleName(),
-                exception.getMessage(), durationMs);
+        if (exception instanceof TimeoutException) {
+            modelCallLogService.markTimeout(log.getCallId(), exception.getClass().getSimpleName(),
+                    exception.getMessage(), durationMs);
+            return;
+        }
+        modelCallLogService.markFailed(log.getCallId(),
+                exception == null ? "UnknownException" : exception.getClass().getSimpleName(),
+                exception == null ? null : exception.getMessage(), durationMs);
+    }
+
+    private void markStreamCanceled(ModelCallLog log, long start) {
+        // 1. 记录客户端取消流式调用
+        long durationMs = Math.max(0, System.currentTimeMillis() - start);
+        modelCallLogService.markCanceled(log.getCallId(), durationMs);
     }
 
     private ModelRouteDecision firstCandidate(ModelRoutePlan plan, String routeKey) {
@@ -208,6 +289,17 @@ public class ModelExecutionTemplate {
             throw new ServiceException("模型路由没有可用候选: " + routeKey);
         }
         return plan.candidates().getFirst();
+    }
+
+    private boolean hasNextCandidate(ModelRoutePlan plan, int index) {
+        return plan.candidates() != null && index + 1 < plan.candidates().size();
+    }
+
+    private int outputCharCount(Object chunk) {
+        if (chunk instanceof ChatModelStreamResponse response && response.content() != null) {
+            return response.content().length();
+        }
+        return 0;
     }
 
     private ModelExecutionAttemptException unwrapAttemptException(Exception exception) {

@@ -5,6 +5,7 @@ import com.nexarag.model.entity.ModelCallLog;
 import com.nexarag.model.enums.ModelBizType;
 import com.nexarag.model.enums.ModelCallStatus;
 import com.nexarag.model.enums.ModelRequestType;
+import com.nexarag.model.enums.TokenUsageSource;
 import com.nexarag.model.mapper.ModelCallLogMapper;
 import com.nexarag.model.service.ModelCallLogService;
 import org.springframework.stereotype.Service;
@@ -70,6 +71,28 @@ public class ModelCallLogServiceImpl extends ServiceImpl<ModelCallLogMapper, Mod
     }
 
     @Override
+    public void markStreamSuccess(String callId, Integer promptTokens, Integer completionTokens,
+                                  Integer totalTokens, TokenUsageSource tokenUsageSource,
+                                  Long firstTokenLatencyMs, Integer chunkCount,
+                                  Integer outputCharCount, Integer estimatedOutputTokens,
+                                  long durationMs) {
+        // 1. 使用 lambdaUpdate 按调用ID更新流式成功状态和观测字段
+        this.lambdaUpdate()
+                .eq(ModelCallLog::getCallId, callId)
+                .set(ModelCallLog::getStatus, ModelCallStatus.SUCCESS)
+                .set(ModelCallLog::getPromptTokens, promptTokens)
+                .set(ModelCallLog::getCompletionTokens, completionTokens)
+                .set(ModelCallLog::getTotalTokens, totalTokens)
+                .set(ModelCallLog::getTokenUsageSource, tokenUsageSource)
+                .set(ModelCallLog::getFirstTokenLatencyMs, firstTokenLatencyMs)
+                .set(ModelCallLog::getChunkCount, chunkCount)
+                .set(ModelCallLog::getOutputCharCount, outputCharCount)
+                .set(ModelCallLog::getEstimatedOutputTokens, estimatedOutputTokens)
+                .set(ModelCallLog::getDurationMs, durationMs)
+                .update();
+    }
+
+    @Override
     public void markFailed(String callId, String errorCode, String errorMessage, long durationMs) {
         // 1. 使用 lambdaUpdate 按调用ID更新失败状态和错误信息
         this.lambdaUpdate()
@@ -77,6 +100,28 @@ public class ModelCallLogServiceImpl extends ServiceImpl<ModelCallLogMapper, Mod
                 .set(ModelCallLog::getStatus, ModelCallStatus.FAILED)
                 .set(ModelCallLog::getErrorCode, errorCode)
                 .set(ModelCallLog::getErrorMessage, errorMessage)
+                .set(ModelCallLog::getDurationMs, durationMs)
+                .update();
+    }
+
+    @Override
+    public void markTimeout(String callId, String errorCode, String errorMessage, long durationMs) {
+        // 1. 使用 lambdaUpdate 按调用ID更新超时状态和错误信息
+        this.lambdaUpdate()
+                .eq(ModelCallLog::getCallId, callId)
+                .set(ModelCallLog::getStatus, ModelCallStatus.TIMEOUT)
+                .set(ModelCallLog::getErrorCode, errorCode)
+                .set(ModelCallLog::getErrorMessage, errorMessage)
+                .set(ModelCallLog::getDurationMs, durationMs)
+                .update();
+    }
+
+    @Override
+    public void markCanceled(String callId, long durationMs) {
+        // 1. 使用 lambdaUpdate 按调用ID更新取消状态
+        this.lambdaUpdate()
+                .eq(ModelCallLog::getCallId, callId)
+                .set(ModelCallLog::getStatus, ModelCallStatus.CANCELED)
                 .set(ModelCallLog::getDurationMs, durationMs)
                 .update();
     }

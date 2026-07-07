@@ -1,5 +1,7 @@
 package com.nexarag.model.governance;
 
+import com.nexarag.common.error.BaseErrorCode;
+import com.nexarag.common.exception.ServiceException;
 import io.github.resilience4j.bulkhead.Bulkhead;
 import io.github.resilience4j.bulkhead.BulkheadConfig;
 import io.github.resilience4j.circuitbreaker.CircuitBreaker;
@@ -8,9 +10,12 @@ import io.github.resilience4j.ratelimiter.RateLimiter;
 import io.github.resilience4j.ratelimiter.RateLimiterConfig;
 import io.github.resilience4j.retry.Retry;
 import io.github.resilience4j.retry.RetryConfig;
+import io.github.resilience4j.timelimiter.TimeLimiter;
+import io.github.resilience4j.timelimiter.TimeLimiterConfig;
 import org.springframework.stereotype.Component;
 
 import java.time.Duration;
+import java.util.concurrent.CompletableFuture;
 import java.util.function.Supplier;
 
 /**
@@ -32,6 +37,7 @@ public class ModelGovernanceExecutor {
     private static final int DEFAULT_TIMEOUT_DURATION_MS = 0;
     private static final int DEFAULT_MAX_CONCURRENT_CALLS = 20;
     private static final int DEFAULT_MAX_WAIT_DURATION_MS = 0;
+    private static final int DEFAULT_TIME_LIMITER_TIMEOUT_MS = 60000;
 
     /**
      * 执行受治理保护的模型调用。
@@ -48,6 +54,7 @@ public class ModelGovernanceExecutor {
         decoratedSupplier = decorateCircuitBreaker(configKey, settings, decoratedSupplier);
         decoratedSupplier = decorateBulkhead(configKey, settings, decoratedSupplier);
         decoratedSupplier = decorateRateLimiter(configKey, settings, decoratedSupplier);
+        decoratedSupplier = decorateTimeLimiter(configKey, settings, decoratedSupplier);
 
         // 2. 执行包装后的模型调用
         return decoratedSupplier.get();
@@ -122,6 +129,29 @@ public class ModelGovernanceExecutor {
                 .build();
         RateLimiter rateLimiter = RateLimiter.of("model-" + configKey, rateLimiterConfig);
         return RateLimiter.decorateSupplier(rateLimiter, supplier);
+    }
+
+    private <T> Supplier<T> decorateTimeLimiter(String configKey, ModelGovernanceSettings settings,
+                                                Supplier<T> supplier) {
+        if (settings == null || !Boolean.TRUE.equals(settings.getTimeLimiterEnabled())) {
+            return supplier;
+        }
+
+        // 1. 使用 TimeLimiter 限制同步模型调用最长执行时间
+        TimeLimiterConfig config = TimeLimiterConfig.custom()
+                .timeoutDuration(Duration.ofMillis(defaultIfInvalid(settings.getTimeLimiterTimeoutMs(),
+                        DEFAULT_TIME_LIMITER_TIMEOUT_MS)))
+                .cancelRunningFuture(true)
+                .build();
+        TimeLimiter timeLimiter = TimeLimiter.of("model-" + configKey, config);
+        return () -> {
+            try {
+                return timeLimiter.executeFutureSupplier(() -> CompletableFuture.supplyAsync(supplier));
+            } catch (Exception exception) {
+                throw new ServiceException("模型同步调用超时或被中断: " + configKey,
+                        exception, BaseErrorCode.SERVICE_ERROR);
+            }
+        };
     }
 
     private int defaultIfInvalid(Integer value, int defaultValue) {

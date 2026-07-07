@@ -5,6 +5,7 @@ import org.junit.jupiter.api.Test;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
  * 模型治理执行器测试。
@@ -30,5 +31,23 @@ class ModelGovernanceExecutorTest {
 
         assertThat(result).isEqualTo("ok");
         assertThat(calls).hasValue(2);
+    }
+
+    @Test
+    void timeLimiterShouldTimeoutSlowSynchronousCall() {
+        ModelGovernanceExecutor executor = new ModelGovernanceExecutor();
+        ModelGovernanceSettings settings = ModelGovernanceSettings.builder()
+                .timeLimiterEnabled(Boolean.TRUE)
+                .timeLimiterTimeoutMs(50)
+                .build();
+
+        assertThatThrownBy(() -> executor.execute("slow-chat", settings, () -> {
+            try {
+                Thread.sleep(200);
+            } catch (InterruptedException exception) {
+                Thread.currentThread().interrupt();
+            }
+            return "ok";
+        })).isInstanceOf(Exception.class);
     }
 }
