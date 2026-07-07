@@ -41,7 +41,6 @@
 
 ## 阶段三未实现
 
-- [ ] 将 `ModelRouter` 从本地配置路由切换为 `model_config`、`model_route` 注册表快照路由。
 - [ ] 将 `ModelClientFactory` 缓存 Key 从 Profile 维度切换为 `config_id + version`。
 - [ ] 将 `ModelGovernanceResolver` 接入 `model_governance_config` 表，并合并本地默认配置。
 - [ ] 补齐模型配置、模型路由、路由配置的完整 REST CRUD 接口。
@@ -63,6 +62,7 @@
 - [x] 新增模型注册表、模型配置、模型路由和路由配置基础表结构。
 - [x] 新增模型密钥加密器。
 - [x] 新增模型注册表快照和刷新消息抽象。
+- [x] 将 `ModelRouter` 切换为数据库注册表快照优先，保留本地配置兜底。
 - [x] 新增模型厂商推荐值 REST 接口。
 - [x] 统一 `ModelGateway`，提供 Chat、Embedding、Rerank 三类入口。
 - [x] 接入 OpenAI-compatible Embedding 模型真实调用初版。
