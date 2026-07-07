@@ -31,4 +31,15 @@ public class ModelProviderController {
         // 1. 查询内置模型厂商推荐值
         return Results.success(modelProviderCatalogService.listProviders());
     }
+
+    /**
+     * 查询模型厂商目录，提供 REST 风格显式路径。
+     *
+     * @return 模型厂商目录
+     */
+    @GetMapping("/catalog")
+    public Result<List<ModelProviderCatalogResponse>> listProviderCatalog() {
+        // 1. 复用模型厂商推荐值查询逻辑
+        return listProviders();
+    }
 }

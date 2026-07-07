@@ -26,4 +26,12 @@ class ModelProviderCatalogServiceImplTest {
         assertThat(dashScope.recommendedModels())
                 .containsKeys(ModelType.CHAT, ModelType.EMBEDDING, ModelType.RERANK);
     }
+
+    @Test
+    void catalogShouldExposeDefaultGovernanceDescription() {
+        ModelProviderCatalogServiceImpl service = new ModelProviderCatalogServiceImpl();
+
+        assertThat(service.listProviders())
+                .anySatisfy(provider -> assertThat(provider.defaultGovernanceDescription()).contains("默认治理"));
+    }
 }

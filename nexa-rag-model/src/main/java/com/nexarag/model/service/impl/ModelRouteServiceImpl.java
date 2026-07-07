@@ -6,6 +6,8 @@ import com.nexarag.common.error.BaseErrorCode;
 import com.nexarag.common.exception.ClientException;
 import com.nexarag.model.config.ModelGovernanceProperties;
 import com.nexarag.model.dto.ModelRouteCreateRequest;
+import com.nexarag.model.dto.ModelRouteResponse;
+import com.nexarag.model.dto.ModelRouteUpdateRequest;
 import com.nexarag.model.entity.ModelGovernanceConfig;
 import com.nexarag.model.entity.ModelRegistryVersion;
 import com.nexarag.model.entity.ModelRoute;
@@ -14,11 +16,15 @@ import com.nexarag.model.mapper.ModelRouteMapper;
 import com.nexarag.model.mapper.ModelRegistryVersionMapper;
 import com.nexarag.model.refresh.ModelRegistryChangePublisher;
 import com.nexarag.model.service.ModelGovernanceConfigService;
+import com.nexarag.model.service.ModelRouteConfigService;
 import com.nexarag.model.service.ModelRouteService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
+
+import java.time.LocalDateTime;
+import java.util.List;
 
 /**
  * 模型路由服务实现类，负责模型路由表基础数据操作。
@@ -36,6 +42,7 @@ public class ModelRouteServiceImpl extends ServiceImpl<ModelRouteMapper, ModelRo
     private final DefaultModelGovernancePolicyFactory defaultModelGovernancePolicyFactory;
     private final ModelGovernanceConfigService modelGovernanceConfigService;
     private final ModelGovernanceProperties modelGovernanceProperties;
+    private final ModelRouteConfigService modelRouteConfigService;
 
     @Override
     @Transactional(rollbackFor = Exception.class)
@@ -66,6 +73,96 @@ public class ModelRouteServiceImpl extends ServiceImpl<ModelRouteMapper, ModelRo
         return route;
     }
 
+    @Override
+    public List<ModelRouteResponse> listRouteResponses() {
+        // 1. 查询模型路由列表并转换为响应对象
+        return this.list().stream()
+                .map(this::toResponse)
+                .toList();
+    }
+
+    @Override
+    public ModelRouteResponse getRouteResponse(Long routeId) {
+        // 1. 查询模型路由详情并转换为响应对象
+        return toResponse(getRequiredRoute(routeId));
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public ModelRoute updateRoute(Long routeId, ModelRouteUpdateRequest request) {
+        if (request == null) {
+            throw new ClientException("模型路由更新请求不能为空", BaseErrorCode.PARAM_ERROR);
+        }
+
+        // 1. 查询已有模型路由
+        ModelRoute route = getRequiredRoute(routeId);
+        String routeKey = StringUtils.hasText(request.routeKey()) ? request.routeKey() : route.getRouteKey();
+        if (!route.getRouteKey().equals(routeKey) && existsByRouteKey(routeKey, routeId)) {
+            throw new ClientException("模型路由标识已存在，routeKey=" + routeKey, BaseErrorCode.PARAM_ERROR);
+        }
+
+        // 2. 应用非空更新字段
+        route.setRouteKey(routeKey);
+        if (request.modelType() != null) {
+            route.setModelType(request.modelType());
+        }
+        if (request.strategy() != null) {
+            route.setStrategy(request.strategy());
+        }
+        if (request.enabled() != null) {
+            route.setEnabled(request.enabled());
+        }
+        if (request.remark() != null) {
+            route.setRemark(request.remark());
+        }
+
+        // 3. 更新模型路由并发布注册表刷新
+        updateRouteById(route);
+        bumpRegistryVersionAndPublish();
+        return route;
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void deleteRoute(Long routeId) {
+        if (routeId == null) {
+            throw new ClientException("模型路由ID不能为空", BaseErrorCode.PARAM_ERROR);
+        }
+
+        // 1. 确认模型路由存在
+        getRequiredRoute(routeId);
+
+        // 2. 禁止删除仍包含候选模型的路由
+        if (modelRouteConfigService.existsByRouteId(routeId)) {
+            throw new ClientException("模型路由仍存在候选配置，请先移除路由下的模型配置", BaseErrorCode.PARAM_ERROR);
+        }
+
+        // 3. 执行逻辑删除并记录删除时间
+        removeRouteById(routeId);
+
+        // 4. 触发模型注册表刷新
+        bumpRegistryVersionAndPublish();
+    }
+
+    @Override
+    public ModelRouteResponse toResponse(ModelRoute route) {
+        if (route == null) {
+            return null;
+        }
+
+        // 1. 转换为前端展示使用的模型路由响应
+        return ModelRouteResponse.builder()
+                .routeId(route.getRouteId())
+                .routeKey(route.getRouteKey())
+                .modelType(route.getModelType())
+                .strategy(route.getStrategy())
+                .enabled(route.getEnabled())
+                .remark(route.getRemark())
+                .createTime(route.getCreateTime())
+                .updateTime(route.getUpdateTime())
+                .build();
+    }
+
     /**
      * 判断模型路由标识是否已存在。
      *
@@ -88,6 +185,51 @@ public class ModelRouteServiceImpl extends ServiceImpl<ModelRouteMapper, ModelRo
      */
     protected boolean saveRoute(ModelRoute route) {
         return this.save(route);
+    }
+
+    /**
+     * 按ID更新模型路由。
+     *
+     * @param route 模型路由
+     * @return true 表示更新成功
+     */
+    protected boolean updateRouteById(ModelRoute route) {
+        return this.lambdaUpdate()
+                .eq(ModelRoute::getRouteId, route.getRouteId())
+                .set(ModelRoute::getRouteKey, route.getRouteKey())
+                .set(ModelRoute::getModelType, route.getModelType())
+                .set(ModelRoute::getStrategy, route.getStrategy())
+                .set(ModelRoute::getEnabled, route.getEnabled())
+                .set(ModelRoute::getRemark, route.getRemark())
+                .update();
+    }
+
+    /**
+     * 根据ID查询模型路由，不存在时抛出异常。
+     *
+     * @param routeId 模型路由ID
+     * @return 模型路由
+     */
+    protected ModelRoute getRequiredRoute(Long routeId) {
+        ModelRoute route = this.getById(routeId);
+        if (route == null) {
+            throw new ClientException("模型路由不存在，routeId=" + routeId, BaseErrorCode.PARAM_ERROR);
+        }
+        return route;
+    }
+
+    /**
+     * 按ID逻辑删除模型路由。
+     *
+     * @param routeId 模型路由ID
+     * @return true 表示删除成功
+     */
+    protected boolean removeRouteById(Long routeId) {
+        return this.lambdaUpdate()
+                .eq(ModelRoute::getRouteId, routeId)
+                .set(ModelRoute::getDelFlag, 1)
+                .set(ModelRoute::getDeleteTime, LocalDateTime.now())
+                .update();
     }
 
     /**

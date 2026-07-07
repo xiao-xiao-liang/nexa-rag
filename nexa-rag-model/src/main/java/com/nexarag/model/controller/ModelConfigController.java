@@ -16,6 +16,7 @@ import com.nexarag.model.service.ModelGovernanceConfigService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
@@ -88,6 +89,20 @@ public class ModelConfigController {
     }
 
     /**
+     * 局部更新模型配置。
+     *
+     * @param configId 模型配置ID
+     * @param request  更新请求
+     * @return 更新后的模型配置
+     */
+    @PatchMapping("/{configId}")
+    public Result<ModelConfigResponse> patchConfig(@PathVariable Long configId,
+                                                   @RequestBody ModelConfigUpdateRequest request) {
+        // 1. 复用模型配置更新逻辑，按非空字段局部更新
+        return updateConfig(configId, request);
+    }
+
+    /**
      * 删除模型配置。
      *
      * @param configId 模型配置ID
@@ -113,6 +128,21 @@ public class ModelConfigController {
                                                           ModelConnectionTestRequest request) {
         // 1. 委托模型连接测试服务执行配置测试
         return Results.success(modelConnectionTestService.testConfig(configId, request));
+    }
+
+    /**
+     * 测试模型配置连接，提供 REST 风格路径。
+     *
+     * @param configId 模型配置ID
+     * @param request  测试请求
+     * @return 测试结果
+     */
+    @PostMapping("/{configId}/connection-tests")
+    public Result<ModelConnectionTestResponse> createConfigConnectionTest(@PathVariable Long configId,
+                                                                          @RequestBody(required = false)
+                                                                          ModelConnectionTestRequest request) {
+        // 1. 复用模型配置连接测试逻辑
+        return testConfig(configId, request);
     }
 
     /**

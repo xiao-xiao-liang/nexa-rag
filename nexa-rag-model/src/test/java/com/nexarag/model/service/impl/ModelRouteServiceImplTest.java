@@ -1,5 +1,6 @@
 package com.nexarag.model.service.impl;
 
+import com.nexarag.common.exception.ClientException;
 import com.nexarag.model.config.ModelGovernanceProperties;
 import com.nexarag.model.dto.ModelRouteCreateRequest;
 import com.nexarag.model.entity.ModelGovernanceConfig;
@@ -9,9 +10,11 @@ import com.nexarag.model.enums.ModelRouteStrategy;
 import com.nexarag.model.enums.ModelType;
 import com.nexarag.model.governance.DefaultModelGovernancePolicyFactory;
 import com.nexarag.model.service.ModelGovernanceConfigService;
+import com.nexarag.model.service.ModelRouteConfigService;
 import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
@@ -52,15 +55,46 @@ class ModelRouteServiceImplTest {
                         && "chat".equals(config.getRouteKey())));
     }
 
+    @Test
+    void deleteRouteShouldFailWhenRouteHasCandidates() {
+        ModelRouteConfigService routeConfigService = mock(ModelRouteConfigService.class);
+        when(routeConfigService.existsByRouteId(2001L)).thenReturn(true);
+        TestableModelRouteServiceImpl service = new TestableModelRouteServiceImpl(routeConfigService);
+        service.existingRoute = ModelRoute.builder()
+                .routeId(2001L)
+                .routeKey("chat")
+                .modelType(ModelType.CHAT)
+                .strategy(ModelRouteStrategy.PRIMARY_BACKUP)
+                .enabled(Boolean.TRUE)
+                .build();
+
+        assertThatThrownBy(() -> service.deleteRoute(2001L))
+                .isInstanceOf(ClientException.class)
+                .hasMessageContaining("请先移除路由下的模型配置");
+    }
+
     private static class TestableModelRouteServiceImpl extends ModelRouteServiceImpl {
 
         private ModelRoute savedRoute;
+        private ModelRoute existingRoute;
         private int registryBumpCount;
 
         private TestableModelRouteServiceImpl(DefaultModelGovernancePolicyFactory policyFactory,
                                               ModelGovernanceConfigService governanceConfigService,
                                               ModelGovernanceProperties properties) {
-            super(null, null, policyFactory, governanceConfigService, properties);
+            this(policyFactory, governanceConfigService, properties, mock(ModelRouteConfigService.class));
+        }
+
+        private TestableModelRouteServiceImpl(ModelRouteConfigService routeConfigService) {
+            this(new DefaultModelGovernancePolicyFactory(), mock(ModelGovernanceConfigService.class),
+                    new ModelGovernanceProperties(), routeConfigService);
+        }
+
+        private TestableModelRouteServiceImpl(DefaultModelGovernancePolicyFactory policyFactory,
+                                              ModelGovernanceConfigService governanceConfigService,
+                                              ModelGovernanceProperties properties,
+                                              ModelRouteConfigService routeConfigService) {
+            super(null, null, policyFactory, governanceConfigService, properties, routeConfigService);
         }
 
         @Override
@@ -72,6 +106,11 @@ class ModelRouteServiceImplTest {
         protected boolean saveRoute(ModelRoute route) {
             this.savedRoute = route;
             return true;
+        }
+
+        @Override
+        protected ModelRoute getRequiredRoute(Long routeId) {
+            return existingRoute;
         }
 
         @Override

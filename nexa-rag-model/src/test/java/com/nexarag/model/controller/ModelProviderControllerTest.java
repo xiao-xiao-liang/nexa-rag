@@ -48,6 +48,16 @@ class ModelProviderControllerTest {
                 .andExpect(jsonPath("$.data[2].provider").value("DASHSCOPE"));
     }
 
+    @Test
+    void listProviderCatalogShouldReturnProviderCatalog() throws Exception {
+        when(modelProviderCatalogService.listProviders()).thenReturn(List.of(providerCatalog(ModelProvider.OPENAI)));
+
+        mockMvc.perform(get("/api/model/providers/catalog"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("0"))
+                .andExpect(jsonPath("$.data[0].provider").value("OPENAI"));
+    }
+
     private ModelProviderCatalogResponse providerCatalog(ModelProvider provider) {
         return ModelProviderCatalogResponse.builder()
                 .provider(provider)

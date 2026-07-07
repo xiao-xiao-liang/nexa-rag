@@ -15,6 +15,11 @@ import java.util.Map;
 @Service
 public class ModelProviderCatalogServiceImpl implements ModelProviderCatalogService {
 
+    private static final String CHAT_ENDPOINT_PATH = "/chat/completions";
+    private static final String RERANK_ENDPOINT_PATH = "/compatible-api/v1/reranks";
+    private static final String DEFAULT_GOVERNANCE_DESCRIPTION =
+            "默认治理会按模型类型自动创建限流、熔断、并发隔离和超时保护配置，可在治理配置中调整。";
+
     @Override
     public List<ModelProviderCatalogResponse> listProviders() {
         return List.of(
@@ -40,6 +45,9 @@ public class ModelProviderCatalogServiceImpl implements ModelProviderCatalogServ
                         ModelType.EMBEDDING, List.of("text-embedding-3-small", "text-embedding-3-large")
                 ))
                 .apiKeyRequired(true)
+                .openAiCompatible(ModelProvider.OPENAI.isOpenAiCompatible())
+                .defaultEndpointPath(CHAT_ENDPOINT_PATH)
+                .defaultGovernanceDescription(DEFAULT_GOVERNANCE_DESCRIPTION)
                 .build();
     }
 
@@ -54,6 +62,9 @@ public class ModelProviderCatalogServiceImpl implements ModelProviderCatalogServ
                         ModelType.EMBEDDING, List.of("nomic-embed-text")
                 ))
                 .apiKeyRequired(false)
+                .openAiCompatible(ModelProvider.OLLAMA.isOpenAiCompatible())
+                .defaultEndpointPath(CHAT_ENDPOINT_PATH)
+                .defaultGovernanceDescription(DEFAULT_GOVERNANCE_DESCRIPTION)
                 .build();
     }
 
@@ -69,6 +80,9 @@ public class ModelProviderCatalogServiceImpl implements ModelProviderCatalogServ
                         ModelType.RERANK, List.of("qwen3-rerank")
                 ))
                 .apiKeyRequired(true)
+                .openAiCompatible(ModelProvider.DASHSCOPE.isOpenAiCompatible())
+                .defaultEndpointPath(RERANK_ENDPOINT_PATH)
+                .defaultGovernanceDescription(DEFAULT_GOVERNANCE_DESCRIPTION)
                 .build();
     }
 
@@ -100,6 +114,9 @@ public class ModelProviderCatalogServiceImpl implements ModelProviderCatalogServ
                 .defaultBaseUrl(baseUrl)
                 .recommendedModels(Map.of())
                 .apiKeyRequired(true)
+                .openAiCompatible(provider.isOpenAiCompatible())
+                .defaultEndpointPath(CHAT_ENDPOINT_PATH)
+                .defaultGovernanceDescription(DEFAULT_GOVERNANCE_DESCRIPTION)
                 .build();
     }
 }

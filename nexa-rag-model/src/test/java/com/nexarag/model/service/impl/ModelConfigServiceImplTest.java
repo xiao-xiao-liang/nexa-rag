@@ -1,5 +1,6 @@
 package com.nexarag.model.service.impl;
 
+import com.nexarag.common.exception.ClientException;
 import com.nexarag.model.dto.ModelConfigCreateRequest;
 import com.nexarag.model.dto.ModelConfigUpdateRequest;
 import com.nexarag.model.config.ModelGovernanceProperties;
@@ -11,9 +12,11 @@ import com.nexarag.model.enums.ModelType;
 import com.nexarag.model.governance.DefaultModelGovernancePolicyFactory;
 import com.nexarag.model.security.ModelSecretEncryptor;
 import com.nexarag.model.service.ModelGovernanceConfigService;
+import com.nexarag.model.service.ModelRouteConfigService;
 import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
@@ -217,6 +220,26 @@ class ModelConfigServiceImplTest {
         assertThat(service.registryBumpCount).isEqualTo(1);
     }
 
+    @Test
+    void deleteConfigShouldFailWhenReferencedByRouteConfig() {
+        ModelRouteConfigService routeConfigService = mock(ModelRouteConfigService.class);
+        when(routeConfigService.existsByConfigId(1L)).thenReturn(true);
+        TestableModelConfigServiceImpl service = new TestableModelConfigServiceImpl(routeConfigService);
+        service.existingConfig = ModelConfig.builder()
+                .configId(1L)
+                .configKey("embedding.openai")
+                .modelType(ModelType.EMBEDDING)
+                .provider(ModelProvider.OPENAI)
+                .baseUrl("https://api.openai.com/v1")
+                .modelName("text-embedding-3-small")
+                .version(1L)
+                .build();
+
+        assertThatThrownBy(() -> service.deleteConfig(1L))
+                .isInstanceOf(ClientException.class)
+                .hasMessageContaining("请先从路由中移除该模型配置");
+    }
+
     private static class TestableModelConfigServiceImpl extends ModelConfigServiceImpl {
 
         private final ModelSecretEncryptor encryptor = new ModelSecretEncryptor("0123456789abcdef0123456789abcdef");
@@ -228,14 +251,26 @@ class ModelConfigServiceImplTest {
 
         private TestableModelConfigServiceImpl() {
             this(new DefaultModelGovernancePolicyFactory(), mock(ModelGovernanceConfigService.class),
-                    new ModelGovernanceProperties());
+                    new ModelGovernanceProperties(), mock(ModelRouteConfigService.class));
+        }
+
+        private TestableModelConfigServiceImpl(ModelRouteConfigService routeConfigService) {
+            this(new DefaultModelGovernancePolicyFactory(), mock(ModelGovernanceConfigService.class),
+                    new ModelGovernanceProperties(), routeConfigService);
         }
 
         private TestableModelConfigServiceImpl(DefaultModelGovernancePolicyFactory policyFactory,
                                                ModelGovernanceConfigService governanceConfigService,
                                                ModelGovernanceProperties properties) {
+            this(policyFactory, governanceConfigService, properties, mock(ModelRouteConfigService.class));
+        }
+
+        private TestableModelConfigServiceImpl(DefaultModelGovernancePolicyFactory policyFactory,
+                                               ModelGovernanceConfigService governanceConfigService,
+                                               ModelGovernanceProperties properties,
+                                               ModelRouteConfigService routeConfigService) {
             super(new ModelSecretEncryptor("0123456789abcdef0123456789abcdef"), null, null,
-                    policyFactory, governanceConfigService, properties);
+                    policyFactory, governanceConfigService, properties, routeConfigService);
         }
 
         @Override

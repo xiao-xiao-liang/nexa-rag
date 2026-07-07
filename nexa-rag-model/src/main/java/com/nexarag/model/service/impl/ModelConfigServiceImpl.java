@@ -19,6 +19,7 @@ import com.nexarag.model.refresh.ModelRegistryChangePublisher;
 import com.nexarag.model.security.ModelSecretEncryptor;
 import com.nexarag.model.service.ModelConfigService;
 import com.nexarag.model.service.ModelGovernanceConfigService;
+import com.nexarag.model.service.ModelRouteConfigService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -51,6 +52,7 @@ public class ModelConfigServiceImpl extends ServiceImpl<ModelConfigMapper, Model
     private final DefaultModelGovernancePolicyFactory defaultModelGovernancePolicyFactory;
     private final ModelGovernanceConfigService modelGovernanceConfigService;
     private final ModelGovernanceProperties modelGovernanceProperties;
+    private final ModelRouteConfigService modelRouteConfigService;
 
     @Override
     @Transactional(rollbackFor = Exception.class)
@@ -150,10 +152,15 @@ public class ModelConfigServiceImpl extends ServiceImpl<ModelConfigMapper, Model
         // 1. 确认模型配置存在
         getRequiredConfig(configId);
 
-        // 2. 执行逻辑删除并记录删除时间
+        // 2. 禁止删除仍被路由候选引用的模型配置
+        if (modelRouteConfigService.existsByConfigId(configId)) {
+            throw new ClientException("模型配置仍被路由引用，请先从路由中移除该模型配置", BaseErrorCode.PARAM_ERROR);
+        }
+
+        // 3. 执行逻辑删除并记录删除时间
         removeConfigById(configId);
 
-        // 3. 触发模型注册表刷新
+        // 4. 触发模型注册表刷新
         bumpRegistryVersionAndPublish();
     }
 
