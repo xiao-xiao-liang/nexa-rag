@@ -24,7 +24,7 @@ class RedisModelRegistryRefreshMessageClientTest {
                 new RedisModelRegistryRefreshMessageClient(redisTemplate, objectMapper);
 
         client.publish("nexa.model.registry.changed",
-                new ModelRegistryChangedMessage(8L, ModelRefreshChannel.PUB_SUB));
+                new ModelRegistryChangedMessage(8L, ModelRefreshChannel.REDIS_PUB_SUB));
 
         ArgumentCaptor<String> messageCaptor = ArgumentCaptor.forClass(String.class);
         verify(redisTemplate).convertAndSend(
@@ -34,7 +34,7 @@ class RedisModelRegistryRefreshMessageClientTest {
         ModelRegistryChangedMessage actual =
                 objectMapper.readValue(messageCaptor.getValue(), ModelRegistryChangedMessage.class);
         assertThat(actual.versionNo()).isEqualTo(8L);
-        assertThat(actual.channel()).isEqualTo(ModelRefreshChannel.PUB_SUB);
-        assertThat(client.channel()).isEqualTo(ModelRefreshChannel.PUB_SUB);
+        assertThat(actual.channel()).isEqualTo(ModelRefreshChannel.REDIS_PUB_SUB);
+        assertThat(client.channel()).isEqualTo(ModelRefreshChannel.REDIS_PUB_SUB);
     }
 }

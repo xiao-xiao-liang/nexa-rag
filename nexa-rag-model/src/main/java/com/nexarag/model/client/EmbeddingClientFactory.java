@@ -57,7 +57,11 @@ public class EmbeddingClientFactory {
 
     private String cacheKey(ModelRouteDecision decision) {
         ModelProfileProperties profile = decision.profile();
+        if (decision.configId() != null) {
+            return decision.configId() + ":" + decision.registryVersion();
+        }
         return String.join(":",
+                "local",
                 decision.profileName(),
                 nullToEmpty(profile.getBaseUrl()),
                 nullToEmpty(profile.getModelName()),

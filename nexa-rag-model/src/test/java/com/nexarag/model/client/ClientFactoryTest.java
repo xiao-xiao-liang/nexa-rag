@@ -23,6 +23,16 @@ class ClientFactoryTest {
     }
 
     @Test
+    void clientCacheShouldSeparateSameConfigAcrossRegistryVersions() {
+        ChatClientFactory factory = new ChatClientFactory();
+
+        Object versionOne = factory.getChatClient(decision(1001L, 1L));
+        Object versionTwo = factory.getChatClient(decision(1001L, 2L));
+
+        assertThat(versionOne).isNotSameAs(versionTwo);
+    }
+
+    @Test
     void embeddingClientCacheShouldSeparateEndpointPath() {
         EmbeddingClientFactory factory = new EmbeddingClientFactory();
 
@@ -52,5 +62,16 @@ class ClientFactoryTest {
                 .modelName(modelName)
                 .build();
         return new ModelRouteDecision("primary", profile, false);
+    }
+
+    private ModelRouteDecision decision(Long configId, Long registryVersion) {
+        ModelProfileProperties profile = ModelProfileProperties.builder()
+                .provider("OPENAI")
+                .baseUrl("https://api.openai.com/v1")
+                .endpointPath("/chat/completions")
+                .apiKey("sk-test")
+                .modelName("gpt-4o-mini")
+                .build();
+        return new ModelRouteDecision("primary", profile, false, null, null, null, configId, registryVersion);
     }
 }

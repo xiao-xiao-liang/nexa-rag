@@ -6,12 +6,17 @@ package com.nexarag.model.enums;
 public enum ModelRefreshChannel {
 
     /**
-     * 通过统一 MQ 适配发布刷新消息。
+     * 仅刷新当前 JVM 实例。
      */
-    MQ,
+    LOCAL,
 
     /**
-     * 通过 Redis PubSub 发布刷新消息。
+     * 通过 Redis Pub/Sub 发布刷新消息。
      */
-    PUB_SUB
+    REDIS_PUB_SUB,
+
+    /**
+     * 通过 infra MQ 适配发布刷新消息，当前阶段仅预留。
+     */
+    INFRA_MQ
 }

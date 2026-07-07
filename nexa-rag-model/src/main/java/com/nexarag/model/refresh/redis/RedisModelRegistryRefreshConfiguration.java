@@ -18,7 +18,7 @@ import java.nio.charset.StandardCharsets;
  * Redis PubSub 模型注册表刷新配置，负责注册发布端和订阅监听容器。
  */
 @Configuration
-@ConditionalOnProperty(prefix = "nexa.model.registry", name = "refresh-channel", havingValue = "PUB_SUB")
+@ConditionalOnProperty(prefix = "nexa.model.registry", name = "refresh-channel", havingValue = "REDIS_PUB_SUB")
 public class RedisModelRegistryRefreshConfiguration {
 
     /**

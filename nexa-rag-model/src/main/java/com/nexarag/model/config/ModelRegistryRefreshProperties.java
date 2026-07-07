@@ -16,7 +16,7 @@ public class ModelRegistryRefreshProperties {
     /**
      * 注册表刷新通道。
      */
-    private ModelRefreshChannel refreshChannel = ModelRefreshChannel.MQ;
+    private ModelRefreshChannel refreshChannel = ModelRefreshChannel.LOCAL;
 
     /**
      * 注册表刷新消息主题。

@@ -17,24 +17,25 @@ class ModelRegistryChangePublisherTest {
     @Test
     void publishShouldUseConfiguredChannelAndTopic() {
         ModelRegistryRefreshProperties properties = new ModelRegistryRefreshProperties();
-        properties.setRefreshChannel(ModelRefreshChannel.PUB_SUB);
+        properties.setRefreshChannel(ModelRefreshChannel.REDIS_PUB_SUB);
         properties.setRefreshTopic("nexa.model.registry.changed");
         RecordingMessageClient client = new RecordingMessageClient();
         DefaultModelRegistryChangePublisher publisher =
-                new DefaultModelRegistryChangePublisher(properties, List.of(client));
+                new DefaultModelRegistryChangePublisher(properties, List.of(client), null);
 
         publisher.publish(3L);
 
         assertThat(client.topic).isEqualTo("nexa.model.registry.changed");
         assertThat(client.message.versionNo()).isEqualTo(3L);
-        assertThat(client.message.channel()).isEqualTo(ModelRefreshChannel.PUB_SUB);
+        assertThat(client.message.channel()).isEqualTo(ModelRefreshChannel.REDIS_PUB_SUB);
     }
 
     @Test
     void publishShouldNotBlockWhenMessageClientMissing() {
         ModelRegistryRefreshProperties properties = new ModelRegistryRefreshProperties();
+        properties.setRefreshChannel(ModelRefreshChannel.REDIS_PUB_SUB);
         DefaultModelRegistryChangePublisher publisher =
-                new DefaultModelRegistryChangePublisher(properties, List.of());
+                new DefaultModelRegistryChangePublisher(properties, List.of(), null);
 
         assertThatCode(() -> publisher.publish(4L)).doesNotThrowAnyException();
     }
@@ -42,9 +43,9 @@ class ModelRegistryChangePublisherTest {
     @Test
     void publishShouldNotBlockWhenMessageClientThrowsException() {
         ModelRegistryRefreshProperties properties = new ModelRegistryRefreshProperties();
-        properties.setRefreshChannel(ModelRefreshChannel.PUB_SUB);
+        properties.setRefreshChannel(ModelRefreshChannel.REDIS_PUB_SUB);
         DefaultModelRegistryChangePublisher publisher =
-                new DefaultModelRegistryChangePublisher(properties, List.of(new FailingMessageClient()));
+                new DefaultModelRegistryChangePublisher(properties, List.of(new FailingMessageClient()), null);
 
         assertThatCode(() -> publisher.publish(5L)).doesNotThrowAnyException();
     }
@@ -56,7 +57,7 @@ class ModelRegistryChangePublisherTest {
 
         @Override
         public ModelRefreshChannel channel() {
-            return ModelRefreshChannel.PUB_SUB;
+            return ModelRefreshChannel.REDIS_PUB_SUB;
         }
 
         @Override
@@ -70,7 +71,7 @@ class ModelRegistryChangePublisherTest {
 
         @Override
         public ModelRefreshChannel channel() {
-            return ModelRefreshChannel.PUB_SUB;
+            return ModelRefreshChannel.REDIS_PUB_SUB;
         }
 
         @Override

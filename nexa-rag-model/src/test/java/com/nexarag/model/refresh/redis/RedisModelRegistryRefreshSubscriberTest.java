@@ -21,12 +21,12 @@ class RedisModelRegistryRefreshSubscriberTest {
         RedisModelRegistryRefreshSubscriber subscriber =
                 new RedisModelRegistryRefreshSubscriber(objectMapper, listener);
         String message = objectMapper.writeValueAsString(
-                new ModelRegistryChangedMessage(9L, ModelRefreshChannel.PUB_SUB));
+                new ModelRegistryChangedMessage(9L, ModelRefreshChannel.REDIS_PUB_SUB));
 
         subscriber.onMessage(message);
 
         assertThat(listener.message.versionNo()).isEqualTo(9L);
-        assertThat(listener.message.channel()).isEqualTo(ModelRefreshChannel.PUB_SUB);
+        assertThat(listener.message.channel()).isEqualTo(ModelRefreshChannel.REDIS_PUB_SUB);
     }
 
     @Test

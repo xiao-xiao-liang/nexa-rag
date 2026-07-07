@@ -93,7 +93,8 @@ public class RegistryFirstModelRouter implements ModelRouter {
         ModelProfileProperties profile = toProfile(config);
         boolean fallback = routeConfig.getRole() == ModelRouteRole.BACKUP;
         return new ModelRouteDecision(config.getConfigKey(), profile, fallback,
-                routeConfig.getPriority(), routeConfig.getWeight(), routeConfig.getRouteConfigId(), config.getConfigId());
+                routeConfig.getPriority(), routeConfig.getWeight(), routeConfig.getRouteConfigId(),
+                config.getConfigId(), modelRegistry.current().versionNo());
     }
 
     private ModelProfileProperties toProfile(ModelConfig config) {

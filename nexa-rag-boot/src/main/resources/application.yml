@@ -67,6 +67,11 @@ nexa:
       vector-weight: 0.7
       keyword-weight: 0.3
   model:
+    registry:
+      # 模型注册表刷新通道：LOCAL=仅刷新当前实例，REDIS_PUB_SUB=Redis发布订阅通知多实例，INFRA_MQ=预留统一MQ通道。
+      refresh-channel: LOCAL
+      # 模型注册表刷新消息主题；REDIS_PUB_SUB 模式下发布和订阅都使用该主题。
+      refresh-topic: nexa.model.registry.changed
     governance:
       # 治理配置绑定模式：CONFIG=按模型配置生效，ROUTE=按业务路由生效；同一时间只生效一种模式。
       binding-mode: CONFIG

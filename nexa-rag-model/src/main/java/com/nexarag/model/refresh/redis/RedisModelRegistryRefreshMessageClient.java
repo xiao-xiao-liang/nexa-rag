@@ -21,7 +21,7 @@ public class RedisModelRegistryRefreshMessageClient implements ModelRefreshMessa
 
     @Override
     public ModelRefreshChannel channel() {
-        return ModelRefreshChannel.PUB_SUB;
+        return ModelRefreshChannel.REDIS_PUB_SUB;
     }
 
     @Override

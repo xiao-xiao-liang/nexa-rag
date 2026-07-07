@@ -12,9 +12,11 @@ import com.nexarag.model.config.ModelProfileProperties;
  * @param weight        候选权重
  * @param routeConfigId 路由配置关联ID
  * @param configId      模型配置ID
+ * @param registryVersion 模型注册表快照版本号
  */
 public record ModelRouteDecision(String profileName, ModelProfileProperties profile, boolean fallback,
-                                 Integer priority, Integer weight, Long routeConfigId, Long configId) {
+                                 Integer priority, Integer weight, Long routeConfigId, Long configId,
+                                 Long registryVersion) {
 
     /**
      * 构造兼容旧主备路由的决策对象。
@@ -24,6 +26,22 @@ public record ModelRouteDecision(String profileName, ModelProfileProperties prof
      * @param fallback    是否为备用模型
      */
     public ModelRouteDecision(String profileName, ModelProfileProperties profile, boolean fallback) {
-        this(profileName, profile, fallback, null, null, null, null);
+        this(profileName, profile, fallback, null, null, null, null, 0L);
+    }
+
+    /**
+     * 构造兼容已有数据库路由测试的决策对象。
+     *
+     * @param profileName   模型Profile名称
+     * @param profile       模型Profile配置
+     * @param fallback      是否为备用模型
+     * @param priority      候选优先级
+     * @param weight        候选权重
+     * @param routeConfigId 路由配置关联ID
+     * @param configId      模型配置ID
+     */
+    public ModelRouteDecision(String profileName, ModelProfileProperties profile, boolean fallback,
+                              Integer priority, Integer weight, Long routeConfigId, Long configId) {
+        this(profileName, profile, fallback, priority, weight, routeConfigId, configId, 0L);
     }
 }
