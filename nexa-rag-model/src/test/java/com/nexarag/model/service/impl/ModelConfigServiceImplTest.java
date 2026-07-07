@@ -2,13 +2,24 @@ package com.nexarag.model.service.impl;
 
 import com.nexarag.model.dto.ModelConfigCreateRequest;
 import com.nexarag.model.dto.ModelConfigUpdateRequest;
+import com.nexarag.model.config.ModelGovernanceProperties;
 import com.nexarag.model.entity.ModelConfig;
+import com.nexarag.model.entity.ModelGovernanceConfig;
+import com.nexarag.model.enums.ModelGovernanceBindingMode;
 import com.nexarag.model.enums.ModelProvider;
 import com.nexarag.model.enums.ModelType;
+import com.nexarag.model.governance.DefaultModelGovernancePolicyFactory;
 import com.nexarag.model.security.ModelSecretEncryptor;
+import com.nexarag.model.service.ModelGovernanceConfigService;
 import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 /**
  * 模型配置服务实现测试。
@@ -38,6 +49,35 @@ class ModelConfigServiceImplTest {
         assertThat(config.getEndpointPath()).isEqualTo("/embeddings");
         assertThat(service.savedConfig).isSameAs(config);
         assertThat(service.registryBumpCount).isEqualTo(1);
+    }
+
+    @Test
+    void createConfigShouldAutoCreateDefaultGovernanceWhenEnabled() {
+        DefaultModelGovernancePolicyFactory policyFactory = mock(DefaultModelGovernancePolicyFactory.class);
+        ModelGovernanceConfigService governanceConfigService = mock(ModelGovernanceConfigService.class);
+        ModelGovernanceProperties properties = new ModelGovernanceProperties();
+        properties.getGovernance().setAutoCreateDefault(Boolean.TRUE);
+        when(policyFactory.createForConfig(anyLong(), eq(ModelType.CHAT))).thenAnswer(invocation ->
+                ModelGovernanceConfig.builder()
+                        .bindingMode(ModelGovernanceBindingMode.CONFIG)
+                        .configId(invocation.getArgument(0))
+                        .enabled(Boolean.TRUE)
+                        .build());
+
+        TestableModelConfigServiceImpl service = new TestableModelConfigServiceImpl(policyFactory,
+                governanceConfigService, properties);
+        ModelConfig created = service.createConfig(ModelConfigCreateRequest.builder()
+                .configKey("chat.openai")
+                .modelType(ModelType.CHAT)
+                .provider(ModelProvider.OPENAI)
+                .baseUrl("https://api.openai.com/v1")
+                .apiKey("sk-chat")
+                .modelName("gpt-4o-mini")
+                .build());
+
+        verify(governanceConfigService).saveDefaultIfAbsent(argThat(config ->
+                config.getBindingMode() == ModelGovernanceBindingMode.CONFIG
+                        && created.getConfigId().equals(config.getConfigId())));
     }
 
     @Test
@@ -187,7 +227,15 @@ class ModelConfigServiceImplTest {
         private int registryBumpCount;
 
         private TestableModelConfigServiceImpl() {
-            super(new ModelSecretEncryptor("0123456789abcdef0123456789abcdef"), null, null);
+            this(new DefaultModelGovernancePolicyFactory(), mock(ModelGovernanceConfigService.class),
+                    new ModelGovernanceProperties());
+        }
+
+        private TestableModelConfigServiceImpl(DefaultModelGovernancePolicyFactory policyFactory,
+                                               ModelGovernanceConfigService governanceConfigService,
+                                               ModelGovernanceProperties properties) {
+            super(new ModelSecretEncryptor("0123456789abcdef0123456789abcdef"), null, null,
+                    policyFactory, governanceConfigService, properties);
         }
 
         @Override

@@ -4,17 +4,21 @@ import com.baomidou.mybatisplus.core.toolkit.IdWorker;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.nexarag.common.error.BaseErrorCode;
 import com.nexarag.common.exception.ClientException;
+import com.nexarag.model.config.ModelGovernanceProperties;
 import com.nexarag.model.dto.ModelConfigCreateRequest;
 import com.nexarag.model.dto.ModelConfigResponse;
 import com.nexarag.model.dto.ModelConfigUpdateRequest;
 import com.nexarag.model.entity.ModelConfig;
+import com.nexarag.model.entity.ModelGovernanceConfig;
 import com.nexarag.model.entity.ModelRegistryVersion;
 import com.nexarag.model.enums.ModelType;
+import com.nexarag.model.governance.DefaultModelGovernancePolicyFactory;
 import com.nexarag.model.mapper.ModelConfigMapper;
 import com.nexarag.model.mapper.ModelRegistryVersionMapper;
 import com.nexarag.model.refresh.ModelRegistryChangePublisher;
 import com.nexarag.model.security.ModelSecretEncryptor;
 import com.nexarag.model.service.ModelConfigService;
+import com.nexarag.model.service.ModelGovernanceConfigService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -44,6 +48,9 @@ public class ModelConfigServiceImpl extends ServiceImpl<ModelConfigMapper, Model
     private final ModelSecretEncryptor secretEncryptor;
     private final ModelRegistryVersionMapper modelRegistryVersionMapper;
     private final ModelRegistryChangePublisher modelRegistryChangePublisher;
+    private final DefaultModelGovernancePolicyFactory defaultModelGovernancePolicyFactory;
+    private final ModelGovernanceConfigService modelGovernanceConfigService;
+    private final ModelGovernanceProperties modelGovernanceProperties;
 
     @Override
     @Transactional(rollbackFor = Exception.class)
@@ -79,7 +86,10 @@ public class ModelConfigServiceImpl extends ServiceImpl<ModelConfigMapper, Model
         // 3. 保存模型配置
         saveConfig(config);
 
-        // 4. 触发模型注册表刷新
+        // 4. 自动创建模型级默认治理配置，已存在时不覆盖
+        autoCreateDefaultGovernance(config);
+
+        // 5. 触发模型注册表刷新
         bumpRegistryVersionAndPublish();
         return config;
     }
@@ -223,6 +233,25 @@ public class ModelConfigServiceImpl extends ServiceImpl<ModelConfigMapper, Model
                 .set(ModelConfig::getDelFlag, 1)
                 .set(ModelConfig::getDeleteTime, LocalDateTime.now())
                 .update();
+    }
+
+    /**
+     * 自动创建模型配置对应的默认治理配置。
+     *
+     * @param config 模型配置
+     */
+    protected void autoCreateDefaultGovernance(ModelConfig config) {
+        if (modelGovernanceProperties == null
+                || !Boolean.TRUE.equals(modelGovernanceProperties.getGovernance().getAutoCreateDefault())) {
+            return;
+        }
+
+        // 1. 按模型类型生成默认治理配置
+        ModelGovernanceConfig governanceConfig =
+                defaultModelGovernancePolicyFactory.createForConfig(config.getConfigId(), config.getModelType());
+
+        // 2. 保存默认治理配置，已存在时不覆盖
+        modelGovernanceConfigService.saveDefaultIfAbsent(governanceConfig);
     }
 
     /**

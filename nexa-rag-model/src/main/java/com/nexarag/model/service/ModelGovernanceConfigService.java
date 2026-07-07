@@ -28,6 +28,36 @@ public interface ModelGovernanceConfigService extends IService<ModelGovernanceCo
     ModelGovernanceConfig saveByConfigId(Long configId, ModelGovernanceConfigRequest request);
 
     /**
+     * 判断模型配置级治理配置是否存在。
+     *
+     * @param configId 模型配置ID
+     * @return true 表示存在
+     */
+    boolean existsConfigBinding(Long configId);
+
+    /**
+     * 判断路由级治理配置是否存在。
+     *
+     * @param routeKey 路由 key
+     * @return true 表示存在
+     */
+    boolean existsRouteBinding(String routeKey);
+
+    /**
+     * 保存默认治理配置，已存在时不覆盖。
+     *
+     * @param config 默认治理配置
+     */
+    void saveDefaultIfAbsent(ModelGovernanceConfig config);
+
+    /**
+     * 显式恢复默认治理策略。
+     *
+     * @param governanceId 治理配置ID
+     */
+    void resetDefault(Long governanceId);
+
+    /**
      * 转换为治理配置响应。
      *
      * @param config 治理配置

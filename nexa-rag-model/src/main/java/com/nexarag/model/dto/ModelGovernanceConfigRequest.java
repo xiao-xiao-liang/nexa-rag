@@ -1,10 +1,13 @@
 package com.nexarag.model.dto;
 
+import com.nexarag.model.enums.ModelGovernanceBindingMode;
 import lombok.Builder;
 
 /**
  * 模型治理配置保存请求。
  *
+ * @param bindingMode               治理配置绑定模式
+ * @param routeKey                  模型路由 key
  * @param enabled                   是否启用治理配置
  * @param retryEnabled              是否启用重试
  * @param maxAttempts               最大尝试次数
@@ -21,11 +24,17 @@ import lombok.Builder;
  * @param limitRefreshPeriodMs      限流周期刷新时间，单位毫秒
  * @param timeoutDurationMs         获取限流许可等待时间，单位毫秒
  * @param bulkheadEnabled           是否启用并发隔离
+ * @param timeLimiterEnabled        是否启用同步调用超时保护
+ * @param timeLimiterTimeoutMs      同步调用超时时间，单位毫秒
+ * @param streamFirstChunkTimeoutMs 流式调用首个分片超时时间，单位毫秒
+ * @param streamMaxDurationMs       流式调用最大持续时间，单位毫秒
  * @param maxConcurrentCalls        最大并发调用数
  * @param maxWaitDurationMs         获取并发许可等待时间，单位毫秒
  */
 @Builder
 public record ModelGovernanceConfigRequest(
+        ModelGovernanceBindingMode bindingMode,
+        String routeKey,
         Boolean enabled,
         Boolean retryEnabled,
         Integer maxAttempts,
@@ -42,6 +51,10 @@ public record ModelGovernanceConfigRequest(
         Integer limitRefreshPeriodMs,
         Integer timeoutDurationMs,
         Boolean bulkheadEnabled,
+        Boolean timeLimiterEnabled,
+        Integer timeLimiterTimeoutMs,
+        Integer streamFirstChunkTimeoutMs,
+        Integer streamMaxDurationMs,
         Integer maxConcurrentCalls,
         Integer maxWaitDurationMs) {
 }
