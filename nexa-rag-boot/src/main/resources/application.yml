@@ -67,6 +67,11 @@ nexa:
       vector-weight: 0.7
       keyword-weight: 0.3
   model:
+    governance:
+      # 治理配置绑定模式：CONFIG=按模型配置生效，ROUTE=按业务路由生效；同一时间只生效一种模式。
+      binding-mode: CONFIG
+      # 新增模型配置时是否自动创建默认治理配置；默认治理值可在管理接口中继续调整。
+      auto-create-default: true
     profiles:
       chat-primary:
         provider: OPENAI_COMPATIBLE

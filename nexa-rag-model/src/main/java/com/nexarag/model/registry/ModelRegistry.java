@@ -1,8 +1,10 @@
 package com.nexarag.model.registry;
 
 import com.nexarag.model.entity.ModelConfig;
+import com.nexarag.model.entity.ModelGovernanceConfig;
 import com.nexarag.model.entity.ModelRoute;
 import com.nexarag.model.entity.ModelRouteConfig;
+import com.nexarag.model.enums.ModelGovernanceBindingMode;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
@@ -76,5 +78,28 @@ public class ModelRegistry {
      */
     public List<ModelRouteConfig> getRouteConfigs(Long routeId) {
         return current().routeConfigMap().getOrDefault(routeId, List.of());
+    }
+
+    /**
+     * 根据治理绑定模式查询治理配置。
+     *
+     * @param bindingMode 治理绑定模式
+     * @param configId    模型配置ID
+     * @param routeKey    模型路由 key
+     * @return 治理配置，不存在返回 null
+     */
+    public ModelGovernanceConfig getGovernanceConfig(ModelGovernanceBindingMode bindingMode, Long configId,
+                                                     String routeKey) {
+        // 1. 根据绑定模式生成与快照一致的索引键
+        String key = switch (bindingMode == null ? ModelGovernanceBindingMode.CONFIG : bindingMode) {
+            case ROUTE -> routeKey == null || routeKey.isBlank() ? null : "ROUTE:" + routeKey;
+            case CONFIG -> configId == null ? null : "CONFIG:" + configId;
+        };
+
+        // 2. 缺失必要标识时直接返回空结果
+        if (key == null) {
+            return null;
+        }
+        return current().governanceConfigMap().get(key);
     }
 }

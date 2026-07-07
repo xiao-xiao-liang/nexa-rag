@@ -1,6 +1,7 @@
 package com.nexarag.model.registry;
 
 import com.nexarag.model.entity.ModelConfig;
+import com.nexarag.model.entity.ModelGovernanceConfig;
 import com.nexarag.model.entity.ModelRoute;
 import com.nexarag.model.entity.ModelRouteConfig;
 
@@ -13,7 +14,8 @@ import java.util.stream.Collectors;
  */
 public record ModelRegistrySnapshot(long versionNo, Map<Long, ModelConfig> configMap,
                                     Map<Long, ModelRoute> routeMap,
-                                    Map<Long, List<ModelRouteConfig>> routeConfigMap) {
+                                    Map<Long, List<ModelRouteConfig>> routeConfigMap,
+                                    Map<String, ModelGovernanceConfig> governanceConfigMap) {
 
     /**
      * 创建不可变模型注册表快照。
@@ -27,6 +29,21 @@ public record ModelRegistrySnapshot(long versionNo, Map<Long, ModelConfig> confi
         configMap = Map.copyOf(configMap == null ? Map.of() : configMap);
         routeMap = Map.copyOf(routeMap == null ? Map.of() : routeMap);
         routeConfigMap = copyRouteConfigMap(routeConfigMap);
+        governanceConfigMap = Map.copyOf(governanceConfigMap == null ? Map.of() : governanceConfigMap);
+    }
+
+    /**
+     * 创建不包含治理配置的模型注册表快照，兼容既有测试和调用方。
+     *
+     * @param versionNo      全局版本号
+     * @param configMap      模型配置映射
+     * @param routeMap       模型路由映射
+     * @param routeConfigMap 路由配置关联映射
+     */
+    public ModelRegistrySnapshot(long versionNo, Map<Long, ModelConfig> configMap,
+                                 Map<Long, ModelRoute> routeMap,
+                                 Map<Long, List<ModelRouteConfig>> routeConfigMap) {
+        this(versionNo, configMap, routeMap, routeConfigMap, Map.of());
     }
 
     /**
@@ -35,7 +52,7 @@ public record ModelRegistrySnapshot(long versionNo, Map<Long, ModelConfig> confi
      * @return 空模型注册表快照
      */
     public static ModelRegistrySnapshot empty() {
-        return new ModelRegistrySnapshot(0L, Map.of(), Map.of(), Map.of());
+        return new ModelRegistrySnapshot(0L, Map.of(), Map.of(), Map.of(), Map.of());
     }
 
     private static Map<Long, List<ModelRouteConfig>> copyRouteConfigMap(

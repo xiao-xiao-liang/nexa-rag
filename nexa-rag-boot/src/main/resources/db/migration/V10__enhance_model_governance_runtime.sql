@@ -1,4 +1,5 @@
 ALTER TABLE model_governance_config
+    MODIFY COLUMN config_id BIGINT NULL COMMENT '模型配置ID',
     ADD COLUMN binding_mode VARCHAR(32) NOT NULL DEFAULT 'CONFIG' COMMENT '治理配置绑定模式：CONFIG按模型配置绑定，ROUTE按路由key绑定' AFTER governance_id,
     ADD COLUMN route_key VARCHAR(128) NULL COMMENT '模型路由key，ROUTE绑定模式使用' AFTER config_id,
     ADD COLUMN time_limiter_enabled TINYINT(1) NOT NULL DEFAULT 0 COMMENT '是否启用同步调用超时保护' AFTER bulkhead_enabled,
