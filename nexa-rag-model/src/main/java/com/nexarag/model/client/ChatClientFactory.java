@@ -50,6 +50,7 @@ public class ChatClientFactory {
                 .build();
         OpenAiChatOptions options = OpenAiChatOptions.builder()
                 .model(profile.getModelName())
+                .streamUsage(true)
                 .build();
         return OpenAiChatModel.builder()
                 .openAiApi(openAiApi)

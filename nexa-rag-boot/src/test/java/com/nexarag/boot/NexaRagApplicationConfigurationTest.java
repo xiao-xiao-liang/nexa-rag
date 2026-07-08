@@ -21,15 +21,16 @@ class NexaRagApplicationConfigurationTest {
         assertThat(Arrays.asList(annotation.exclude())).doesNotContain(DataSourceAutoConfiguration.class);
     }
     @Test
-    void defaultApplicationShouldConfigureRedisConnectionPlaceholders() throws Exception {
+    void defaultApplicationShouldConfigureRedisConnectionDefaults() throws Exception {
         org.springframework.core.io.ClassPathResource resource = new org.springframework.core.io.ClassPathResource("application.yml");
 
         assertThat(resource.exists()).isTrue();
         String content = resource.getContentAsString(java.nio.charset.StandardCharsets.UTF_8);
         assertThat(content).contains("redis:");
-        assertThat(content).contains("host: ${NEXA_REDIS_HOST:192.168.0.134}");
-        assertThat(content).contains("port: ${NEXA_REDIS_PORT:6379}");
-        assertThat(content).contains("password: ${NEXA_REDIS_PASSWORD:}");
-        assertThat(content).contains("timeout: ${NEXA_REDIS_TIMEOUT:3s}");
+        assertThat(content).contains("host: 192.168.0.134");
+        assertThat(content).contains("port: 6379");
+        assertThat(content).contains("password: ");
+        assertThat(content).contains("timeout: 3s");
+        assertThat(content).doesNotContain("${");
     }
 }

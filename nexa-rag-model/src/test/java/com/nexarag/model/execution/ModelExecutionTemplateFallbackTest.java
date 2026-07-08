@@ -5,6 +5,7 @@ import com.nexarag.model.entity.ModelCallLog;
 import com.nexarag.model.enums.ModelBizType;
 import com.nexarag.model.enums.ModelRequestType;
 import com.nexarag.model.enums.ModelRouteStrategy;
+import com.nexarag.model.enums.TokenUsageSource;
 import com.nexarag.model.gateway.chat.ChatModelRequest;
 import com.nexarag.model.gateway.chat.ChatModelResponse;
 import com.nexarag.model.route.ModelRouteContext;
@@ -71,7 +72,8 @@ class ModelExecutionTemplateFallbackTest {
         assertThat(calls).hasValue(2);
         verify(modelCallLogService).markFailed(eq("chat-primary"), eq("IllegalStateException"),
                 eq("主模型失败"), anyLong());
-        verify(modelCallLogService).markSuccess(eq("chat-backup"), eq(1), eq(2), eq(3), anyLong());
+        verify(modelCallLogService).markSuccess(eq("chat-backup"), eq(1), eq(2), eq(3),
+                eq(TokenUsageSource.PROVIDER_USAGE), anyLong());
     }
 
     private ChatModelRequest request() {

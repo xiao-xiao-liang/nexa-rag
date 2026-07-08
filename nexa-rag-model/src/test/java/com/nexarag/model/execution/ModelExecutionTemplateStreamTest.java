@@ -92,6 +92,31 @@ class ModelExecutionTemplateStreamTest {
         verify(logService).markFailed(eq("call-1"), anyString(), contains("输出后失败"), anyLong());
     }
 
+    @Test
+    void streamShouldRecordProviderUsageWhenUsageChunkExists() {
+        ModelRouter router = mock(ModelRouter.class);
+        ModelCallLogService logService = mock(ModelCallLogService.class);
+        when(router.plan(any(ModelRouteContext.class))).thenReturn(new ModelRoutePlan("chat", null,
+                List.of(decision("primary"))));
+        when(logService.createRunningLog(nullable(String.class), eq(ModelBizType.CHAT), nullable(String.class),
+                nullable(String.class), nullable(String.class), nullable(String.class), nullable(String.class),
+                any(ModelRequestType.class), any(), nullable(String.class), nullable(String.class)))
+                .thenReturn(ModelCallLog.builder().callId("call-1").build());
+        ModelExecutionTemplate template = new ModelExecutionTemplate(router, logService);
+        ModelExecutionCommand<Flux<ChatModelStreamResponse>> command = streamCommand(currentDecision ->
+                Flux.just(
+                        ChatModelStreamResponse.message("hello"),
+                        ChatModelStreamResponse.message(null, 11, 22, 33)
+                ));
+
+        StepVerifier.create(template.executeStream(command))
+                .expectNextMatches(chunk -> "hello".equals(chunk.content()))
+                .verifyComplete();
+
+        verify(logService).markStreamSuccess(eq("call-1"), eq(11), eq(22), eq(33),
+                eq(TokenUsageSource.PROVIDER_USAGE), any(), eq(1), eq(5), eq(0), anyLong());
+    }
+
     private ModelExecutionCommand<Flux<ChatModelStreamResponse>> streamCommand(
             Function<ModelRouteDecision, Flux<ChatModelStreamResponse>> executor) {
         ChatModelRequest request = ChatModelRequest.builder()

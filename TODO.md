@@ -41,15 +41,11 @@
 
 ## 阶段三未实现
 
-- [ ] 将 `ModelClientFactory` 缓存 Key 从 Profile 维度切换为 `config_id + version`。
-- [ ] 将 `ModelGovernanceResolver` 接入 `model_governance_config` 表，并合并本地默认配置。
-- [ ] 补齐模型配置、模型路由、路由配置的完整 REST CRUD 接口。
-- [ ] 接入模型注册表刷新消息的真实 MQ、Redis Pub/Sub 客户端。
-- [ ] 接入 Resilience4j TimeLimiter。
+- [ ] 接入模型注册表刷新消息的真实 MQ 客户端。
 - [ ] 实现规则路由。
 - [ ] 实现动态权重路由。
-- [ ] 实现 Token 精确统计。
-- [ ] 实现流式 Chat Token 精确统计。
+- [ ] 实现 OpenAI-compatible 通用 Token 精确统计。
+- [ ] 实现不返回 usage 的流式 Chat 厂商 Token 适配或近似估算。
 - [ ] 实现模型调用日志归档或聚合统计。
 - [ ] 设计 `model_call_trace` 聚合表，用于表达一次业务模型调用的整体结果，包括 fallback 成功、最终状态、attempt_count、final_call_id、总耗时等。
 - [ ] 实现模型注册表刷新失败自动重试和告警。
@@ -81,6 +77,17 @@
 - [x] 实现静态权重路由候选排序能力。
 - [x] 增强模型调用日志，记录尝试次数和 fallback 来源。
 - [x] 新增临时 HTML 模型管理页面。
+- [x] 将 `ModelClientFactory` 缓存 Key 从 Profile 维度切换为 `config_id + version`，并在注册表刷新后清理客户端缓存。
+- [x] 将 `ModelGovernanceResolver` 接入 `model_governance_config` 表，并支持 CONFIG、ROUTE 两种治理绑定模式。
+- [x] 新增默认模型治理配置工厂，创建模型配置或路由时自动写入默认治理配置。
+- [x] 补齐模型配置、模型路由、路由配置的 REST 管理接口，并增加治理配置重置默认值和注册表快照接口。
+- [x] 扩展模型厂商目录，返回 OpenAI 兼容性、默认 endpoint、推荐模型和默认治理说明。
+- [x] 接入模型注册表刷新消息的 LOCAL 和 Redis Pub/Sub 通道，并验证 Redis Pub/Sub 客户端和订阅处理逻辑。
+- [x] 接入 Resilience4j TimeLimiter，并补充流式首包超时、最大时长、客户端取消状态处理。
+- [x] 新增 `CANCELED`、`TIMEOUT` 模型调用状态。
+- [x] 实现 DashScope Token 用量统计，其他厂商适配继续保留在后续 TODO。
+- [x] 实现 OpenAI 兼容流式 Chat 的 `stream_options.include_usage` 用量贯通。
+- [x] 补齐模型治理运行时表结构、完整 schema SQL 和迁移脚本。
 
 ## 后续阶段
 

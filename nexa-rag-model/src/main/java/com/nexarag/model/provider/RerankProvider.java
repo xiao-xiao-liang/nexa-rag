@@ -122,14 +122,14 @@ public class RerankProvider implements ModelProviderAdapter {
 
     private Integer totalTokens(Qwen3RerankResponse response) {
         if (response == null || response.usage() == null || response.usage().totalTokens() == null) {
-            return 0;
+            return null;
         }
         return response.usage().totalTokens();
     }
 
     private Integer totalTokens(ServiceRerankResponse response) {
         if (response == null || response.usage() == null || response.usage().totalTokens() == null) {
-            return 0;
+            return null;
         }
         return response.usage().totalTokens();
     }

@@ -16,6 +16,7 @@ import org.springframework.ai.chat.metadata.ChatResponseMetadata;
 import org.springframework.ai.chat.metadata.Usage;
 import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.ai.chat.prompt.Prompt;
+import org.springframework.ai.support.UsageCalculator;
 import org.springframework.stereotype.Component;
 import org.springframework.util.CollectionUtils;
 import org.springframework.util.StringUtils;
@@ -69,8 +70,12 @@ public class ChatProvider implements ModelProviderAdapter {
         // 2. 将 Spring AI 流式响应转换为模型网关统一分片
         return chatClientFactory.getChatClient(decision)
                 .stream(prompt)
-                .map(response -> ChatModelStreamResponse.message(content(response)))
-                .filter(chunk -> StringUtils.hasText(chunk.content()));
+                .map(response -> {
+                    Usage usage = usage(response.getMetadata());
+                    return ChatModelStreamResponse.message(content(response), promptTokens(usage),
+                            completionTokens(usage), totalTokens(usage));
+                })
+                .filter(chunk -> StringUtils.hasText(chunk.content()) || chunk.totalTokens() != null);
     }
 
     private List<Message> messages(List<ChatModelRequest.ChatMessage> messages) {
@@ -92,22 +97,28 @@ public class ChatProvider implements ModelProviderAdapter {
     }
 
     private String content(ChatResponse response) {
-        return response == null ? "" : response.getResult().getOutput().getText();
+        if (response == null || response.getResult() == null || response.getResult().getOutput() == null) {
+            return "";
+        }
+        return response.getResult().getOutput().getText();
     }
 
     private Usage usage(ChatResponseMetadata metadata) {
-        return metadata == null ? null : metadata.getUsage();
+        if (metadata == null || UsageCalculator.isEmpty(metadata.getUsage())) {
+            return null;
+        }
+        return metadata.getUsage();
     }
 
     private Integer promptTokens(Usage usage) {
-        return usage == null || usage.getPromptTokens() == null ? 0 : usage.getPromptTokens();
+        return usage == null ? null : usage.getPromptTokens();
     }
 
     private Integer completionTokens(Usage usage) {
-        return usage == null || usage.getCompletionTokens() == null ? 0 : usage.getCompletionTokens();
+        return usage == null ? null : usage.getCompletionTokens();
     }
 
     private Integer totalTokens(Usage usage) {
-        return usage == null || usage.getTotalTokens() == null ? 0 : usage.getTotalTokens();
+        return usage == null ? null : usage.getTotalTokens();
     }
 }

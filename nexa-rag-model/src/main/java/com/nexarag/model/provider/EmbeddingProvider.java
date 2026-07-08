@@ -11,6 +11,7 @@ import org.springframework.ai.embedding.Embedding;
 import org.springframework.ai.embedding.EmbeddingRequest;
 import org.springframework.ai.embedding.EmbeddingResponse;
 import org.springframework.ai.embedding.EmbeddingResponseMetadata;
+import org.springframework.ai.support.UsageCalculator;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
@@ -43,8 +44,8 @@ public class EmbeddingProvider implements ModelProviderAdapter {
     }
 
     private Integer totalTokens(EmbeddingResponseMetadata metadata) {
-        if (metadata == null || metadata.getUsage() == null || metadata.getUsage().getTotalTokens() == null) {
-            return 0;
+        if (metadata == null || UsageCalculator.isEmpty(metadata.getUsage())) {
+            return null;
         }
         return metadata.getUsage().getTotalTokens();
     }

@@ -5,6 +5,7 @@ import com.nexarag.model.entity.ModelCallLog;
 import com.nexarag.model.enums.ModelBizType;
 import com.nexarag.model.enums.ModelRequestType;
 import com.nexarag.model.enums.ModelRouteStrategy;
+import com.nexarag.model.enums.TokenUsageSource;
 import com.nexarag.model.route.ModelRouteContext;
 import com.nexarag.model.route.ModelRouteDecision;
 import com.nexarag.model.route.ModelRoutePlan;
@@ -53,6 +54,33 @@ class ModelExecutionTemplateTest {
         ));
 
         assertThat(result).isEqualTo("ok");
-        verify(logService).markSuccess(eq("call-1"), eq(1), eq(2), eq(3), longThat(durationMs -> durationMs >= 0));
+        verify(logService).markSuccess(eq("call-1"), eq(1), eq(2), eq(3),
+                eq(TokenUsageSource.UNKNOWN), longThat(durationMs -> durationMs >= 0));
+    }
+
+    @Test
+    void shouldRecordProviderUsageSourceWhenResponseContainsUsage() {
+        ModelRouter router = mock(ModelRouter.class);
+        ModelCallLogService logService = mock(ModelCallLogService.class);
+        ModelProfileProperties profile = new ModelProfileProperties();
+        profile.setProvider("DASHSCOPE");
+        profile.setBaseUrl("https://dashscope.aliyuncs.com/compatible-mode/v1");
+        profile.setModelName("qwen3-rerank");
+        when(router.plan(any(ModelRouteContext.class)))
+                .thenReturn(new ModelRoutePlan("rerank", ModelRouteStrategy.PRIMARY_BACKUP,
+                        List.of(new ModelRouteDecision("rerank-primary", profile, false))));
+        when(logService.createRunningLog(any(), any(), any(), any(), any(), any(), any(), any(),
+                any(), any(), any())).thenReturn(ModelCallLog.builder().callId("call-1").build());
+        ModelExecutionTemplate template = new ModelExecutionTemplate(router, logService);
+
+        String result = template.execute(new ModelExecutionCommand<>(
+                "trace-1", ModelBizType.RERANK, "biz-1", "rerank", ModelRequestType.RERANK,
+                decision -> "ok", response -> 0, response -> 0, response -> 79,
+                response -> TokenUsageSource.PROVIDER_USAGE
+        ));
+
+        assertThat(result).isEqualTo("ok");
+        verify(logService).markSuccess(eq("call-1"), eq(0), eq(0), eq(79),
+                eq(TokenUsageSource.PROVIDER_USAGE), longThat(durationMs -> durationMs >= 0));
     }
 }

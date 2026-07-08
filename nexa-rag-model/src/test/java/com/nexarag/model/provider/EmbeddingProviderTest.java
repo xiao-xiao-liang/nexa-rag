@@ -48,7 +48,7 @@ class EmbeddingProviderTest {
         EmbeddingModelResponse response = provider.embedding(decision, request);
 
         assertThat(response.modelProfile()).isEqualTo("embedding-primary");
-        assertThat(response.totalTokens()).isZero();
+        assertThat(response.totalTokens()).isNull();
         assertThat(response.embeddings()).hasSize(1);
         assertThat(response.embeddings().getFirst()).containsExactly(0.1f, 0.2f);
     }

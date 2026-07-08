@@ -2,6 +2,7 @@ package com.nexarag.model.execution;
 
 import com.nexarag.model.enums.ModelBizType;
 import com.nexarag.model.enums.ModelRequestType;
+import com.nexarag.model.enums.TokenUsageSource;
 import com.nexarag.model.gateway.chat.ChatModelRequest;
 import com.nexarag.model.gateway.chat.ChatModelResponse;
 import com.nexarag.model.gateway.chat.ChatModelStreamResponse;
@@ -28,6 +29,7 @@ import reactor.core.publisher.Flux;
  * @param promptTokenExtractor     输入Token提取器
  * @param completionTokenExtractor 输出Token提取器
  * @param totalTokenExtractor      总Token提取器
+ * @param tokenUsageSourceExtractor Token 用量来源提取器
  * @param <T>                      模型响应类型
  */
 public record ModelExecutionCommand<T>(
@@ -39,7 +41,30 @@ public record ModelExecutionCommand<T>(
         Function<ModelRouteDecision, T> executor,
         ToIntFunction<T> promptTokenExtractor,
         ToIntFunction<T> completionTokenExtractor,
-        ToIntFunction<T> totalTokenExtractor) {
+        ToIntFunction<T> totalTokenExtractor,
+        Function<T, TokenUsageSource> tokenUsageSourceExtractor) {
+
+    /**
+     * 创建模型执行命令，兼容暂未显式提供 Token 来源的调用方。
+     *
+     * @param traceId                  链路追踪ID
+     * @param bizType                  业务类型
+     * @param bizId                    业务ID
+     * @param routeKey                 路由Key
+     * @param requestType              请求类型
+     * @param executor                 实际模型调用逻辑
+     * @param promptTokenExtractor     输入Token提取器
+     * @param completionTokenExtractor 输出Token提取器
+     * @param totalTokenExtractor      总Token提取器
+     */
+    public ModelExecutionCommand(String traceId, ModelBizType bizType, String bizId, String routeKey,
+                                 ModelRequestType requestType, Function<ModelRouteDecision, T> executor,
+                                 ToIntFunction<T> promptTokenExtractor,
+                                 ToIntFunction<T> completionTokenExtractor,
+                                 ToIntFunction<T> totalTokenExtractor) {
+        this(traceId, bizType, bizId, routeKey, requestType, executor, promptTokenExtractor,
+                completionTokenExtractor, totalTokenExtractor, response -> TokenUsageSource.UNKNOWN);
+    }
 
     /**
      * 构造向量化模型执行命令。
@@ -61,7 +86,8 @@ public record ModelExecutionCommand<T>(
                 executor,
                 response -> 0,
                 response -> 0,
-                response -> safeToken(response.totalTokens())
+                response -> safeToken(response.totalTokens()),
+                response -> providerUsageSource(response.totalTokens())
         );
     }
 
@@ -85,7 +111,8 @@ public record ModelExecutionCommand<T>(
                 executor,
                 response -> safeToken(response.promptTokens()),
                 response -> safeToken(response.completionTokens()),
-                response -> safeToken(response.totalTokens())
+                response -> safeToken(response.totalTokens()),
+                response -> providerUsageSource(response.totalTokens())
         );
     }
 
@@ -109,7 +136,8 @@ public record ModelExecutionCommand<T>(
                 executor,
                 response -> 0,
                 response -> 0,
-                response -> 0
+                response -> 0,
+                response -> TokenUsageSource.ESTIMATED
         );
     }
 
@@ -133,11 +161,16 @@ public record ModelExecutionCommand<T>(
                 executor,
                 response -> 0,
                 response -> 0,
-                response -> safeToken(response.totalTokens())
+                response -> safeToken(response.totalTokens()),
+                response -> providerUsageSource(response.totalTokens())
         );
     }
 
     private static int safeToken(Integer token) {
         return token == null ? 0 : token;
+    }
+
+    private static TokenUsageSource providerUsageSource(Integer totalTokens) {
+        return totalTokens == null ? TokenUsageSource.UNKNOWN : TokenUsageSource.PROVIDER_USAGE;
     }
 }

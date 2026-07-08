@@ -6,72 +6,69 @@ spring:
     name: nexa-rag
   main:
     banner-mode: console
-  mustache:
-    check-template-location: false
-  ai:
-    openai:
-      api-key: ${OPENAI_API_KEY:ollama}
-      base-url: ${OPENAI_BASE_URL:http://localhost:11434/v1}
   flyway:
     enabled: false
   data:
     redis:
-      host: ${NEXA_REDIS_HOST:192.168.0.134}
-      port: ${NEXA_REDIS_PORT:6379}
-      password: ${NEXA_REDIS_PASSWORD:}
-      timeout: ${NEXA_REDIS_TIMEOUT:3s}
+      host: 192.168.0.134
+      port: 6379
+      password: 
+      timeout: 3s
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: jdbc:mysql://192.168.0.134:3306/nexa_rag?useUnicode=true&characterEncoding=utf8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true
+    username: root
+    password: 
 
 nexa:
-  config-center:
-    type: local
-    fallback-to-local: true
+  # 文档流水线处理配置，用于控制本地 Worker 与 Redis 队列协作。
   document:
     pipeline:
-      mode: local
+      mode: local # 文档处理模式，可选值：local/mq。当前仅本地模式会启动 Worker。
+      # 队列模式，可选值：pipeline。当前仅整条流水线排队模式生效。
       queue-mode: pipeline
-      worker-enabled: ${NEXA_DOCUMENT_PIPELINE_WORKER_ENABLED:false}
-      max-concurrency: 2
-      max-retry-count: 3
-      poll-interval-ms: ${NEXA_DOCUMENT_PIPELINE_POLL_INTERVAL_MS:1000}
-      lease-ttl-seconds: ${NEXA_DOCUMENT_PIPELINE_LEASE_TTL_SECONDS:300}
+      worker-enabled: false # 是否启用本地文档流水线 Worker，可选值：true、false。
+      max-concurrency: 2 # 本地 Worker 最大并发线程数，最小有效值为 1。
+      poll-interval-ms: 1000 # 队列为空时的轮询间隔，单位：毫秒。
+      lease-ttl-seconds: 300 # Worker 获取任务后的租约有效期，单位：秒。
+      # Redis 文档流水线队列配置。
       queue:
-        key-prefix: ${NEXA_DOCUMENT_PIPELINE_QUEUE_KEY_PREFIX:nexa:document:pipeline}
-        lease-ttl-seconds: ${NEXA_DOCUMENT_PIPELINE_LEASE_TTL_SECONDS:300}
-        retry-ttl-seconds: ${NEXA_DOCUMENT_PIPELINE_RETRY_TTL_SECONDS:86400}
+        key-prefix: nexa:document:pipeline # Redis key 前缀，用于隔离文档流水线相关队列、租约和运行态数据。
+        lease-ttl-seconds: 300 # 队列任务租约有效期，单位：秒。
+        retry-ttl-seconds: 86400 # 运行态重试副本保留时间，单位：秒。
+
+  # 文件存储配置，用于控制文档原始文件和解析产物的存取位置。
   storage:
-    type: ${NEXA_STORAGE_TYPE:MINIO}
-    endpoint: ${NEXA_STORAGE_ENDPOINT:http://127.0.0.1:9000}
-    access-key: ${NEXA_STORAGE_ACCESS_KEY:liang}
-    secret-key: ${NEXA_STORAGE_SECRET_KEY:liang123}
-    bucket: ${NEXA_STORAGE_BUCKET:nexa-rag}
-    create-bucket: true
+    type: MINIO # 存储类型，可选值：MINIO、RUSTFS、OSS、QINIU、LOCAL。
+    endpoint: http://127.0.0.1:9000 # 对象存储服务地址。
+    access-key: liang  # 对象存储访问密钥。
+    secret-key: liang123 # 对象存储访问密钥密码。
+    bucket: nexa-rag # 文档对象存储桶名称。
+    create-bucket: true # 存储桶不存在时是否自动创建，可选值：true、false。
+
+  # 文档解析器配置，用于控制 MinerU、Tika 和直通解析器的启停及连接参数。
   parser:
     mineru:
-      enabled: ${NEXA_PARSER_MINERU_ENABLED:true}
-      mode: ${NEXA_PARSER_MINERU_MODE:local}
-      local-endpoint: ${NEXA_PARSER_MINERU_LOCAL_ENDPOINT:http://127.0.0.1:8000}
-      local-parse-path: ${NEXA_PARSER_MINERU_LOCAL_PARSE_PATH:/file_parse}
-      official-endpoint: ${NEXA_PARSER_MINERU_OFFICIAL_ENDPOINT:}
-      api-key: ${NEXA_MINERU_API_KEY:}
-      connect-timeout: ${NEXA_PARSER_MINERU_CONNECT_TIMEOUT:3s}
-      read-timeout: ${NEXA_PARSER_MINERU_READ_TIMEOUT:120s}
-      poll-interval: ${NEXA_PARSER_MINERU_POLL_INTERVAL:2s}
-      max-poll-count: ${NEXA_PARSER_MINERU_MAX_POLL_COUNT:60}
-    tika:
-      enabled: ${NEXA_PARSER_TIKA_ENABLED:true}
-    passthrough:
-      enabled: ${NEXA_PARSER_PASSTHROUGH_ENABLED:true}
-  retrieval:
-    rerank:
-      type: score_fusion
-      vector-weight: 0.7
-      keyword-weight: 0.3
+      enabled: true # 是否启用 MinerU 解析器，可选值：true、false。
+      mode: local # MinerU 调用模式，可选值：LOCAL、OFFICIAL；配置时大小写均可绑定。
+      local-endpoint: http://127.0.0.1:8000  # 本地 MinerU 服务地址，仅 mode=LOCAL 时使用。
+      local-parse-path: /file_parse # 本地 MinerU 文件解析接口路径，仅 mode=LOCAL 时使用。
+      official-endpoint: # 官方 MinerU 服务地址，仅 mode=OFFICIAL 时使用。
+      api-key: # 官方 MinerU API Key，仅 mode=OFFICIAL 时使用。
+      connect-timeout: 3s # MinerU 客户端连接超时时间。
+      read-timeout: 120s # MinerU 客户端读取超时时间。
+      poll-interval: 2s # 官方 MinerU 异步任务轮询间隔。
+      max-poll-count: 60 # 官方 MinerU 异步任务最大轮询次数。
+
+  # 模型治理配置，用于控制模型路由、Profile、密钥加密和注册表刷新。
   model:
     registry:
       # 模型注册表刷新通道：LOCAL=仅刷新当前实例，REDIS_PUB_SUB=Redis发布订阅通知多实例，INFRA_MQ=预留统一MQ通道。
-      refresh-channel: LOCAL
+      refresh-channel: REDIS_PUB_SUB
       # 模型注册表刷新消息主题；REDIS_PUB_SUB 模式下发布和订阅都使用该主题。
       refresh-topic: nexa.model.registry.changed
+    secret:
+      master-key: = # 模型 API Key 加密主密钥。
     governance:
       # 治理配置绑定模式：CONFIG=按模型配置生效，ROUTE=按业务路由生效；同一时间只生效一种模式。
       binding-mode: CONFIG
@@ -102,14 +99,22 @@ nexa:
         api-key: ollama
         model-name: qwen2.5:7b
         timeout-ms: 60000
+    # 模型路由集合，key 为业务路由名，调用方通过 routeKey 选择具体模型路由。
     routes:
       chat:
+        # 路由类型，可选值：PRIMARY_FALLBACK。
         type: PRIMARY_FALLBACK
+        # 主用模型 Profile 名称。
         primary: chat-primary
+        # 备用模型 Profile 名称，仅主用调用失败时使用。
         fallback: chat-backup
       embedding:
+        # 路由类型，可选值：PRIMARY_FALLBACK。
         type: PRIMARY_FALLBACK
+        # 主用模型 Profile 名称。
         primary: embedding-primary
       rerank:
+        # 路由类型，可选值：PRIMARY_FALLBACK。
         type: PRIMARY_FALLBACK
+        # 主用模型 Profile 名称。
         primary: rerank-primary

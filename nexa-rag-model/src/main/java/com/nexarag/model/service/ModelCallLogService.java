@@ -61,6 +61,19 @@ public interface ModelCallLogService extends IService<ModelCallLog> {
     void markSuccess(String callId, Integer promptTokens, Integer completionTokens, Integer totalTokens, long durationMs);
 
     /**
+     * 标记模型调用成功。
+     *
+     * @param callId           模型调用ID
+     * @param promptTokens     输入 Token 数
+     * @param completionTokens 输出 Token 数
+     * @param totalTokens      总 Token 数
+     * @param tokenUsageSource Token 用量统计来源
+     * @param durationMs       耗时毫秒
+     */
+    void markSuccess(String callId, Integer promptTokens, Integer completionTokens,
+                     Integer totalTokens, TokenUsageSource tokenUsageSource, long durationMs);
+
+    /**
      * 标记流式模型调用成功。
      *
      * @param callId                模型调用ID

@@ -11,6 +11,7 @@ import com.nexarag.model.route.ModelRouteDecision;
 import com.nexarag.model.route.ModelRoutePlan;
 import com.nexarag.model.route.ModelRouter;
 import com.nexarag.model.service.ModelCallLogService;
+import org.springframework.util.StringUtils;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Signal;
 
@@ -150,6 +151,7 @@ public class ModelExecutionTemplate {
                     command.promptTokenExtractor().applyAsInt(response),
                     command.completionTokenExtractor().applyAsInt(response),
                     command.totalTokenExtractor().applyAsInt(response),
+                    command.tokenUsageSourceExtractor().apply(response),
                     durationMs
             );
             return response;
@@ -212,7 +214,7 @@ public class ModelExecutionTemplate {
         }
         if (signal.isOnComplete()) {
             // 2. 流在首个分片前正常结束，按空响应成功处理
-            markStreamSuccess(log, start, null, 0, 0);
+            markStreamSuccess(log, start, null, 0, 0, 0, 0, 0, TokenUsageSource.ESTIMATED);
             return Flux.empty();
         }
 
@@ -230,33 +232,43 @@ public class ModelExecutionTemplate {
                                             Flux<T> flux) {
         AtomicInteger chunkCount = new AtomicInteger();
         AtomicInteger outputCharCount = new AtomicInteger();
+        AtomicInteger promptTokens = new AtomicInteger(-1);
+        AtomicInteger completionTokens = new AtomicInteger(-1);
+        AtomicInteger totalTokens = new AtomicInteger(-1);
         AtomicLong firstTokenLatencyMs = new AtomicLong(-1L);
 
         return flux
                 .doOnNext(chunk -> {
-                    // 1. 记录首个分片耗时和流式输出规模
-                    chunkCount.incrementAndGet();
-                    if (firstTokenLatencyMs.compareAndSet(-1L, Math.max(0, System.currentTimeMillis() - start))) {
-                        // 首个分片耗时已记录
+                    // 1. 记录首个文本分片耗时和流式输出规模
+                    if (hasContent(chunk)) {
+                        chunkCount.incrementAndGet();
+                        if (firstTokenLatencyMs.compareAndSet(-1L, Math.max(0, System.currentTimeMillis() - start))) {
+                            // 首个分片耗时已记录
+                        }
+                        outputCharCount.addAndGet(outputCharCount(chunk));
                     }
-                    outputCharCount.addAndGet(outputCharCount(chunk));
+                    // 2. 记录流式响应中最新的厂商 Token 用量
+                    recordStreamTokenUsage(chunk, promptTokens, completionTokens, totalTokens);
                 })
                 .doOnComplete(() -> markStreamSuccess(log, start, firstTokenLatencyMs.get(),
-                        chunkCount.get(), outputCharCount.get()))
+                        chunkCount.get(), outputCharCount.get(), tokenValue(promptTokens),
+                        tokenValue(completionTokens), tokenValue(totalTokens), tokenUsageSource(totalTokens)))
                 .doOnCancel(() -> markStreamCanceled(log, start))
-                .doOnError(exception -> markStreamFailed(log, start, exception));
+                .doOnError(exception -> markStreamFailed(log, start, exception))
+                .filter(this::shouldEmitStreamChunk);
     }
 
     private void markStreamSuccess(ModelCallLog log, long start, Long firstTokenLatencyMs,
-                                   Integer chunkCount, Integer outputCharCount) {
-        // 1. 流式 Chat 暂记 Token 为 0，精确统计后续单独实现
+                                   Integer chunkCount, Integer outputCharCount, Integer promptTokens,
+                                   Integer completionTokens, Integer totalTokens, TokenUsageSource tokenUsageSource) {
+        // 1. 记录流式调用成功结果和 Token 用量
         long durationMs = Math.max(0, System.currentTimeMillis() - start);
         modelCallLogService.markStreamSuccess(
                 log.getCallId(),
-                0,
-                0,
-                0,
-                TokenUsageSource.ESTIMATED,
+                promptTokens,
+                completionTokens,
+                totalTokens,
+                tokenUsageSource,
                 firstTokenLatencyMs == null || firstTokenLatencyMs < 0 ? null : firstTokenLatencyMs,
                 chunkCount,
                 outputCharCount,
@@ -300,6 +312,46 @@ public class ModelExecutionTemplate {
             return response.content().length();
         }
         return 0;
+    }
+
+    private boolean hasContent(Object chunk) {
+        return chunk instanceof ChatModelStreamResponse response && StringUtils.hasText(response.content());
+    }
+
+    private boolean shouldEmitStreamChunk(Object chunk) {
+        if (!(chunk instanceof ChatModelStreamResponse response)) {
+            return true;
+        }
+        // 1. 只过滤用于内部统计的 Token 分片，避免向前端输出空文本分片
+        return StringUtils.hasText(response.content())
+                || StringUtils.hasText(response.finishReason())
+                || StringUtils.hasText(response.errorCode())
+                || StringUtils.hasText(response.errorMessage());
+    }
+
+    private void recordStreamTokenUsage(Object chunk, AtomicInteger promptTokens, AtomicInteger completionTokens,
+                                        AtomicInteger totalTokens) {
+        if (!(chunk instanceof ChatModelStreamResponse response)) {
+            return;
+        }
+        // 1. 使用流式响应中最新的非空 Token 用量覆盖旧值
+        updateTokenValue(promptTokens, response.promptTokens());
+        updateTokenValue(completionTokens, response.completionTokens());
+        updateTokenValue(totalTokens, response.totalTokens());
+    }
+
+    private void updateTokenValue(AtomicInteger holder, Integer value) {
+        if (value != null) {
+            holder.set(value);
+        }
+    }
+
+    private Integer tokenValue(AtomicInteger holder) {
+        return holder.get() < 0 ? 0 : holder.get();
+    }
+
+    private TokenUsageSource tokenUsageSource(AtomicInteger totalTokens) {
+        return totalTokens.get() < 0 ? TokenUsageSource.ESTIMATED : TokenUsageSource.PROVIDER_USAGE;
     }
 
     private ModelExecutionAttemptException unwrapAttemptException(Exception exception) {

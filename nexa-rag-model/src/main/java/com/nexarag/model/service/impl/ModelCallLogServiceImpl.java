@@ -59,6 +59,12 @@ public class ModelCallLogServiceImpl extends ServiceImpl<ModelCallLogMapper, Mod
     @Override
     public void markSuccess(String callId, Integer promptTokens, Integer completionTokens,
                             Integer totalTokens, long durationMs) {
+        markSuccess(callId, promptTokens, completionTokens, totalTokens, TokenUsageSource.UNKNOWN, durationMs);
+    }
+
+    @Override
+    public void markSuccess(String callId, Integer promptTokens, Integer completionTokens,
+                            Integer totalTokens, TokenUsageSource tokenUsageSource, long durationMs) {
         // 1. 使用 lambdaUpdate 按调用ID更新成功状态和 Token 统计
         this.lambdaUpdate()
                 .eq(ModelCallLog::getCallId, callId)
@@ -66,6 +72,7 @@ public class ModelCallLogServiceImpl extends ServiceImpl<ModelCallLogMapper, Mod
                 .set(ModelCallLog::getPromptTokens, promptTokens)
                 .set(ModelCallLog::getCompletionTokens, completionTokens)
                 .set(ModelCallLog::getTotalTokens, totalTokens)
+                .set(ModelCallLog::getTokenUsageSource, tokenUsageSource)
                 .set(ModelCallLog::getDurationMs, durationMs)
                 .update();
     }
