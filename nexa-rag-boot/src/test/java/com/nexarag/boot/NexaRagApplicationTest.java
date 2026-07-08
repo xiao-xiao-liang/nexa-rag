@@ -8,6 +8,8 @@ import com.nexarag.model.mapper.ModelGovernanceConfigMapper;
 import com.nexarag.model.mapper.ModelRegistryVersionMapper;
 import com.nexarag.model.mapper.ModelRouteConfigMapper;
 import com.nexarag.model.mapper.ModelRouteMapper;
+import com.nexarag.retrieval.index.keyword.KeywordIndexClient;
+import com.nexarag.retrieval.index.vector.VectorIndexClient;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
@@ -43,6 +45,12 @@ class NexaRagApplicationTest {
 
     @MockitoBean
     private ModelRouteConfigMapper modelRouteConfigMapper;
+
+    @MockitoBean
+    private VectorIndexClient vectorIndexClient;
+
+    @MockitoBean
+    private KeywordIndexClient keywordIndexClient;
 
     @Test
     void contextLoads() {

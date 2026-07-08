@@ -50,6 +50,7 @@
         <archunit.version>1.4.2</archunit.version>
         <lombok.version>1.18.46</lombok.version>
         <jmustache.version>1.16</jmustache.version>
+        <milvus.version>2.6.6</milvus.version>
     </properties>
 
     <dependencyManagement>
@@ -111,6 +112,11 @@
                 <groupId>com.samskivert</groupId>
                 <artifactId>jmustache</artifactId>
                 <version>${jmustache.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>io.milvus</groupId>
+                <artifactId>milvus-sdk-java</artifactId>
+                <version>${milvus.version}</version>
             </dependency>
         </dependencies>
     </dependencyManagement>

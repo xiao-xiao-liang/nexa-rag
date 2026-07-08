@@ -65,6 +65,56 @@ public class DocumentChunkServiceImpl extends ServiceImpl<DocumentChunkMapper, D
                 .count();
     }
 
+    /**
+     * 标记片段索引成功并回写索引ID。
+     *
+     * @param chunkId        片段ID
+     * @param vectorId       向量索引ID
+     * @param keywordIndexId 关键词索引ID
+     */
+    @Override
+    public void markChunkIndexed(String chunkId, String vectorId, String keywordIndexId) {
+        // 1. 回写索引ID并清空失败原因
+        this.lambdaUpdate()
+                .eq(DocumentChunk::getChunkId, chunkId)
+                .set(DocumentChunk::getStatus, ChunkStatus.INDEXED)
+                .set(DocumentChunk::getVectorId, vectorId)
+                .set(DocumentChunk::getKeywordIndexId, keywordIndexId)
+                .set(DocumentChunk::getFailureReason, null)
+                .update();
+    }
+
+    /**
+     * 标记片段索引失败。
+     *
+     * @param chunkId       片段ID
+     * @param failureReason 失败原因
+     */
+    @Override
+    public void markChunkIndexFailed(String chunkId, String failureReason) {
+        // 1. 标记失败状态并保存失败原因
+        this.lambdaUpdate()
+                .eq(DocumentChunk::getChunkId, chunkId)
+                .set(DocumentChunk::getStatus, ChunkStatus.FAILED)
+                .set(DocumentChunk::getFailureReason, failureReason)
+                .update();
+    }
+
+    /**
+     * 标记指定文档中需要跳过索引的片段。
+     *
+     * @param documentId 文档ID
+     */
+    @Override
+    public void markDocumentSkippedChunks(Long documentId) {
+        // 1. 将跳过索引的片段稳定标记为 SKIP_INDEX
+        this.lambdaUpdate()
+                .eq(DocumentChunk::getDocumentId, documentId)
+                .eq(DocumentChunk::getSkipIndex, 1)
+                .set(DocumentChunk::getStatus, ChunkStatus.SKIP_INDEX)
+                .update();
+    }
+
     private DocumentChunk toChunk(Long documentId, ChunkDraft draft, int order) {
         if (draft == null || !StringUtils.hasText(draft.chunkId()) || !StringUtils.hasText(draft.text())) {
             throw new ServiceException("文档片段草稿不合法，documentId=" + documentId,

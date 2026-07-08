@@ -35,4 +35,28 @@ public interface DocumentChunkService extends IService<DocumentChunk> {
      * @return 片段数量
      */
     long countByDocumentId(Long documentId);
+
+    /**
+     * 标记片段索引成功并回写索引ID。
+     *
+     * @param chunkId        片段ID
+     * @param vectorId       向量索引ID
+     * @param keywordIndexId 关键词索引ID
+     */
+    void markChunkIndexed(String chunkId, String vectorId, String keywordIndexId);
+
+    /**
+     * 标记片段索引失败。
+     *
+     * @param chunkId        片段ID
+     * @param failureReason 失败原因
+     */
+    void markChunkIndexFailed(String chunkId, String failureReason);
+
+    /**
+     * 标记指定文档中需要跳过索引的片段。
+     *
+     * @param documentId 文档ID
+     */
+    void markDocumentSkippedChunks(Long documentId);
 }

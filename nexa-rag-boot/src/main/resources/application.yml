@@ -60,6 +60,32 @@ nexa:
       poll-interval: 2s # 官方 MinerU 异步任务轮询间隔。
       max-poll-count: 60 # 官方 MinerU 异步任务最大轮询次数。
 
+  # 检索索引配置，用于控制文档片段向量化、向量索引和关键词索引适配器。
+  retrieval:
+    embedding:
+      type: model # 向量化类型，可选值：model。由 ModelGateway 调用模型。
+      route-key: embedding # ModelGateway 向量化路由Key。
+      max-batch-size: 10 # 单次向量化最大片段数量，避免超过云端 Embedding 接口限制。
+    vector:
+      type: milvus # 向量索引类型，可选值：milvus。
+      host: 192.168.0.134 # 向量索引服务地址。
+      port: 19530 # 向量索引服务端口。
+      database-name: # 向量库数据库名称，为空时使用默认数据库。
+      collection-name: nexa_document_chunk # 文档片段向量集合名称。
+      dimension: 0 # 0 表示按首次写入的真实向量维度创建集合。
+      username: # 向量索引服务用户名，未启用鉴权时为空。
+      password: # 向量索引服务密码，未启用鉴权时为空。
+      rpc-deadline-ms: 60000 # 向量索引 RPC 超时时间，单位：毫秒。
+    keyword:
+      type: elasticsearch # 关键词索引类型，可选值：none/elasticsearch。
+      scheme: http # 关键词索引服务协议。
+      host: 192.168.0.134 # Elasticsearch 服务地址。
+      port: 9200 # Elasticsearch HTTP 端口。
+      index-name: nexa_document_chunk # 文档片段关键词索引名称。
+      username: elastic # Elasticsearch 用户名。
+      password:  # Elasticsearch 密码。
+      request-timeout-ms: 30000 # Elasticsearch 请求超时时间，单位：毫秒。
+
   # 模型治理配置，用于控制模型路由、Profile、密钥加密和注册表刷新。
   model:
     registry:
