@@ -27,7 +27,7 @@ nexa:
       mode: local # 文档处理模式，可选值：local/mq。当前仅本地模式会启动 Worker。
       # 队列模式，可选值：pipeline。当前仅整条流水线排队模式生效。
       queue-mode: pipeline
-      worker-enabled: false # 是否启用本地文档流水线 Worker，可选值：true、false。
+      worker-enabled: true # 是否启用本地文档流水线 Worker，可选值：true、false。
       max-concurrency: 2 # 本地 Worker 最大并发线程数，最小有效值为 1。
       poll-interval-ms: 1000 # 队列为空时的轮询间隔，单位：毫秒。
       lease-ttl-seconds: 300 # Worker 获取任务后的租约有效期，单位：秒。
