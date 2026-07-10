@@ -52,8 +52,8 @@ class LocalDocumentPipelineWorkerTest {
         RecordingWorkflowService workflowService = new RecordingWorkflowService();
         LocalDocumentPipelineWorker worker = new LocalDocumentPipelineWorker(buildProperties(), queue, workflowService);
 
-        worker.runOnceForTest("worker-1");
-        worker.runOnceForTest("worker-1");
+        worker.runOnceForTest();
+        worker.runOnceForTest();
 
         assertThat(workflowService.graphNames()).containsExactly(DOCUMENT_INGESTION_GRAPH_NAME, DOCUMENT_INGESTION_GRAPH_NAME);
         assertThat(workflowService.documentIds()).containsExactly(10L, 20L);
@@ -69,9 +69,9 @@ class LocalDocumentPipelineWorkerTest {
         FailOnceWorkflowService workflowService = new FailOnceWorkflowService(10L);
         LocalDocumentPipelineWorker worker = new LocalDocumentPipelineWorker(buildProperties(), queue, workflowService);
 
-        worker.runOnceForTest("worker-1");
-        worker.runOnceForTest("worker-1");
-        worker.runOnceForTest("worker-1");
+        worker.runOnceForTest();
+        worker.runOnceForTest();
+        worker.runOnceForTest();
 
         assertThat(workflowService.documentIds()).containsExactly(10L, 20L, 10L);
     }

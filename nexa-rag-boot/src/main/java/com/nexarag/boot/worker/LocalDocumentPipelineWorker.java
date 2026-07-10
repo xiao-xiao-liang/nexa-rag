@@ -3,6 +3,7 @@ package com.nexarag.boot.worker;
 import com.nexarag.infra.queue.document.DocumentPipelineQueue;
 import com.nexarag.infra.queue.document.DocumentPipelineTask;
 import com.nexarag.workflow.service.WorkflowService;
+import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.SmartLifecycle;
@@ -24,6 +25,7 @@ import static com.nexarag.workflow.constants.DocumentIngestionStateKeys.DOCUMENT
  * 本地文档流水线 Worker，负责轮询 Redis 队列并启动文档入库 Workflow Graph。
  */
 @Component
+@RequiredArgsConstructor
 public class LocalDocumentPipelineWorker implements SmartLifecycle {
 
     private static final Logger log = LoggerFactory.getLogger(LocalDocumentPipelineWorker.class);
@@ -36,14 +38,6 @@ public class LocalDocumentPipelineWorker implements SmartLifecycle {
     private final AtomicBoolean running = new AtomicBoolean(false);
 
     private ExecutorService executorService;
-
-    public LocalDocumentPipelineWorker(DocumentPipelineWorkerProperties properties,
-                                       DocumentPipelineQueue documentPipelineQueue,
-                                       WorkflowService workflowService) {
-        this.properties = properties;
-        this.documentPipelineQueue = documentPipelineQueue;
-        this.workflowService = workflowService;
-    }
 
     /**
      * 启动本地 Worker 线程池。
@@ -114,11 +108,9 @@ public class LocalDocumentPipelineWorker implements SmartLifecycle {
 
     /**
      * 单次执行队列任务，供单元测试验证 Worker 编排行为。
-     *
-     * @param workerId 工作器ID
      */
-    void runOnceForTest(String workerId) {
-        runOnce(workerId);
+    void runOnceForTest() {
+        runOnce("worker-1");
     }
 
     private void runLoop(String workerId) {

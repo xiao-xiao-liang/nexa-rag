@@ -1,10 +1,10 @@
 package com.nexarag.infra.parser.passthrough;
 
-import com.nexarag.infra.parser.DocumentParseRequest;
-import com.nexarag.infra.parser.DocumentParseResult;
+import com.nexarag.infra.parser.model.DocumentParseRequest;
+import com.nexarag.infra.parser.model.DocumentParseResult;
 import com.nexarag.infra.parser.DocumentParser;
-import com.nexarag.infra.parser.ParsedContentTypes;
-import com.nexarag.infra.parser.ParserFileTypes;
+import com.nexarag.infra.constants.ParsedContentTypes;
+import com.nexarag.infra.constants.ParserFileTypes;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 

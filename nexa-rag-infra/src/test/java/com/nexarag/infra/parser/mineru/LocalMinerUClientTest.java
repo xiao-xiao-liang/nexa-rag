@@ -1,5 +1,9 @@
 package com.nexarag.infra.parser.mineru;
 
+import com.nexarag.infra.config.MinerUProperties;
+import com.nexarag.infra.parser.mineru.client.LocalMinerUClient;
+import com.nexarag.infra.parser.model.MinerUParseCommand;
+import com.nexarag.infra.parser.model.MinerUParseResponse;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;
 import org.junit.jupiter.api.AfterEach;

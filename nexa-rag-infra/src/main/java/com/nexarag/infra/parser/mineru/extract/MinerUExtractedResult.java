@@ -1,5 +1,6 @@
-package com.nexarag.infra.parser.mineru;
+package com.nexarag.infra.parser.mineru.extract;
 
+import com.nexarag.infra.parser.model.MinerUAssetFile;
 import lombok.Builder;
 
 import java.util.List;

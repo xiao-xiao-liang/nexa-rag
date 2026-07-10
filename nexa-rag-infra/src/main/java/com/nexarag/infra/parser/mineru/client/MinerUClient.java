@@ -1,4 +1,7 @@
-package com.nexarag.infra.parser.mineru;
+package com.nexarag.infra.parser.mineru.client;
+
+import com.nexarag.infra.parser.model.MinerUParseCommand;
+import com.nexarag.infra.parser.model.MinerUParseResponse;
 
 /**
  * MinerU 客户端接口，屏蔽本地服务和官方服务调用差异。

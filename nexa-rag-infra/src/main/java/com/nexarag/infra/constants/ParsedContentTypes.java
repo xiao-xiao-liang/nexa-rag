@@ -1,4 +1,4 @@
-package com.nexarag.infra.parser;
+package com.nexarag.infra.constants;
 
 /**
  * 解析产物内容类型常量，避免解析器之间重复硬编码 MIME 类型。

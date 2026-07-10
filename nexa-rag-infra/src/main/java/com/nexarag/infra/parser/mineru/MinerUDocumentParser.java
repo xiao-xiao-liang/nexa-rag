@@ -2,11 +2,15 @@ package com.nexarag.infra.parser.mineru;
 
 import com.nexarag.common.error.BaseErrorCode;
 import com.nexarag.common.exception.ServiceException;
-import com.nexarag.infra.parser.DocumentParseRequest;
-import com.nexarag.infra.parser.DocumentParseResult;
+import com.nexarag.infra.parser.model.*;
 import com.nexarag.infra.parser.DocumentParser;
-import com.nexarag.infra.parser.ParsedContentTypes;
-import com.nexarag.infra.parser.ParserFileTypes;
+import com.nexarag.infra.constants.ParsedContentTypes;
+import com.nexarag.infra.constants.ParserFileTypes;
+import com.nexarag.infra.parser.mineru.client.MinerUClient;
+import com.nexarag.infra.parser.mineru.extract.MarkdownImageUrlRewriter;
+import com.nexarag.infra.parser.mineru.extract.MinerUExtractedResult;
+import com.nexarag.infra.parser.mineru.extract.MinerUZipResultExtractor;
+import com.nexarag.infra.parser.mineru.ratelimit.MinerUParseLimiter;
 import com.nexarag.infra.storage.ObjectNameResolver;
 import com.nexarag.infra.storage.StoredFile;
 import com.nexarag.infra.storage.service.FileStorageService;
@@ -33,6 +37,7 @@ public class MinerUDocumentParser implements DocumentParser {
     private final MinerUClient minerUClient;
     private final MinerUZipResultExtractor zipResultExtractor;
     private final MarkdownImageUrlRewriter imageUrlRewriter;
+    private final MinerUParseLimiter minerUParseLimiter;
 
     /**
      * 判断当前请求是否应交由 MinerU 解析。
@@ -54,6 +59,10 @@ public class MinerUDocumentParser implements DocumentParser {
      */
     @Override
     public DocumentParseResult parse(DocumentParseRequest request) {
+        return minerUParseLimiter.execute(request.documentId(), () -> doParse(request));
+    }
+
+    private DocumentParseResult doParse(DocumentParseRequest request) {
         try (InputStream originalInputStream = fileStorageService.load(request.originalObjectName())) {
             // 1. 调用 MinerU 获取 ZIP 格式解析产物
             MinerUParseResponse response = minerUClient.parse(MinerUParseCommand.builder()

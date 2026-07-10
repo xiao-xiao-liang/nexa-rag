@@ -1,5 +1,6 @@
 package com.nexarag.infra.parser.mineru;
 
+import com.nexarag.infra.parser.mineru.extract.MarkdownImageUrlRewriter;
 import org.junit.jupiter.api.Test;
 
 import java.util.Map;

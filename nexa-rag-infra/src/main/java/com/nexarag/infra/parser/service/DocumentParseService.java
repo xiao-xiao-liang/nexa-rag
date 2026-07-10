@@ -1,4 +1,7 @@
-package com.nexarag.infra.parser;
+package com.nexarag.infra.parser.service;
+
+import com.nexarag.infra.parser.model.DocumentParseRequest;
+import com.nexarag.infra.parser.model.DocumentParseResult;
 
 /**
  * 文档解析服务，负责根据文件类型选择解析器并执行解析。

@@ -1,4 +1,4 @@
-package com.nexarag.infra.parser.mineru;
+package com.nexarag.infra.parser.mineru.extract;
 
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;

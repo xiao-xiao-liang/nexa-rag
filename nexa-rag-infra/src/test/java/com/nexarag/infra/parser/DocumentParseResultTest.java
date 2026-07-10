@@ -1,5 +1,7 @@
 package com.nexarag.infra.parser;
 
+import com.nexarag.infra.constants.ParsedContentTypes;
+import com.nexarag.infra.parser.model.DocumentParseResult;
 import org.junit.jupiter.api.Test;
 
 import java.util.Map;

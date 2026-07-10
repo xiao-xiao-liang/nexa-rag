@@ -1,5 +1,6 @@
-package com.nexarag.infra.parser.mineru;
+package com.nexarag.infra.config;
 
+import com.nexarag.infra.enums.MinerUClientMode;
 import lombok.Getter;
 import lombok.Setter;
 import org.springframework.boot.context.properties.ConfigurationProperties;
@@ -45,4 +46,16 @@ public class MinerUProperties {
 
     /** 官方异步任务最大轮询次数。 */
     private int maxPollCount = 60;
+
+    /** MinerU 全局最大并发解析任务数。 */
+    private int concurrencyLimit = 5;
+
+    /** MinerU 解析分布式信号量名称。 */
+    private String semaphoreName = "nexa:mineru:parse";
+
+    /** 获取 MinerU 解析许可最大等待秒数。 */
+    private int maxWaitSeconds = 30;
+
+    /** MinerU 解析许可自动释放秒数。 */
+    private int leaseSeconds = 900;
 }

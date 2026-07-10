@@ -1,9 +1,15 @@
 package com.nexarag.infra.parser.mineru;
 
-import com.nexarag.infra.parser.DocumentParseRequest;
-import com.nexarag.infra.parser.DocumentParseResult;
-import com.nexarag.infra.parser.ParsedContentTypes;
-import com.nexarag.infra.parser.ParserFileTypes;
+import com.nexarag.infra.parser.model.DocumentParseRequest;
+import com.nexarag.infra.parser.model.DocumentParseResult;
+import com.nexarag.infra.constants.ParsedContentTypes;
+import com.nexarag.infra.constants.ParserFileTypes;
+import com.nexarag.infra.parser.mineru.client.MinerUClient;
+import com.nexarag.infra.parser.mineru.extract.MarkdownImageUrlRewriter;
+import com.nexarag.infra.parser.mineru.extract.MinerUZipResultExtractor;
+import com.nexarag.infra.parser.mineru.ratelimit.MinerUParseLimiter;
+import com.nexarag.infra.parser.model.MinerUParseCommand;
+import com.nexarag.infra.parser.model.MinerUParseResponse;
 import com.nexarag.infra.storage.ObjectNameResolver;
 import com.nexarag.infra.storage.StoredFile;
 import com.nexarag.infra.storage.service.FileStorageService;
@@ -15,6 +21,7 @@ import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.function.Supplier;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 
@@ -37,6 +44,7 @@ class MinerUDocumentParserTest {
     @Test
     void parseShouldSaveAssetsRewriteMarkdownAndSaveParsedMarkdown() throws Exception {
         RecordingFileStorageService storageService = new RecordingFileStorageService("original".getBytes(StandardCharsets.UTF_8));
+        RecordingMinerUParseLimiter parseLimiter = new RecordingMinerUParseLimiter();
         MinerUDocumentParser parser = new MinerUDocumentParser(
                 storageService,
                 new ObjectNameResolver(),
@@ -45,11 +53,14 @@ class MinerUDocumentParserTest {
                         "result/images/a.png", "fake-image"
                 ))),
                 new MinerUZipResultExtractor(),
-                new MarkdownImageUrlRewriter()
+                new MarkdownImageUrlRewriter(),
+                parseLimiter
         );
 
         DocumentParseResult result = parser.parse(request(ParserFileTypes.PDF));
 
+        assertThat(parseLimiter.acquiredDocumentId).isEqualTo(1L);
+        assertThat(parseLimiter.released).isTrue();
         assertThat(result.contentType()).isEqualTo(ParsedContentTypes.TEXT_MARKDOWN);
         assertThat(result.parsedObjectName()).isEqualTo("parsed/1/content.md");
         assertThat(storageService.savedObjects).containsKey("parsed/1/content.md");
@@ -69,7 +80,8 @@ class MinerUDocumentParserTest {
                 new ObjectNameResolver(),
                 new StubMinerUClient(zipBytes),
                 new MinerUZipResultExtractor(),
-                new MarkdownImageUrlRewriter()
+                new MarkdownImageUrlRewriter(),
+                new RecordingMinerUParseLimiter()
         );
     }
 
@@ -115,6 +127,22 @@ class MinerUDocumentParserTest {
                     .zipInputStream(new ByteArrayInputStream(zipBytes))
                     .metadata(Map.of("client", "stub"))
                     .build();
+        }
+    }
+
+    private static class RecordingMinerUParseLimiter implements MinerUParseLimiter {
+
+        private Long acquiredDocumentId;
+        private boolean released;
+
+        @Override
+        public <T> T execute(Long documentId, Supplier<T> action) {
+            acquiredDocumentId = documentId;
+            try {
+                return action.get();
+            } finally {
+                released = true;
+            }
         }
     }
 

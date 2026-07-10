@@ -1,10 +1,15 @@
 package com.nexarag.infra.parser.mineru;
 
+import com.nexarag.infra.config.MinerUProperties;
 import com.nexarag.infra.config.StorageProperties;
-import com.nexarag.infra.parser.DocumentParseRequest;
-import com.nexarag.infra.parser.DocumentParseResult;
-import com.nexarag.infra.parser.ParsedContentTypes;
-import com.nexarag.infra.parser.ParserFileTypes;
+import com.nexarag.infra.parser.model.DocumentParseRequest;
+import com.nexarag.infra.parser.model.DocumentParseResult;
+import com.nexarag.infra.constants.ParsedContentTypes;
+import com.nexarag.infra.constants.ParserFileTypes;
+import com.nexarag.infra.parser.mineru.client.LocalMinerUClient;
+import com.nexarag.infra.parser.mineru.extract.MarkdownImageUrlRewriter;
+import com.nexarag.infra.parser.mineru.extract.MinerUZipResultExtractor;
+import com.nexarag.infra.parser.mineru.ratelimit.MinerUParseLimiter;
 import com.nexarag.infra.storage.ObjectNameResolver;
 import com.nexarag.infra.storage.StoredFile;
 import com.nexarag.infra.storage.minio.MinioFileStorageStrategy;
@@ -18,6 +23,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.function.Supplier;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -53,7 +59,8 @@ class MinerUDocumentParserIntegrationTest {
                 new ObjectNameResolver(),
                 new LocalMinerUClient(buildMinerUProperties()),
                 new MinerUZipResultExtractor(),
-                new MarkdownImageUrlRewriter()
+                new MarkdownImageUrlRewriter(),
+                new NoopMinerUParseLimiter()
         );
         DocumentParseResult result = parser.parse(DocumentParseRequest.builder()
                 .documentId(documentId)
@@ -94,5 +101,13 @@ class MinerUDocumentParserIntegrationTest {
         properties.setLocalEndpoint(System.getProperty("nexa.parser.mineru.local-endpoint", "http://127.0.0.1:8000"));
         properties.setLocalParsePath(System.getProperty("nexa.parser.mineru.local-parse-path", "/file_parse"));
         return properties;
+    }
+
+    private static class NoopMinerUParseLimiter implements MinerUParseLimiter {
+
+        @Override
+        public <T> T execute(Long documentId, Supplier<T> action) {
+            return action.get();
+        }
     }
 }

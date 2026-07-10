@@ -9,9 +9,9 @@ import com.nexarag.document.entity.Document;
 import com.nexarag.document.enums.DocumentStatus;
 import com.nexarag.document.enums.FileType;
 import com.nexarag.document.service.DocumentService;
-import com.nexarag.infra.parser.DocumentParseRequest;
-import com.nexarag.infra.parser.DocumentParseResult;
-import com.nexarag.infra.parser.DocumentParseService;
+import com.nexarag.infra.parser.model.DocumentParseRequest;
+import com.nexarag.infra.parser.model.DocumentParseResult;
+import com.nexarag.infra.parser.service.DocumentParseService;
 import org.junit.jupiter.api.Test;
 
 import java.util.Map;

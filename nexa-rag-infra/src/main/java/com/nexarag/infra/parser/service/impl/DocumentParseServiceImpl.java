@@ -1,6 +1,10 @@
-package com.nexarag.infra.parser;
+package com.nexarag.infra.parser.service.impl;
 
 import com.nexarag.common.exception.ServiceException;
+import com.nexarag.infra.parser.model.DocumentParseRequest;
+import com.nexarag.infra.parser.model.DocumentParseResult;
+import com.nexarag.infra.parser.DocumentParser;
+import com.nexarag.infra.parser.service.DocumentParseService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;

@@ -23,6 +23,13 @@ spring:
 nexa:
   # 文档流水线处理配置，用于控制本地 Worker 与 Redis 队列协作。
   document:
+    upload:
+      rate-limit:
+        enabled: true # 是否启用文档上传入口限流，可选值：true、false。
+        semaphore-name: nexa:document:upload # 文档上传分布式信号量名称。
+        max-concurrent: 10 # 文档上传最大并发请求数。
+        max-wait-seconds: 5 # 获取上传许可最大等待时间，单位：秒。
+        lease-seconds: 300 # 上传许可自动释放时间，单位：秒。
     pipeline:
       mode: local # 文档处理模式，可选值：local/mq。当前仅本地模式会启动 Worker。
       # 队列模式，可选值：pipeline。当前仅整条流水线排队模式生效。
@@ -59,6 +66,10 @@ nexa:
       read-timeout: 120s # MinerU 客户端读取超时时间。
       poll-interval: 2s # 官方 MinerU 异步任务轮询间隔。
       max-poll-count: 60 # 官方 MinerU 异步任务最大轮询次数。
+      concurrency-limit: 5 # MinerU 全局最大并发解析任务数。
+      semaphore-name: nexa:mineru:parse # MinerU 解析分布式信号量名称。
+      max-wait-seconds: 30 # 获取 MinerU 解析许可最大等待时间，单位：秒。
+      lease-seconds: 900 # MinerU 解析许可自动释放时间，单位：秒。
 
   # 检索索引配置，用于控制文档片段向量化、向量索引和关键词索引适配器。
   retrieval:

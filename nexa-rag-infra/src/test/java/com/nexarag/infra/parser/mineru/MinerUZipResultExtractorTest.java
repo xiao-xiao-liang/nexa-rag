@@ -1,6 +1,8 @@
 package com.nexarag.infra.parser.mineru;
 
 import com.nexarag.common.exception.ServiceException;
+import com.nexarag.infra.parser.mineru.extract.MinerUExtractedResult;
+import com.nexarag.infra.parser.mineru.extract.MinerUZipResultExtractor;
 import org.junit.jupiter.api.Test;
 
 import java.io.ByteArrayInputStream;

@@ -1,7 +1,8 @@
-package com.nexarag.infra.parser.mineru;
+package com.nexarag.infra.parser.mineru.extract;
 
 import com.nexarag.common.error.BaseErrorCode;
 import com.nexarag.common.exception.ServiceException;
+import com.nexarag.infra.parser.model.MinerUAssetFile;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 

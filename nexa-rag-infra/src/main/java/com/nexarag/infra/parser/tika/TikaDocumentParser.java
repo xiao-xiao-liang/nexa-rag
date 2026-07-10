@@ -2,11 +2,11 @@ package com.nexarag.infra.parser.tika;
 
 import com.nexarag.common.error.BaseErrorCode;
 import com.nexarag.common.exception.ServiceException;
-import com.nexarag.infra.parser.DocumentParseRequest;
-import com.nexarag.infra.parser.DocumentParseResult;
+import com.nexarag.infra.parser.model.DocumentParseRequest;
+import com.nexarag.infra.parser.model.DocumentParseResult;
 import com.nexarag.infra.parser.DocumentParser;
-import com.nexarag.infra.parser.ParsedContentTypes;
-import com.nexarag.infra.parser.ParserFileTypes;
+import com.nexarag.infra.constants.ParsedContentTypes;
+import com.nexarag.infra.constants.ParserFileTypes;
 import com.nexarag.infra.storage.ObjectNameResolver;
 import com.nexarag.infra.storage.StoredFile;
 import com.nexarag.infra.storage.service.FileStorageService;

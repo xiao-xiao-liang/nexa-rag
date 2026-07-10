@@ -1,4 +1,4 @@
-package com.nexarag.infra.parser.mineru;
+package com.nexarag.infra.parser.model;
 
 import lombok.Builder;
 

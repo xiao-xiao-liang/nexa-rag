@@ -1,6 +1,9 @@
-package com.nexarag.infra.parser.mineru;
+package com.nexarag.infra.parser.mineru.client;
 
 import com.nexarag.common.exception.ServiceException;
+import com.nexarag.infra.parser.model.MinerUParseCommand;
+import com.nexarag.infra.parser.model.MinerUParseResponse;
+import com.nexarag.infra.config.MinerUProperties;
 import lombok.RequiredArgsConstructor;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;

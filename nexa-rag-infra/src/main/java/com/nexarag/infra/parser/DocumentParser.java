@@ -1,5 +1,8 @@
 package com.nexarag.infra.parser;
 
+import com.nexarag.infra.parser.model.DocumentParseRequest;
+import com.nexarag.infra.parser.model.DocumentParseResult;
+
 /**
  * 文档解析器接口，定义不同文件类型解析适配器需要实现的统一能力。
  */

@@ -1,4 +1,4 @@
-package com.nexarag.infra.parser.mineru;
+package com.nexarag.infra.parser.model;
 
 /**
  * MinerU 解析资源文件。

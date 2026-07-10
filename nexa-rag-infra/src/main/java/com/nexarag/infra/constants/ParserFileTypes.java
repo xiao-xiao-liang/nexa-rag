@@ -1,4 +1,4 @@
-package com.nexarag.infra.parser;
+package com.nexarag.infra.constants;
 
 /**
  * 解析器使用的文件类型常量，保持 infra 不依赖 document 模块的 FileType 枚举。

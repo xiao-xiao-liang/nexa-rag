@@ -1,6 +1,10 @@
 package com.nexarag.infra.parser.mineru;
 
 import com.nexarag.common.exception.ServiceException;
+import com.nexarag.infra.config.MinerUProperties;
+import com.nexarag.infra.enums.MinerUClientMode;
+import com.nexarag.infra.parser.mineru.client.OfficialMinerUClient;
+import com.nexarag.infra.parser.model.MinerUParseCommand;
 import org.junit.jupiter.api.Test;
 
 import java.io.ByteArrayInputStream;
