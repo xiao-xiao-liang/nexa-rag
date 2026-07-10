@@ -1,0 +1,42 @@
+package com.nexarag.workflow.dispatcher.document;
+
+import com.alibaba.cloud.ai.graph.OverAllState;
+import com.nexarag.common.exception.ServiceException;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
+
+import java.util.Map;
+
+import static com.alibaba.cloud.ai.graph.StateGraph.END;
+import static com.nexarag.workflow.constants.DocumentIngestionNodeConstants.CHUNKING_NODE;
+import static com.nexarag.workflow.constants.DocumentIngestionNodeConstants.INDEXING_NODE;
+import static com.nexarag.workflow.constants.DocumentIngestionNodeConstants.PARSING_NODE;
+import static com.nexarag.workflow.constants.DocumentIngestionStateKeys.ROUTE_TARGET;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+
+/**
+ * 文档处理节点 Dispatcher 测试，验证普通节点后续路由规则。
+ */
+class DocumentNodeDispatcherTest {
+
+    @ParameterizedTest
+    @ValueSource(strings = {CHUNKING_NODE, INDEXING_NODE, END})
+    void applyShouldReturnAllowedRouteTarget(String routeTarget) throws Exception {
+        DocumentNodeDispatcher dispatcher = new DocumentNodeDispatcher();
+
+        String next = dispatcher.apply(new OverAllState(Map.of(ROUTE_TARGET, routeTarget)));
+
+        assertThat(next).isEqualTo(routeTarget);
+    }
+
+    @Test
+    void applyShouldRejectParsingRouteTarget() {
+        DocumentNodeDispatcher dispatcher = new DocumentNodeDispatcher();
+
+        assertThatThrownBy(() -> dispatcher.apply(new OverAllState(Map.of(ROUTE_TARGET, PARSING_NODE))))
+                .isInstanceOf(ServiceException.class)
+                .hasMessageContaining("未知文档入库路由");
+    }
+}
