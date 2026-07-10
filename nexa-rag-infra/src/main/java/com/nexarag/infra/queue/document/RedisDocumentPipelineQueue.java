@@ -13,6 +13,7 @@ import org.springframework.stereotype.Service;
 
 import java.time.Duration;
 import java.time.LocalDateTime;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -176,10 +177,14 @@ public class RedisDocumentPipelineQueue implements DocumentPipelineQueue {
         if (result == null || result.isEmpty()) {
             return Optional.empty();
         }
-        if (!TASK.equals(toString(result.getFirst()))) {
+        String taskMarker = toRedisString(result.getFirst());
+        if (taskMarker == null || taskMarker.isBlank()) {
+            return Optional.empty();
+        }
+        if (!TASK.equals(taskMarker)) {
             throw new ServiceException("Redis 返回的文档流水线任务格式不合法");
         }
-        return Optional.of(new DocumentPipelineTask(toLong(result.get(1)), toString(result.get(3)),
+        return Optional.of(new DocumentPipelineTask(toLong(result.get(1)), toRedisString(result.get(3)),
                 workerId, toLong(result.get(2))));
     }
 
@@ -252,13 +257,13 @@ public class RedisDocumentPipelineQueue implements DocumentPipelineQueue {
         if (result == null || result.isEmpty()) {
             throw new ServiceException("Redis 返回的文档入队结果为空");
         }
-        String status = toString(result.getFirst());
+        String status = toRedisString(result.getFirst());
         if (STATUS_WAITING.equals(status)) {
             return new DocumentPipelineQueueStatus(documentId, toInteger(result.get(1)), toInteger(result.get(2)),
                     false, null, null, toLong(result.get(3)));
         }
         if (STATUS_RUNNING.equals(status)) {
-            RunningState runningState = parseRunningState(toString(result.get(3)));
+            RunningState runningState = parseRunningState(toRedisString(result.get(3)));
             Long leaseTtlSeconds = redisTemplate.getExpire(keys.leaseKey(documentId));
             return new DocumentPipelineQueueStatus(documentId, null, toInteger(result.get(2)), true,
                     runningState.workerId(), leaseTtlSeconds, runningState.enqueueSequence());
@@ -285,7 +290,7 @@ public class RedisDocumentPipelineQueue implements DocumentPipelineQueue {
     private RunningState parseRunningState(String runningJson) {
         try {
             Map<String, Object> runningMap = OBJECT_MAPPER.readValue(runningJson, RUNNING_STATE_TYPE_REFERENCE);
-            return new RunningState(toString(runningMap.get("workerId")), toLong(runningMap.get("enqueueSequence")));
+            return new RunningState(toRedisString(runningMap.get("workerId")), toLong(runningMap.get("enqueueSequence")));
         } catch (JsonProcessingException exception) {
             throw new ServiceException("解析 Redis 文档运行态失败", exception, BaseErrorCode.SERVICE_ERROR);
         }
@@ -297,16 +302,24 @@ public class RedisDocumentPipelineQueue implements DocumentPipelineQueue {
         }
     }
 
-    private String toString(Object value) {
-        return value == null ? null : value.toString();
+    static String toRedisString(Object value) {
+        if (value == null) {
+            return null;
+        }
+        if (value instanceof byte[] bytes) {
+            return new String(bytes, StandardCharsets.UTF_8);
+        }
+        return value.toString();
     }
 
     private Long toLong(Object value) {
-        return value == null ? null : Long.valueOf(value.toString());
+        String stringValue = toRedisString(value);
+        return stringValue == null ? null : Long.valueOf(stringValue);
     }
 
     private Integer toInteger(Object value) {
-        return value == null || value.toString().isBlank() ? null : Integer.valueOf(value.toString());
+        String stringValue = toRedisString(value);
+        return stringValue == null || stringValue.isBlank() ? null : Integer.valueOf(stringValue);
     }
 
     private Integer safeInt(Long value) {

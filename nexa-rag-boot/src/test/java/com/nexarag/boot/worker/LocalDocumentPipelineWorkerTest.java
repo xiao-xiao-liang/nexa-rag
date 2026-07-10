@@ -17,6 +17,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.TreeMap;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
 import static com.nexarag.workflow.constants.DocumentIngestionGraphConstants.DOCUMENT_INGESTION_GRAPH_NAME;
@@ -75,11 +76,45 @@ class LocalDocumentPipelineWorkerTest {
         assertThat(workflowService.documentIds()).containsExactly(10L, 20L, 10L);
     }
 
+    @Test
+    void startShouldContinuePollingWhenQueuePollFailsOnce() throws InterruptedException {
+        FailOncePollingQueue queue = new FailOncePollingQueue();
+        queue.enqueue(10L);
+        RecordingWorkflowService workflowService = new RecordingWorkflowService();
+        LocalDocumentPipelineWorker worker = new LocalDocumentPipelineWorker(buildEnabledProperties(), queue, workflowService);
+
+        worker.start();
+        try {
+            waitUntilDocumentExecuted(workflowService, 10L);
+        } finally {
+            worker.stop();
+        }
+
+        assertThat(workflowService.documentIds()).contains(10L);
+    }
+
     private DocumentPipelineWorkerProperties buildProperties() {
         DocumentPipelineWorkerProperties properties = new DocumentPipelineWorkerProperties();
         properties.setLeaseTtlSeconds(300L);
         properties.setPollIntervalMs(1L);
         return properties;
+    }
+
+    private DocumentPipelineWorkerProperties buildEnabledProperties() {
+        DocumentPipelineWorkerProperties properties = buildProperties();
+        properties.setWorkerEnabled(true);
+        properties.setMaxConcurrency(1);
+        return properties;
+    }
+
+    private void waitUntilDocumentExecuted(RecordingWorkflowService workflowService, Long documentId)
+            throws InterruptedException {
+        for (int index = 0; index < 100; index++) {
+            if (workflowService.documentIds().contains(documentId)) {
+                return;
+            }
+            Thread.sleep(20L);
+        }
     }
 
     /**
@@ -131,7 +166,7 @@ class LocalDocumentPipelineWorkerTest {
     /**
      * 用于验证 FIFO、确认和释放行为的内存队列。
      */
-    private static final class TestDocumentPipelineQueue implements DocumentPipelineQueue {
+    private static class TestDocumentPipelineQueue implements DocumentPipelineQueue {
 
         private final AtomicLong sequence = new AtomicLong();
         private final TreeMap<Long, Long> waitingDocumentIds = new TreeMap<>();
@@ -200,6 +235,22 @@ class LocalDocumentPipelineWorkerTest {
                 position++;
             }
             return null;
+        }
+    }
+
+    /**
+     * 首次轮询抛出异常的内存队列，用于验证 Worker 不会静默退出。
+     */
+    private static final class FailOncePollingQueue extends TestDocumentPipelineQueue {
+
+        private final AtomicInteger pollCount = new AtomicInteger();
+
+        @Override
+        public Optional<DocumentPipelineTask> poll(String workerId, Duration leaseTtl) {
+            if (pollCount.incrementAndGet() == 1) {
+                throw new IllegalStateException("模拟 Redis 队列轮询失败");
+            }
+            return super.poll(workerId, leaseTtl);
         }
     }
 }

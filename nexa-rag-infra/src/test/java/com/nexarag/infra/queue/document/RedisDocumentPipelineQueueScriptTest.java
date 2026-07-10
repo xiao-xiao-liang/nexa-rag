@@ -2,6 +2,8 @@ package com.nexarag.infra.queue.document;
 
 import org.junit.jupiter.api.Test;
 
+import java.nio.charset.StandardCharsets;
+
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
@@ -31,5 +33,14 @@ class RedisDocumentPipelineQueueScriptTest {
         assertThat(RedisDocumentPipelineQueue.RELEASE_SCRIPT).contains("GET");
         assertThat(RedisDocumentPipelineQueue.RELEASE_SCRIPT).contains("INCR");
         assertThat(RedisDocumentPipelineQueue.RELEASE_SCRIPT).contains("ZADD");
+    }
+
+    @Test
+    void redisValueToStringShouldDecodeBinaryRedisResult() {
+        byte[] taskMarker = "TASK".getBytes(StandardCharsets.UTF_8);
+
+        String value = RedisDocumentPipelineQueue.toRedisString(taskMarker);
+
+        assertThat(value).isEqualTo("TASK");
     }
 }

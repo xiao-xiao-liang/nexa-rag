@@ -123,8 +123,14 @@ public class LocalDocumentPipelineWorker implements SmartLifecycle {
 
     private void runLoop(String workerId) {
         while (running.get()) {
-            boolean executed = runOnce(workerId);
-            if (!executed) {
+            try {
+                // 1. 单次轮询失败不能让 Worker 线程静默退出，避免 Redis 短暂异常导致队列停摆
+                boolean executed = runOnce(workerId);
+                if (!executed) {
+                    sleepWhenQueueEmpty();
+                }
+            } catch (RuntimeException exception) {
+                log.error("本地文档流水线 Worker 轮询任务失败，将继续重试，workerId={}", workerId, exception);
                 sleepWhenQueueEmpty();
             }
         }
