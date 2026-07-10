@@ -9,6 +9,8 @@ public final class DocumentIngestionGraphConstants {
 
     public static final String THREAD_ID_SEPARATOR = ":";
 
+    public static final String PARSE_FAILURE_REASON = "文档解析失败";
+
     private DocumentIngestionGraphConstants() {
     }
 }
