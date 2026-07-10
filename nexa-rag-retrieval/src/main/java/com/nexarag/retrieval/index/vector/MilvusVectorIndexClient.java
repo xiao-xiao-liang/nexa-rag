@@ -6,7 +6,6 @@ import com.google.gson.JsonObject;
 import com.nexarag.common.exception.ServiceException;
 import com.nexarag.retrieval.config.RetrievalProperties;
 import com.nexarag.retrieval.constants.DocumentIndexFieldConstants;
-import com.nexarag.retrieval.constants.MilvusIndexConstants;
 import com.nexarag.retrieval.dto.VectorIndexWriteRequest;
 import com.nexarag.retrieval.model.VectorIndexDocument;
 import com.nexarag.retrieval.model.VectorIndexWriteResult;
@@ -17,6 +16,8 @@ import io.milvus.v2.common.IndexParam;
 import io.milvus.v2.service.collection.request.CreateCollectionReq;
 import io.milvus.v2.service.collection.request.HasCollectionReq;
 import io.milvus.v2.service.collection.request.LoadCollectionReq;
+import io.milvus.v2.service.database.request.CreateDatabaseReq;
+import io.milvus.v2.service.database.response.ListDatabasesResp;
 import io.milvus.v2.service.utility.request.FlushReq;
 import io.milvus.v2.service.vector.request.DeleteReq;
 import io.milvus.v2.service.vector.request.UpsertReq;
@@ -44,6 +45,7 @@ public class MilvusVectorIndexClient implements VectorIndexClient, DisposableBea
 
     public MilvusVectorIndexClient(RetrievalProperties retrievalProperties) {
         this.vectorProperties = retrievalProperties.getVector();
+        ensureDatabase();
         this.milvusClient = new MilvusClientV2(connectConfig());
     }
 
@@ -110,11 +112,15 @@ public class MilvusVectorIndexClient implements VectorIndexClient, DisposableBea
     }
 
     private ConnectConfig connectConfig() {
+        return connectConfig(databaseNameOrNull());
+    }
+
+    private ConnectConfig connectConfig(String databaseName) {
         ConnectConfig.ConnectConfigBuilder builder = ConnectConfig.builder()
                 .uri("http://" + vectorProperties.getHost() + ":" + vectorProperties.getPort())
                 .rpcDeadlineMs(vectorProperties.getRpcDeadlineMs());
-        if (StringUtils.hasText(vectorProperties.getDatabaseName())) {
-            builder.dbName(vectorProperties.getDatabaseName());
+        if (StringUtils.hasText(databaseName)) {
+            builder.dbName(databaseName);
         }
         if (StringUtils.hasText(vectorProperties.getUsername())) {
             builder.username(vectorProperties.getUsername());
@@ -123,6 +129,37 @@ public class MilvusVectorIndexClient implements VectorIndexClient, DisposableBea
             builder.password(vectorProperties.getPassword());
         }
         return builder.build();
+    }
+
+    private void ensureDatabase() {
+        String databaseName = databaseNameOrNull();
+        if (databaseName == null) {
+            return;
+        }
+        validateDatabaseName(databaseName);
+
+        // 1. 使用默认库连接检查目标数据库，避免目标库不存在时正式连接失败
+        MilvusClientV2 bootstrapClient = new MilvusClientV2(connectConfig(null));
+        try {
+            ListDatabasesResp response = bootstrapClient.listDatabases();
+            if (response != null && response.getDatabaseNames().contains(databaseName)) {
+                return;
+            }
+
+            // 2. 目标数据库不存在时自动创建，后续集合初始化仍由 ensureCollection 负责
+            bootstrapClient.createDatabase(CreateDatabaseReq.builder()
+                    .databaseName(databaseName)
+                    .build());
+            log.info("Milvus 数据库自动创建完成，databaseName={}", databaseName);
+        } finally {
+            bootstrapClient.close();
+        }
+    }
+
+    private void validateDatabaseName(String databaseName) {
+        if (!databaseName.matches(DATABASE_NAME_REGEX)) {
+            throw new ServiceException("Milvus 数据库名称不合法，仅允许数字、字母和下划线，databaseName=" + databaseName);
+        }
     }
 
     private synchronized void ensureCollection(String collectionName, int vectorDimension) {

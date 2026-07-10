@@ -70,7 +70,7 @@ nexa:
       type: milvus # 向量索引类型，可选值：milvus。
       host: 192.168.0.134 # 向量索引服务地址。
       port: 19530 # 向量索引服务端口。
-      database-name: # 向量库数据库名称，为空时使用默认数据库。
+      database-name: nexa_rag # 向量库数据库名称，为空时使用默认数据库。
       collection-name: nexa_document_chunk # 文档片段向量集合名称。
       dimension: 0 # 0 表示按首次写入的真实向量维度创建集合。
       username: # 向量索引服务用户名，未启用鉴权时为空。

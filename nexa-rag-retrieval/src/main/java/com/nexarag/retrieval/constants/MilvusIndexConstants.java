@@ -9,6 +9,7 @@ public final class MilvusIndexConstants {
     public static final int CHUNK_ID_MAX_LENGTH = 128;
     public static final int TEXT_MAX_LENGTH = 65535;
     public static final int METADATA_MAX_LENGTH = 65535;
+    public static final String DATABASE_NAME_REGEX = "^[A-Za-z0-9_]+$";
 
     private MilvusIndexConstants() {
     }
