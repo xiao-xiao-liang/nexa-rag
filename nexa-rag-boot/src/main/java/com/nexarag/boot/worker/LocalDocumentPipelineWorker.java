@@ -1,14 +1,15 @@
 package com.nexarag.boot.worker;
 
-import com.nexarag.document.service.DocumentPipelineExecutor;
 import com.nexarag.infra.queue.document.DocumentPipelineQueue;
 import com.nexarag.infra.queue.document.DocumentPipelineTask;
+import com.nexarag.workflow.service.WorkflowService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.SmartLifecycle;
 import org.springframework.stereotype.Component;
 
 import java.time.Duration;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.ExecutorService;
@@ -16,8 +17,11 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import static com.nexarag.workflow.constants.DocumentIngestionGraphConstants.DOCUMENT_INGESTION_GRAPH_NAME;
+import static com.nexarag.workflow.constants.DocumentIngestionStateKeys.DOCUMENT_ID;
+
 /**
- * 本地文档流水线 Worker，负责轮询 Redis 队列并组合调用文档流水线执行器。
+ * 本地文档流水线 Worker，负责轮询 Redis 队列并启动文档入库 Workflow Graph。
  */
 @Component
 public class LocalDocumentPipelineWorker implements SmartLifecycle {
@@ -28,17 +32,17 @@ public class LocalDocumentPipelineWorker implements SmartLifecycle {
 
     private final DocumentPipelineWorkerProperties properties;
     private final DocumentPipelineQueue documentPipelineQueue;
-    private final DocumentPipelineExecutor documentPipelineExecutor;
+    private final WorkflowService workflowService;
     private final AtomicBoolean running = new AtomicBoolean(false);
 
     private ExecutorService executorService;
 
     public LocalDocumentPipelineWorker(DocumentPipelineWorkerProperties properties,
                                        DocumentPipelineQueue documentPipelineQueue,
-                                       DocumentPipelineExecutor documentPipelineExecutor) {
+                                       WorkflowService workflowService) {
         this.properties = properties;
         this.documentPipelineQueue = documentPipelineQueue;
-        this.documentPipelineExecutor = documentPipelineExecutor;
+        this.workflowService = workflowService;
     }
 
     /**
@@ -136,8 +140,8 @@ public class LocalDocumentPipelineWorker implements SmartLifecycle {
 
         DocumentPipelineTask task = optionalTask.get();
         try {
-            // 2. 调用 document 模块提供的流水线执行器
-            documentPipelineExecutor.execute(task.documentId());
+            // 2. 调用 Workflow Graph 执行文档入库流水线
+            workflowService.run(DOCUMENT_INGESTION_GRAPH_NAME, Map.of(DOCUMENT_ID, task.documentId()));
 
             // 3. 执行成功后确认任务完成
             documentPipelineQueue.ack(task.documentId(), task.leaseToken());

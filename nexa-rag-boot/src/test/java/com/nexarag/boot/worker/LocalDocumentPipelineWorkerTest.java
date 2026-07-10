@@ -2,10 +2,10 @@ package com.nexarag.boot.worker;
 
 import ch.qos.logback.classic.Level;
 import ch.qos.logback.classic.Logger;
-import com.nexarag.document.service.DocumentPipelineExecutor;
 import com.nexarag.infra.queue.document.DocumentPipelineQueue;
 import com.nexarag.infra.queue.document.DocumentPipelineQueueStatus;
 import com.nexarag.infra.queue.document.DocumentPipelineTask;
+import com.nexarag.workflow.service.WorkflowService;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -14,10 +14,13 @@ import org.slf4j.LoggerFactory;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.TreeMap;
 import java.util.concurrent.atomic.AtomicLong;
 
+import static com.nexarag.workflow.constants.DocumentIngestionGraphConstants.DOCUMENT_INGESTION_GRAPH_NAME;
+import static com.nexarag.workflow.constants.DocumentIngestionStateKeys.DOCUMENT_ID;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
@@ -41,17 +44,18 @@ class LocalDocumentPipelineWorkerTest {
     }
 
     @Test
-    void runOnceForTestShouldExecuteTaskByFifoAndAck() {
+    void runOnceForTestShouldRunDocumentIngestionGraphByFifoAndAck() {
         TestDocumentPipelineQueue queue = new TestDocumentPipelineQueue();
         queue.enqueue(10L);
         queue.enqueue(20L);
-        RecordingDocumentPipelineExecutor executor = new RecordingDocumentPipelineExecutor();
-        LocalDocumentPipelineWorker worker = new LocalDocumentPipelineWorker(buildProperties(), queue, executor);
+        RecordingWorkflowService workflowService = new RecordingWorkflowService();
+        LocalDocumentPipelineWorker worker = new LocalDocumentPipelineWorker(buildProperties(), queue, workflowService);
 
         worker.runOnceForTest("worker-1");
         worker.runOnceForTest("worker-1");
 
-        assertThat(executor.executedDocumentIds()).containsExactly(10L, 20L);
+        assertThat(workflowService.graphNames()).containsExactly(DOCUMENT_INGESTION_GRAPH_NAME, DOCUMENT_INGESTION_GRAPH_NAME);
+        assertThat(workflowService.documentIds()).containsExactly(10L, 20L);
         assertThat(queue.queryStatus(10L)).isEmpty();
         assertThat(queue.queryStatus(20L)).isEmpty();
     }
@@ -61,14 +65,14 @@ class LocalDocumentPipelineWorkerTest {
         TestDocumentPipelineQueue queue = new TestDocumentPipelineQueue();
         queue.enqueue(10L);
         queue.enqueue(20L);
-        FailOnceDocumentPipelineExecutor executor = new FailOnceDocumentPipelineExecutor(10L);
-        LocalDocumentPipelineWorker worker = new LocalDocumentPipelineWorker(buildProperties(), queue, executor);
+        FailOnceWorkflowService workflowService = new FailOnceWorkflowService(10L);
+        LocalDocumentPipelineWorker worker = new LocalDocumentPipelineWorker(buildProperties(), queue, workflowService);
 
         worker.runOnceForTest("worker-1");
         worker.runOnceForTest("worker-1");
         worker.runOnceForTest("worker-1");
 
-        assertThat(executor.executedDocumentIds()).containsExactly(10L, 20L, 10L);
+        assertThat(workflowService.documentIds()).containsExactly(10L, 20L, 10L);
     }
 
     private DocumentPipelineWorkerProperties buildProperties() {
@@ -78,39 +82,55 @@ class LocalDocumentPipelineWorkerTest {
         return properties;
     }
 
-    private static class RecordingDocumentPipelineExecutor implements DocumentPipelineExecutor {
+    /**
+     * 记录 Workflow 调用的测试服务。
+     */
+    private static class RecordingWorkflowService implements WorkflowService {
 
-        private final List<Long> executedDocumentIds = new ArrayList<>();
+        private final List<String> graphNames = new ArrayList<>();
+        private final List<Long> documentIds = new ArrayList<>();
 
         @Override
-        public void execute(Long documentId) {
-            executedDocumentIds.add(documentId);
+        public void run(String graphName, Map<String, Object> initialState) {
+            graphNames.add(graphName);
+            documentIds.add((Long) initialState.get(DOCUMENT_ID));
         }
 
-        List<Long> executedDocumentIds() {
-            return executedDocumentIds;
+        List<String> graphNames() {
+            return graphNames;
+        }
+
+        List<Long> documentIds() {
+            return documentIds;
         }
     }
 
-    private static final class FailOnceDocumentPipelineExecutor extends RecordingDocumentPipelineExecutor {
+    /**
+     * 首次执行指定文档时失败的 Workflow 测试服务。
+     */
+    private static final class FailOnceWorkflowService extends RecordingWorkflowService {
 
         private final Long failDocumentId;
         private boolean failed;
 
-        private FailOnceDocumentPipelineExecutor(Long failDocumentId) {
+        private FailOnceWorkflowService(Long failDocumentId) {
             this.failDocumentId = failDocumentId;
         }
 
         @Override
-        public void execute(Long documentId) {
-            super.execute(documentId);
+        public void run(String graphName, Map<String, Object> initialState) {
+            super.run(graphName, initialState);
+            Long documentId = (Long) initialState.get(DOCUMENT_ID);
             if (!failed && failDocumentId.equals(documentId)) {
                 failed = true;
-                throw new IllegalStateException("模拟文档流水线执行失败");
+                throw new IllegalStateException("模拟文档入库 Graph 执行失败");
             }
         }
     }
 
+    /**
+     * 用于验证 FIFO、确认和释放行为的内存队列。
+     */
     private static final class TestDocumentPipelineQueue implements DocumentPipelineQueue {
 
         private final AtomicLong sequence = new AtomicLong();
