@@ -28,7 +28,7 @@ public class MyBatisPlusAutoFillHandler implements MetaObjectHandler {
     public void updateFill(MetaObject metaObject) {
         // 1. 更新修改时间
         LocalDateTime now = LocalDateTime.now();
-        fillStrategy(metaObject, "updateTime", now);
+        setFieldValByName("updateTime", now, metaObject);
 
         // 2. 逻辑删除更新时统一记录删除时间
         if (isLogicalDelete(metaObject)) {
@@ -51,7 +51,7 @@ public class MyBatisPlusAutoFillHandler implements MetaObjectHandler {
 
         // 2. 记录删除时间和更新时间
         fillStrategy(metaObject, "deleteTime", now);
-        fillStrategy(metaObject, "updateTime", now);
+        setFieldValByName("updateTime", now, metaObject);
     }
 
     /**

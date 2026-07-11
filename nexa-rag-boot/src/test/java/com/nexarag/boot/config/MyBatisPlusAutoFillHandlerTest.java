@@ -53,6 +53,19 @@ class MyBatisPlusAutoFillHandlerTest {
         assertThat(entity.updateTime).isNotNull();
     }
 
+    @Test
+    void updateFillShouldOverwriteExistingUpdateTime() {
+        MyBatisPlusAutoFillHandler handler = new MyBatisPlusAutoFillHandler();
+        TestEntity entity = new TestEntity();
+        LocalDateTime originalUpdateTime = LocalDateTime.now().minusDays(1);
+        entity.setUpdateTime(originalUpdateTime);
+        MetaObject metaObject = SystemMetaObject.forObject(entity);
+
+        handler.updateFill(metaObject);
+
+        assertThat(entity.updateTime).isAfter(originalUpdateTime);
+    }
+
     static class TestEntity {
 
         private LocalDateTime createTime;
