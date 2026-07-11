@@ -1,6 +1,7 @@
 package com.nexarag.document.dto;
 
 import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.Max;
 
 /**
  * Excel/CSV 切分参数。
@@ -14,5 +15,6 @@ public record ExcelSplitOptions(ExcelSplitMode mode,
                                 Boolean firstRowAsHeader,
                                 String charset,
                                 @Min(value = 1, message = "每个片段最多行数不能小于1")
+                                @Max(value = 10000, message = "每个片段最多行数不能超过10000")
                                 Integer maxRowsPerChunk) {
 }

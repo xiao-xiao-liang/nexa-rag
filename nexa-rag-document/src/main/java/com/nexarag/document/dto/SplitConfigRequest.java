@@ -1,6 +1,7 @@
 package com.nexarag.document.dto;
 
 import com.nexarag.document.enums.SplitStrategy;
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;
@@ -24,9 +25,9 @@ public record SplitConfigRequest(
         @Min(value = 0, message = "片段重叠大小不能小于0")
         @Max(value = 5000, message = "片段重叠大小不能超过5000")
         Integer chunkOverlap,
-        MarkdownSplitOptions markdown,
-        RegexSplitOptions regex,
-        ExcelSplitOptions excel) {
+        @Valid MarkdownSplitOptions markdown,
+        @Valid RegexSplitOptions regex,
+        @Valid ExcelSplitOptions excel) {
 
     /**
      * 兼容阶段二仅传基础切分配置的构造方式。

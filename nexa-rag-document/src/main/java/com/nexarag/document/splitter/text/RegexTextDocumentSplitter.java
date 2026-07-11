@@ -29,6 +29,7 @@ public class RegexTextDocumentSplitter implements DocumentSplitter {
 
     private final TextWindowSplitter textWindowSplitter;
     private final DocumentChunkIdGenerator chunkIdGenerator;
+    private final RegexSafetyValidator regexSafetyValidator;
 
     @Override
     public SplitStrategy strategy() {
@@ -62,7 +63,9 @@ public class RegexTextDocumentSplitter implements DocumentSplitter {
 
     private List<String> splitRawParts(String content, RegexSplitOptions options) {
         if (options != null && StringUtils.hasText(options.regex())) {
-            return Pattern.compile(options.regex()).splitAsStream(content).toList();
+            return regexSafetyValidator.validateAndCompile(options.regex())
+                    .splitAsStream(content)
+                    .toList();
         }
         if (options != null && StringUtils.hasText(options.separator())) {
             return List.of(content.split(Pattern.quote(options.separator())));
