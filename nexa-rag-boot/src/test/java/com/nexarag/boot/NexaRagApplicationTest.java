@@ -2,6 +2,8 @@ package com.nexarag.boot;
 
 import com.nexarag.document.mapper.DocumentChunkMapper;
 import com.nexarag.document.mapper.DocumentMapper;
+import com.nexarag.document.outbox.mapper.DocumentPipelineOutboxMapper;
+import com.nexarag.infra.messaging.document.DocumentPipelineMessagePublisher;
 import com.nexarag.model.mapper.ModelCallLogMapper;
 import com.nexarag.model.mapper.ModelConfigMapper;
 import com.nexarag.model.mapper.ModelGovernanceConfigMapper;
@@ -27,6 +29,12 @@ class NexaRagApplicationTest {
 
     @MockitoBean
     private DocumentChunkMapper documentChunkMapper;
+
+    @MockitoBean
+    private DocumentPipelineOutboxMapper documentPipelineOutboxMapper;
+
+    @MockitoBean
+    private DocumentPipelineMessagePublisher documentPipelineMessagePublisher;
 
     @MockitoBean
     private ModelCallLogMapper modelCallLogMapper;

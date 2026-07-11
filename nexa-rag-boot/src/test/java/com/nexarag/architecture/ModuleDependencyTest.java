@@ -5,6 +5,7 @@ import com.tngtech.archunit.core.importer.ClassFileImporter;
 import org.junit.jupiter.api.Test;
 
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
+import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * 模块依赖架构测试。
@@ -64,5 +65,18 @@ class ModuleDependencyTest {
                 .should().dependOnClassesThat().resideInAPackage("..mapper..")
                 .allowEmptyShould(true)
                 .check(classes);
+    }
+
+    @Test
+    void legacyDocumentQueueAndLocalWorkerShouldBeRemoved() {
+        // 1. 验证旧Redis文档队列包不再包含任何类
+        assertThat(classes.stream()
+                .filter(javaClass -> javaClass.getPackageName().startsWith("com.nexarag.infra.queue.document")))
+                .isEmpty();
+
+        // 2. 验证本地Worker和旧任务投递接口不再存在
+        assertThat(classes.stream().map(javaClass -> javaClass.getSimpleName()))
+                .doesNotContain("LocalDocumentPipelineWorker", "DocumentPipelineWorkerProperties",
+                        "DocumentProcessTaskDispatcher", "DocumentPipelineQueue");
     }
 }
