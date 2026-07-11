@@ -12,7 +12,8 @@ public interface DocumentPipelineMessagePublisher {
      * 发布文档流水线消息。
      *
      * @param message 文档流水线消息
-     * @return 消息发布结果
+     * @return 消息发布成功结果；发布失败时不返回结果
+     * @throws com.nexarag.common.exception.ServiceException 消息发布失败时抛出
      */
     DocumentPipelinePublishResult publish(DocumentPipelineMessage message);
 }

@@ -39,22 +39,26 @@ public class RocketMqDocumentPipelinePublisher implements DocumentPipelineMessag
      */
     @Override
     public DocumentPipelinePublishResult publish(DocumentPipelineMessage message) {
+        // 1. 校验并构建 RocketMQ 消息
+        if (message == null) {
+            throw new ServiceException("文档流水线消息不能为空");
+        }
         String messageKey = message.documentId() + ":" + message.processId();
         Message<DocumentPipelineMessage> rocketMqMessage = MessageBuilder.withPayload(message)
                 .setHeader(RocketMQHeaders.KEYS, messageKey)
                 .build();
 
         try {
-            // 1. 使用配置主题同步发布消息
+            // 2. 使用配置主题同步发布消息
             SendResult sendResult = rocketMQTemplate.syncSend(properties.getTopic(), rocketMqMessage);
 
-            // 2. 校验 RocketMQ 返回结果
+            // 3. 校验 RocketMQ 返回结果
             validateSendResult(sendResult, message);
 
-            // 3. 返回发布成功结果
+            // 4. 返回发布成功结果
             log.info("文档流水线消息发布成功，documentId={}，processId={}，messageId={}",
                     message.documentId(), message.processId(), sendResult.getMsgId());
-            return new DocumentPipelinePublishResult(true, sendResult.getMsgId(), null);
+            return DocumentPipelinePublishResult.success(sendResult.getMsgId());
         } catch (ServiceException exception) {
             throw exception;
         } catch (Exception exception) {
@@ -80,6 +84,10 @@ public class RocketMqDocumentPipelinePublisher implements DocumentPipelineMessag
         if (sendResult.getSendStatus() != SendStatus.SEND_OK) {
             throw new ServiceException("文档流水线消息发布失败，发送状态=" + sendResult.getSendStatus()
                     + "，documentId=" + message.documentId() + "，processId=" + message.processId());
+        }
+        if (sendResult.getMsgId() == null || sendResult.getMsgId().isBlank()) {
+            throw new ServiceException("文档流水线消息发布失败，消息ID为空，documentId=" + message.documentId()
+                    + "，processId=" + message.processId());
         }
     }
 }

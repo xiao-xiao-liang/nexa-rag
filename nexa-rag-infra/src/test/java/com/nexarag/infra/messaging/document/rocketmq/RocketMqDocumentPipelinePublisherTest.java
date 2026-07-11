@@ -47,7 +47,7 @@ class RocketMqDocumentPipelinePublisherTest {
         assertThat(result.success()).isTrue();
         assertThat(result.messageId()).isEqualTo("message-001");
         assertThat(result.failureReason()).isNull();
-        ArgumentCaptor<Message<DocumentPipelineMessage>> messageCaptor = ArgumentCaptor.forClass(Message.class);
+        ArgumentCaptor<Message<?>> messageCaptor = ArgumentCaptor.forClass(Message.class);
         verify(rocketMQTemplate).syncSend(eq(TOPIC), messageCaptor.capture());
         assertThat(messageCaptor.getValue().getPayload()).isEqualTo(createMessage());
         assertThat(messageCaptor.getValue().getHeaders().get(RocketMQHeaders.KEYS))
@@ -96,6 +96,31 @@ class RocketMqDocumentPipelinePublisherTest {
                 .hasMessageContaining("documentId=" + DOCUMENT_ID)
                 .hasMessageContaining("processId=" + PROCESS_ID)
                 .hasCause(originalException);
+    }
+
+    @Test
+    void shouldThrowServiceExceptionWhenMessageIsNull() {
+        RocketMqDocumentPipelinePublisher publisher = createPublisher(mock(RocketMQTemplate.class));
+
+        assertThatThrownBy(() -> publisher.publish(null))
+                .isInstanceOf(ServiceException.class)
+                .hasMessage("文档流水线消息不能为空");
+    }
+
+    @Test
+    void shouldThrowServiceExceptionWhenMessageIdIsBlank() {
+        RocketMQTemplate rocketMQTemplate = mock(RocketMQTemplate.class);
+        SendResult sendResult = mock(SendResult.class);
+        when(sendResult.getSendStatus()).thenReturn(SendStatus.SEND_OK);
+        when(sendResult.getMsgId()).thenReturn(" ");
+        when(rocketMQTemplate.syncSend(eq(TOPIC), any(Message.class))).thenReturn(sendResult);
+        RocketMqDocumentPipelinePublisher publisher = createPublisher(rocketMQTemplate);
+
+        assertThatThrownBy(() -> publisher.publish(createMessage()))
+                .isInstanceOf(ServiceException.class)
+                .hasMessageContaining("消息ID为空")
+                .hasMessageContaining("documentId=" + DOCUMENT_ID)
+                .hasMessageContaining("processId=" + PROCESS_ID);
     }
 
     @Test
