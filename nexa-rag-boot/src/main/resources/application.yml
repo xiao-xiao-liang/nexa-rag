@@ -24,8 +24,14 @@ spring:
     username: root
     password: 
 
+# RocketMQ连接配置。name-server为NameServer地址，多个地址使用分号分隔；producer.group为全局生产者组名称。
+rocketmq:
+  name-server: 118.195.146.161:8082 # RocketMQ NameServer地址，默认连接局域网开发环境。
+  producer:
+    group: nexa-document-pipeline-producer # 文档流水线生产者组，同一应用集群应保持一致。
+
 nexa:
-  # 文档流水线处理配置，用于控制本地 Worker 与 Redis 队列协作。
+  # 文档上传和异步处理流水线配置。
   document:
     upload:
       rate-limit:
@@ -35,18 +41,26 @@ nexa:
         max-wait-seconds: 5 # 获取上传许可最大等待时间，单位：秒。
         lease-seconds: 300 # 上传许可自动释放时间，单位：秒。
     pipeline:
-      mode: local # 文档处理模式，可选值：local/mq。当前仅本地模式会启动 Worker。
-      # 队列模式，可选值：pipeline。当前仅整条流水线排队模式生效。
-      queue-mode: pipeline
-      worker-enabled: true # 是否启用本地文档流水线 Worker，可选值：true、false。
-      max-concurrency: 2 # 本地 Worker 最大并发线程数，最小有效值为 1。
-      poll-interval-ms: 1000 # 队列为空时的轮询间隔，单位：毫秒。
-      lease-ttl-seconds: 300 # Worker 获取任务后的租约有效期，单位：秒。
-      # Redis 文档流水线队列配置。
-      queue:
-        key-prefix: nexa:document:pipeline # Redis key 前缀，用于隔离文档流水线相关队列、租约和运行态数据。
-        lease-ttl-seconds: 300 # 队列任务租约有效期，单位：秒。
-        retry-ttl-seconds: 86400 # 运行态重试副本保留时间，单位：秒。
+      # 消息中间件配置：当前仅支持ROCKETMQ，REDIS_STREAM属于后续预留适配目标。
+      messaging:
+        type: ROCKETMQ # 消息中间件类型，当前必须为ROCKETMQ。
+        publish-mode: OUTBOX # 发布模式当前仅支持OUTBOX，TRANSACTION_MESSAGE属于后续预留适配目标。
+        topic: nexa-document-pipeline # 正常流水线消息主题。
+        failure-topic: nexa-document-pipeline-failure # 不可重试异常的业务失败主题。
+        consumer-group: nexa-document-pipeline-worker # 正常流水线消费者组。
+        failure-consumer-group: nexa-document-pipeline-failure-handler # 业务失败和死信处理消费者组前缀。
+        max-reconsume-times: 5 # RocketMQ最大重新消费次数，最小值为0；监听器当前按5次配置。
+      # Outbox发布配置：负责将数据库待发布记录可靠投递到RocketMQ。
+      outbox:
+        batch-size: 100 # 单次扫描最大记录数，最小值为1。
+        poll-interval-ms: 1000 # Outbox扫描间隔，单位：毫秒，最小值为100。
+        publishing-timeout-seconds: 60 # PUBLISHING状态抢占超时，单位：秒，最小值为1。
+        max-publish-retries: 10 # 消息发布最大尝试次数，最小值为1。
+        initial-retry-delay-seconds: 5 # 首次发布重试延迟，单位：秒，最小值为1。
+        max-retry-delay-seconds: 300 # 指数退避最大延迟，单位：秒，且不应小于首次延迟。
+      # 对象存储上传瞬时失败退避配置；列表长度即最大尝试次数。
+      upload-retry:
+        backoff-millis: [200, 500, 1000] # 每次失败后的退避时间，单位：毫秒，元素不能小于0。
 
   # 文件存储配置，用于控制文档原始文件和解析产物的存取位置。
   storage:

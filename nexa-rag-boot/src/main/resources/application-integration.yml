@@ -16,7 +16,23 @@ spring:
       password: ${NEXA_REDIS_PASSWORD:}
       timeout: ${NEXA_REDIS_TIMEOUT:3s}
 
+# 集成环境RocketMQ连接配置，默认使用已确认可用的NameServer。
+rocketmq:
+  name-server: ${NEXA_ROCKETMQ_NAME_SERVER:118.195.146.161:8082}
+  producer:
+    group: ${NEXA_ROCKETMQ_PRODUCER_GROUP:nexa-document-pipeline-producer}
+
 nexa:
+  document:
+    pipeline:
+      messaging:
+        type: ${NEXA_DOCUMENT_MESSAGING_TYPE:ROCKETMQ} # 当前可用值为ROCKETMQ。
+        publish-mode: ${NEXA_DOCUMENT_PUBLISH_MODE:OUTBOX} # 当前可用值为OUTBOX。
+        topic: ${NEXA_DOCUMENT_PIPELINE_TOPIC:nexa-document-pipeline}
+        failure-topic: ${NEXA_DOCUMENT_FAILURE_TOPIC:nexa-document-pipeline-failure}
+        consumer-group: ${NEXA_DOCUMENT_CONSUMER_GROUP:nexa-document-pipeline-worker}
+        failure-consumer-group: ${NEXA_DOCUMENT_FAILURE_CONSUMER_GROUP:nexa-document-pipeline-failure-handler}
+        max-reconsume-times: ${NEXA_DOCUMENT_MAX_RECONSUME_TIMES:5}
   integration:
     enabled: ${NEXA_INTEGRATION_ENABLED:false}
     mysql:

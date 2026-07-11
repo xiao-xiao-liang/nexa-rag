@@ -42,4 +42,17 @@ class NexaRagApplicationConfigurationTest {
         assertThat(content).contains("max-file-size: 100MB");
         assertThat(content).contains("max-request-size: 110MB");
     }
+
+    @Test
+    void defaultApplicationShouldConfigureRocketMqPipelineAndRemoveLegacyQueue() throws Exception {
+        org.springframework.core.io.ClassPathResource resource = new org.springframework.core.io.ClassPathResource("application.yml");
+
+        String content = resource.getContentAsString(java.nio.charset.StandardCharsets.UTF_8);
+        assertThat(content).contains("name-server: 118.195.146.161:8082");
+        assertThat(content).contains("type: ROCKETMQ", "publish-mode: OUTBOX");
+        assertThat(content).contains("topic: nexa-document-pipeline", "max-reconsume-times: 5");
+        assertThat(content).contains("backoff-millis: [200, 500, 1000]");
+        assertThat(content).doesNotContain("worker-enabled:", "queue-mode:", "lease-ttl-seconds:",
+                "key-prefix: nexa:document:pipeline");
+    }
 }

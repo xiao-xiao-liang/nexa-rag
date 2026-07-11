@@ -2,6 +2,9 @@ package com.nexarag.boot;
 
 import com.nexarag.document.mapper.DocumentChunkMapper;
 import com.nexarag.document.mapper.DocumentMapper;
+import com.nexarag.document.messaging.RocketMqDocumentPipelineConsumer;
+import com.nexarag.document.messaging.RocketMqDocumentPipelineDeadLetterConsumer;
+import com.nexarag.document.messaging.RocketMqDocumentPipelineFailureConsumer;
 import com.nexarag.document.outbox.mapper.DocumentPipelineOutboxMapper;
 import com.nexarag.infra.messaging.document.DocumentPipelineMessagePublisher;
 import com.nexarag.model.mapper.ModelCallLogMapper;
@@ -35,6 +38,15 @@ class NexaRagApplicationTest {
 
     @MockitoBean
     private DocumentPipelineMessagePublisher documentPipelineMessagePublisher;
+
+    @MockitoBean
+    private RocketMqDocumentPipelineConsumer documentPipelineConsumer;
+
+    @MockitoBean
+    private RocketMqDocumentPipelineFailureConsumer documentPipelineFailureConsumer;
+
+    @MockitoBean
+    private RocketMqDocumentPipelineDeadLetterConsumer documentPipelineDeadLetterConsumer;
 
     @MockitoBean
     private ModelCallLogMapper modelCallLogMapper;

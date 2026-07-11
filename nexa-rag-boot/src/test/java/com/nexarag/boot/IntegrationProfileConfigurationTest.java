@@ -22,6 +22,7 @@ class IntegrationProfileConfigurationTest {
         assertThat(content).contains("${NEXA_MYSQL_PASSWORD:}");
         assertThat(content).contains("${NEXA_REDIS_PASSWORD:}");
         assertThat(content).contains("${NEXA_ELASTICSEARCH_PASSWORD:}");
+        assertThat(content).contains("${NEXA_ROCKETMQ_NAME_SERVER:118.195.146.161:8082}");
         assertThat(content).doesNotContain("");
         assertThat(content).doesNotContain("722121" + "Zheng");
         assertThat(content).doesNotContain("");
