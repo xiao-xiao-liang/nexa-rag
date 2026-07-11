@@ -6,6 +6,7 @@ import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableLogic;
 import com.baomidou.mybatisplus.annotation.TableName;
 import com.baomidou.mybatisplus.annotation.Version;
+import com.nexarag.document.enums.DocumentPipelineMessageStatus;
 import com.nexarag.document.enums.DocumentStatus;
 import com.nexarag.document.enums.FileType;
 import lombok.AllArgsConstructor;
@@ -87,6 +88,26 @@ public class Document {
      * 文档处理状态。
      */
     private DocumentStatus status;
+
+    /**
+     * 文档处理流水号。
+     */
+    private String processId;
+
+    /**
+     * 文档流水线消息状态。
+     */
+    private DocumentPipelineMessageStatus messageStatus;
+
+    /**
+     * 消息消费次数。
+     */
+    private Integer consumedTimes;
+
+    /**
+     * 最近消费消息ID。
+     */
+    private String lastMessageId;
 
     /**
      * 排队阶段。
