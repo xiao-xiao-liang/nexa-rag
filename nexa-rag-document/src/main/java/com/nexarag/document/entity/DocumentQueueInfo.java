@@ -1,4 +1,4 @@
-package com.nexarag.document.service;
+package com.nexarag.document.entity;
 
 /**
  * 文档队列信息，描述上传提交后在处理流水线中的实时排队概况。

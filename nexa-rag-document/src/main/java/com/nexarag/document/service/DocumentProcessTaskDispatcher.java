@@ -1,5 +1,7 @@
 package com.nexarag.document.service;
 
+import com.nexarag.document.entity.DocumentQueueInfo;
+
 /**
  * 文档处理任务分发器，负责把整条文档入库流水线任务交给后续队列或 Worker。
  */

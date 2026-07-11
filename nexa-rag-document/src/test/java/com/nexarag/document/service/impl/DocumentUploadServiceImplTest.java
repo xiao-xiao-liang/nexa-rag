@@ -9,7 +9,7 @@ import com.nexarag.document.entity.Document;
 import com.nexarag.document.enums.DocumentStatus;
 import com.nexarag.document.enums.FileType;
 import com.nexarag.document.service.DocumentProcessTaskDispatcher;
-import com.nexarag.document.service.DocumentQueueInfo;
+import com.nexarag.document.entity.DocumentQueueInfo;
 import com.nexarag.document.service.ProcessConfigDefaults;
 import com.nexarag.document.vo.UploadDocumentResponse;
 import com.nexarag.infra.storage.service.FileStorageService;

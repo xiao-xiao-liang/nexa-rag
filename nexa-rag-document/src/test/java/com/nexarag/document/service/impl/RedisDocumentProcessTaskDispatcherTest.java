@@ -1,6 +1,6 @@
 package com.nexarag.document.service.impl;
 
-import com.nexarag.document.service.DocumentQueueInfo;
+import com.nexarag.document.entity.DocumentQueueInfo;
 import com.nexarag.infra.queue.document.DocumentPipelineQueue;
 import com.nexarag.infra.queue.document.DocumentPipelineQueueStatus;
 import com.nexarag.infra.queue.document.DocumentPipelineTask;

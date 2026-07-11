@@ -2,7 +2,7 @@ package com.nexarag.document.service.impl;
 
 import com.nexarag.document.converter.DocumentConverter;
 import com.nexarag.document.entity.Document;
-import com.nexarag.document.service.DocumentQueueInfo;
+import com.nexarag.document.entity.DocumentQueueInfo;
 import com.nexarag.document.service.DocumentQueueStatusService;
 import com.nexarag.document.service.DocumentService;
 import com.nexarag.document.vo.DocumentProcessStatusVO;

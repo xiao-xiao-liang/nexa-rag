@@ -4,7 +4,7 @@ import com.nexarag.document.dto.ProcessDocumentRequest;
 import com.nexarag.document.entity.Document;
 import com.nexarag.document.enums.DocumentStatus;
 import com.nexarag.document.service.DocumentProcessTaskDispatcher;
-import com.nexarag.document.service.DocumentQueueInfo;
+import com.nexarag.document.entity.DocumentQueueInfo;
 import com.nexarag.document.service.DocumentService;
 import com.nexarag.document.vo.DocumentProcessStatusVO;
 import org.junit.jupiter.api.Test;

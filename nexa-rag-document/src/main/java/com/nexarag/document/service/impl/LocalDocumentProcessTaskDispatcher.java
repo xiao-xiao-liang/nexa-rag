@@ -1,7 +1,7 @@
 package com.nexarag.document.service.impl;
 
 import com.nexarag.document.service.DocumentProcessTaskDispatcher;
-import com.nexarag.document.service.DocumentQueueInfo;
+import com.nexarag.document.entity.DocumentQueueInfo;
 import lombok.extern.slf4j.Slf4j;
 
 /**

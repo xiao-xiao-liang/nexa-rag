@@ -3,7 +3,7 @@ package com.nexarag.document.converter;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.nexarag.document.entity.Document;
 import com.nexarag.document.entity.DocumentChunk;
-import com.nexarag.document.service.DocumentQueueInfo;
+import com.nexarag.document.entity.DocumentQueueInfo;
 import com.nexarag.document.vo.DocumentChunkVO;
 import com.nexarag.document.vo.DocumentDetailVO;
 import com.nexarag.document.vo.DocumentProcessStatusVO;
