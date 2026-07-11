@@ -3,7 +3,6 @@ package com.nexarag.document.converter;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.nexarag.document.entity.Document;
 import com.nexarag.document.entity.DocumentChunk;
-import com.nexarag.document.entity.DocumentQueueInfo;
 import com.nexarag.document.vo.DocumentChunkVO;
 import com.nexarag.document.vo.DocumentDetailVO;
 import com.nexarag.document.vo.DocumentProcessStatusVO;
@@ -49,21 +48,9 @@ public final class DocumentConverter {
      * @return 文档处理状态响应
      */
     public static DocumentProcessStatusVO toProcessStatusVO(Document document) {
-        return new DocumentProcessStatusVO(document.getDocumentId(), document.getStatus(), document.getRetryCount(),
-                document.getFailureStage(), document.getFailureReason());
-    }
-
-    /**
-     * 转换文档处理状态并附加实时队列信息。
-     *
-     * @param document  文档实体
-     * @param queueInfo 文档队列信息
-     * @return 文档处理状态响应
-     */
-    public static DocumentProcessStatusVO toProcessStatusVO(Document document, DocumentQueueInfo queueInfo) {
-        return new DocumentProcessStatusVO(document.getDocumentId(), document.getStatus(), document.getRetryCount(),
-                document.getFailureStage(), document.getFailureReason(), queueInfo.queuePosition(),
-                queueInfo.waitingCount(), queueInfo.running(), queueInfo.workerId(), queueInfo.leaseTtlSeconds());
+        return new DocumentProcessStatusVO(document.getDocumentId(), document.getProcessId(), document.getStatus(),
+                document.getMessageStatus(), document.getConsumedTimes(), document.getFailureStage(),
+                document.getFailureReason());
     }
 
     /**

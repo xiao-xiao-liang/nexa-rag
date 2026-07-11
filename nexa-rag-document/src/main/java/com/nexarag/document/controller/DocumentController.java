@@ -8,7 +8,6 @@ import com.nexarag.document.dto.ProcessDocumentRequest;
 import com.nexarag.document.dto.UploadDocumentRequest;
 import com.nexarag.document.service.DocumentChunkService;
 import com.nexarag.document.service.DocumentPipelineSubmitService;
-import com.nexarag.document.service.DocumentQueueStatusService;
 import com.nexarag.document.service.DocumentService;
 import com.nexarag.document.service.DocumentUploadService;
 import com.nexarag.document.vo.DocumentChunkVO;
@@ -43,7 +42,6 @@ public class DocumentController {
     private final DocumentChunkService documentChunkService;
     private final DocumentUploadService documentUploadService;
     private final DocumentPipelineSubmitService documentPipelineSubmitService;
-    private final DocumentQueueStatusService documentQueueStatusService;
 
     /**
      * 创建文档记录。
@@ -138,7 +136,8 @@ public class DocumentController {
      */
     @GetMapping("/{documentId}/process-status")
     public Result<DocumentProcessStatusVO> getProcessStatus(@PathVariable Long documentId) {
-        return Results.success(documentQueueStatusService.getProcessStatus(documentId));
+        return Results.success(DocumentConverter.toProcessStatusVO(
+                documentService.getRequiredDocument(documentId)));
     }
 
     /**
