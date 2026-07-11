@@ -4,6 +4,7 @@ import com.nexarag.infra.messaging.document.enums.DocumentPipelineMessagingType;
 import com.nexarag.infra.messaging.document.enums.DocumentPipelinePublishMode;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 import lombok.Getter;
 import lombok.Setter;
 import org.springframework.boot.context.properties.ConfigurationProperties;
@@ -23,11 +24,13 @@ public class DocumentPipelineMessagingProperties {
     /**
      * 消息中间件类型。
      */
+    @NotNull(message = "消息中间件类型不能为空")
     private DocumentPipelineMessagingType type = DocumentPipelineMessagingType.ROCKETMQ;
 
     /**
      * 消息发布模式。
      */
+    @NotNull(message = "消息发布模式不能为空")
     private DocumentPipelinePublishMode publishMode = DocumentPipelinePublishMode.OUTBOX;
 
     /**

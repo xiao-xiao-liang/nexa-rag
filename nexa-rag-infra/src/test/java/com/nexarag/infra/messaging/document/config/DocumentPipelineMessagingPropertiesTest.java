@@ -8,6 +8,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.boot.context.properties.bind.BindException;
 import org.springframework.boot.context.properties.bind.Bindable;
 import org.springframework.boot.context.properties.bind.Binder;
+import org.springframework.boot.context.properties.bind.validation.BindValidationException;
 import org.springframework.boot.context.properties.bind.validation.ValidationBindHandler;
 import org.springframework.boot.context.properties.source.MapConfigurationPropertySource;
 import org.springframework.validation.beanvalidation.SpringValidatorAdapter;
@@ -91,12 +92,55 @@ class DocumentPipelineMessagingPropertiesTest {
                 .isInstanceOf(BindException.class);
     }
 
+    @Test
+    void shouldRejectBlankMessagingTypeWhenBinding() {
+        // 1. 清空默认消息中间件类型并准备空白配置
+        DocumentPipelineMessagingProperties properties = new DocumentPipelineMessagingProperties();
+        properties.setType(null);
+        MapConfigurationPropertySource source = new MapConfigurationPropertySource(Map.of(
+                "nexa.document.pipeline.messaging.type", ""));
+
+        // 2. 绑定并执行配置校验
+        assertThatThrownBy(() -> bindWithValidation(source, properties))
+                // 3. 验证空白消息中间件类型触发非空校验
+                .isInstanceOf(BindException.class)
+                .hasCauseInstanceOf(BindValidationException.class);
+    }
+
+    @Test
+    void shouldRejectBlankPublishModeWhenBinding() {
+        // 1. 清空默认消息发布模式并准备空白配置
+        DocumentPipelineMessagingProperties properties = new DocumentPipelineMessagingProperties();
+        properties.setPublishMode(null);
+        MapConfigurationPropertySource source = new MapConfigurationPropertySource(Map.of(
+                "nexa.document.pipeline.messaging.publish-mode", ""));
+
+        // 2. 绑定并执行配置校验
+        assertThatThrownBy(() -> bindWithValidation(source, properties))
+                // 3. 验证空白消息发布模式触发非空校验
+                .isInstanceOf(BindException.class)
+                .hasCauseInstanceOf(BindValidationException.class);
+    }
+
     /**
      * 使用 Jakarta Bean Validation 校验器绑定文档流水线消息配置。
      *
      * @param source 配置属性源
      */
     private void bindWithValidation(MapConfigurationPropertySource source) {
+        // 1. 使用默认配置对象执行绑定校验
+        bindWithValidation(source, new DocumentPipelineMessagingProperties());
+    }
+
+    /**
+     * 使用 Jakarta Bean Validation 校验器绑定到指定文档流水线消息配置对象。
+     *
+     * @param source 配置属性源
+     * @param properties 待绑定配置对象
+     */
+    private void bindWithValidation(
+            MapConfigurationPropertySource source,
+            DocumentPipelineMessagingProperties properties) {
         // 1. 创建 Jakarta Bean Validation 校验器
         try (ValidatorFactory validatorFactory = Validation.buildDefaultValidatorFactory()) {
             SpringValidatorAdapter validator = new SpringValidatorAdapter(validatorFactory.getValidator());
@@ -104,7 +148,7 @@ class DocumentPipelineMessagingPropertiesTest {
             // 2. 绑定配置并执行约束校验
             new Binder(source).bind(
                     "nexa.document.pipeline.messaging",
-                    Bindable.of(DocumentPipelineMessagingProperties.class),
+                    Bindable.ofInstance(properties),
                     new ValidationBindHandler(validator));
         }
     }
