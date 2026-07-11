@@ -33,4 +33,13 @@ class NexaRagApplicationConfigurationTest {
         assertThat(content).contains("timeout: 3s");
         assertThat(content).doesNotContain("${");
     }
+
+    @Test
+    void defaultApplicationShouldLimitMultipartUploadSize() throws Exception {
+        org.springframework.core.io.ClassPathResource resource = new org.springframework.core.io.ClassPathResource("application.yml");
+
+        String content = resource.getContentAsString(java.nio.charset.StandardCharsets.UTF_8);
+        assertThat(content).contains("max-file-size: 100MB");
+        assertThat(content).contains("max-request-size: 110MB");
+    }
 }

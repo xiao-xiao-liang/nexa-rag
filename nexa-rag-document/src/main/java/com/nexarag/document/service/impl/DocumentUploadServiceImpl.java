@@ -7,6 +7,7 @@ import com.nexarag.document.dto.CreateDocumentRequest;
 import com.nexarag.document.dto.ProcessDocumentRequest;
 import com.nexarag.document.dto.UploadDocumentRequest;
 import com.nexarag.document.entity.Document;
+import com.nexarag.document.enums.FileType;
 import com.nexarag.document.error.DocumentErrorCode;
 import com.nexarag.document.service.DocumentProcessTaskDispatcher;
 import com.nexarag.document.service.DocumentQueueInfo;
@@ -18,6 +19,7 @@ import com.nexarag.infra.storage.service.FileStorageService;
 import com.nexarag.infra.storage.StoredFile;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.boot.autoconfigure.web.servlet.MultipartProperties;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 import org.springframework.web.multipart.MultipartFile;
@@ -36,6 +38,7 @@ public class DocumentUploadServiceImpl implements DocumentUploadService {
     private final DocumentService documentService;
     private final ProcessConfigDefaults processConfigDefaults;
     private final DocumentProcessTaskDispatcher taskDispatcher;
+    private final MultipartProperties multipartProperties;
 
     /**
      * 上传文档并提交处理。
@@ -56,9 +59,15 @@ public class DocumentUploadServiceImpl implements DocumentUploadService {
         // 2. 保存原始文件到对象存储
         StoredFile storedFile = saveOriginalFile(file, originalFileName);
 
-        // 3. 创建文档记录，稳定状态先落为 UPLOADED
-        Document uploadedDocument = documentService.createDocument(buildCreateDocumentRequest(
-                safeRequest, originalFileName, storedFile));
+        // 3. 创建文档记录，失败时删除本次上传产生的孤儿对象
+        Document uploadedDocument;
+        try {
+            uploadedDocument = documentService.createDocument(buildCreateDocumentRequest(
+                    safeRequest, originalFileName, storedFile));
+        } catch (RuntimeException exception) {
+            compensateStoredFile(storedFile.objectName(), exception);
+            throw exception;
+        }
 
         // 4. 合并默认处理配置并推进为 QUEUED
         ProcessDocumentRequest processRequest = processConfigDefaults.merge(uploadedDocument.getFileType(), safeRequest);
@@ -79,6 +88,19 @@ public class DocumentUploadServiceImpl implements DocumentUploadService {
         if (!StringUtils.hasText(file.getOriginalFilename())) {
             throw new ClientException("上传文件名不能为空", DocumentErrorCode.DOCUMENT_UPLOAD_FILE_INVALID);
         }
+
+        // 1. 复用 Spring Multipart 配置限制单文件大小
+        long maxFileSize = multipartProperties.getMaxFileSize().toBytes();
+        if (file.getSize() > maxFileSize) {
+            throw new ClientException("上传文件大小超过限制，最大允许=" + multipartProperties.getMaxFileSize(),
+                    DocumentErrorCode.DOCUMENT_UPLOAD_FILE_INVALID);
+        }
+
+        // 2. 在写入对象存储前校验文档类型
+        if (FileType.fromFileName(file.getOriginalFilename()) == FileType.UNKNOWN) {
+            throw new ClientException("不支持的文档类型，fileName=" + file.getOriginalFilename(),
+                    DocumentErrorCode.DOCUMENT_FILE_TYPE_UNSUPPORTED);
+        }
     }
 
     private StoredFile saveOriginalFile(MultipartFile file, String originalFileName) {
@@ -96,5 +118,15 @@ public class DocumentUploadServiceImpl implements DocumentUploadService {
         String title = StringUtils.hasText(request.title()) ? request.title() : originalFileName;
         return new CreateDocumentRequest(title, request.description(), originalFileName,
                 storedFile.objectName(), storedFile.url(), storedFile.size());
+    }
+
+    private void compensateStoredFile(String objectName, RuntimeException originalException) {
+        try {
+            // 1. 删除文档记录创建失败前已保存的原始对象
+            fileStorageService.delete(objectName);
+        } catch (RuntimeException cleanupException) {
+            log.error("创建文档记录失败后删除原始对象失败，objectName={}", objectName, cleanupException);
+            originalException.addSuppressed(cleanupException);
+        }
     }
 }

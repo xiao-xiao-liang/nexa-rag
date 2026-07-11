@@ -218,11 +218,11 @@ public void delete(String objectName) {
 }
 ```
 
-增加入队失败补偿测试：
+增加文档创建成功后入队失败保留对象测试：
 
 ```java
 @Test
-void uploadShouldDeleteStoredObjectWhenEnqueueFails() {
+void uploadShouldKeepStoredObjectWhenEnqueueFailsAfterDocumentCreated() {
     RecordingFileStorageService storageService = new RecordingFileStorageService();
     DocumentProcessTaskDispatcher dispatcher = documentId -> {
         throw new ServiceException("模拟Redis入队失败");
@@ -236,7 +236,7 @@ void uploadShouldDeleteStoredObjectWhenEnqueueFails() {
     assertThatThrownBy(() -> uploadService.upload(file, null))
             .isInstanceOf(ServiceException.class)
             .hasMessageContaining("模拟Redis入队失败");
-    assertThat(storageService.deletedObjectName).isEqualTo("original/demo.pdf");
+    assertThat(storageService.deletedObjectName).isNull();
 }
 ```
 
@@ -283,18 +283,17 @@ public void delete(String objectName) {
 void uploadShouldKeepOriginalExceptionWhenStoredObjectCleanupFails() {
     RecordingFileStorageService storageService = new RecordingFileStorageService();
     storageService.deleteException = new IllegalStateException("模拟对象删除失败");
-    ServiceException enqueueException = new ServiceException("模拟Redis入队失败");
-    DocumentProcessTaskDispatcher dispatcher = documentId -> {
-        throw enqueueException;
-    };
+    RecordingDocumentService documentService = new RecordingDocumentService();
+    ServiceException createException = new ServiceException("模拟文档创建失败");
+    documentService.createException = createException;
     DocumentUploadServiceImpl uploadService = new DocumentUploadServiceImpl(
-            storageService, new RecordingDocumentService(), new ProcessConfigDefaults(),
-            dispatcher, multipartProperties());
+            storageService, documentService, new ProcessConfigDefaults(),
+            new FixedDocumentProcessTaskDispatcher(), multipartProperties());
     MockMultipartFile file = new MockMultipartFile(
             "file", "demo.pdf", "application/pdf", "hello".getBytes(StandardCharsets.UTF_8));
 
     assertThatThrownBy(() -> uploadService.upload(file, null))
-            .isSameAs(enqueueException)
+            .isSameAs(createException)
             .satisfies(exception -> assertThat(exception.getSuppressed())
                     .extracting(Throwable::getMessage)
                     .containsExactly("模拟对象删除失败"));
@@ -374,24 +373,26 @@ private void validateFile(MultipartFile file) {
 
 - [ ] **Step 6: 实现对象存储失败补偿**
 
-将保存后的业务步骤放入 `try-catch`：
+仅将文档记录创建步骤放入 `try-catch`：
 
 ```java
 StoredFile storedFile = saveOriginalFile(file, originalFileName);
+Document uploadedDocument;
 try {
-    Document uploadedDocument = documentService.createDocument(buildCreateDocumentRequest(
+    uploadedDocument = documentService.createDocument(buildCreateDocumentRequest(
             safeRequest, originalFileName, storedFile));
-    ProcessDocumentRequest processRequest = processConfigDefaults.merge(uploadedDocument.getFileType(), safeRequest);
-    Document queuedDocument = documentService.submitProcess(uploadedDocument.getDocumentId(), processRequest);
-    DocumentQueueInfo queueInfo = taskDispatcher.enqueue(queuedDocument.getDocumentId());
-    log.info("文档上传并提交处理成功，documentId={}，status={}",
-            queuedDocument.getDocumentId(), queuedDocument.getStatus());
-    return new UploadDocumentResponse(queuedDocument.getDocumentId(), queuedDocument.getStatus(),
-            queueInfo.queuePosition(), queueInfo.waitingCount());
 } catch (RuntimeException exception) {
     compensateStoredFile(storedFile.objectName(), exception);
     throw exception;
 }
+
+ProcessDocumentRequest processRequest = processConfigDefaults.merge(uploadedDocument.getFileType(), safeRequest);
+Document queuedDocument = documentService.submitProcess(uploadedDocument.getDocumentId(), processRequest);
+DocumentQueueInfo queueInfo = taskDispatcher.enqueue(queuedDocument.getDocumentId());
+log.info("文档上传并提交处理成功，documentId={}，status={}",
+        queuedDocument.getDocumentId(), queuedDocument.getStatus());
+return new UploadDocumentResponse(queuedDocument.getDocumentId(), queuedDocument.getStatus(),
+        queueInfo.queuePosition(), queueInfo.waitingCount());
 ```
 
 新增补偿方法：

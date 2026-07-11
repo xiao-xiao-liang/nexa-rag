@@ -6,6 +6,10 @@ spring:
     name: nexa-rag
   main:
     banner-mode: console
+  servlet:
+    multipart:
+      max-file-size: 100MB
+      max-request-size: 110MB
   flyway:
     enabled: false
   data:
