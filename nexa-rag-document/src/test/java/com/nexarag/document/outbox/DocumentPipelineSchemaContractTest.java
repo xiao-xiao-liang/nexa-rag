@@ -6,6 +6,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -33,16 +34,25 @@ class DocumentPipelineSchemaContractTest {
         assertOutboxSchema(schemaSql);
     }
 
+    @Test
+    void shouldNormalizeSqlLineSeparators() {
+        assertEquals("第一行\n第二行\n第三行", normalizeLineSeparators("第一行\r\n第二行\r第三行"));
+    }
+
     private static String readRepositoryFile(String relativePath) throws IOException {
         Path current = Path.of("").toAbsolutePath().normalize();
         while (current != null) {
             Path target = current.resolve(relativePath);
             if (Files.isRegularFile(target)) {
-                return Files.readString(target);
+                return normalizeLineSeparators(Files.readString(target));
             }
             current = current.getParent();
         }
         throw new IOException("未找到数据库结构文件：" + relativePath);
+    }
+
+    private static String normalizeLineSeparators(String text) {
+        return text.replace("\r\n", "\n").replace('\r', '\n');
     }
 
     private static void assertDocumentMessagingColumns(String sql) {
