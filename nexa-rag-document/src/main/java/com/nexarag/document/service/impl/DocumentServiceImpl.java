@@ -13,6 +13,7 @@ import com.nexarag.document.dto.CreateDocumentRequest;
 import com.nexarag.document.dto.ProcessDocumentRequest;
 import com.nexarag.document.entity.Document;
 import com.nexarag.document.enums.DocumentStatus;
+import com.nexarag.document.enums.DocumentPipelineMessageStatus;
 import com.nexarag.document.enums.FileType;
 import com.nexarag.document.error.DocumentErrorCode;
 import com.nexarag.document.mapper.DocumentMapper;
@@ -105,7 +106,8 @@ public class DocumentServiceImpl extends ServiceImpl<DocumentMapper, Document> i
     }
 
     @Override
-    public Document submitProcess(Long documentId, ProcessDocumentRequest request) {
+    public Document submitProcess(Long documentId, ProcessDocumentRequest request, String processId) {
+        validateProcessId(processId);
         Document document = getRequiredDocument(documentId);
         DocumentStatus oldStatus = document.getStatus();
         if (!oldStatus.canTransferTo(DocumentStatus.QUEUED)) {
@@ -118,6 +120,13 @@ public class DocumentServiceImpl extends ServiceImpl<DocumentMapper, Document> i
         document.setStatus(DocumentStatus.QUEUED);
         document.setQueueStage(QUEUE_STAGE_PIPELINE);
         document.setQueueTime(LocalDateTime.now());
+        document.setProcessId(processId);
+        document.setMessageStatus(DocumentPipelineMessageStatus.PENDING_PUBLISH);
+        document.setConsumedTimes(0);
+        document.setLastMessageId(null);
+        document.setFailureStage(null);
+        document.setFailureReason(null);
+        document.setFailureDetail(null);
 
         // 2. 使用原状态作为条件，避免并发重复提交
         if (documentStatusUpdateFailed(document, oldStatus)) {
@@ -173,7 +182,8 @@ public class DocumentServiceImpl extends ServiceImpl<DocumentMapper, Document> i
     }
 
     @Override
-    public Document retryProcess(Long documentId) {
+    public Document retryProcess(Long documentId, String processId) {
+        validateProcessId(processId);
         Document document = getRequiredDocument(documentId);
         DocumentStatus oldStatus = document.getStatus();
         if (oldStatus != DocumentStatus.FAILED) {
@@ -193,6 +203,10 @@ public class DocumentServiceImpl extends ServiceImpl<DocumentMapper, Document> i
         document.setStatus(DocumentStatus.QUEUED);
         document.setQueueStage(QUEUE_STAGE_PIPELINE);
         document.setQueueTime(LocalDateTime.now());
+        document.setProcessId(processId);
+        document.setMessageStatus(DocumentPipelineMessageStatus.PENDING_PUBLISH);
+        document.setConsumedTimes(0);
+        document.setLastMessageId(null);
         if (documentRetryUpdateFailed(document, oldStatus)) {
             throw new ClientException("文档状态已变化，请刷新后重试，documentId=" + documentId,
                     DocumentErrorCode.DOCUMENT_STATUS_INVALID);
@@ -263,6 +277,13 @@ public class DocumentServiceImpl extends ServiceImpl<DocumentMapper, Document> i
                 .set(Document::getProcessConfigJson, document.getProcessConfigJson())
                 .set(Document::getRetryCount, document.getRetryCount())
                 .set(Document::getLastRetryTime, document.getLastRetryTime())
+                .set(Document::getProcessId, document.getProcessId())
+                .set(Document::getMessageStatus, document.getMessageStatus())
+                .set(Document::getConsumedTimes, document.getConsumedTimes())
+                .set(Document::getLastMessageId, document.getLastMessageId())
+                .set(Document::getFailureStage, document.getFailureStage())
+                .set(Document::getFailureReason, document.getFailureReason())
+                .set(Document::getFailureDetail, document.getFailureDetail())
                 .update();
     }
 
@@ -287,6 +308,10 @@ public class DocumentServiceImpl extends ServiceImpl<DocumentMapper, Document> i
                 .set(Document::getFailureReason, document.getFailureReason())
                 .set(Document::getFailureDetail, document.getFailureDetail())
                 .set(Document::getProcessEndTime, document.getProcessEndTime())
+                .set(Document::getProcessId, document.getProcessId())
+                .set(Document::getMessageStatus, document.getMessageStatus())
+                .set(Document::getConsumedTimes, document.getConsumedTimes())
+                .set(Document::getLastMessageId, document.getLastMessageId())
                 .update();
     }
 
@@ -355,6 +380,12 @@ public class DocumentServiceImpl extends ServiceImpl<DocumentMapper, Document> i
         } catch (JsonProcessingException exception) {
             throw new ServiceException("序列化文档处理配置失败", exception,
                     DocumentErrorCode.DOCUMENT_PROCESS_CONFIG_INVALID);
+        }
+    }
+
+    private void validateProcessId(String processId) {
+        if (processId == null || processId.isBlank()) {
+            throw new ClientException("文档处理批次ID不能为空", DocumentErrorCode.DOCUMENT_PROCESS_CONFIG_INVALID);
         }
     }
 }

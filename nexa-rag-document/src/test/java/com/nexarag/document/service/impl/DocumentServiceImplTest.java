@@ -47,7 +47,8 @@ class DocumentServiceImplTest {
                 .build();
 
         Document document = documentService.submitProcess(1L,
-                new ProcessDocumentRequest(new SplitConfigRequest(SplitStrategy.PARENT_MARKDOWN, 1000, 100)));
+                new ProcessDocumentRequest(new SplitConfigRequest(SplitStrategy.PARENT_MARKDOWN, 1000, 100)),
+                "process-1");
 
         assertThat(document.getStatus()).isEqualTo(DocumentStatus.QUEUED);
         assertThat(document.getQueueStage()).isEqualTo("PIPELINE");
@@ -66,7 +67,7 @@ class DocumentServiceImplTest {
                 .maxRetryCount(3)
                 .build();
 
-        assertThatThrownBy(() -> documentService.submitProcess(1L, null))
+        assertThatThrownBy(() -> documentService.submitProcess(1L, null, "process-1"))
                 .isInstanceOf(ClientException.class);
     }
 
@@ -126,7 +127,7 @@ class DocumentServiceImplTest {
                 .failureDetail("MinerU调用失败")
                 .build();
 
-        Document document = documentService.retryProcess(1L);
+        Document document = documentService.retryProcess(1L, "process-2");
 
         assertThat(document.getStatus()).isEqualTo(DocumentStatus.QUEUED);
         assertThat(document.getQueueStage()).isEqualTo("PIPELINE");

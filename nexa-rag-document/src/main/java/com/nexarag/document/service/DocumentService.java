@@ -34,9 +34,10 @@ public interface DocumentService extends IService<Document> {
      *
      * @param documentId 文档ID
      * @param request    文档处理请求
+     * @param processId 处理批次ID
      * @return 文档实体
      */
-    Document submitProcess(Long documentId, ProcessDocumentRequest request);
+    Document submitProcess(Long documentId, ProcessDocumentRequest request, String processId);
 
     /**
      * 记录文档处理失败，并由系统自动决定重新排队或最终失败。
@@ -53,9 +54,10 @@ public interface DocumentService extends IService<Document> {
      * 人工重试失败文档，通常用于自动重试耗尽后由用户重新入队。
      *
      * @param documentId 文档ID
+     * @param processId 新的处理批次ID
      * @return 文档实体
      */
-    Document retryProcess(Long documentId);
+    Document retryProcess(Long documentId, String processId);
 
     /**
      * 删除文档。

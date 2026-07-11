@@ -7,7 +7,7 @@ import com.nexarag.document.dto.CreateDocumentRequest;
 import com.nexarag.document.dto.ProcessDocumentRequest;
 import com.nexarag.document.dto.UploadDocumentRequest;
 import com.nexarag.document.service.DocumentChunkService;
-import com.nexarag.document.service.DocumentPipelineTriggerService;
+import com.nexarag.document.service.DocumentPipelineSubmitService;
 import com.nexarag.document.service.DocumentQueueStatusService;
 import com.nexarag.document.service.DocumentService;
 import com.nexarag.document.service.DocumentUploadService;
@@ -42,7 +42,7 @@ public class DocumentController {
     private final DocumentService documentService;
     private final DocumentChunkService documentChunkService;
     private final DocumentUploadService documentUploadService;
-    private final DocumentPipelineTriggerService documentPipelineTriggerService;
+    private final DocumentPipelineSubmitService documentPipelineSubmitService;
     private final DocumentQueueStatusService documentQueueStatusService;
 
     /**
@@ -116,7 +116,7 @@ public class DocumentController {
     @PostMapping("/{documentId}/process")
     public Result<DocumentProcessStatusVO> processDocument(@PathVariable Long documentId,
                                                            @Valid @RequestBody(required = false) ProcessDocumentRequest request) {
-        return Results.success(documentPipelineTriggerService.submitProcess(documentId, request));
+        return Results.success(documentPipelineSubmitService.submitProcess(documentId, request));
     }
 
     /**
@@ -127,7 +127,7 @@ public class DocumentController {
      */
     @PostMapping("/{documentId}/retry")
     public Result<DocumentProcessStatusVO> retryDocument(@PathVariable Long documentId) {
-        return Results.success(documentPipelineTriggerService.retryProcess(documentId));
+        return Results.success(documentPipelineSubmitService.retryProcess(documentId));
     }
 
     /**

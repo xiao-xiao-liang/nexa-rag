@@ -3,15 +3,13 @@ package com.nexarag.document.vo;
 import com.nexarag.document.enums.DocumentStatus;
 
 /**
- * 上传文档响应，返回文档稳定状态和实时排队概况。
+ * 上传文档响应，返回文档处理批次和排队状态。
  *
  * @param documentId    文档ID
- * @param status        文档状态
- * @param queuePosition 当前队列位置
- * @param waitingCount  等待处理数量
+ * @param processId  处理批次ID
+ * @param status     文档状态
  */
 public record UploadDocumentResponse(Long documentId,
-                                     DocumentStatus status,
-                                     Integer queuePosition,
-                                     Integer waitingCount) {
+                                     String processId,
+                                     DocumentStatus status) {
 }

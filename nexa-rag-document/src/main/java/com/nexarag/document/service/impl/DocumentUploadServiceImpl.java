@@ -3,20 +3,20 @@ package com.nexarag.document.service.impl;
 import com.nexarag.common.error.BaseErrorCode;
 import com.nexarag.common.exception.ClientException;
 import com.nexarag.common.exception.ServiceException;
+import com.nexarag.document.config.DocumentUploadRetryProperties;
 import com.nexarag.document.dto.CreateDocumentRequest;
 import com.nexarag.document.dto.ProcessDocumentRequest;
 import com.nexarag.document.dto.UploadDocumentRequest;
 import com.nexarag.document.entity.Document;
 import com.nexarag.document.enums.FileType;
 import com.nexarag.document.error.DocumentErrorCode;
-import com.nexarag.document.service.DocumentProcessTaskDispatcher;
-import com.nexarag.document.entity.DocumentQueueInfo;
-import com.nexarag.document.service.DocumentService;
+import com.nexarag.document.service.DocumentPipelineSubmitService;
+import com.nexarag.document.service.DocumentUploadRetryWaiter;
 import com.nexarag.document.service.DocumentUploadService;
 import com.nexarag.document.service.ProcessConfigDefaults;
 import com.nexarag.document.vo.UploadDocumentResponse;
-import com.nexarag.infra.storage.service.FileStorageService;
 import com.nexarag.infra.storage.StoredFile;
+import com.nexarag.infra.storage.service.FileStorageService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.web.servlet.MultipartProperties;
@@ -25,9 +25,10 @@ import org.springframework.util.StringUtils;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
+import java.util.List;
 
 /**
- * 文档上传服务实现，负责保存原始文件、创建文档记录并投递处理流水线。
+ * 文档上传服务实现，负责上传原始文件并通过事务提交服务创建文档处理任务。
  */
 @Slf4j
 @Service
@@ -35,50 +36,37 @@ import java.io.IOException;
 public class DocumentUploadServiceImpl implements DocumentUploadService {
 
     private final FileStorageService fileStorageService;
-    private final DocumentService documentService;
+    private final DocumentPipelineSubmitService pipelineSubmitService;
     private final ProcessConfigDefaults processConfigDefaults;
-    private final DocumentProcessTaskDispatcher taskDispatcher;
     private final MultipartProperties multipartProperties;
+    private final DocumentUploadRetryProperties retryProperties;
+    private final DocumentUploadRetryWaiter retryWaiter;
 
-    /**
-     * 上传文档并提交处理。
-     *
-     * @param file    上传文件
-     * @param request 上传文档请求
-     * @return 上传响应
-     */
     @Override
     public UploadDocumentResponse upload(MultipartFile file, UploadDocumentRequest request) {
-        // 1. 校验上传文件，避免空文件进入后续流水线
+        // 1. 校验上传文件，避免无效文件进入对象存储
         validateFile(file);
         UploadDocumentRequest safeRequest = request == null
                 ? new UploadDocumentRequest(null, null, null, null, null)
                 : request;
         String originalFileName = file.getOriginalFilename();
 
-        // 2. 保存原始文件到对象存储
-        StoredFile storedFile = saveOriginalFile(file, originalFileName);
+        // 2. 使用短退避策略保存原始文件
+        StoredFile storedFile = saveOriginalFileWithRetry(file, originalFileName);
 
-        // 3. 创建文档记录，失败时删除本次上传产生的孤儿对象
-        Document uploadedDocument;
+        // 3. 在同一事务内创建文档、推进排队状态并写入Outbox
         try {
-            uploadedDocument = documentService.createDocument(buildCreateDocumentRequest(
-                    safeRequest, originalFileName, storedFile));
+            ProcessDocumentRequest processRequest = processConfigDefaults.merge(
+                    FileType.fromFileName(originalFileName), safeRequest);
+            Document document = pipelineSubmitService.createAndSubmit(
+                    buildCreateDocumentRequest(safeRequest, originalFileName, storedFile), processRequest);
+            log.info("文档上传并提交处理成功，documentId={}，processId={}，status={}",
+                    document.getDocumentId(), document.getProcessId(), document.getStatus());
+            return new UploadDocumentResponse(document.getDocumentId(), document.getProcessId(), document.getStatus());
         } catch (RuntimeException exception) {
             compensateStoredFile(storedFile.objectName(), exception);
             throw exception;
         }
-
-        // 4. 合并默认处理配置并推进为 QUEUED
-        ProcessDocumentRequest processRequest = processConfigDefaults.merge(uploadedDocument.getFileType(), safeRequest);
-        Document queuedDocument = documentService.submitProcess(uploadedDocument.getDocumentId(), processRequest);
-
-        // 5. 投递处理任务并立即返回排队信息
-        DocumentQueueInfo queueInfo = taskDispatcher.enqueue(queuedDocument.getDocumentId());
-        log.info("文档上传并提交处理成功，documentId={}，status={}",
-                queuedDocument.getDocumentId(), queuedDocument.getStatus());
-        return new UploadDocumentResponse(queuedDocument.getDocumentId(), queuedDocument.getStatus(),
-                queueInfo.queuePosition(), queueInfo.waitingCount());
     }
 
     private void validateFile(MultipartFile file) {
@@ -89,10 +77,9 @@ public class DocumentUploadServiceImpl implements DocumentUploadService {
             throw new ClientException("上传文件名不能为空", DocumentErrorCode.DOCUMENT_UPLOAD_FILE_INVALID);
         }
 
-        // 1. 复用 Spring Multipart 配置限制单文件大小
-        long maxFileSize = multipartProperties.getMaxFileSize().toBytes();
-        if (file.getSize() > maxFileSize) {
-            throw new ClientException("上传文件大小超过限制，最大允许=" + multipartProperties.getMaxFileSize(),
+        // 1. 复用Spring Multipart配置限制单文件大小
+        if (file.getSize() > multipartProperties.getMaxFileSize().toBytes()) {
+            throw new ClientException("上传文件大小超过限制，最大允许" + multipartProperties.getMaxFileSize(),
                     DocumentErrorCode.DOCUMENT_UPLOAD_FILE_INVALID);
         }
 
@@ -103,13 +90,26 @@ public class DocumentUploadServiceImpl implements DocumentUploadService {
         }
     }
 
-    private StoredFile saveOriginalFile(MultipartFile file, String originalFileName) {
-        try {
-            return fileStorageService.save(originalFileName, file.getInputStream(), file.getSize());
-        } catch (IOException exception) {
-            throw new ServiceException("读取上传文件流失败，fileName=" + originalFileName,
-                    exception, BaseErrorCode.SERVICE_ERROR);
+    private StoredFile saveOriginalFileWithRetry(MultipartFile file, String originalFileName) {
+        List<Long> backoffMillis = retryProperties.getBackoffMillis();
+        RuntimeException lastException = null;
+        for (int attempt = 0; attempt < backoffMillis.size(); attempt++) {
+            try {
+                return fileStorageService.save(originalFileName, file.getInputStream(), file.getSize());
+            } catch (IOException exception) {
+                throw new ServiceException("读取上传文件流失败，fileName=" + originalFileName,
+                        exception, BaseErrorCode.SERVICE_ERROR);
+            } catch (RuntimeException exception) {
+                lastException = exception;
+                log.warn("保存原始文件失败，准备重试，fileName={}，attempt={}，maxAttempts={}",
+                        originalFileName, attempt + 1, backoffMillis.size(), exception);
+                if (attempt + 1 < backoffMillis.size()) {
+                    retryWaiter.await(backoffMillis.get(attempt));
+                }
+            }
         }
+        throw new ServiceException("保存原始文件重试耗尽，fileName=" + originalFileName,
+                lastException, BaseErrorCode.SERVICE_ERROR);
     }
 
     private CreateDocumentRequest buildCreateDocumentRequest(UploadDocumentRequest request,
@@ -122,10 +122,10 @@ public class DocumentUploadServiceImpl implements DocumentUploadService {
 
     private void compensateStoredFile(String objectName, RuntimeException originalException) {
         try {
-            // 1. 删除文档记录创建失败前已保存的原始对象
+            // 1. 删除数据库事务失败前已保存的原始对象
             fileStorageService.delete(objectName);
         } catch (RuntimeException cleanupException) {
-            log.error("创建文档记录失败后删除原始对象失败，objectName={}", objectName, cleanupException);
+            log.error("文档提交事务失败后删除原始对象失败，objectName={}", objectName, cleanupException);
             originalException.addSuppressed(cleanupException);
         }
     }
