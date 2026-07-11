@@ -82,7 +82,8 @@ class DocumentChunkTransactionServiceTest {
         Document document = Document.builder().documentId(1L).build();
         when(documentService.recordProcessFailure(1L, "CHUNK", "文档切分失败", "测试异常"))
                 .thenReturn(document);
-        DocumentProcessFailureService service = new DocumentProcessFailureService(documentService);
+        DocumentProcessFailureService service = new DocumentProcessFailureService(
+                documentService, org.mockito.Mockito.mock(com.nexarag.document.alert.DocumentPipelineAlertService.class));
 
         Document result = service.recordFailure(1L, "CHUNK", "文档切分失败", "测试异常");
 

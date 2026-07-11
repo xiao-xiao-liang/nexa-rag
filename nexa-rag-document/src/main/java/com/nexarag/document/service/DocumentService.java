@@ -60,6 +60,30 @@ public interface DocumentService extends IService<Document> {
     Document retryProcess(Long documentId, String processId);
 
     /**
+     * 记录当前处理轮次的消息消费信息。
+     *
+     * @param documentId    文档ID
+     * @param processId     处理批次ID
+     * @param messageId     RocketMQ消息ID
+     * @param consumedTimes 消息消费次数
+     * @return true表示当前轮次已更新，false表示旧轮次或终态消息
+     */
+    boolean recordMessageConsumption(Long documentId, String processId, String messageId, int consumedTimes);
+
+    /**
+     * 将当前处理轮次标记为最终失败。
+     *
+     * @param documentId   文档ID
+     * @param processId    处理批次ID
+     * @param failureStage 失败阶段
+     * @param failureReason 失败原因
+     * @param failureDetail 失败详情
+     * @return true表示更新成功，false表示处理轮次已变化
+     */
+    boolean markProcessFailed(Long documentId, String processId, String failureStage,
+                              String failureReason, String failureDetail);
+
+    /**
      * 删除文档。
      *
      * @param documentId 文档ID

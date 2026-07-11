@@ -217,6 +217,47 @@ public class DocumentServiceImpl extends ServiceImpl<DocumentMapper, Document> i
     }
 
     @Override
+    public boolean recordMessageConsumption(Long documentId, String processId, String messageId, int consumedTimes) {
+        DocumentPipelineMessageStatus messageStatus = consumedTimes > 1
+                ? DocumentPipelineMessageStatus.RETRYING
+                : DocumentPipelineMessageStatus.PROCESSING;
+
+        // 1. 仅更新当前处理轮次且尚未进入终态的文档
+        return this.lambdaUpdate()
+                .eq(Document::getDocumentId, documentId)
+                .eq(Document::getProcessId, processId)
+                .notIn(Document::getStatus, DocumentStatus.INDEXED, DocumentStatus.FAILED)
+                .set(Document::getMessageStatus, messageStatus)
+                .set(Document::getConsumedTimes, consumedTimes)
+                .set(Document::getLastMessageId, messageId)
+                .update();
+    }
+
+    @Override
+    public boolean markProcessFailed(Long documentId, String processId, String failureStage,
+                                     String failureReason, String failureDetail) {
+        LocalDateTime now = LocalDateTime.now();
+
+        // 1. 仅允许当前处理轮次进入最终失败，避免旧消息覆盖人工重试状态
+        boolean updated = this.lambdaUpdate()
+                .eq(Document::getDocumentId, documentId)
+                .eq(Document::getProcessId, processId)
+                .notIn(Document::getStatus, DocumentStatus.INDEXED, DocumentStatus.FAILED)
+                .set(Document::getStatus, DocumentStatus.FAILED)
+                .set(Document::getMessageStatus, DocumentPipelineMessageStatus.FAILED)
+                .set(Document::getFailureStage, failureStage)
+                .set(Document::getFailureReason, failureReason)
+                .set(Document::getFailureDetail, failureDetail)
+                .set(Document::getProcessEndTime, now)
+                .update();
+        if (updated) {
+            log.error("文档处理轮次已标记为最终失败，documentId={}，processId={}，failureStage={}",
+                    documentId, processId, failureStage);
+        }
+        return updated;
+    }
+
+    @Override
     public boolean deleteDocument(Long documentId) {
         getRequiredDocument(documentId);
 
