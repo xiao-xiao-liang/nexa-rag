@@ -1,5 +1,6 @@
 package com.nexarag.document.service;
 
+import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.service.IService;
 import com.nexarag.document.entity.DocumentChunk;
 import com.nexarag.document.splitter.ChunkDraft;
@@ -18,6 +19,16 @@ public interface DocumentChunkService extends IService<DocumentChunk> {
      * @return 文档片段列表
      */
     List<DocumentChunk> listByDocumentId(Long documentId);
+
+    /**
+     * 分页查询指定文档的片段。
+     *
+     * @param documentId 文档ID
+     * @param pageNum    页码
+     * @param pageSize   每页数量
+     * @return 文档片段分页数据
+     */
+    IPage<DocumentChunk> pageByDocumentId(Long documentId, long pageNum, long pageSize);
 
     /**
      * 替换指定文档的片段。

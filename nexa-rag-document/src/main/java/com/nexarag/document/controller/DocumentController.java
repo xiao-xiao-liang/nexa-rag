@@ -31,8 +31,6 @@ import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.util.List;
-
 /**
  * 文档接口控制器，负责接收文档相关 REST 请求并返回统一响应。
  */
@@ -147,12 +145,16 @@ public class DocumentController {
      * 查询文档片段。
      *
      * @param documentId 文档ID
-     * @return 文档片段列表
+     * @param pageNum    页码
+     * @param pageSize   每页数量
+     * @return 文档片段分页列表
      */
     @GetMapping("/{documentId}/chunks")
-    public Result<List<DocumentChunkVO>> listChunks(@PathVariable Long documentId) {
-        return Results.success(documentChunkService.listByDocumentId(documentId).stream()
-                .map(DocumentConverter::toChunkVO)
-                .toList());
+    public Result<PageVO<DocumentChunkVO>> listChunks(
+            @PathVariable Long documentId,
+            @RequestParam(defaultValue = "1") long pageNum,
+            @RequestParam(defaultValue = "20") long pageSize) {
+        return Results.success(DocumentConverter.toChunkPageVO(
+                documentChunkService.pageByDocumentId(documentId, pageNum, pageSize)));
     }
 }

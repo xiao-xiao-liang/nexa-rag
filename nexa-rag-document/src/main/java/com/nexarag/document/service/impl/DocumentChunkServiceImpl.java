@@ -1,5 +1,7 @@
 package com.nexarag.document.service.impl;
 
+import com.baomidou.mybatisplus.core.metadata.IPage;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -26,6 +28,8 @@ public class DocumentChunkServiceImpl extends ServiceImpl<DocumentChunkMapper, D
         implements DocumentChunkService {
 
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
+    private static final long DEFAULT_PAGE_SIZE = 20;
+    private static final long MAX_PAGE_SIZE = 100;
 
     @Override
     public List<DocumentChunk> listByDocumentId(Long documentId) {
@@ -34,6 +38,31 @@ public class DocumentChunkServiceImpl extends ServiceImpl<DocumentChunkMapper, D
                 .eq(DocumentChunk::getDocumentId, documentId)
                 .orderByAsc(DocumentChunk::getChunkOrder)
                 .list();
+    }
+
+    @Override
+    public IPage<DocumentChunk> pageByDocumentId(Long documentId, long pageNum, long pageSize) {
+        long safePageNum = pageNum <= 0 ? 1 : pageNum;
+        long safePageSize = pageSize <= 0 ? DEFAULT_PAGE_SIZE : Math.min(pageSize, MAX_PAGE_SIZE);
+
+        // 1. 使用归一化后的分页参数查询指定文档片段
+        return queryChunkPage(documentId, safePageNum, safePageSize);
+    }
+
+    /**
+     * 查询指定文档的片段分页数据。
+     *
+     * @param documentId 文档ID
+     * @param pageNum    页码
+     * @param pageSize   每页数量
+     * @return 文档片段分页数据
+     */
+    protected IPage<DocumentChunk> queryChunkPage(Long documentId, long pageNum, long pageSize) {
+        Page<DocumentChunk> page = Page.of(pageNum, pageSize);
+        return this.lambdaQuery()
+                .eq(DocumentChunk::getDocumentId, documentId)
+                .orderByAsc(DocumentChunk::getChunkOrder)
+                .page(page);
     }
 
     @Transactional(rollbackFor = Exception.class)

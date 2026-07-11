@@ -1,5 +1,6 @@
 package com.nexarag.document.converter;
 
+import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.nexarag.document.entity.Document;
 import com.nexarag.document.entity.DocumentChunk;
 import com.nexarag.document.service.DocumentQueueInfo;
@@ -7,6 +8,7 @@ import com.nexarag.document.vo.DocumentChunkVO;
 import com.nexarag.document.vo.DocumentDetailVO;
 import com.nexarag.document.vo.DocumentProcessStatusVO;
 import com.nexarag.document.vo.DocumentSummaryVO;
+import com.nexarag.document.vo.PageVO;
 
 /**
  * 文档对象转换器。
@@ -73,5 +75,21 @@ public final class DocumentConverter {
     public static DocumentChunkVO toChunkVO(DocumentChunk chunk) {
         return new DocumentChunkVO(chunk.getChunkId(), chunk.getDocumentId(), chunk.getChunkOrder(),
                 chunk.getText(), chunk.getStatus());
+    }
+
+    /**
+     * 将文档片段分页数据转换为分页响应。
+     *
+     * @param page 文档片段分页数据
+     * @return 文档片段分页响应
+     */
+    public static PageVO<DocumentChunkVO> toChunkPageVO(IPage<DocumentChunk> page) {
+        return PageVO.<DocumentChunkVO>builder()
+                .records(page.getRecords().stream().map(DocumentConverter::toChunkVO).toList())
+                .total(page.getTotal())
+                .current(page.getCurrent())
+                .size(page.getSize())
+                .pages(page.getPages())
+                .build();
     }
 }
