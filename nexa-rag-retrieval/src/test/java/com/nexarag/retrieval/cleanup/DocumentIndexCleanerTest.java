@@ -33,4 +33,37 @@ class DocumentIndexCleanerTest {
         verify(vectorIndexClient).deleteByDocumentId(1L);
         verify(keywordIndexClient).deleteByDocumentId(1L);
     }
+
+    @Test
+    void cleanupShouldContinueKeywordCleanupWhenVectorCleanupFails() {
+        VectorIndexClient vectorIndexClient = mock(VectorIndexClient.class);
+        KeywordIndexClient keywordIndexClient = mock(KeywordIndexClient.class);
+        when(vectorIndexClient.deleteByDocumentId(1L)).thenThrow(new IllegalStateException("Milvus不可用"));
+        when(keywordIndexClient.deleteByDocumentId(1L)).thenReturn(3);
+        DocumentIndexCleaner cleaner = new DocumentIndexCleanerImpl(vectorIndexClient, keywordIndexClient);
+
+        DocumentIndexCleanupResult result = cleaner.cleanup(1L);
+
+        assertThat(result.success()).isFalse();
+        assertThat(result.vectorDeletedCount()).isZero();
+        assertThat(result.keywordDeletedCount()).isEqualTo(3);
+        assertThat(result.failureReason()).contains("Milvus不可用");
+        verify(keywordIndexClient).deleteByDocumentId(1L);
+    }
+
+    @Test
+    void cleanupShouldKeepVectorResultWhenKeywordCleanupFails() {
+        VectorIndexClient vectorIndexClient = mock(VectorIndexClient.class);
+        KeywordIndexClient keywordIndexClient = mock(KeywordIndexClient.class);
+        when(vectorIndexClient.deleteByDocumentId(1L)).thenReturn(2);
+        when(keywordIndexClient.deleteByDocumentId(1L)).thenThrow(new IllegalStateException("Elasticsearch不可用"));
+        DocumentIndexCleaner cleaner = new DocumentIndexCleanerImpl(vectorIndexClient, keywordIndexClient);
+
+        DocumentIndexCleanupResult result = cleaner.cleanup(1L);
+
+        assertThat(result.success()).isFalse();
+        assertThat(result.vectorDeletedCount()).isEqualTo(2);
+        assertThat(result.keywordDeletedCount()).isZero();
+        assertThat(result.failureReason()).contains("Elasticsearch不可用");
+    }
 }

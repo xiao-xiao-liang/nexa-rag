@@ -2,6 +2,7 @@ package com.nexarag.retrieval.index.keyword;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.nexarag.common.error.BaseErrorCode;
 import com.nexarag.common.exception.ServiceException;
 import com.nexarag.retrieval.config.RetrievalProperties;
 import com.nexarag.retrieval.constants.DocumentIndexFieldConstants;
@@ -28,6 +29,7 @@ import java.util.List;
 import java.util.Map;
 
 import static com.nexarag.retrieval.constants.DocumentIndexFieldConstants.*;
+import static com.nexarag.retrieval.constants.ElasticsearchIndexConstants.MAX_RESPONSE_BODY_LENGTH;
 
 /**
  * Elasticsearch 关键词索引客户端，负责创建片段关键词索引、写入片段文本并按文档清理索引数据。
@@ -91,16 +93,12 @@ public class ElasticsearchKeywordIndexClient implements KeywordIndexClient {
     }
 
     private KeywordIndexWriteResult upsertDocument(String indexName, KeywordIndexDocument document) {
-        try {
-            HttpResponse<String> response = send(jsonRequest("PUT",
-                    "/" + encodePath(indexName) + "/_doc/" + encodePath(document.chunkId()),
-                    toJson(toElasticsearchDocument(document))));
-            validateSuccess(response, "Elasticsearch 关键词索引写入失败");
-            return new KeywordIndexWriteResult(document.chunkId(), keywordIndexId(indexName, document.chunkId()),
-                    true, null);
-        } catch (RuntimeException exception) {
-            return new KeywordIndexWriteResult(document.chunkId(), null, false, exception.getMessage());
-        }
+        HttpResponse<String> response = send(jsonRequest("PUT",
+                "/" + encodePath(indexName) + "/_doc/" + encodePath(document.chunkId()),
+                toJson(toElasticsearchDocument(document))));
+        validateSuccess(response, "Elasticsearch 关键词索引写入失败");
+        return new KeywordIndexWriteResult(document.chunkId(), keywordIndexId(indexName, document.chunkId()),
+                true, null);
     }
 
     private void ensureIndex(String indexName) {
@@ -164,16 +162,18 @@ public class ElasticsearchKeywordIndexClient implements KeywordIndexClient {
         try {
             return httpClient.send(requestBuilder.build(), HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
         } catch (IOException exception) {
-            throw new ServiceException("Elasticsearch 关键词索引请求失败");
+            throw new ServiceException("Elasticsearch 关键词索引请求失败", exception, BaseErrorCode.SERVICE_ERROR);
         } catch (InterruptedException exception) {
             Thread.currentThread().interrupt();
-            throw new ServiceException("Elasticsearch 关键词索引请求被中断");
+            throw new ServiceException("Elasticsearch 关键词索引请求被中断", exception,
+                    BaseErrorCode.SERVICE_ERROR);
         }
     }
 
     private void validateSuccess(HttpResponse<String> response, String message) {
         if (!isSuccess(response.statusCode())) {
-            throw new ServiceException(message + "，statusCode=" + response.statusCode());
+            throw new ServiceException(message + "，statusCode=" + response.statusCode()
+                    + "，responseBody=" + truncateResponseBody(response.body()));
         }
     }
 
@@ -186,7 +186,8 @@ public class ElasticsearchKeywordIndexClient implements KeywordIndexClient {
             JsonNode root = objectMapper.readTree(body);
             return root.path("deleted").asInt(0);
         } catch (IOException exception) {
-            throw new ServiceException("解析 Elasticsearch 删除结果失败");
+            throw new ServiceException("解析 Elasticsearch 删除结果失败", exception,
+                    BaseErrorCode.SERVICE_ERROR);
         }
     }
 
@@ -194,8 +195,16 @@ public class ElasticsearchKeywordIndexClient implements KeywordIndexClient {
         try {
             return objectMapper.writeValueAsString(value);
         } catch (IOException exception) {
-            throw new ServiceException("序列化 Elasticsearch 请求失败");
+            throw new ServiceException("序列化 Elasticsearch 请求失败", exception,
+                    BaseErrorCode.SERVICE_ERROR);
         }
+    }
+
+    private String truncateResponseBody(String body) {
+        if (body == null || body.length() <= MAX_RESPONSE_BODY_LENGTH) {
+            return body;
+        }
+        return body.substring(0, MAX_RESPONSE_BODY_LENGTH);
     }
 
     private String resolveIndexName(String indexName) {

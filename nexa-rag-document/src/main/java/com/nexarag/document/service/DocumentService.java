@@ -123,4 +123,22 @@ public interface DocumentService extends IService<Document> {
      * @return true 表示状态更新成功，false 表示文档状态已变化
      */
     boolean markChunked(Long documentId);
+
+    /**
+     * 将当前处理轮次从切分完成推进到索引中。
+     *
+     * @param documentId 文档ID
+     * @param processId  处理批次ID
+     * @return true表示推进成功，false表示状态或轮次已变化
+     */
+    boolean markIndexing(Long documentId, String processId);
+
+    /**
+     * 将当前处理轮次从索引中推进到索引完成。
+     *
+     * @param documentId 文档ID
+     * @param processId  处理批次ID
+     * @return true表示推进成功，false表示状态或轮次已变化
+     */
+    boolean markIndexed(Long documentId, String processId);
 }

@@ -311,6 +311,29 @@ public class DocumentServiceImpl extends ServiceImpl<DocumentMapper, Document> i
                 .update();
     }
 
+    @Override
+    public boolean markIndexing(Long documentId, String processId) {
+        // 1. 使用处理轮次和当前状态条件抢占索引阶段
+        return this.lambdaUpdate()
+                .eq(Document::getDocumentId, documentId)
+                .eq(Document::getProcessId, processId)
+                .eq(Document::getStatus, DocumentStatus.CHUNKED)
+                .set(Document::getStatus, DocumentStatus.INDEXING)
+                .update();
+    }
+
+    @Override
+    public boolean markIndexed(Long documentId, String processId) {
+        // 1. 仅允许当前处理轮次从索引中进入索引完成
+        return this.lambdaUpdate()
+                .eq(Document::getDocumentId, documentId)
+                .eq(Document::getProcessId, processId)
+                .eq(Document::getStatus, DocumentStatus.INDEXING)
+                .set(Document::getStatus, DocumentStatus.INDEXED)
+                .set(Document::getProcessEndTime, LocalDateTime.now())
+                .update();
+    }
+
     /**
      * 条件更新文档处理提交状态。
      *

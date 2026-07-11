@@ -25,13 +25,30 @@ public class DocumentIndexCleanerImpl implements DocumentIndexCleaner {
      */
     @Override
     public DocumentIndexCleanupResult cleanup(Long documentId) {
-        // 1. 先清理向量索引
-        int vectorDeletedCount = vectorIndexClient.deleteByDocumentId(documentId);
+        int vectorDeletedCount = 0;
+        int keywordDeletedCount = 0;
+        String vectorFailure = null;
+        String keywordFailure = null;
 
-        // 2. 再清理关键词索引
-        int keywordDeletedCount = keywordIndexClient.deleteByDocumentId(documentId);
+        // 1. 独立清理向量索引，失败后仍继续执行关键词索引清理
+        try {
+            vectorDeletedCount = vectorIndexClient.deleteByDocumentId(documentId);
+        } catch (RuntimeException exception) {
+            vectorFailure = "向量索引清理失败：" + exception.getMessage();
+        }
 
-        // 3. 返回清理统计
-        return new DocumentIndexCleanupResult(documentId, vectorDeletedCount, keywordDeletedCount, true, null);
+        // 2. 独立清理关键词索引，保留向量索引清理结果
+        try {
+            keywordDeletedCount = keywordIndexClient.deleteByDocumentId(documentId);
+        } catch (RuntimeException exception) {
+            keywordFailure = "关键词索引清理失败：" + exception.getMessage();
+        }
+
+        // 3. 聚合两个阶段的删除数量和失败原因
+        String failureReason = java.util.stream.Stream.of(vectorFailure, keywordFailure)
+                .filter(java.util.Objects::nonNull)
+                .collect(java.util.stream.Collectors.joining("；"));
+        return new DocumentIndexCleanupResult(documentId, vectorDeletedCount, keywordDeletedCount,
+                failureReason.isEmpty(), failureReason.isEmpty() ? null : failureReason);
     }
 }

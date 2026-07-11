@@ -1,6 +1,7 @@
 package com.nexarag.retrieval.service.impl;
 
 import com.nexarag.common.exception.ClientException;
+import com.nexarag.common.exception.ServiceException;
 import com.nexarag.document.entity.Document;
 import com.nexarag.document.enums.DocumentStatus;
 import com.nexarag.document.error.DocumentErrorCode;
@@ -43,8 +44,6 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class DocumentIndexServiceImpl implements DocumentIndexService {
 
-    private static final String FAILURE_STAGE_INDEX = "INDEX";
-
     private final DocumentService documentService;
     private final ChunkIndexRepository chunkIndexRepository;
     private final IndexConfigResolver indexConfigResolver;
@@ -70,7 +69,12 @@ public class DocumentIndexServiceImpl implements DocumentIndexService {
         validateDocumentStatus(document);
 
         // 2. 推进文档进入索引中状态
-        transferDocumentStatus(document, DocumentStatus.INDEXING);
+        if (document.getStatus() == DocumentStatus.CHUNKED &&
+                !documentService.markIndexing(documentId, document.getProcessId())) {
+            throw new ClientException("文档索引状态已变化，documentId=" + documentId,
+                    DocumentErrorCode.DOCUMENT_STATUS_INVALID);
+        }
+        document.setStatus(DocumentStatus.INDEXING);
         IndexConfigSnapshot config = indexConfigResolver.resolve(document);
         boolean vectorEnabled = config.enabled() && config.vectorEnabled();
         boolean keywordEnabled = config.enabled() && config.keywordEnabled();
@@ -80,7 +84,7 @@ public class DocumentIndexServiceImpl implements DocumentIndexService {
         List<IndexableChunk> chunks = chunkIndexRepository.listIndexableChunks(documentId);
         int skippedChunkCount = chunkIndexRepository.listSkippedChunks(documentId).size();
         if (chunks.isEmpty()) {
-            transferDocumentStatus(document, DocumentStatus.INDEXED);
+            markIndexed(document);
             return new DocumentIndexResult(documentId, true, skippedChunkCount, 0, skippedChunkCount, 0,
                     vectorEnabled, keywordEnabled, null, List.of());
         }
@@ -90,13 +94,12 @@ public class DocumentIndexServiceImpl implements DocumentIndexService {
         int indexedChunkCount = (int) chunkResults.stream().filter(DocumentChunkIndexResult::success).count();
         int failedChunkCount = (int) chunkResults.stream().filter(result -> !result.success()).count();
         if (failedChunkCount > 0) {
-            documentService.recordProcessFailure(documentId, FAILURE_STAGE_INDEX, "文档索引失败", "存在片段索引失败");
-            return new DocumentIndexResult(documentId, false, chunks.size() + skippedChunkCount, indexedChunkCount,
-                    skippedChunkCount, failedChunkCount, vectorEnabled, keywordEnabled, "存在片段索引失败", chunkResults);
+            throw new ServiceException("文档索引存在片段写入失败，documentId=" + documentId,
+                    DocumentErrorCode.DOCUMENT_STATUS_INVALID);
         }
 
         // 5. 全部成功后推进文档到索引完成状态
-        transferDocumentStatus(document, DocumentStatus.INDEXED);
+        markIndexed(document);
         log.info("文档索引阶段执行完成，documentId={}，indexedChunkCount={}，skippedChunkCount={}",
                 documentId, indexedChunkCount, skippedChunkCount);
         return new DocumentIndexResult(documentId, true, chunks.size() + skippedChunkCount, indexedChunkCount,
@@ -199,15 +202,18 @@ public class DocumentIndexServiceImpl implements DocumentIndexService {
     }
 
     private void validateDocumentStatus(Document document) {
-        if (document.getStatus() != DocumentStatus.CHUNKED) {
+        if (document.getStatus() != DocumentStatus.CHUNKED && document.getStatus() != DocumentStatus.INDEXING) {
             throw new ClientException("文档状态不允许执行索引，documentId=" + document.getDocumentId()
                     + "，status=" + document.getStatus(), DocumentErrorCode.DOCUMENT_STATUS_INVALID);
         }
     }
 
-    private void transferDocumentStatus(Document document, DocumentStatus targetStatus) {
-        document.setStatus(targetStatus);
-        documentService.updateById(document);
+    private void markIndexed(Document document) {
+        if (!documentService.markIndexed(document.getDocumentId(), document.getProcessId())) {
+            throw new ClientException("文档索引完成状态更新失败，documentId=" + document.getDocumentId(),
+                    DocumentErrorCode.DOCUMENT_STATUS_INVALID);
+        }
+        document.setStatus(DocumentStatus.INDEXED);
     }
 
     private String resolveFailureReason(String chunkId, boolean vectorEnabled, boolean keywordEnabled,

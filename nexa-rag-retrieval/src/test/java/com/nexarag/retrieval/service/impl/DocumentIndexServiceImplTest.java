@@ -30,6 +30,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
@@ -88,6 +89,17 @@ class DocumentIndexServiceImplTest {
         verify(fixture.documentService, never()).updateById(any(Document.class));
     }
 
+    @Test
+    void indexDocumentShouldPropagateEmbeddingExceptionWithoutRequeueing() {
+        Fixture fixture = new Fixture(DocumentStatus.CHUNKED, null, chunks(),
+                (chunks, config) -> { throw new IllegalStateException("模型服务暂时不可用"); });
+
+        assertThatThrownBy(() -> fixture.service.indexDocument(1L))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("模型服务暂时不可用");
+        verify(fixture.documentService, never()).recordProcessFailure(any(), any(), any(), any());
+    }
+
     private List<DocumentChunk> chunks() {
         List<DocumentChunk> chunks = new ArrayList<>();
         chunks.add(DocumentChunk.builder()
@@ -117,8 +129,14 @@ class DocumentIndexServiceImplTest {
         private final DocumentIndexService service;
 
         private Fixture(DocumentStatus status, String processConfigJson, List<DocumentChunk> chunks) {
+            this(status, processConfigJson, chunks, new StubEmbeddingService());
+        }
+
+        private Fixture(DocumentStatus status, String processConfigJson, List<DocumentChunk> chunks,
+                        EmbeddingService embeddingService) {
             this.document = Document.builder()
                     .documentId(1L)
+                    .processId("process-1")
                     .status(status)
                     .processConfigJson(processConfigJson)
                     .retryCount(0)
@@ -129,6 +147,8 @@ class DocumentIndexServiceImplTest {
             DocumentChunkService documentChunkService = mock(DocumentChunkService.class);
             when(documentService.getRequiredDocument(1L)).thenReturn(document);
             when(documentService.updateById(any(Document.class))).thenReturn(true);
+            when(documentService.markIndexing(1L, "process-1")).thenReturn(true);
+            when(documentService.markIndexed(1L, "process-1")).thenReturn(true);
             when(documentChunkService.listByDocumentId(1L)).thenReturn(chunks);
             doAnswer(invocation -> {
                 markChunkIndexed(invocation.getArgument(0), invocation.getArgument(1), invocation.getArgument(2));
@@ -148,7 +168,7 @@ class DocumentIndexServiceImplTest {
             this.service = new DocumentIndexServiceImpl(documentService,
                     new ChunkIndexRepositoryImpl(documentChunkService),
                     new IndexConfigResolver(objectMapper, retrievalProperties),
-                    new StubEmbeddingService(),
+                    embeddingService,
                     new StubVectorIndexClient(),
                     new StubKeywordIndexClient(),
                     cleaner);
