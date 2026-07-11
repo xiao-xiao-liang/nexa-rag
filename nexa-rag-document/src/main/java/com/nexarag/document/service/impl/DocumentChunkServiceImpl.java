@@ -11,6 +11,7 @@ import com.nexarag.document.mapper.DocumentChunkMapper;
 import com.nexarag.document.service.DocumentChunkService;
 import com.nexarag.document.splitter.ChunkDraft;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
 import java.util.ArrayList;
@@ -35,6 +36,7 @@ public class DocumentChunkServiceImpl extends ServiceImpl<DocumentChunkMapper, D
                 .list();
     }
 
+    @Transactional(rollbackFor = Exception.class)
     @Override
     public List<DocumentChunk> replaceDocumentChunks(Long documentId, List<ChunkDraft> drafts) {
         if (documentId == null || drafts == null || drafts.isEmpty()) {
