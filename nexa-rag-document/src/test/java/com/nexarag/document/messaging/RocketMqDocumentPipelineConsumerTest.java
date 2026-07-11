@@ -38,6 +38,7 @@ class RocketMqDocumentPipelineConsumerTest {
         fixture.consumer.onMessage(messageExt(fixture.objectMapper, 1));
 
         verify(fixture.messageHandler).handle(any(DocumentPipelineMessage.class));
+        verify(fixture.documentService).markMessageCompleted(1L, "process-1");
     }
 
     @Test

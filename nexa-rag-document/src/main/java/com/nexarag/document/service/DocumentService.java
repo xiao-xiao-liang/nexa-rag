@@ -71,6 +71,15 @@ public interface DocumentService extends IService<Document> {
     boolean recordMessageConsumption(Long documentId, String processId, String messageId, int consumedTimes);
 
     /**
+     * 标记当前处理轮次消息处理完成。
+     *
+     * @param documentId 文档ID
+     * @param processId  处理批次ID
+     * @return true表示更新成功，false表示轮次或文档状态不匹配
+     */
+    boolean markMessageCompleted(Long documentId, String processId);
+
+    /**
      * 将当前处理轮次标记为最终失败。
      *
      * @param documentId   文档ID

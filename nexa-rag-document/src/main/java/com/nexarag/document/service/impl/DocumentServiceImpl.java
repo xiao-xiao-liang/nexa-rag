@@ -234,6 +234,17 @@ public class DocumentServiceImpl extends ServiceImpl<DocumentMapper, Document> i
     }
 
     @Override
+    public boolean markMessageCompleted(Long documentId, String processId) {
+        // 1. 仅允许当前处理轮次且已完成索引的文档标记消息完成
+        return this.lambdaUpdate()
+                .eq(Document::getDocumentId, documentId)
+                .eq(Document::getProcessId, processId)
+                .eq(Document::getStatus, DocumentStatus.INDEXED)
+                .set(Document::getMessageStatus, DocumentPipelineMessageStatus.COMPLETED)
+                .update();
+    }
+
+    @Override
     public boolean markProcessFailed(Long documentId, String processId, String failureStage,
                                      String failureReason, String failureDetail) {
         LocalDateTime now = LocalDateTime.now();

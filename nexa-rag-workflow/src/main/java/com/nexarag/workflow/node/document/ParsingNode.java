@@ -22,7 +22,6 @@ import java.time.LocalDateTime;
 import java.util.Map;
 
 import static com.alibaba.cloud.ai.graph.StateGraph.END;
-import static com.nexarag.workflow.constants.DocumentIngestionGraphConstants.PARSE_FAILURE_REASON;
 import static com.nexarag.workflow.constants.DocumentIngestionNodeConstants.CHUNKING_NODE;
 import static com.nexarag.workflow.constants.DocumentIngestionNodeConstants.INDEXING_NODE;
 import static com.nexarag.workflow.constants.DocumentIngestionStateKeys.CURRENT_STAGE;
@@ -62,21 +61,16 @@ public class ParsingNode implements NodeAction {
         validateParseStatus(document);
         markParsing(document);
 
-        try {
-            // 3. 调用 infra 解析能力生成标准解析产物
-            DocumentParseResult parseResult = documentParseService.parse(buildParseRequest(document));
+        // 3. 调用infra解析能力生成标准解析产物，异常交给RocketMQ触发重试
+        DocumentParseResult parseResult = documentParseService.parse(buildParseRequest(document));
 
-            // 4. 回写解析产物并路由到切分节点
-            markParsed(document, parseResult);
-            return Map.of(
-                    CURRENT_STAGE, DocumentStatus.PARSING.name(),
-                    CURRENT_STATUS, DocumentStatus.PARSED.name(),
-                    ROUTE_TARGET, CHUNKING_NODE
-            );
-        } catch (RuntimeException exception) {
-            // 5. 记录解析失败，按文档服务返回状态决定重试或结束
-            return recordParseFailure(documentId, exception);
-        }
+        // 4. 回写解析产物并路由到切分节点
+        markParsed(document, parseResult);
+        return Map.of(
+                CURRENT_STAGE, DocumentStatus.PARSING.name(),
+                CURRENT_STATUS, DocumentStatus.PARSED.name(),
+                ROUTE_TARGET, CHUNKING_NODE
+        );
     }
 
     private Map<String, Object> shortcutWhenAlreadyAdvanced(Document document) {
@@ -152,17 +146,4 @@ public class ParsingNode implements NodeAction {
         }
     }
 
-    private Map<String, Object> recordParseFailure(Long documentId, RuntimeException exception) {
-        Document failureDocument = documentService.recordProcessFailure(documentId, DocumentStatus.PARSING.name(),
-                PARSE_FAILURE_REASON, exception.getMessage());
-        if (failureDocument.getStatus() == DocumentStatus.QUEUED) {
-            throw new ServiceException("文档解析失败，documentId=" + documentId, exception,
-                    DocumentErrorCode.DOCUMENT_STATUS_INVALID);
-        }
-        return Map.of(
-                CURRENT_STAGE, DocumentStatus.PARSING.name(),
-                CURRENT_STATUS, failureDocument.getStatus().name(),
-                ROUTE_TARGET, END
-        );
-    }
 }

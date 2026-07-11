@@ -27,15 +27,11 @@ import java.util.List;
 @RequiredArgsConstructor
 public class DocumentChunkingServiceImpl implements DocumentChunkingService {
 
-    private static final String FAILURE_STAGE_CHUNK = "CHUNK";
-    private static final String FAILURE_REASON_CHUNK = "文档切分失败";
-
     private final DocumentService documentService;
     private final DocumentSplitContextBuilder contextBuilder;
     private final DocumentSplitterFactory splitterFactory;
     private final DocumentChunkService documentChunkService;
     private final DocumentChunkPersistenceService chunkPersistenceService;
-    private final DocumentProcessFailureService processFailureService;
 
     /**
      * 执行文档切分阶段。
@@ -55,31 +51,19 @@ public class DocumentChunkingServiceImpl implements DocumentChunkingService {
         }
 
         markChunking(document);
-        try {
-            // 1. 构造上下文并选择切分器
-            DocumentSplitContext context = contextBuilder.build(document);
-            DocumentSplitter splitter = splitterFactory.getRequired(context.config().splitStrategy());
-            List<ChunkDraft> drafts = splitter.split(context);
-            if (drafts.isEmpty()) {
-                throw new ServiceException("文档切分结果为空，documentId=" + documentId,
-                        DocumentErrorCode.DOCUMENT_PROCESS_CONFIG_INVALID);
-            }
-
-            // 2. 在短事务内保存片段并推进到 CHUNKED
-            chunkPersistenceService.replaceChunksAndMarkChunked(documentId, drafts);
-            log.info("文档切分阶段执行完成，documentId={}，chunkCount={}", documentId, drafts.size());
-            return drafts.size();
-        } catch (RuntimeException exception) {
-            Document failureDocument = processFailureService.recordFailure(documentId, FAILURE_STAGE_CHUNK,
-                    FAILURE_REASON_CHUNK, exception.getMessage());
-            if (failureDocument.getStatus() == DocumentStatus.QUEUED) {
-                throw new ServiceException("文档切分失败，documentId=" + documentId, exception,
-                        DocumentErrorCode.DOCUMENT_STATUS_INVALID);
-            }
-            log.error("文档切分失败且不再重试，documentId={}，status={}",
-                    documentId, failureDocument.getStatus(), exception);
-            return 0;
+        // 1. 构造上下文并选择切分器，异常交给RocketMQ触发重试
+        DocumentSplitContext context = contextBuilder.build(document);
+        DocumentSplitter splitter = splitterFactory.getRequired(context.config().splitStrategy());
+        List<ChunkDraft> drafts = splitter.split(context);
+        if (drafts.isEmpty()) {
+            throw new ServiceException("文档切分结果为空，documentId=" + documentId,
+                    DocumentErrorCode.DOCUMENT_PROCESS_CONFIG_INVALID);
         }
+
+        // 2. 在短事务内保存片段并推进到CHUNKED
+        chunkPersistenceService.replaceChunksAndMarkChunked(documentId, drafts);
+        log.info("文档切分阶段执行完成，documentId={}，chunkCount={}", documentId, drafts.size());
+        return drafts.size();
     }
 
     private void markChunking(Document document) {

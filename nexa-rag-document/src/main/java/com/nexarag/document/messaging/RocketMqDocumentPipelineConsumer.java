@@ -63,6 +63,7 @@ public class RocketMqDocumentPipelineConsumer implements RocketMQListener<Messag
         try {
             // 2. 委托工作流执行当前文档处理轮次
             messageHandler.handle(message);
+            documentService.markMessageCompleted(message.documentId(), message.processId());
         } catch (ClientException | DocumentPipelineNonRetryableException exception) {
             // 3. 永久性业务异常直接发布失败主题，避免无效重试
             publishFailure(message, messageExt, consumedTimes, exception);

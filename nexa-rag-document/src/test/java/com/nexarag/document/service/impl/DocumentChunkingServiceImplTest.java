@@ -34,7 +34,6 @@ class DocumentChunkingServiceImplTest {
         DocumentSplitterFactory splitterFactory = mock(DocumentSplitterFactory.class);
         DocumentChunkService documentChunkService = mock(DocumentChunkService.class);
         DocumentChunkPersistenceService chunkPersistenceService = mock(DocumentChunkPersistenceService.class);
-        DocumentProcessFailureService processFailureService = mock(DocumentProcessFailureService.class);
         DocumentSplitter splitter = mock(DocumentSplitter.class);
         Document document = Document.builder()
                 .documentId(1L)
@@ -52,7 +51,7 @@ class DocumentChunkingServiceImplTest {
         when(splitterFactory.getRequired(SplitStrategy.PARENT_MARKDOWN)).thenReturn(splitter);
         when(splitter.split(context)).thenReturn(drafts);
         DocumentChunkingServiceImpl service = new DocumentChunkingServiceImpl(documentService, contextBuilder,
-                splitterFactory, documentChunkService, chunkPersistenceService, processFailureService);
+                splitterFactory, documentChunkService, chunkPersistenceService);
 
         int count = service.chunk(1L);
 

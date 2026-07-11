@@ -2,7 +2,6 @@ package com.nexarag.workflow.node.document;
 
 import com.alibaba.cloud.ai.graph.OverAllState;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.nexarag.common.exception.ServiceException;
 import com.nexarag.document.dto.ParseConfigRequest;
 import com.nexarag.document.dto.ProcessDocumentRequest;
 import com.nexarag.document.entity.Document;
@@ -16,7 +15,6 @@ import org.junit.jupiter.api.Test;
 
 import java.util.Map;
 
-import static com.alibaba.cloud.ai.graph.StateGraph.END;
 import static com.nexarag.workflow.constants.DocumentIngestionNodeConstants.CHUNKING_NODE;
 import static com.nexarag.workflow.constants.DocumentIngestionStateKeys.DOCUMENT_ID;
 import static com.nexarag.workflow.constants.DocumentIngestionStateKeys.ROUTE_TARGET;
@@ -61,38 +59,20 @@ class ParsingNodeTest {
     }
 
     @Test
-    void applyShouldThrowWhenParseFailureNeedsRetry() throws Exception {
+    void applyShouldPropagateParseFailureToMessageConsumer() throws Exception {
         DocumentService documentService = mock(DocumentService.class);
         DocumentParseService parseService = mock(DocumentParseService.class);
         Document document = buildQueuedDocument();
         when(documentService.getRequiredDocument(1001L)).thenReturn(document);
         when(documentService.updateById(any(Document.class))).thenReturn(true);
-        when(parseService.parse(any(DocumentParseRequest.class))).thenThrow(new IllegalStateException("解析失败"));
-        when(documentService.recordProcessFailure(1001L, "PARSING", "文档解析失败", "解析失败"))
-                .thenReturn(Document.builder().documentId(1001L).status(DocumentStatus.QUEUED).build());
+        IllegalStateException failure = new IllegalStateException("解析失败");
+        when(parseService.parse(any(DocumentParseRequest.class))).thenThrow(failure);
 
         ParsingNode node = new ParsingNode(documentService, parseService, objectMapper);
 
         assertThatThrownBy(() -> node.apply(new OverAllState(Map.of(DOCUMENT_ID, 1001L))))
-                .isInstanceOf(ServiceException.class)
-                .hasMessageContaining("文档解析失败");
-    }
-
-    @Test
-    void applyShouldEndWhenParseFailureExhausted() throws Exception {
-        DocumentService documentService = mock(DocumentService.class);
-        DocumentParseService parseService = mock(DocumentParseService.class);
-        Document document = buildQueuedDocument();
-        when(documentService.getRequiredDocument(1001L)).thenReturn(document);
-        when(documentService.updateById(any(Document.class))).thenReturn(true);
-        when(parseService.parse(any(DocumentParseRequest.class))).thenThrow(new IllegalStateException("解析失败"));
-        when(documentService.recordProcessFailure(1001L, "PARSING", "文档解析失败", "解析失败"))
-                .thenReturn(Document.builder().documentId(1001L).status(DocumentStatus.FAILED).build());
-
-        ParsingNode node = new ParsingNode(documentService, parseService, objectMapper);
-        Map<String, Object> result = node.apply(new OverAllState(Map.of(DOCUMENT_ID, 1001L)));
-
-        assertThat(result).containsEntry(ROUTE_TARGET, END);
+                .isSameAs(failure);
+        verify(documentService, never()).recordProcessFailure(any(), any(), any(), any());
     }
 
     @Test
