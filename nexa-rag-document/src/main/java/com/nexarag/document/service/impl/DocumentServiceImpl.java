@@ -221,6 +221,30 @@ public class DocumentServiceImpl extends ServiceImpl<DocumentMapper, Document> i
         return document;
     }
 
+    @Override
+    public boolean markChunking(Long documentId) {
+        // 1. 仅允许已解析文档进入切分中状态，避免多个 Worker 重复执行切分
+        return this.lambdaUpdate()
+                .eq(Document::getDocumentId, documentId)
+                .eq(Document::getStatus, DocumentStatus.PARSED)
+                .set(Document::getStatus, DocumentStatus.CHUNKING)
+                .update();
+    }
+
+    @Override
+    public boolean markChunked(Long documentId) {
+        // 1. 仅允许切分中文档进入完成状态，并清理历史失败信息
+        return this.lambdaUpdate()
+                .eq(Document::getDocumentId, documentId)
+                .eq(Document::getStatus, DocumentStatus.CHUNKING)
+                .set(Document::getStatus, DocumentStatus.CHUNKED)
+                .set(Document::getFailureStage, null)
+                .set(Document::getFailureReason, null)
+                .set(Document::getFailureDetail, null)
+                .set(Document::getProcessEndTime, LocalDateTime.now())
+                .update();
+    }
+
     /**
      * 条件更新文档处理提交状态。
      *

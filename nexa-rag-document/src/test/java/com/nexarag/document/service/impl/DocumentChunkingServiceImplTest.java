@@ -2,7 +2,6 @@ package com.nexarag.document.service.impl;
 
 import com.nexarag.document.dto.SplitConfigRequest;
 import com.nexarag.document.entity.Document;
-import com.nexarag.document.entity.DocumentChunk;
 import com.nexarag.document.enums.DocumentStatus;
 import com.nexarag.document.enums.FileType;
 import com.nexarag.document.enums.SplitStrategy;
@@ -19,7 +18,6 @@ import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -35,6 +33,8 @@ class DocumentChunkingServiceImplTest {
         DocumentSplitContextBuilder contextBuilder = mock(DocumentSplitContextBuilder.class);
         DocumentSplitterFactory splitterFactory = mock(DocumentSplitterFactory.class);
         DocumentChunkService documentChunkService = mock(DocumentChunkService.class);
+        DocumentChunkPersistenceService chunkPersistenceService = mock(DocumentChunkPersistenceService.class);
+        DocumentProcessFailureService processFailureService = mock(DocumentProcessFailureService.class);
         DocumentSplitter splitter = mock(DocumentSplitter.class);
         Document document = Document.builder()
                 .documentId(1L)
@@ -47,18 +47,17 @@ class DocumentChunkingServiceImplTest {
         List<ChunkDraft> drafts = List.of(new ChunkDraft("chunk_1", null, "# title", null, Map.of(), false));
 
         when(documentService.getRequiredDocument(1L)).thenReturn(document);
-        when(documentService.updateById(any(Document.class))).thenReturn(true);
+        when(documentService.markChunking(1L)).thenReturn(true);
         when(contextBuilder.build(document)).thenReturn(context);
         when(splitterFactory.getRequired(SplitStrategy.PARENT_MARKDOWN)).thenReturn(splitter);
         when(splitter.split(context)).thenReturn(drafts);
-        when(documentChunkService.replaceDocumentChunks(1L, drafts)).thenReturn(List.of(DocumentChunk.builder().build()));
         DocumentChunkingServiceImpl service = new DocumentChunkingServiceImpl(documentService, contextBuilder,
-                splitterFactory, documentChunkService);
+                splitterFactory, documentChunkService, chunkPersistenceService, processFailureService);
 
         int count = service.chunk(1L);
 
         assertThat(count).isEqualTo(1);
-        assertThat(document.getStatus()).isEqualTo(DocumentStatus.CHUNKED);
-        verify(documentChunkService).replaceDocumentChunks(1L, drafts);
+        verify(documentService).markChunking(1L);
+        verify(chunkPersistenceService).replaceChunksAndMarkChunked(1L, drafts);
     }
 }

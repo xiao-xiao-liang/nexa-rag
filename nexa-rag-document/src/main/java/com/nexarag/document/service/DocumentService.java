@@ -72,4 +72,20 @@ public interface DocumentService extends IService<Document> {
      * @return 文档实体
      */
     Document getRequiredDocument(Long documentId);
+
+    /**
+     * 将已解析文档原子推进到切分中状态。
+     *
+     * @param documentId 文档ID
+     * @return true 表示状态更新成功，false 表示文档状态已变化
+     */
+    boolean markChunking(Long documentId);
+
+    /**
+     * 将切分中文档原子推进到切分完成状态。
+     *
+     * @param documentId 文档ID
+     * @return true 表示状态更新成功，false 表示文档状态已变化
+     */
+    boolean markChunked(Long documentId);
 }

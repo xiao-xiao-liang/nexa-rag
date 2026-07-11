@@ -17,7 +17,6 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
-import java.time.LocalDateTime;
 import java.util.List;
 
 /**
@@ -35,6 +34,8 @@ public class DocumentChunkingServiceImpl implements DocumentChunkingService {
     private final DocumentSplitContextBuilder contextBuilder;
     private final DocumentSplitterFactory splitterFactory;
     private final DocumentChunkService documentChunkService;
+    private final DocumentChunkPersistenceService chunkPersistenceService;
+    private final DocumentProcessFailureService processFailureService;
 
     /**
      * 执行文档切分阶段。
@@ -64,13 +65,12 @@ public class DocumentChunkingServiceImpl implements DocumentChunkingService {
                         DocumentErrorCode.DOCUMENT_PROCESS_CONFIG_INVALID);
             }
 
-            // 2. 保存片段并推进到 CHUNKED
-            documentChunkService.replaceDocumentChunks(documentId, drafts);
-            markChunked(document);
+            // 2. 在短事务内保存片段并推进到 CHUNKED
+            chunkPersistenceService.replaceChunksAndMarkChunked(documentId, drafts);
             log.info("文档切分阶段执行完成，documentId={}，chunkCount={}", documentId, drafts.size());
             return drafts.size();
         } catch (RuntimeException exception) {
-            Document failureDocument = documentService.recordProcessFailure(documentId, FAILURE_STAGE_CHUNK,
+            Document failureDocument = processFailureService.recordFailure(documentId, FAILURE_STAGE_CHUNK,
                     FAILURE_REASON_CHUNK, exception.getMessage());
             if (failureDocument.getStatus() == DocumentStatus.QUEUED) {
                 throw new ServiceException("文档切分失败，documentId=" + documentId, exception,
@@ -83,22 +83,11 @@ public class DocumentChunkingServiceImpl implements DocumentChunkingService {
     }
 
     private void markChunking(Document document) {
+        // 1. 通过条件更新抢占切分任务，避免多个 Worker 重复处理
+        if (!documentService.markChunking(document.getDocumentId())) {
+            throw new ClientException("文档状态已变化，请刷新后重试，documentId=" + document.getDocumentId(),
+                    DocumentErrorCode.DOCUMENT_STATUS_INVALID);
+        }
         document.setStatus(DocumentStatus.CHUNKING);
-        boolean updated = documentService.updateById(document);
-        if (!updated) {
-            throw new ServiceException("更新文档切分中状态失败，documentId=" + document.getDocumentId());
-        }
-    }
-
-    private void markChunked(Document document) {
-        document.setStatus(DocumentStatus.CHUNKED);
-        document.setFailureStage(null);
-        document.setFailureReason(null);
-        document.setFailureDetail(null);
-        document.setProcessEndTime(LocalDateTime.now());
-        boolean updated = documentService.updateById(document);
-        if (!updated) {
-            throw new ServiceException("更新文档切分完成状态失败，documentId=" + document.getDocumentId());
-        }
     }
 }
