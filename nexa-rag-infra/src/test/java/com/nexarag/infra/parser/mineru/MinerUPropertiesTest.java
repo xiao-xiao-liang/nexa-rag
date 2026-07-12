@@ -21,6 +21,7 @@ class MinerUPropertiesTest {
         assertThat(properties.getMode()).isEqualTo(MinerUClientMode.LOCAL);
         assertThat(properties.getLocalEndpoint()).isEqualTo("http://127.0.0.1:8000");
         assertThat(properties.getLocalParsePath()).isEqualTo("/file_parse");
+        assertThat(properties.getOfficialEndpoint()).isEqualTo("https://mineru.net");
         assertThat(properties.getConnectTimeout()).isEqualTo(Duration.ofSeconds(3));
         assertThat(properties.getReadTimeout()).isEqualTo(Duration.ofSeconds(120));
         assertThat(properties.getConcurrencyLimit()).isEqualTo(5);

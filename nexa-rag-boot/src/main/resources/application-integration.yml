@@ -3,7 +3,6 @@ spring:
     driver-class-name: com.mysql.cj.jdbc.Driver
     url: jdbc:mysql://${NEXA_MYSQL_HOST:192.168.0.134}:${NEXA_MYSQL_PORT:3306}/${NEXA_MYSQL_DATABASE:nexa_rag}?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true
     username: ${NEXA_MYSQL_USERNAME:root}
-    password: ${NEXA_MYSQL_PASSWORD:}
   flyway:
     enabled: true
     locations: classpath:db/migration
@@ -13,16 +12,21 @@ spring:
     redis:
       host: ${NEXA_REDIS_HOST:192.168.0.134}
       port: ${NEXA_REDIS_PORT:6379}
-      password: ${NEXA_REDIS_PASSWORD:}
       timeout: ${NEXA_REDIS_TIMEOUT:3s}
 
 # 集成环境RocketMQ连接配置，默认使用已确认可用的NameServer。
 rocketmq:
-  name-server: ${NEXA_ROCKETMQ_NAME_SERVER:118.195.146.161:8082}
   producer:
     group: ${NEXA_ROCKETMQ_PRODUCER_GROUP:nexa-document-pipeline-producer}
 
 nexa:
+  parser:
+    mineru:
+      enabled: true
+      mode: ${MINERU_MODE:OFFICIAL}
+      official-endpoint: ${MINERU_OFFICIAL_ENDPOINT:https://mineru.net}
+      poll-interval: ${MINERU_POLL_INTERVAL:2s}
+      max-poll-count: ${MINERU_MAX_POLL_COUNT:300}
   document:
     pipeline:
       messaging:

@@ -30,7 +30,7 @@ public class MinerUProperties {
     private String localParsePath = "/file_parse";
 
     /** 官方 MinerU 服务地址。 */
-    private String officialEndpoint = "";
+    private String officialEndpoint = "https://mineru.net";
 
     /** 官方 MinerU API Key，只允许通过环境变量或外部配置注入。 */
     private String apiKey = "";

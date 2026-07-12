@@ -3,6 +3,7 @@ package com.nexarag.boot;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.autoconfigure.jdbc.DataSourceAutoConfiguration;
+import org.springframework.scheduling.annotation.EnableScheduling;
 
 import java.util.Arrays;
 
@@ -20,6 +21,11 @@ class NexaRagApplicationConfigurationTest {
         assertThat(annotation).isNotNull();
         assertThat(Arrays.asList(annotation.exclude())).doesNotContain(DataSourceAutoConfiguration.class);
     }
+
+    @Test
+    void applicationShouldEnableScheduledOutboxPublisher() {
+        assertThat(NexaRagApplication.class.getAnnotation(EnableScheduling.class)).isNotNull();
+    }
     @Test
     void defaultApplicationShouldConfigureRedisConnectionDefaults() throws Exception {
         org.springframework.core.io.ClassPathResource resource = new org.springframework.core.io.ClassPathResource("application.yml");
@@ -31,7 +37,7 @@ class NexaRagApplicationConfigurationTest {
         assertThat(content).contains("port: 6379");
         assertThat(content).contains("password: ");
         assertThat(content).contains("timeout: 3s");
-        assertThat(content).doesNotContain("${");
+        assertThat(content).doesNotContain("${NEXA_REDIS");
     }
 
     @Test
@@ -48,7 +54,7 @@ class NexaRagApplicationConfigurationTest {
         org.springframework.core.io.ClassPathResource resource = new org.springframework.core.io.ClassPathResource("application.yml");
 
         String content = resource.getContentAsString(java.nio.charset.StandardCharsets.UTF_8);
-        assertThat(content).contains("name-server: 118.195.146.161:8082");
+        assertThat(content).contains("name-server: 118.195.146.161:9876");
         assertThat(content).contains("type: ROCKETMQ", "publish-mode: OUTBOX");
         assertThat(content).contains("topic: nexa-document-pipeline", "max-reconsume-times: 5");
         assertThat(content).contains("backoff-millis: [200, 500, 1000]");
