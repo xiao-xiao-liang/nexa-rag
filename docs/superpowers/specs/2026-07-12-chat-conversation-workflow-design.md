@@ -124,7 +124,7 @@ public record ChatWorkflowRequest(
 | 请求 | `USER_ID`、`CONVERSATION_ID`、`USER_QUESTION`、`TRACE_ID`、`GENERATION_ID` | Runner、会话校验节点 |
 | 会话 | `IS_NEW_CONVERSATION`、`CONVERSATION_CONTEXT`、`USER_MESSAGE_ID` | 会话校验、上下文节点 |
 | 改写与意图 | `REWRITTEN_QUESTION`、`INTENT_RESULT` | 改写、意图节点 |
-| 检索 | `RETRIEVAL_SCOPE`、`RETRIEVAL_ROUND`、`MAX_RETRIEVAL_ROUND`、`RETRIEVAL_TOP_K`、`RAW_RETRIEVAL_RESULTS`、`FUSED_RETRIEVAL_RESULTS`、`RERANKED_RETRIEVAL_RESULTS` | Runner、检索节点、融合分发器、重排序节点 |
+| 检索 | `RETRIEVAL_SCOPE`、`RETRIEVAL_ROUND`、`MAX_RETRIEVAL_ROUND`、`RETRIEVAL_TOP_K`、`RETRIEVAL_VECTOR_THRESHOLD`、`RAW_RETRIEVAL_RESULTS`、`FUSED_RETRIEVAL_RESULTS`、`RERANKED_RETRIEVAL_RESULTS` | Runner、检索节点、融合分发器、重排序节点 |
 | 回答 | `ASSISTANT_CONTENT`、`STREAM_STATUS`、`FINISH_REASON`、`PROMPT_TOKENS`、`COMPLETION_TOKENS`、`TOTAL_TOKENS` | 回答生成节点 |
 | 持久化 | `ASSISTANT_MESSAGE_ID` | 回答生成、消息最终化节点 |
 | 错误 | `ERROR_CODE`、`ERROR_MESSAGE` | 失败节点 |
@@ -155,7 +155,7 @@ RETRIEVAL_TOP_K = 默认 Top-K
 | `ConversationContextNode` | 优先从 Redis 读取摘要和最近消息；未命中时从 MySQL 加载并回填 Redis；保存用户消息。 |
 | `QuestionRewriteNode` | 基于摘要、历史消息和当前问题改写问题；失败时使用原问题。 |
 | `IntentRecognitionNode` | 使用 `chat-intent` 路由识别检索意图与范围。 |
-| `RetrievalNode` | 按当前 `scope` 和 `topK` 并行执行 Milvus、BM25；单路失败可降级。 |
+| `RetrievalNode` | 按当前 `scope`、候选 `topK` 和向量阈值并行执行 Milvus、BM25；单路失败可降级。 |
 | `RetrievalFusionNode` | 标准化结果、按 Chunk 去重、执行 RRF 融合。 |
 | `RerankNode` | 使用改写问题对融合候选重排序，并截取最终 Top-K。 |
 | `AnswerGenerationNode` | 创建 `GENERATING` 状态的 AI 消息占位记录；组装 Prompt；调用 `chat-answer` 路由；输出模型流并累积结果。 |
@@ -172,6 +172,7 @@ RETRIEVAL_TOP_K = 默认 Top-K
 融合结果不足且 retrievalRound < maxRetrievalRound
   → retrievalRound + 1
   → 扩大 retrievalTopK
+  → 适度降低 retrievalVectorThreshold
   → retrievalScope = INTENT_AND_GLOBAL
   → RETRIEVAL_NODE
 
@@ -201,7 +202,24 @@ START
 
 ## 7. 检索策略
 
-### 7.1 初次检索
+### 7.1 读侧分层与标准化结果
+
+检索读侧不暴露 Milvus、Elasticsearch 或 Spring AI 的 SDK 对象，分为四层：
+
+```text
+ConversationRetrievalRequest
+  → MilvusConversationRetriever / Bm25ConversationRetriever
+  → ConversationRetrievalService（并行编排、单路降级）
+  → RetrievalFusionNode（去重、RRF）
+  → RetrievalFusionDispatcher（质量判断与一次扩召）
+  → RerankNode（最终证据排序）
+```
+
+`ConversationRetrievalRequest` 固定包含改写问题、意图结果、检索范围、候选 `topK`、向量阈值和检索轮次。`RetrievalChunk` 固定包含 `chunkId`、`documentId`、`chunkIndex`、`parentChunkId`、标题、来源、正文、原始分数、通道和通道内名次。
+
+两个通道只负责后端查询、元数据过滤和结果标准化；`ConversationRetrievalService` 只负责并行与单路降级，不负责去重、融合或重排。这样未来替换向量库不会影响 Workflow。
+
+### 7.2 初次检索
 
 `RetrievalNode` 使用改写后的问题，按意图范围并行执行：
 
@@ -210,9 +228,9 @@ Milvus 向量检索
 BM25 关键词检索
 ```
 
-当意图置信度不足时，首次检索可以同时增加全库召回。检索服务接口必须接受 `topK`，由 Workflow 控制每轮召回范围。
+`RETRIEVAL_TOP_K` 是每个通道的候选池大小，而非最终回答证据数。首次检索按意图范围执行；意图置信度不足时同时增加全库召回。检索服务接口必须接受候选 `topK` 和向量阈值，由 Workflow 控制每轮范围。
 
-### 7.2 融合与重排序
+### 7.3 融合、质量判断与重排序
 
 执行顺序：
 
@@ -222,18 +240,12 @@ BM25 关键词检索
   → RRF 融合（建议 k = 60）
   → 截取 Rerank 候选集
   → Rerank
-  → 最终 Top-K
+ → 最终 Top-K
 ```
 
-去重 Key 优先级：
+RRF 固定使用 `1 / (60 + rank + 1)` 累加通道内排名，不比较 Milvus 相似度与 BM25 原始分数。去重 Key 依次使用 `chunkId`、`documentId + chunkIndex`、正文 SHA-256。
 
-```text
-chunkId
-  → documentId + chunkIndex
-  → 正文 SHA-256
-```
-
-不能使用 `String.hashCode()` 作为跨通道 Chunk 去重 Key。
+首轮质量不足的判定只使用可跨通道解释的信号：融合结果为空、有效去重候选少于最小数量、或 RRF 头部得分低于阈值。满足条件且未达到最大轮次时，只扩召一次：扩大候选 `topK`、适度降低向量阈值，并将范围放宽到 `INTENT_AND_GLOBAL`。第二轮无论结果如何都进入 Rerank；Rerank 后按需根据 `parentChunkId` 扩展父片段正文，作为回答上下文，避免在 RRF 前混入父子片段污染排序。
 
 ## 8. Prompt 组装与模型路由
 

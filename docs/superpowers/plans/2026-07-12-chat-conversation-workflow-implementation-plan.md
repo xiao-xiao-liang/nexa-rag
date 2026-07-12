@@ -74,7 +74,10 @@ Commit: `refactor(workflow): 支持流式工作流分发`
 - Create: `nexa-rag-retrieval/src/main/java/com/nexarag/retrieval/chat/QueryRewriteService.java`
 - Create: `nexa-rag-retrieval/src/main/java/com/nexarag/retrieval/chat/IntentRecognitionService.java`
 - Create: `nexa-rag-retrieval/src/main/java/com/nexarag/retrieval/chat/ConversationRetrievalService.java`
+- Create: `nexa-rag-retrieval/src/main/java/com/nexarag/retrieval/chat/MilvusConversationRetriever.java`
+- Create: `nexa-rag-retrieval/src/main/java/com/nexarag/retrieval/chat/Bm25ConversationRetriever.java`
 - Create: `nexa-rag-retrieval/src/main/java/com/nexarag/retrieval/chat/RerankService.java`
+- Create: `nexa-rag-retrieval/src/main/java/com/nexarag/retrieval/chat/model/ConversationRetrievalRequest.java`
 - Create: `nexa-rag-retrieval/src/main/java/com/nexarag/retrieval/chat/model/IntentRecognitionResult.java`
 - Create: `nexa-rag-retrieval/src/main/java/com/nexarag/retrieval/chat/model/RetrievalChunk.java`
 - Create: `nexa-rag-retrieval/src/main/java/com/nexarag/retrieval/chat/model/RetrievalScope.java`
@@ -96,10 +99,7 @@ void retrieveShouldForwardScopeAndTopK() {
 
 ```java
 public interface ConversationRetrievalService {
-    List<RetrievalChunk> retrieve(String question, IntentRecognitionResult intentResult,
-                                  RetrievalScope scope, int topK);
-
-    List<RetrievalChunk> fuse(List<RetrievalChunk> chunks);
+    List<RetrievalChunk> retrieve(ConversationRetrievalRequest request);
 }
 ```
 
@@ -107,11 +107,11 @@ public interface ConversationRetrievalService {
 
 - [ ] **Step 3: 实现并行 Milvus/BM25 召回和单路降级**
 
-Milvus 与 BM25 使用 `CompletableFuture` 并行执行；任一通道异常记录中文日志并返回空列表；两个通道都失败时返回空候选而不是抛出异常。
+Milvus 与 BM25 使用 `CompletableFuture` 并行执行；每个通道接收改写问题、意图范围、候选 Top-K 与向量阈值。任一通道异常记录中文日志并返回空列表；两个通道都失败时返回空候选而不是抛出异常。RRF 仍由 Workflow 的 `RetrievalFusionNode` 执行，避免基础服务承担 Graph 编排职责。
 
-- [ ] **Step 4: 实现去重和 RRF 融合**
+- [ ] **Step 4: 实现读侧适配器并保留父片段定位信息**
 
-去重 Key 按 `chunkId`、`documentId + chunkIndex`、正文 SHA-256 依次生成；RRF 使用 `1 / (60 + rank + 1)` 累加跨通道分数；融合结果按分数倒序返回。
+Milvus 适配器负责查询向量库并返回片段原始分数；BM25 适配器负责 Elasticsearch 全文检索并返回片段原始分数。两者均保留 `parentChunkId`，不在读侧展开父片段。
 
 - [ ] **Step 5: 运行检索测试并提交**
 
