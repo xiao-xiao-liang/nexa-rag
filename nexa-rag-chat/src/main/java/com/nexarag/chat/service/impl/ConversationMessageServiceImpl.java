@@ -1,6 +1,7 @@
 package com.nexarag.chat.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.nexarag.chat.cache.ConversationContextLock;
 import com.nexarag.chat.domain.ChatMessageVO;
@@ -83,7 +84,8 @@ public class ConversationMessageServiceImpl extends ServiceImpl<ChatMessageMappe
                                          Integer promptTokens, Integer completionTokens, Integer totalTokens,
                                          String referencesJson) {
         validateContent(content);
-        ChatMessage message = requireMessageEntity(messageId);
+        // 1. 组装完成状态和模型用量
+        ChatMessage message = new ChatMessage();
         message.setStatus(ChatMessageStatus.COMPLETED.name());
         message.setContent(content);
         message.setThinkingContent(thinkingContent);
@@ -93,25 +95,35 @@ public class ConversationMessageServiceImpl extends ServiceImpl<ChatMessageMappe
         message.setTotalTokens(totalTokens);
         message.setFailureCode(null);
         message.setFailureMessage(null);
-        updateById(message);
+        // 2. 仅允许生成中的消息进入完成状态
+        updateGeneratingMessage(messageId, message);
     }
 
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public void failAssistantMessage(String messageId, String failureCode, String failureMessage) {
-        ChatMessage message = requireMessageEntity(messageId);
+    public void failAssistantMessage(String messageId, String partialContent,
+                                     String failureCode, String failureMessage) {
+        // 1. 组装失败状态和已生成的部分回答
+        ChatMessage message = new ChatMessage();
         message.setStatus(ChatMessageStatus.FAILED.name());
+        message.setContent(partialContent);
         message.setFailureCode(failureCode);
         message.setFailureMessage(failureMessage);
-        updateById(message);
+
+        // 2. 仅允许生成中的消息进入失败状态
+        updateGeneratingMessage(messageId, message);
     }
 
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public void cancelAssistantMessage(String messageId) {
-        ChatMessage message = requireMessageEntity(messageId);
+    public void cancelAssistantMessage(String messageId, String partialContent) {
+        // 1. 组装取消状态和已生成的部分回答
+        ChatMessage message = new ChatMessage();
         message.setStatus(ChatMessageStatus.CANCELLED.name());
-        updateById(message);
+        message.setContent(partialContent);
+
+        // 2. 仅允许生成中的消息进入取消状态
+        updateGeneratingMessage(messageId, message);
     }
 
     @Override
@@ -150,14 +162,16 @@ public class ConversationMessageServiceImpl extends ServiceImpl<ChatMessageMappe
         return conversationService.getOwnedConversation(conversationId, userId);
     }
 
-    private ChatMessage requireMessageEntity(String messageId) {
-        ChatMessage message = baseMapper.selectOne(new LambdaQueryWrapper<ChatMessage>()
+    /**
+     * 原子地最终化生成中的助手消息，已最终化的消息保持原状态。
+     *
+     * @param messageId 消息 ID
+     * @param finalMessage 最终状态字段
+     */
+    private void updateGeneratingMessage(String messageId, ChatMessage finalMessage) {
+        baseMapper.update(finalMessage, new LambdaUpdateWrapper<ChatMessage>()
                 .eq(ChatMessage::getMessageId, messageId)
-        );
-        if (message == null) {
-            throw new ClientException("消息不存在");
-        }
-        return message;
+                .eq(ChatMessage::getStatus, ChatMessageStatus.GENERATING.name()));
     }
 
     private void updateByConversation(ChatConversation conversation) {

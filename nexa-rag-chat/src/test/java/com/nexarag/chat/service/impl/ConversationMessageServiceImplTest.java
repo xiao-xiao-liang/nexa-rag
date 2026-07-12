@@ -18,6 +18,7 @@ import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.verify;
@@ -66,5 +67,31 @@ class ConversationMessageServiceImplTest {
         assertThat(result.content()).isEqualTo("你好");
         verify(mapper).insert(any(ChatMessage.class));
         verify(conversationService).updateById(any(ChatConversation.class));
+    }
+
+    @Test
+    void shouldSavePartialContentWhenAssistantMessageFails() {
+        when(mapper.update(any(ChatMessage.class), any())).thenReturn(1);
+
+        messageService.failAssistantMessage("m1", "部分回答", "MODEL_UNAVAILABLE", "模型不可用");
+
+        verify(mapper).update(argThat(message ->
+                        "FAILED".equals(message.getStatus())
+                                && "部分回答".equals(message.getContent())
+                                && "MODEL_UNAVAILABLE".equals(message.getFailureCode())
+                                && "模型不可用".equals(message.getFailureMessage())),
+                any());
+    }
+
+    @Test
+    void shouldSavePartialContentWhenAssistantMessageIsCancelled() {
+        when(mapper.update(any(ChatMessage.class), any())).thenReturn(1);
+
+        messageService.cancelAssistantMessage("m1", "已生成内容");
+
+        verify(mapper).update(argThat(message ->
+                        "CANCELLED".equals(message.getStatus())
+                                && "已生成内容".equals(message.getContent())),
+                any());
     }
 }

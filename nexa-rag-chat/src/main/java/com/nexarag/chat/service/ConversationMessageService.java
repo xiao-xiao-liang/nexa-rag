@@ -22,11 +22,12 @@ public interface ConversationMessageService extends IService<ChatMessage> {
                                   Integer promptTokens, Integer completionTokens, Integer totalTokens,
                                   String referencesJson);
 
-    /** 更新助手消息为失败状态。 */
-    void failAssistantMessage(String messageId, String failureCode, String failureMessage);
+    /** 更新助手消息为失败状态，并保存已生成的部分回答。 */
+    void failAssistantMessage(String messageId, String partialContent,
+                              String failureCode, String failureMessage);
 
-    /** 更新助手消息为取消状态。 */
-    void cancelAssistantMessage(String messageId);
+    /** 更新助手消息为取消状态，并保存已生成的部分回答。 */
+    void cancelAssistantMessage(String messageId, String partialContent);
 
     /** 分页限制查询会话历史消息。 */
     List<ChatMessageVO> listHistory(String conversationId, String userId, int limit);
