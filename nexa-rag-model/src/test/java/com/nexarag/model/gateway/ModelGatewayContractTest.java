@@ -2,6 +2,7 @@ package com.nexarag.model.gateway;
 
 import com.nexarag.model.enums.ModelBizType;
 import com.nexarag.model.gateway.chat.ChatModelRequest;
+import com.nexarag.model.gateway.chat.ChatModelMessage;
 import com.nexarag.model.gateway.chat.ChatModelResponse;
 import com.nexarag.model.gateway.embedding.EmbeddingModelRequest;
 import com.nexarag.model.gateway.embedding.EmbeddingModelResponse;
@@ -27,7 +28,7 @@ class ModelGatewayContractTest {
                 .bizType(ModelBizType.CHAT)
                 .bizId("conversation-1")
                 .routeKey("chat")
-                .messages(List.of(new ChatModelRequest.ChatMessage("USER", "你好")))
+                .messages(List.of(new ChatModelMessage("USER", "你好")))
                 .options(Map.of("temperature", 0.7))
                 .build();
         ChatModelResponse response = ChatModelResponse.builder()

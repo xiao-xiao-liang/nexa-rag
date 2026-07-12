@@ -7,6 +7,7 @@ import com.nexarag.model.enums.ModelRequestType;
 import com.nexarag.model.enums.ModelRouteStrategy;
 import com.nexarag.model.enums.TokenUsageSource;
 import com.nexarag.model.gateway.chat.ChatModelRequest;
+import com.nexarag.model.gateway.chat.ChatModelMessage;
 import com.nexarag.model.gateway.chat.ChatModelResponse;
 import com.nexarag.model.route.ModelRouteContext;
 import com.nexarag.model.route.ModelRouteDecision;
@@ -82,7 +83,7 @@ class ModelExecutionTemplateFallbackTest {
                 .bizType(ModelBizType.CHAT)
                 .bizId("conversation-1")
                 .routeKey("chat.default")
-                .messages(List.of(new ChatModelRequest.ChatMessage("USER", "你好")))
+                .messages(List.of(new ChatModelMessage("USER", "你好")))
                 .options(Map.of())
                 .build();
     }

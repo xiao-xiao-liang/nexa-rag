@@ -6,6 +6,7 @@ import com.nexarag.model.enums.ModelBizType;
 import com.nexarag.model.enums.ModelProvider;
 import com.nexarag.model.enums.ModelType;
 import com.nexarag.model.gateway.chat.ChatModelRequest;
+import com.nexarag.model.gateway.chat.ChatModelMessage;
 import com.nexarag.model.gateway.chat.ChatModelResponse;
 import com.nexarag.model.route.ModelRouteDecision;
 import org.junit.jupiter.api.Test;
@@ -46,7 +47,7 @@ class ChatProviderTest {
                 .bizType(ModelBizType.CHAT)
                 .bizId("conversation-1")
                 .routeKey("chat")
-                .messages(List.of(new ChatModelRequest.ChatMessage("USER", "你好")))
+                .messages(List.of(new ChatModelMessage("USER", "你好")))
                 .options(Map.of())
                 .build();
 
@@ -77,7 +78,7 @@ class ChatProviderTest {
                 .bizType(ModelBizType.CHAT)
                 .bizId("conversation-1")
                 .routeKey("chat")
-                .messages(List.of(new ChatModelRequest.ChatMessage("USER", "你好")))
+                .messages(List.of(new ChatModelMessage("USER", "你好")))
                 .options(Map.of())
                 .build();
 
@@ -102,7 +103,7 @@ class ChatProviderTest {
                 .bizType(ModelBizType.CHAT)
                 .bizId("conversation-1")
                 .routeKey("chat")
-                .messages(List.of(new ChatModelRequest.ChatMessage("USER", "你好")))
+                .messages(List.of(new ChatModelMessage("USER", "你好")))
                 .options(Map.of())
                 .build();
 
@@ -128,7 +129,7 @@ class ChatProviderTest {
                 .bizType(ModelBizType.CHAT)
                 .bizId("conversation-1")
                 .routeKey("chat")
-                .messages(List.of(new ChatModelRequest.ChatMessage("USER", "你好")))
+                .messages(List.of(new ChatModelMessage("USER", "你好")))
                 .options(Map.of())
                 .build();
 

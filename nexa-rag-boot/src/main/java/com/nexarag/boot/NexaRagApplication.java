@@ -4,12 +4,18 @@ import org.mybatis.spring.annotation.MapperScan;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.scheduling.annotation.EnableScheduling;
+import org.springframework.scheduling.annotation.EnableAsync;
 
 /**
  * NexaRAG 应用启动类。
  */
-@MapperScan("com.nexarag.**.mapper")
+@MapperScan({
+        "com.nexarag.document.mapper",
+        "com.nexarag.document.outbox.mapper",
+        "com.nexarag.model.mapper"
+})
 @EnableScheduling
+@EnableAsync
 @SpringBootApplication(scanBasePackages = "com.nexarag")
 public class NexaRagApplication {
 

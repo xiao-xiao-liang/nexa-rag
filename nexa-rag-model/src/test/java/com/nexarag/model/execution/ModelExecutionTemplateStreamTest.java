@@ -6,6 +6,7 @@ import com.nexarag.model.enums.ModelBizType;
 import com.nexarag.model.enums.ModelRequestType;
 import com.nexarag.model.enums.TokenUsageSource;
 import com.nexarag.model.gateway.chat.ChatModelRequest;
+import com.nexarag.model.gateway.chat.ChatModelMessage;
 import com.nexarag.model.gateway.chat.ChatModelStreamResponse;
 import com.nexarag.model.route.ModelRouteContext;
 import com.nexarag.model.route.ModelRouteDecision;
@@ -124,7 +125,7 @@ class ModelExecutionTemplateStreamTest {
                 .bizType(ModelBizType.CHAT)
                 .bizId("conversation-1")
                 .routeKey("chat")
-                .messages(List.of(new ChatModelRequest.ChatMessage("USER", "你好")))
+                .messages(List.of(new ChatModelMessage("USER", "你好")))
                 .options(Map.of())
                 .build();
         return ModelExecutionCommand.ofChatStream(request, executor);

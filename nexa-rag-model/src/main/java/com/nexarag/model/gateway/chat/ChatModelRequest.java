@@ -9,23 +9,14 @@ import java.util.Map;
 /**
  * 聊天模型请求。
  *
- * @param traceId  链路追踪ID
+ * @param traceId  链路追踪 ID
  * @param bizType  业务类型
- * @param bizId    业务ID
- * @param routeKey 路由Key
+ * @param bizId    业务 ID
+ * @param routeKey 路由键
  * @param messages 消息列表
  * @param options  调用选项
  */
 @Builder
 public record ChatModelRequest(String traceId, ModelBizType bizType, String bizId, String routeKey,
-                               List<ChatMessage> messages, Map<String, Object> options) {
-
-    /**
-     * 聊天消息。
-     *
-     * @param role    角色
-     * @param content 内容
-     */
-    public record ChatMessage(String role, String content) {
-    }
+                               List<ChatModelMessage> messages, Map<String, Object> options) {
 }

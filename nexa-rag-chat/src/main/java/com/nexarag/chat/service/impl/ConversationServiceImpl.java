@@ -1,0 +1,132 @@
+package com.nexarag.chat.service.impl;
+
+import cn.hutool.core.bean.BeanUtil;
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.metadata.IPage;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.nexarag.chat.domain.ChatConversationVO;
+import com.nexarag.chat.entity.ChatConversation;
+import com.nexarag.chat.enums.ConversationStatus;
+import com.nexarag.chat.id.ChatIdGenerator;
+import com.nexarag.chat.mapper.ChatConversationMapper;
+import com.nexarag.chat.service.ConversationService;
+import com.nexarag.common.exception.ClientException;
+import lombok.RequiredArgsConstructor;
+import org.apache.ibatis.session.SqlSessionFactory;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.time.LocalDateTime;
+
+
+/**
+ * 会话生命周期服务，负责会话创建、查询、改名、归档和删除。
+ */
+@Service
+@ConditionalOnBean(SqlSessionFactory.class)
+@RequiredArgsConstructor
+public class ConversationServiceImpl extends ServiceImpl<ChatConversationMapper, ChatConversation>
+        implements ConversationService {
+
+    private static final String DEFAULT_TITLE = "新会话";
+
+    private final ChatIdGenerator chatIdGenerator;
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public ChatConversationVO create(String userId, String title) {
+        validateUserId(userId);
+        ChatConversation entity = ChatConversation.builder()
+                .conversationId(chatIdGenerator.nextId())
+                .userId(userId)
+                .title(title == null || title.isBlank() ? DEFAULT_TITLE : title.trim())
+                .status(ConversationStatus.ACTIVE.name())
+                .version(0)
+                .build();
+        save(entity);
+        return toDomain(entity);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public ChatConversationVO getOwned(String conversationId, String userId) {
+        return lambdaQuery()
+                .eq(ChatConversation::getConversationId, conversationId)
+                .eq(ChatConversation::getUserId, userId)
+                .ne(ChatConversation::getStatus, ConversationStatus.DELETED.name())
+                .oneOpt()
+                .map(this::toDomain)
+                .orElseThrow(() -> new ClientException("会话不存在或不属于当前用户"));
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public IPage<ChatConversationVO> pageByUser(String userId, long current, long size) {
+        validateUserId(userId);
+        long safeCurrent = Math.max(current, 1L);
+        long safeSize = Math.min(Math.max(size, 1L), 100L);
+        IPage<ChatConversation> entityPage = baseMapper.selectPage(Page.of(safeCurrent, safeSize),
+                new LambdaQueryWrapper<ChatConversation>()
+                        .eq(ChatConversation::getUserId, userId)
+                        .ne(ChatConversation::getStatus, ConversationStatus.DELETED.name())
+                        .orderByDesc(ChatConversation::getUpdateTime));
+        Page<ChatConversationVO> page = Page.of(entityPage.getCurrent(), entityPage.getSize(), entityPage.getTotal());
+        page.setRecords(entityPage.getRecords().stream().map(this::toDomain).toList());
+        return page;
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void rename(String conversationId, String userId, String title) {
+        ChatConversation entity = getOwnedConversation(conversationId, userId);
+        if (title == null || title.isBlank()) {
+            throw new ClientException("会话标题不能为空");
+        }
+        entity.setTitle(title.trim());
+        updateById(entity);
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void archive(String conversationId, String userId) {
+        updateStatus(conversationId, userId, ConversationStatus.ARCHIVED);
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void delete(String conversationId, String userId) {
+        updateStatus(conversationId, userId, ConversationStatus.DELETED);
+    }
+
+    /**
+     * 查询属于指定用户的会话实体，供同一模块的消息服务复用。
+     */
+    public ChatConversation getOwnedConversation(String conversationId, String userId) {
+        return lambdaQuery()
+                .eq(ChatConversation::getConversationId, conversationId)
+                .eq(ChatConversation::getUserId, userId)
+                .ne(ChatConversation::getStatus, ConversationStatus.DELETED.name())
+                .oneOpt()
+                .orElseThrow(() -> new ClientException("会话不存在或不属于当前用户"));
+    }
+
+    private void updateStatus(String conversationId, String userId, ConversationStatus status) {
+        ChatConversation entity = getOwnedConversation(conversationId, userId);
+        entity.setStatus(status.name());
+        updateById(entity);
+    }
+
+    private void validateUserId(String userId) {
+        if (userId == null || userId.isBlank()) {
+            throw new ClientException("用户 ID 不能为空");
+        }
+    }
+
+    private ChatConversationVO toDomain(ChatConversation entity) {
+        ChatConversationVO vo = BeanUtil.copyProperties(entity, ChatConversationVO.class);
+        vo.setStatus(ConversationStatus.valueOf(entity.getStatus()));
+        return vo;
+    }
+}

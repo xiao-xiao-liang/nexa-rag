@@ -79,7 +79,7 @@ nexa:
       local-endpoint: http://127.0.0.1:8000  # 本地 MinerU 服务地址，仅 mode=LOCAL 时使用。
       local-parse-path: /file_parse # 本地 MinerU 文件解析接口路径，仅 mode=LOCAL 时使用。
       official-endpoint: https://mineru.net # 官方 MinerU 服务地址，仅 mode=OFFICIAL 时使用；为空时默认使用 https://mineru.net。
-      api-key: ${MINERU_TOKEN} # 官方 MinerU API Key，仅 mode=OFFICIAL 时使用。
+      api-key: ${MINERU_TOKEN:} # 官方 MinerU API Key，仅 mode=OFFICIAL 时使用。
       connect-timeout: 3s # MinerU 客户端连接超时时间。
       read-timeout: 120s # MinerU 客户端读取超时时间。
       poll-interval: 2s # 官方 MinerU 异步任务轮询间隔。

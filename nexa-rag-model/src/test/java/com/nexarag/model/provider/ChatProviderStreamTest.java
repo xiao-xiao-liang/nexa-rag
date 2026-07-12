@@ -4,6 +4,7 @@ import com.nexarag.model.client.ChatClientFactory;
 import com.nexarag.model.config.ModelProfileProperties;
 import com.nexarag.model.enums.ModelBizType;
 import com.nexarag.model.gateway.chat.ChatModelRequest;
+import com.nexarag.model.gateway.chat.ChatModelMessage;
 import com.nexarag.model.gateway.chat.ChatModelStreamResponse;
 import com.nexarag.model.route.ModelRouteDecision;
 import org.junit.jupiter.api.Test;
@@ -51,7 +52,7 @@ class ChatProviderStreamTest {
                 .bizType(ModelBizType.CHAT)
                 .bizId("chat.default")
                 .routeKey("chat.default")
-                .messages(List.of(new ChatModelRequest.ChatMessage("USER", "你好")))
+                .messages(List.of(new ChatModelMessage("USER", "你好")))
                 .options(Map.of())
                 .build();
     }

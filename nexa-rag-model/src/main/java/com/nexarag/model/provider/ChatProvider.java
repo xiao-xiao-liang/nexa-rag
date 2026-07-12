@@ -4,6 +4,7 @@ import com.nexarag.model.client.ChatClientFactory;
 import com.nexarag.model.enums.ModelProvider;
 import com.nexarag.model.enums.ModelType;
 import com.nexarag.model.gateway.chat.ChatModelRequest;
+import com.nexarag.model.gateway.chat.ChatModelMessage;
 import com.nexarag.model.gateway.chat.ChatModelResponse;
 import com.nexarag.model.gateway.chat.ChatModelStreamResponse;
 import com.nexarag.model.route.ModelRouteDecision;
@@ -78,7 +79,7 @@ public class ChatProvider implements ModelProviderAdapter {
                 .filter(chunk -> StringUtils.hasText(chunk.content()) || chunk.totalTokens() != null);
     }
 
-    private List<Message> messages(List<ChatModelRequest.ChatMessage> messages) {
+    private List<Message> messages(List<ChatModelMessage> messages) {
         if (CollectionUtils.isEmpty(messages)) {
             return List.of(new UserMessage("你好"));
         }
@@ -87,7 +88,7 @@ public class ChatProvider implements ModelProviderAdapter {
                 .toList();
     }
 
-    private Message message(ChatModelRequest.ChatMessage message) {
+    private Message message(ChatModelMessage message) {
         String role = message.role() == null ? "USER" : message.role().toUpperCase(Locale.ROOT);
         return switch (role) {
             case "SYSTEM" -> new SystemMessage(message.content());

@@ -1,6 +1,6 @@
 package com.nexarag.model.dto;
 
-import com.nexarag.model.gateway.chat.ChatModelRequest.ChatMessage;
+import com.nexarag.model.gateway.chat.ChatModelMessage;
 
 import java.util.List;
 import java.util.Map;
@@ -12,5 +12,5 @@ import java.util.Map;
  * @param messages 聊天消息列表
  * @param options  调用选项
  */
-public record ModelChatRequest(String routeKey, List<ChatMessage> messages, Map<String, Object> options) {
+public record ModelChatRequest(String routeKey, List<ChatModelMessage> messages, Map<String, Object> options) {
 }

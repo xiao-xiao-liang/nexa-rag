@@ -13,6 +13,7 @@ import com.nexarag.model.enums.ModelBizType;
 import com.nexarag.model.enums.ModelProvider;
 import com.nexarag.model.enums.ModelType;
 import com.nexarag.model.gateway.ModelGateway;
+import com.nexarag.model.gateway.chat.ChatModelMessage;
 import com.nexarag.model.gateway.chat.ChatModelRequest;
 import com.nexarag.model.gateway.chat.ChatModelResponse;
 import com.nexarag.model.gateway.embedding.EmbeddingModelRequest;
@@ -137,7 +138,7 @@ public class ModelConnectionTestServiceImpl implements ModelConnectionTestServic
                 .bizType(ModelBizType.MODEL_TEST)
                 .bizId(routeKey)
                 .routeKey(routeKey)
-                .messages(List.of(new ChatModelRequest.ChatMessage("USER", DEFAULT_CHAT_PROMPT)))
+                .messages(List.of(new ChatModelMessage("USER", DEFAULT_CHAT_PROMPT)))
                 .options(Map.of())
                 .build();
     }
