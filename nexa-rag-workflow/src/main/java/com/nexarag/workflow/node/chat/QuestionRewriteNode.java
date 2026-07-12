@@ -16,6 +16,7 @@ import java.util.UUID;
 import static com.nexarag.workflow.constants.ChatWorkflowStateKeys.CONVERSATION_CONTEXT;
 import static com.nexarag.workflow.constants.ChatWorkflowStateKeys.REWRITTEN_QUESTION;
 import static com.nexarag.workflow.constants.ChatWorkflowStateKeys.USER_QUESTION;
+import static com.nexarag.chat.constants.ChatModelRouteConstants.CHAT_REWRITE_ROUTE_KEY;
 
 /**
  * 会话问题改写节点，负责调用普通能力模型生成独立检索问题。
@@ -44,8 +45,8 @@ public class QuestionRewriteNode implements NodeAction {
             var response = modelGateway.chat(ChatModelRequest.builder()
                     .traceId(UUID.randomUUID().toString())
                     .bizType(ModelBizType.CHAT)
-                    .bizId("chat-rewrite")
-                    .routeKey("chat-rewrite")
+                    .bizId(CHAT_REWRITE_ROUTE_KEY)
+                    .routeKey(CHAT_REWRITE_ROUTE_KEY)
                     .messages(promptBuilder.buildRewriteMessages(question, context))
                     .build());
             String rewrittenQuestion = response == null || response.content() == null || response.content().isBlank()

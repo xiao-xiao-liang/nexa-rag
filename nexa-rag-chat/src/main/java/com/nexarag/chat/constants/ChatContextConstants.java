@@ -13,7 +13,7 @@ public final class ChatContextConstants {
     public static final String CACHE_KEY_PREFIX = "nexa:chat:context:";
     public static final String CACHE_KEY_VERSION = "v1";
     public static final Duration CACHE_TTL = Duration.ofHours(24);
-    public static final String SUMMARY_ROUTE_KEY = "chat-summary";
+    public static final String SUMMARY_ROUTE_KEY = ChatModelRouteConstants.CHAT_SUMMARY_ROUTE_KEY;
     public static final int SUMMARY_START_TURNS = 9;
     public static final int SUMMARY_MAX_CHARS = 1000;
     /** 摘要任务全局最大并发数。 */

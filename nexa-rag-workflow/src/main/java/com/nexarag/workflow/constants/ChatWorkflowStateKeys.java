@@ -19,6 +19,20 @@ public final class ChatWorkflowStateKeys {
     public static final String TOTAL_TOKENS = "totalTokens";
     public static final String ERROR_CODE = "errorCode";
     public static final String ERROR_MESSAGE = "errorMessage";
+    public static final String USER_ID = "userId";
+    public static final String CONVERSATION_ID = "conversationId";
+    public static final String TRACE_ID = "traceId";
+    public static final String GENERATION_ID = "generationId";
+    public static final String IS_NEW_CONVERSATION = "isNewConversation";
+    public static final String USER_MESSAGE_ID = "userMessageId";
+    public static final String ASSISTANT_MESSAGE_ID = "assistantMessageId";
+    public static final String RETRIEVAL_SCOPE = "retrievalScope";
+    public static final String RETRIEVAL_ROUND = "retrievalRound";
+    public static final String MAX_RETRIEVAL_ROUND = "maxRetrievalRound";
+    public static final String RETRIEVAL_TOP_K = "retrievalTopK";
+    public static final String RETRIEVAL_VECTOR_THRESHOLD = "retrievalVectorThreshold";
+    public static final String RAW_RETRIEVAL_RESULTS = "rawRetrievalResults";
+    public static final String MODEL_STREAM_RESULT = "modelStreamResult";
 
     private ChatWorkflowStateKeys() {
     }

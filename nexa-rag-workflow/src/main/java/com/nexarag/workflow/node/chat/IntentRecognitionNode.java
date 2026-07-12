@@ -18,6 +18,7 @@ import java.util.UUID;
 
 import static com.nexarag.workflow.constants.ChatWorkflowStateKeys.INTENT_RESULT;
 import static com.nexarag.workflow.constants.ChatWorkflowStateKeys.REWRITTEN_QUESTION;
+import static com.nexarag.chat.constants.ChatModelRouteConstants.CHAT_INTENT_ROUTE_KEY;
 
 /**
  * 会话意图识别节点，负责识别检索意图和置信度。
@@ -45,8 +46,8 @@ public class IntentRecognitionNode implements NodeAction {
             var response = modelGateway.chat(ChatModelRequest.builder()
                     .traceId(UUID.randomUUID().toString())
                     .bizType(ModelBizType.CHAT)
-                    .bizId("chat-intent")
-                    .routeKey("chat-intent")
+                    .bizId(CHAT_INTENT_ROUTE_KEY)
+                    .routeKey(CHAT_INTENT_ROUTE_KEY)
                     .messages(promptBuilder.buildIntentMessages(question))
                     .build());
 

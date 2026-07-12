@@ -37,7 +37,21 @@ public final class ChatWorkflowStreamingUtil {
      */
     public static Flux<GraphResponse<StreamingOutput<ChatStreamEvent>>> toGraphStream(
             Class<?> nodeClass, OverAllState state, Flux<ChatModelStreamResponse> modelStream) {
-        ChatGenerationAccumulator accumulator = new ChatGenerationAccumulator();
+        return toGraphStream(nodeClass, state, modelStream, new ChatGenerationAccumulator());
+    }
+
+    /**
+     * 使用指定累积器将模型流转换为 Graph 原生流输出。
+     *
+     * @param nodeClass 当前节点类型
+     * @param state Graph 当前状态
+     * @param modelStream 模型流
+     * @param accumulator 任务共享累积器
+     * @return Graph 流输出
+     */
+    public static Flux<GraphResponse<StreamingOutput<ChatStreamEvent>>> toGraphStream(
+            Class<?> nodeClass, OverAllState state, Flux<ChatModelStreamResponse> modelStream,
+            ChatGenerationAccumulator accumulator) {
         AtomicBoolean terminal = new AtomicBoolean();
         String nodeName = nodeClass.getSimpleName();
 
