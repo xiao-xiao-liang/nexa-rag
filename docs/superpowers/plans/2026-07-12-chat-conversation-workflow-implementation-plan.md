@@ -28,7 +28,7 @@
 - Modify: `nexa-rag-workflow/src/main/java/com/nexarag/workflow/service/impl/WorkflowServiceImpl.java`
 - Test: `nexa-rag-workflow/src/test/java/com/nexarag/workflow/service/impl/WorkflowServiceImplTest.java`
 
-- [ ] **Step 1: 写失败测试，验证任务型和流式 Runner 分别按图名分发**
+- [x] **Step 1: 写失败测试，验证任务型和流式 Runner 分别按图名分发**
 
 ```java
 @Test
@@ -42,13 +42,13 @@ void streamShouldDispatchToMatchedStreamingRunner() {
 }
 ```
 
-- [ ] **Step 2: 运行失败测试**
+- [x] **Step 2: 运行失败测试**
 
 Run: `mvn -pl nexa-rag-workflow -am -Dtest=WorkflowServiceImplTest "-Dsurefire.failIfNoSpecifiedTests=false" test`
 
 Expected: FAIL，缺少流式 Runner 接口和 `WorkflowService.stream(...)`。
 
-- [ ] **Step 3: 实现流式 Runner 接口与双 Runner Map 分发**
+- [x] **Step 3: 实现流式 Runner 接口与双 Runner Map 分发**
 
 ```java
 public interface StreamingWorkflowGraphRunner {
@@ -60,7 +60,7 @@ public interface StreamingWorkflowGraphRunner {
 
 `WorkflowServiceImpl` 构造器分别接收 `List<WorkflowGraphRunner>` 和 `List<StreamingWorkflowGraphRunner>`，对每种 Map 执行重复 Graph 名称校验；`run(...)` 只查询任务型 Map，`stream(...)` 只查询流式 Map。
 
-- [ ] **Step 4: 运行测试并提交**
+- [x] **Step 4: 运行测试并提交**
 
 Run: `mvn -pl nexa-rag-workflow -am -Dtest=WorkflowServiceImplTest "-Dsurefire.failIfNoSpecifiedTests=false" test`
 
@@ -71,19 +71,16 @@ Commit: `refactor(workflow): 支持流式工作流分发`
 ### Task 2: 建立对话检索读侧契约
 
 **Files:**
-- Create: `nexa-rag-retrieval/src/main/java/com/nexarag/retrieval/chat/QueryRewriteService.java`
-- Create: `nexa-rag-retrieval/src/main/java/com/nexarag/retrieval/chat/IntentRecognitionService.java`
 - Create: `nexa-rag-retrieval/src/main/java/com/nexarag/retrieval/chat/ConversationRetrievalService.java`
-- Create: `nexa-rag-retrieval/src/main/java/com/nexarag/retrieval/chat/MilvusConversationRetriever.java`
-- Create: `nexa-rag-retrieval/src/main/java/com/nexarag/retrieval/chat/Bm25ConversationRetriever.java`
-- Create: `nexa-rag-retrieval/src/main/java/com/nexarag/retrieval/chat/RerankService.java`
+- Create: `nexa-rag-retrieval/src/main/java/com/nexarag/retrieval/retriever/vector/MilvusConversationRetriever.java`
+- Create: `nexa-rag-retrieval/src/main/java/com/nexarag/retrieval/retriever/keyword/Bm25ConversationRetriever.java`
 - Create: `nexa-rag-retrieval/src/main/java/com/nexarag/retrieval/chat/model/ConversationRetrievalRequest.java`
 - Create: `nexa-rag-retrieval/src/main/java/com/nexarag/retrieval/chat/model/IntentRecognitionResult.java`
 - Create: `nexa-rag-retrieval/src/main/java/com/nexarag/retrieval/chat/model/RetrievalChunk.java`
 - Create: `nexa-rag-retrieval/src/main/java/com/nexarag/retrieval/chat/model/RetrievalScope.java`
 - Test: `nexa-rag-retrieval/src/test/java/com/nexarag/retrieval/chat/ConversationRetrievalServiceTest.java`
 
-- [ ] **Step 1: 写失败测试，验证检索接口能接收范围和动态 Top-K**
+- [x] **Step 1: 写失败测试，验证检索接口能接收范围和动态 Top-K**
 
 ```java
 @Test
@@ -95,7 +92,7 @@ void retrieveShouldForwardScopeAndTopK() {
 }
 ```
 
-- [ ] **Step 2: 定义不可变结果模型和服务接口**
+- [x] **Step 2: 定义不可变结果模型和服务接口**
 
 ```java
 public interface ConversationRetrievalService {
@@ -105,9 +102,9 @@ public interface ConversationRetrievalService {
 
 `RetrievalChunk` 必须包含 `chunkId`、`documentId`、`chunkIndex`、`title`、`source`、`content`、`score`、`channel` 和 `rank`，不能暴露底层 SDK 对象。
 
-- [ ] **Step 3: 实现并行 Milvus/BM25 召回和单路降级**
+- [x] **Step 3: 实现并行 Milvus/BM25 召回和单路降级**
 
-Milvus 与 BM25 使用 `CompletableFuture` 并行执行；每个通道接收改写问题、意图范围、候选 Top-K 与向量阈值。任一通道异常记录中文日志并返回空列表；两个通道都失败时返回空候选而不是抛出异常。RRF 仍由 Workflow 的 `RetrievalFusionNode` 执行，避免基础服务承担 Graph 编排职责。
+Milvus 与 BM25 使用 `CompletableFuture` 并行执行；每个通道接收改写问题、意图范围、候选 Top-K 与向量阈值。`MilvusConversationRetriever` 仅在 `nexa.retrieval.vector.type=milvus` 时注册，`Bm25ConversationRetriever` 仅在 `nexa.retrieval.keyword.type=elasticsearch` 时注册，与现有 `MilvusVectorIndexClient`、`ElasticsearchKeywordIndexClient` 保持一致。任一通道异常记录中文日志并返回空列表；两个通道都失败时返回空候选而不是抛出异常。RRF 仍由 Workflow 的 `RetrievalFusionNode` 执行，避免基础服务承担 Graph 编排职责。
 
 - [ ] **Step 4: 实现读侧适配器并保留父片段定位信息**
 
@@ -121,16 +118,16 @@ Expected: PASS。
 
 Commit: `feat(retrieval): 增加对话混合检索基础能力`
 
-### Task 3: 实现改写、意图识别和重排序基础服务
+### Task 3: 在 Workflow 节点中实现改写、意图识别和重排序
 
 **Files:**
-- Create: `nexa-rag-retrieval/src/main/java/com/nexarag/retrieval/chat/impl/QueryRewriteServiceImpl.java`
-- Create: `nexa-rag-retrieval/src/main/java/com/nexarag/retrieval/chat/impl/IntentRecognitionServiceImpl.java`
-- Create: `nexa-rag-retrieval/src/main/java/com/nexarag/retrieval/chat/impl/RerankServiceImpl.java`
-- Create: `nexa-rag-retrieval/src/main/java/com/nexarag/retrieval/chat/constants/ChatRetrievalRouteConstants.java`
-- Test: `nexa-rag-retrieval/src/test/java/com/nexarag/retrieval/chat/impl/QueryRewriteServiceImplTest.java`
-- Test: `nexa-rag-retrieval/src/test/java/com/nexarag/retrieval/chat/impl/IntentRecognitionServiceImplTest.java`
-- Test: `nexa-rag-retrieval/src/test/java/com/nexarag/retrieval/chat/impl/RerankServiceImplTest.java`
+- Create: `nexa-rag-workflow/src/main/java/com/nexarag/workflow/prompt/ChatWorkflowPromptBuilder.java`
+- Create: `nexa-rag-workflow/src/main/java/com/nexarag/workflow/node/chat/QuestionRewriteNode.java`
+- Create: `nexa-rag-workflow/src/main/java/com/nexarag/workflow/node/chat/IntentRecognitionNode.java`
+- Create: `nexa-rag-workflow/src/main/java/com/nexarag/workflow/node/chat/RerankNode.java`
+- Test: `nexa-rag-workflow/src/test/java/com/nexarag/workflow/node/chat/QuestionRewriteNodeTest.java`
+- Test: `nexa-rag-workflow/src/test/java/com/nexarag/workflow/node/chat/IntentRecognitionNodeTest.java`
+- Test: `nexa-rag-workflow/src/test/java/com/nexarag/workflow/node/chat/RerankNodeTest.java`
 
 - [ ] **Step 1: 写失败测试，验证改写失败时回退原问题**
 
@@ -144,7 +141,7 @@ assertThat(requestCaptor.getValue().routeKey()).isEqualTo("chat-rewrite");
 
 - [ ] **Step 2: 实现改写和意图识别路由调用**
 
-改写使用 `chat-rewrite`，意图识别使用 `chat-intent`；两者均通过 `ModelGateway.chat(...)` 调用。意图解析失败时返回“无明确意图”的结果，使后续检索走 `INTENT_AND_GLOBAL`。
+改写节点使用 `ChatWorkflowPromptBuilder` 组装提示词并通过 `ModelGateway.chat(...)` 调用 `chat-rewrite`；意图节点以相同方式调用 `chat-intent`。意图解析失败时返回“无明确意图”的结果，使后续检索走 `INTENT_AND_GLOBAL`。
 
 - [ ] **Step 3: 写失败测试并实现重排序**
 

@@ -1,6 +1,8 @@
 package com.nexarag.retrieval.index.keyword;
 
+import com.nexarag.retrieval.dto.KeywordIndexSearchRequest;
 import com.nexarag.retrieval.dto.KeywordIndexWriteRequest;
+import com.nexarag.retrieval.model.KeywordIndexSearchResult;
 import com.nexarag.retrieval.model.KeywordIndexWriteResult;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
@@ -13,6 +15,11 @@ import java.util.List;
 @Component
 @ConditionalOnProperty(prefix = "nexa.retrieval.keyword", name = "type", havingValue = "none", matchIfMissing = true)
 public class NoneKeywordIndexClient implements KeywordIndexClient {
+
+    @Override
+    public List<KeywordIndexSearchResult> search(KeywordIndexSearchRequest request) {
+        return List.of();
+    }
 
     /**
      * 返回稳定成功结果，不访问外部关键词索引服务。

@@ -7,7 +7,9 @@ import com.nexarag.common.exception.ServiceException;
 import com.nexarag.retrieval.config.RetrievalProperties;
 import com.nexarag.retrieval.constants.DocumentIndexFieldConstants;
 import com.nexarag.retrieval.dto.VectorIndexWriteRequest;
+import com.nexarag.retrieval.dto.VectorIndexSearchRequest;
 import com.nexarag.retrieval.model.VectorIndexDocument;
+import com.nexarag.retrieval.model.VectorIndexSearchResult;
 import com.nexarag.retrieval.model.VectorIndexWriteResult;
 import io.milvus.v2.client.ConnectConfig;
 import io.milvus.v2.client.MilvusClientV2;
@@ -20,8 +22,11 @@ import io.milvus.v2.service.database.request.CreateDatabaseReq;
 import io.milvus.v2.service.database.response.ListDatabasesResp;
 import io.milvus.v2.service.utility.request.FlushReq;
 import io.milvus.v2.service.vector.request.DeleteReq;
+import io.milvus.v2.service.vector.request.SearchReq;
 import io.milvus.v2.service.vector.request.UpsertReq;
+import io.milvus.v2.service.vector.request.data.FloatVec;
 import io.milvus.v2.service.vector.response.DeleteResp;
+import io.milvus.v2.service.vector.response.SearchResp;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.DisposableBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -80,6 +85,42 @@ public class MilvusVectorIndexClient implements VectorIndexClient, DisposableBea
                 .map(document -> new VectorIndexWriteResult(document.chunkId(), vectorId(collectionName, document.chunkId()),
                         true, null))
                 .toList();
+    }
+
+    /**
+     * 使用 Milvus 余弦相似度检索片段。
+     *
+     * @param request 向量检索请求
+     * @return 按相似度排序的片段结果
+     */
+    @Override
+    public List<VectorIndexSearchResult> search(VectorIndexSearchRequest request) {
+        if (request == null || request.vector() == null || request.vector().length == 0 || request.topK() <= 0) {
+            return List.of();
+        }
+        String collectionName = resolveCollectionName(request.collectionName());
+        if (!hasCollection(collectionName)) {
+            return List.of();
+        }
+
+        // 1. 查询并返回回答所需的片段字段
+        SearchResp response = milvusClient.search(SearchReq.builder()
+                .collectionName(collectionName)
+                .databaseName(databaseNameOrNull())
+                .annsField(VECTOR)
+                .metricType(IndexParam.MetricType.COSINE)
+                .topK(request.topK())
+                .data(List.of(new FloatVec(request.vector())))
+                .outputFields(List.of(DocumentIndexFieldConstants.CHUNK_ID, DocumentIndexFieldConstants.DOCUMENT_ID,
+                        DocumentIndexFieldConstants.PARENT_CHUNK_ID, DocumentIndexFieldConstants.CHUNK_ORDER,
+                        DocumentIndexFieldConstants.TEXT, DocumentIndexFieldConstants.METADATA_JSON))
+                .build());
+
+        // 2. 标准化首个查询向量的候选结果
+        if (response == null || response.getSearchResults() == null || response.getSearchResults().isEmpty()) {
+            return List.of();
+        }
+        return response.getSearchResults().getFirst().stream().map(this::toSearchResult).toList();
     }
 
     /**
@@ -265,6 +306,33 @@ public class MilvusVectorIndexClient implements VectorIndexClient, DisposableBea
         addNullableString(row, DocumentIndexFieldConstants.METADATA_JSON, document.metadataJson(), METADATA_MAX_LENGTH);
         row.add(VECTOR, toJsonArray(document.vector()));
         return row;
+    }
+
+    private VectorIndexSearchResult toSearchResult(SearchResp.SearchResult result) {
+        java.util.Map<String, Object> entity = result.getEntity();
+        return new VectorIndexSearchResult(
+                stringValue(entity, DocumentIndexFieldConstants.CHUNK_ID),
+                longValue(entity, DocumentIndexFieldConstants.DOCUMENT_ID),
+                stringValue(entity, DocumentIndexFieldConstants.PARENT_CHUNK_ID),
+                integerValue(entity, DocumentIndexFieldConstants.CHUNK_ORDER),
+                stringValue(entity, DocumentIndexFieldConstants.TEXT),
+                stringValue(entity, DocumentIndexFieldConstants.METADATA_JSON),
+                result.getScore() == null ? 0.0D : result.getScore());
+    }
+
+    private String stringValue(java.util.Map<String, Object> entity, String fieldName) {
+        Object value = entity == null ? null : entity.get(fieldName);
+        return value == null ? null : String.valueOf(value);
+    }
+
+    private Long longValue(java.util.Map<String, Object> entity, String fieldName) {
+        Object value = entity == null ? null : entity.get(fieldName);
+        return value instanceof Number number ? number.longValue() : null;
+    }
+
+    private Integer integerValue(java.util.Map<String, Object> entity, String fieldName) {
+        Object value = entity == null ? null : entity.get(fieldName);
+        return value instanceof Number number ? number.intValue() : null;
     }
 
     private void addNullableString(JsonObject row, String fieldName, String value, int maxLength) {

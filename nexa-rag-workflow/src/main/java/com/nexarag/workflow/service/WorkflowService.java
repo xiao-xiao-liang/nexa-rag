@@ -1,5 +1,9 @@
 package com.nexarag.workflow.service;
 
+import com.alibaba.cloud.ai.graph.GraphResponse;
+import com.alibaba.cloud.ai.graph.streaming.StreamingOutput;
+import reactor.core.publisher.Flux;
+
 import java.util.Map;
 
 /**
@@ -14,4 +18,13 @@ public interface WorkflowService {
      * @param initialState 初始状态
      */
     void run(String graphName, Map<String, Object> initialState);
+
+    /**
+     * 流式运行指定工作流图。
+     *
+     * @param graphName    图名称
+     * @param initialState 初始状态
+     * @return Graph 流式输出
+     */
+    Flux<GraphResponse<StreamingOutput<?>>> stream(String graphName, Map<String, Object> initialState);
 }

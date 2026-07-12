@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nexarag.retrieval.config.RetrievalProperties;
 import com.nexarag.retrieval.dto.KeywordIndexWriteRequest;
+import com.nexarag.retrieval.dto.KeywordIndexSearchRequest;
 import com.nexarag.retrieval.model.KeywordIndexDocument;
 import com.nexarag.retrieval.model.KeywordIndexWriteResult;
 import com.sun.net.httpserver.HttpExchange;
@@ -79,6 +80,18 @@ class ElasticsearchKeywordIndexClientTest {
         assertThat(deleteRequest.path()).isEqualTo("/nexa_document_chunk/_delete_by_query");
         JsonNode body = objectMapper.readTree(deleteRequest.body());
         assertThat(body.at("/query/term/document_id/value").asLong()).isEqualTo(1L);
+    }
+
+    @Test
+    void searchShouldUseMatchQueryAndKeepBm25Score() {
+        ElasticsearchKeywordIndexClient client = new ElasticsearchKeywordIndexClient(properties(), objectMapper);
+
+        var results = client.search(new KeywordIndexSearchRequest("nexa_document_chunk", "退款规则", 5));
+
+        assertThat(results).isEmpty();
+        CapturedRequest searchRequest = requests.getLast();
+        assertThat(searchRequest.method()).isEqualTo("POST");
+        assertThat(searchRequest.path()).isEqualTo("/nexa_document_chunk/_search");
     }
 
     private RetrievalProperties properties() {

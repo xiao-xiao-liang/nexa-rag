@@ -27,7 +27,7 @@ nexa-rag-chat
   └─ 会话、消息、Redis 上下文、标题、摘要
 
 nexa-rag-retrieval
-  └─ 问题改写、意图识别、Milvus、BM25、RRF、重排序
+  └─ Milvus、BM25 和标准化检索结果
 
 nexa-rag-model
   └─ 模型路由、模型治理、主备降级、流式模型调用
@@ -153,11 +153,11 @@ RETRIEVAL_TOP_K = 默认 Top-K
 | --- | --- |
 | `ConversationValidationNode` | 校验会话归属；新会话时同步创建会话、写入临时标题，并使用虚拟线程异步生成正式标题；发送 `META` 事件。 |
 | `ConversationContextNode` | 优先从 Redis 读取摘要和最近消息；未命中时从 MySQL 加载并回填 Redis；保存用户消息。 |
-| `QuestionRewriteNode` | 基于摘要、历史消息和当前问题改写问题；失败时使用原问题。 |
-| `IntentRecognitionNode` | 使用 `chat-intent` 路由识别检索意图与范围。 |
+| `QuestionRewriteNode` | 使用 PromptBuilder 组装摘要、历史消息和当前问题；通过 `ModelGateway.chat(...)` 的 `chat-rewrite` 路由改写问题；失败时使用原问题。 |
+| `IntentRecognitionNode` | 使用 PromptBuilder 组装意图识别请求；通过 `ModelGateway.chat(...)` 的 `chat-intent` 路由识别检索意图与范围。 |
 | `RetrievalNode` | 按当前 `scope`、候选 `topK` 和向量阈值并行执行 Milvus、BM25；单路失败可降级。 |
 | `RetrievalFusionNode` | 标准化结果、按 Chunk 去重、执行 RRF 融合。 |
-| `RerankNode` | 使用改写问题对融合候选重排序，并截取最终 Top-K。 |
+| `RerankNode` | 使用 PromptBuilder 以外的结构化候选请求直接调用 `ModelGateway.rerank(...)`，并截取最终 Top-K。 |
 | `AnswerGenerationNode` | 创建 `GENERATING` 状态的 AI 消息占位记录；组装 Prompt；调用 `chat-answer` 路由；输出模型流并累积结果。 |
 | `AssistantMessagePersistenceNode` | 最终化 AI 消息；更新会话最后消息；刷新 Redis；成功时异步触发摘要；发送最终事件。 |
 

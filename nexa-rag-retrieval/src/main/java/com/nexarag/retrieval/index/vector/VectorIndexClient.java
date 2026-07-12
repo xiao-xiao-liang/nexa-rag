@@ -1,6 +1,8 @@
 package com.nexarag.retrieval.index.vector;
 
+import com.nexarag.retrieval.dto.VectorIndexSearchRequest;
 import com.nexarag.retrieval.dto.VectorIndexWriteRequest;
+import com.nexarag.retrieval.model.VectorIndexSearchResult;
 import com.nexarag.retrieval.model.VectorIndexWriteResult;
 
 import java.util.List;
@@ -9,6 +11,16 @@ import java.util.List;
  * 向量索引客户端，抽象向量索引写入和按文档清理能力。
  */
 public interface VectorIndexClient {
+
+    /**
+     * 按查询向量检索片段。
+     *
+     * @param request 向量检索请求
+     * @return 按相似度排序的片段结果
+     */
+    default List<VectorIndexSearchResult> search(VectorIndexSearchRequest request) {
+        return List.of();
+    }
 
     /**
      * 批量写入或更新向量索引。

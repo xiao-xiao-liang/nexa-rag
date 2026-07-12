@@ -7,7 +7,9 @@ import com.nexarag.common.exception.ServiceException;
 import com.nexarag.retrieval.config.RetrievalProperties;
 import com.nexarag.retrieval.constants.DocumentIndexFieldConstants;
 import com.nexarag.retrieval.dto.KeywordIndexWriteRequest;
+import com.nexarag.retrieval.dto.KeywordIndexSearchRequest;
 import com.nexarag.retrieval.model.KeywordIndexDocument;
+import com.nexarag.retrieval.model.KeywordIndexSearchResult;
 import com.nexarag.retrieval.model.KeywordIndexWriteResult;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -64,6 +66,30 @@ public class ElasticsearchKeywordIndexClient implements KeywordIndexClient {
         return request.documents().stream()
                 .map(document -> upsertDocument(indexName, document))
                 .toList();
+    }
+
+    /**
+     * 使用 Elasticsearch BM25 检索片段。
+     *
+     * @param request 关键词检索请求
+     * @return 按相关性排序的片段结果
+     */
+    @Override
+    public List<KeywordIndexSearchResult> search(KeywordIndexSearchRequest request) {
+        if (request == null || !StringUtils.hasText(request.query()) || request.topK() <= 0) {
+            return List.of();
+        }
+
+        // 1. 组装全文匹配请求，并限制单通道候选数量
+        String indexName = resolveIndexName(request.indexName());
+        Map<String, Object> body = Map.of(
+                "size", request.topK(),
+                "query", Map.of("match", Map.of(TEXT, request.query())));
+        HttpResponse<String> response = send(jsonRequest("POST", "/" + encodePath(indexName) + "/_search", toJson(body)));
+        validateSuccess(response, "Elasticsearch 关键词检索失败");
+
+        // 2. 将 Elasticsearch 文档和分数转换为模块内标准结果
+        return parseSearchResults(response.body());
     }
 
     /**
@@ -188,6 +214,30 @@ public class ElasticsearchKeywordIndexClient implements KeywordIndexClient {
         } catch (IOException exception) {
             throw new ServiceException("解析 Elasticsearch 删除结果失败", exception,
                     BaseErrorCode.SERVICE_ERROR);
+        }
+    }
+
+    private List<KeywordIndexSearchResult> parseSearchResults(String body) {
+        try {
+            JsonNode hits = objectMapper.readTree(body).path("hits").path("hits");
+            if (!hits.isArray()) {
+                return List.of();
+            }
+            List<KeywordIndexSearchResult> results = new java.util.ArrayList<>();
+            for (JsonNode hit : hits) {
+                JsonNode source = hit.path("_source");
+                results.add(new KeywordIndexSearchResult(
+                        source.path(CHUNK_ID).asText(null),
+                        source.path(DOCUMENT_ID).isNumber() ? source.path(DOCUMENT_ID).asLong() : null,
+                        source.path(PARENT_CHUNK_ID).asText(null),
+                        source.path(CHUNK_ORDER).isInt() ? source.path(CHUNK_ORDER).asInt() : null,
+                        source.path(TEXT).asText(""),
+                        source.path(METADATA_JSON).asText(null),
+                        hit.path("_score").asDouble(0.0D)));
+            }
+            return results;
+        } catch (IOException exception) {
+            throw new ServiceException("解析 Elasticsearch 关键词检索结果失败", exception, BaseErrorCode.SERVICE_ERROR);
         }
     }
 
