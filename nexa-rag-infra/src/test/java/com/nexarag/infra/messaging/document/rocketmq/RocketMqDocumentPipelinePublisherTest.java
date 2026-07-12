@@ -2,7 +2,7 @@ package com.nexarag.infra.messaging.document.rocketmq;
 
 import com.nexarag.common.exception.ServiceException;
 import com.nexarag.infra.messaging.document.DocumentPipelineMessagePublisher;
-import com.nexarag.infra.messaging.document.config.DocumentPipelineMessagingProperties;
+import com.nexarag.infra.config.DocumentPipelineMessagingProperties;
 import com.nexarag.infra.messaging.document.model.DocumentPipelineMessage;
 import com.nexarag.infra.messaging.document.model.DocumentPipelinePublishResult;
 import org.apache.rocketmq.client.producer.SendResult;

@@ -4,7 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nexarag.common.exception.ClientException;
 import com.nexarag.document.service.DocumentService;
 import com.nexarag.infra.messaging.document.DocumentPipelineMessageHandler;
-import com.nexarag.infra.messaging.document.config.DocumentPipelineMessagingProperties;
+import com.nexarag.infra.config.DocumentPipelineMessagingProperties;
 import com.nexarag.infra.messaging.document.model.DocumentPipelineMessage;
 import org.apache.rocketmq.client.producer.SendResult;
 import org.apache.rocketmq.client.producer.SendStatus;

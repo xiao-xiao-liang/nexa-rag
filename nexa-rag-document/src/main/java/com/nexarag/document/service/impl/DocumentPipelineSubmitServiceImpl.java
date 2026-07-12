@@ -15,7 +15,7 @@ import com.nexarag.document.outbox.service.DocumentPipelineOutboxService;
 import com.nexarag.document.service.DocumentPipelineSubmitService;
 import com.nexarag.document.service.DocumentService;
 import com.nexarag.document.vo.DocumentProcessStatusVO;
-import com.nexarag.infra.messaging.document.config.DocumentPipelineMessagingProperties;
+import com.nexarag.infra.config.DocumentPipelineMessagingProperties;
 import com.nexarag.infra.messaging.document.model.DocumentPipelineMessage;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;

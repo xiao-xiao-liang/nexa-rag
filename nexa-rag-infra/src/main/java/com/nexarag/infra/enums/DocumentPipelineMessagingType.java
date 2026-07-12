@@ -1,4 +1,4 @@
-package com.nexarag.infra.messaging.document.enums;
+package com.nexarag.infra.enums;
 
 /**
  * 文档流水线消息中间件类型，用于选择消息传输实现。

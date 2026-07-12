@@ -11,7 +11,7 @@ import com.nexarag.document.outbox.enums.OutboxPublishStatus;
 import com.nexarag.document.outbox.service.DocumentPipelineOutboxService;
 import com.nexarag.document.service.DocumentService;
 import com.nexarag.document.vo.DocumentProcessStatusVO;
-import com.nexarag.infra.messaging.document.config.DocumentPipelineMessagingProperties;
+import com.nexarag.infra.config.DocumentPipelineMessagingProperties;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 

@@ -1,7 +1,8 @@
 package com.nexarag.infra.messaging.document.config;
 
-import com.nexarag.infra.messaging.document.enums.DocumentPipelineMessagingType;
-import com.nexarag.infra.messaging.document.enums.DocumentPipelinePublishMode;
+import com.nexarag.infra.config.DocumentPipelineMessagingProperties;
+import com.nexarag.infra.enums.DocumentPipelineMessagingType;
+import com.nexarag.infra.enums.DocumentPipelinePublishMode;
 import jakarta.validation.Validation;
 import jakarta.validation.ValidatorFactory;
 import org.junit.jupiter.api.Test;

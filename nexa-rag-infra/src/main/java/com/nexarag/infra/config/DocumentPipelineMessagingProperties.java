@@ -1,7 +1,7 @@
-package com.nexarag.infra.messaging.document.config;
+package com.nexarag.infra.config;
 
-import com.nexarag.infra.messaging.document.enums.DocumentPipelineMessagingType;
-import com.nexarag.infra.messaging.document.enums.DocumentPipelinePublishMode;
+import com.nexarag.infra.enums.DocumentPipelineMessagingType;
+import com.nexarag.infra.enums.DocumentPipelinePublishMode;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;

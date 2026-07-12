@@ -6,7 +6,7 @@ import com.nexarag.common.exception.ServiceException;
 import com.nexarag.document.service.DocumentService;
 import com.nexarag.infra.messaging.document.DocumentPipelineMessageHandler;
 import com.nexarag.infra.messaging.document.DocumentPipelineNonRetryableException;
-import com.nexarag.infra.messaging.document.config.DocumentPipelineMessagingProperties;
+import com.nexarag.infra.config.DocumentPipelineMessagingProperties;
 import com.nexarag.infra.messaging.document.model.DocumentPipelineFailureMessage;
 import com.nexarag.infra.messaging.document.model.DocumentPipelineMessage;
 import lombok.RequiredArgsConstructor;
@@ -22,7 +22,6 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.messaging.support.MessageBuilder;
 import org.springframework.stereotype.Component;
 
-import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 
 /**
