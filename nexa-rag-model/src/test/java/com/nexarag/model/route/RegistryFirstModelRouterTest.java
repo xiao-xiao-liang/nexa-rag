@@ -25,6 +25,27 @@ import static org.assertj.core.api.Assertions.assertThat;
 class RegistryFirstModelRouterTest {
 
     @Test
+    void shouldResolveAllChatWorkflowRouteKeys() {
+        ModelGovernanceProperties properties = new ModelGovernanceProperties();
+        ModelProfileProperties profile = new ModelProfileProperties();
+        profile.setProvider("OPENAI_COMPATIBLE");
+        profile.setModelName("chat-model");
+        properties.getProfiles().put("chat-primary", profile);
+        for (String routeKey : List.of(
+                "chat-answer", "chat-rewrite", "chat-intent", "chat-summary", "chat-title")) {
+            ModelRouteProperties route = new ModelRouteProperties();
+            route.setPrimary("chat-primary");
+            properties.getRoutes().put(routeKey, route);
+        }
+        RegistryFirstModelRouter router = new RegistryFirstModelRouter(
+                new ModelRegistry(), new PrimaryFallbackModelRouter(properties));
+
+        for (String routeKey : properties.getRoutes().keySet()) {
+            assertThat(router.plan(new ModelRouteContext(routeKey, false)).candidates()).isNotEmpty();
+        }
+    }
+
+    @Test
     void shouldUseRegistryRouteBeforeLocalProperties() {
         ModelRegistry registry = new ModelRegistry();
         registry.replace(new ModelRegistrySnapshot(1L,
