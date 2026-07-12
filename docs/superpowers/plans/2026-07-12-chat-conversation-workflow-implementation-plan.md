@@ -106,11 +106,11 @@ public interface ConversationRetrievalService {
 
 Milvus 与 BM25 使用 `CompletableFuture` 并行执行；每个通道接收改写问题、意图范围、候选 Top-K 与向量阈值。`MilvusConversationRetriever` 仅在 `nexa.retrieval.vector.type=milvus` 时注册，`Bm25ConversationRetriever` 仅在 `nexa.retrieval.keyword.type=elasticsearch` 时注册，与现有 `MilvusVectorIndexClient`、`ElasticsearchKeywordIndexClient` 保持一致。任一通道异常记录中文日志并返回空列表；两个通道都失败时返回空候选而不是抛出异常。RRF 仍由 Workflow 的 `RetrievalFusionNode` 执行，避免基础服务承担 Graph 编排职责。
 
-- [ ] **Step 4: 实现读侧适配器并保留父片段定位信息**
+- [x] **Step 4: 实现读侧适配器并保留父片段定位信息**
 
 Milvus 适配器负责查询向量库并返回片段原始分数；BM25 适配器负责 Elasticsearch 全文检索并返回片段原始分数。两者均保留 `parentChunkId`，不在读侧展开父片段。
 
-- [ ] **Step 5: 运行检索测试并提交**
+- [x] **Step 5: 运行检索测试并提交**
 
 Run: `mvn -pl nexa-rag-retrieval -am test`
 
@@ -129,7 +129,7 @@ Commit: `feat(retrieval): 增加对话混合检索基础能力`
 - Test: `nexa-rag-workflow/src/test/java/com/nexarag/workflow/node/chat/IntentRecognitionNodeTest.java`
 - Test: `nexa-rag-workflow/src/test/java/com/nexarag/workflow/node/chat/RerankNodeTest.java`
 
-- [ ] **Step 1: 写失败测试，验证改写失败时回退原问题**
+- [x] **Step 1: 写失败测试，验证改写失败时回退原问题**
 
 ```java
 when(modelGateway.chat(any())).thenThrow(new ServiceException("模型不可用"));
@@ -139,11 +139,11 @@ verify(modelGateway).chat(requestCaptor.capture());
 assertThat(requestCaptor.getValue().routeKey()).isEqualTo("chat-rewrite");
 ```
 
-- [ ] **Step 2: 实现改写和意图识别路由调用**
+- [x] **Step 2: 实现改写和意图识别路由调用**
 
 改写节点使用 `ChatWorkflowPromptBuilder` 组装提示词并通过 `ModelGateway.chat(...)` 调用 `chat-rewrite`；意图节点以相同方式调用 `chat-intent`。意图解析失败时返回“无明确意图”的结果，使后续检索走 `INTENT_AND_GLOBAL`。
 
-- [ ] **Step 3: 写失败测试并实现重排序**
+- [x] **Step 3: 写失败测试并实现重排序**
 
 ```java
 assertThat(rerankService.rerank("改写问题", chunks, 5)).hasSize(5);
@@ -153,7 +153,7 @@ assertThat(requestCaptor.getValue().routeKey()).isEqualTo("rerank");
 
 空候选直接返回空列表，不调用 Rerank 模型。
 
-- [ ] **Step 4: 运行测试并提交**
+- [x] **Step 4: 运行测试并提交**
 
 Run: `mvn -pl nexa-rag-retrieval -am test`
 
@@ -168,7 +168,7 @@ Commit: `feat(retrieval): 接入改写意图和重排序服务`
 - Modify: `nexa-rag-chat/src/main/java/com/nexarag/chat/service/impl/ConversationMessageServiceImpl.java`
 - Modify: `nexa-rag-chat/src/test/java/com/nexarag/chat/service/impl/ConversationMessageServiceImplTest.java`
 
-- [ ] **Step 1: 写失败测试，验证失败和取消能保存部分回答**
+- [x] **Step 1: 写失败测试，验证失败和取消能保存部分回答**
 
 ```java
 conversationMessageService.failAssistantMessage("m1", "部分回答", "MODEL_UNAVAILABLE", "模型不可用");
@@ -177,7 +177,7 @@ verify(mapper).updateById(argThat(message ->
         "FAILED".equals(message.getStatus()) && "部分回答".equals(message.getContent())));
 ```
 
-- [ ] **Step 2: 扩展服务接口**
+- [x] **Step 2: 扩展服务接口**
 
 ```java
 void failAssistantMessage(String messageId, String partialContent,
@@ -186,11 +186,11 @@ void failAssistantMessage(String messageId, String partialContent,
 void cancelAssistantMessage(String messageId, String partialContent);
 ```
 
-- [ ] **Step 3: 实现状态条件更新**
+- [x] **Step 3: 实现状态条件更新**
 
 只允许 `GENERATING` 迁移至 `COMPLETED`、`FAILED` 或 `CANCELLED`；状态已最终化时直接返回，避免完成和取消竞争导致内容覆盖。
 
-- [ ] **Step 4: 运行测试并提交**
+- [x] **Step 4: 运行测试并提交**
 
 Run: `mvn -pl nexa-rag-chat -am test`
 
@@ -210,7 +210,7 @@ Commit: `feat(chat): 支持流式消息失败和取消最终化`
 - Test: `nexa-rag-workflow/src/test/java/com/nexarag/workflow/stream/ChatWorkflowStreamingUtilTest.java`
 - Test: `nexa-rag-workflow/src/test/java/com/nexarag/workflow/stream/ChatGenerationTaskManagerTest.java`
 
-- [ ] **Step 1: 写失败测试，验证模型分片被映射为 TOKEN，结束时回写完整 State**
+- [x] **Step 1: 写失败测试，验证模型分片被映射为 TOKEN，结束时回写完整 State**
 
 ```java
 StepVerifier.create(ChatWorkflowStreamingUtil.toGraphStream(nodeClass, state,
@@ -221,15 +221,15 @@ StepVerifier.create(ChatWorkflowStreamingUtil.toGraphStream(nodeClass, state,
         .verifyComplete();
 ```
 
-- [ ] **Step 2: 实现线程安全累积器和流式转换**
+- [x] **Step 2: 实现线程安全累积器和流式转换**
 
 累积器使用同步快照保存正文、Token 和 finishReason。正常完成与模型最终失败均产生 `GraphResponse.done(...)`，分别写入 `COMPLETED` 与 `FAILED`；只有 Graph State 损坏等不可恢复系统错误才返回 `GraphResponse.error(...)`。
 
-- [ ] **Step 3: 实现跨实例取消管理**
+- [x] **Step 3: 实现跨实例取消管理**
 
 使用本地缓存、Redis Key `nexa:chat:generation:cancel:{generationId}` 和 Topic `nexa:chat:generation:cancel`；取消操作校验 userId，使用 CAS 确保取消最终化回调只执行一次，并支持“先取消后绑定流”的情况。
 
-- [ ] **Step 4: 运行测试并提交**
+- [x] **Step 4: 运行测试并提交**
 
 Run: `mvn -pl nexa-rag-workflow -am -Dtest=ChatWorkflowStreamingUtilTest,ChatGenerationTaskManagerTest "-Dsurefire.failIfNoSpecifiedTests=false" test`
 
@@ -260,7 +260,7 @@ Commit: `feat(workflow): 增加会话流式输出和取消任务管理`
 - Test: `nexa-rag-workflow/src/test/java/com/nexarag/workflow/config/ChatWorkflowConfigurationTest.java`
 - Test: `nexa-rag-workflow/src/test/java/com/nexarag/workflow/service/chat/ChatWorkflowRunnerTest.java`
 
-- [ ] **Step 1: 写 Dispatcher 失败测试，验证仅回环一次且扩大 Top-K**
+- [x] **Step 1: 写 Dispatcher 失败测试，验证仅回环一次且扩大 Top-K**
 
 ```java
 assertThat(dispatcher.apply(stateWith(List.of(), 1, 2, 10))).isEqualTo(RETRIEVAL_NODE);
@@ -271,15 +271,15 @@ assertThat(state.value(RETRIEVAL_SCOPE)).isEqualTo(INTENT_AND_GLOBAL);
 assertThat(dispatcher.apply(stateWith(List.of(), 2, 2, 30))).isEqualTo(RERANK_NODE);
 ```
 
-- [ ] **Step 2: 实现节点并限制职责**
+- [x] **Step 2: 实现节点并限制职责**
 
 会话校验节点新会话时创建临时标题并通过虚拟线程触发 `chat-title`；上下文节点使用 `ConversationContextService.loadForTurn(...)` 后保存用户消息；回答节点先创建 `GENERATING` 占位消息，再用 `chat-answer` 调用 `ModelGateway.streamChat(...)`；最终化节点按 `STREAM_STATUS` 调用完成、失败或取消服务，并只在 `COMPLETED` 时刷新上下文和触发摘要。
 
-- [ ] **Step 3: 实现 Graph 条件边并写配置测试**
+- [x] **Step 3: 实现 Graph 条件边并写配置测试**
 
 配置必须包含：`START → 校验 → 上下文 → 改写 → 意图 → 检索 → 融合`，融合条件边映射 `RETRIEVAL_NODE` 与 `RERANK_NODE`，最后 `Rerank → Answer → Persistence → END`。
 
-- [ ] **Step 4: 实现 Chat Runner 并运行测试**
+- [x] **Step 4: 实现 Chat Runner 并运行测试**
 
 Runner 将 `ChatWorkflowRequest` 转为初始 State，生成 `chat:{traceId}` 的 `RunnableConfig.threadId`，调用编译后 Graph 的流式方法。
 
@@ -296,7 +296,7 @@ Commit: `feat(workflow): 实现会话对话 Graph 编排`
 - Create: `nexa-rag-boot/src/main/java/com/nexarag/boot/controller/request/ChatStreamRequest.java`
 - Create: `nexa-rag-boot/src/test/java/com/nexarag/boot/controller/ChatControllerTest.java`
 
-- [ ] **Step 1: 写失败测试，验证用户身份不从请求体读取且返回 SSE TOKEN 事件**
+- [x] **Step 1: 写失败测试，验证用户身份不从请求体读取且返回 SSE TOKEN 事件**
 
 ```java
 mockMvc.perform(post("/api/chat/stream")
@@ -307,11 +307,11 @@ mockMvc.perform(post("/api/chat/stream")
         .andExpect(header().string(HttpHeaders.CONTENT_TYPE, containsString("text/event-stream")));
 ```
 
-- [ ] **Step 2: 实现发起与取消接口**
+- [x] **Step 2: 实现发起与取消接口**
 
 `POST /api/chat/stream` 从 `CurrentUserContext` 获取 userId，生成雪花 `generationId` 和 UUID `traceId`，调用 Chat Workflow 并映射为 `ServerSentEvent<ChatStreamEvent>`；`DELETE /api/chat/generations/{generationId}` 由任务管理器校验用户后取消。
 
-- [ ] **Step 3: 在 SSE 取消时触发任务取消并运行测试**
+- [x] **Step 3: 在 SSE 取消时触发任务取消并运行测试**
 
 Run: `mvn -pl nexa-rag-boot -am -Dtest=ChatControllerTest "-Dsurefire.failIfNoSpecifiedTests=false" test`
 
@@ -327,7 +327,7 @@ Commit: `feat(chat): 提供会话流式对话和取消接口`
 - Create: `nexa-rag-chat/src/main/java/com/nexarag/chat/constants/ChatModelRouteConstants.java`
 - Test: `nexa-rag-model/src/test/java/com/nexarag/model/route/RegistryFirstModelRouterTest.java`
 
-- [ ] **Step 1: 写路由测试，验证五个 routeKey 都能选中 CHAT 候选配置**
+- [x] **Step 1: 写路由测试，验证五个 routeKey 都能选中 CHAT 候选配置**
 
 ```java
 for (String routeKey : List.of("chat-answer", "chat-rewrite", "chat-intent", "chat-summary", "chat-title")) {
@@ -335,11 +335,11 @@ for (String routeKey : List.of("chat-answer", "chat-rewrite", "chat-intent", "ch
 }
 ```
 
-- [ ] **Step 2: 编写可重复执行的 SQL 迁移**
+- [x] **Step 2: 编写可重复执行的 SQL 迁移**
 
 迁移必须修复当前 `answer` 路由错误关联和失效治理绑定，创建五个 `CHAT + PRIMARY_BACKUP` 路由、对应主备 `model_route_config` 关联，以及 `ROUTE` 绑定的治理记录；`chat-answer` 使用高能力模型配置，改写和意图使用普通模型配置，摘要和标题使用轻量模型配置。每次路由数据变化后递增 `model_registry_version.version_no`。
 
-- [ ] **Step 3: 配置路由常量并运行模型模块测试**
+- [x] **Step 3: 配置路由常量并运行模型模块测试**
 
 Run: `mvn -pl nexa-rag-model -am test`
 
@@ -353,17 +353,17 @@ Commit: `feat(model): 配置会话工作流模型路由和治理`
 - Modify: `docs/superpowers/specs/2026-07-12-chat-conversation-workflow-design.md`
 - Modify: `TODO.md`
 
-- [ ] **Step 1: 添加 Workflow 集成测试**
+- [x] **Step 1: 添加 Workflow 集成测试**
 
 覆盖新会话 META、Redis 回源、检索回环、模型首片前 fallback、正常 COMPLETE、模型最终失败、主动取消和摘要触发。
 
-- [ ] **Step 2: 运行完整验证**
+- [x] **Step 2: 运行完整验证**
 
 Run: `mvn -pl nexa-rag-boot -am test`
 
 Expected: PASS；若现有 `IntegrationProfileConfigurationTest` 因环境变量或外部 MySQL 配置失败，单独记录该既有环境阻塞，并补跑 Chat、Workflow、Model 的定向测试。
 
-- [ ] **Step 3: 更新设计文档和 TODO 并提交**
+- [x] **Step 3: 更新设计文档和 TODO 并提交**
 
 在设计文档中记录实施状态，在 `TODO.md` 勾选已完成的模型路由、流式 Workflow 和取消能力。
 

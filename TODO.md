@@ -39,7 +39,7 @@
 - [ ] 精细化阶段级队列完整实现。
 - [ ] 大文件分片上传。
 - [ ] 前端上传页和进度页。
-- [ ] 聊天 RAG Workflow。
+- [x] 聊天 RAG Workflow。
 - [ ] Sa-Token 登录鉴权。
 
 ## 阶段三未实现
@@ -97,5 +97,5 @@
 - [ ] 阶段四：实现 `nexa-rag-retrieval` 检索地基，包括向量索引、关键词索引、召回结果模型和排序策略。
 - [ ] 阶段五：实现真实 infra 适配，包括 storage、parser、messaging、config-center。
 - [ ] 阶段六：实现文档入库 Workflow。
-- [ ] 阶段七：实现聊天 RAG Workflow 和 WebFlux 流式输出。
+- [x] 阶段七：实现聊天 RAG Workflow 和 SSE 流式输出。
 - [ ] 阶段八：实现 Sa-Token 登录鉴权。

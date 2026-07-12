@@ -515,3 +515,18 @@ Controller 不负责编排、会话创建、消息保存、检索、模型调用
 - 主动取消、SSE 断开、跨实例取消和取消完成竞争下的幂等最终化；
 - 完成消息刷新 Redis 并触发摘要，失败和取消消息不触发摘要；
 - 任务型 Workflow 与流式 Workflow 的 `WorkflowService` 分发互不影响。
+
+## 15. 实施状态
+
+截至 2026-07-13，本设计的首版能力已经落地：
+
+- 已实现 Chat Graph 主链、一次检索扩召、RRF 融合和 Rerank；
+- 已实现 TOKEN、COMPLETE、ERROR、CANCELLED 事件模型和 SSE 映射；
+- 已实现生成内容累积、失败或取消时的部分内容最终化；
+- 已实现本地任务缓存、Redis 取消标记和 Pub/Sub 跨实例取消；
+- 已实现 `chat-answer`、`chat-rewrite`、`chat-intent`、`chat-summary`、`chat-title` 路由迁移；
+- 已实现成功消息刷新活跃上下文并异步触发摘要。
+
+当前完整测试仍保留 `IntegrationProfileConfigurationTest` 对本机集成环境变量的既有要求；
+`NexaRagApplicationTest` 在本机 Redis `192.168.0.134:6379` 不可用时也会被既有 Redisson 自动配置阻塞。
+Chat、Workflow、Model 和 Controller 的定向测试不依赖这些外部环境。
