@@ -20,6 +20,8 @@ import com.nexarag.document.mapper.DocumentMapper;
 import com.nexarag.document.service.DocumentService;
 import com.nexarag.document.vo.DocumentSummaryVO;
 import com.nexarag.document.vo.PageVO;
+import com.nexarag.infra.config.DocumentPipelineMessagingProperties;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
@@ -31,13 +33,15 @@ import java.util.List;
  */
 @Slf4j
 @Service
+@RequiredArgsConstructor
 public class DocumentServiceImpl extends ServiceImpl<DocumentMapper, Document> implements DocumentService {
 
     private static final String QUEUE_STAGE_PIPELINE = "PIPELINE";
-    private static final int DEFAULT_MAX_RETRY_COUNT = 3;
     private static final long DEFAULT_PAGE_SIZE = 20;
     private static final long MAX_PAGE_SIZE = 100;
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
+
+    private final DocumentPipelineMessagingProperties messagingProperties;
 
     @Override
     public Document createDocument(CreateDocumentRequest request) {
@@ -59,7 +63,7 @@ public class DocumentServiceImpl extends ServiceImpl<DocumentMapper, Document> i
                 .fileType(fileType)
                 .status(DocumentStatus.UPLOADED)
                 .retryCount(0)
-                .maxRetryCount(DEFAULT_MAX_RETRY_COUNT)
+                .maxRetryCount(messagingProperties.getMaxReconsumeTimes())
                 .cleanupRetryCount(0)
                 .build();
 
@@ -124,6 +128,9 @@ public class DocumentServiceImpl extends ServiceImpl<DocumentMapper, Document> i
         document.setMessageStatus(DocumentPipelineMessageStatus.PENDING_PUBLISH);
         document.setConsumedTimes(0);
         document.setLastMessageId(null);
+        document.setRetryCount(0);
+        document.setMaxRetryCount(messagingProperties.getMaxReconsumeTimes());
+        document.setLastRetryTime(null);
         document.setFailureStage(null);
         document.setFailureReason(null);
         document.setFailureDetail(null);
@@ -193,7 +200,8 @@ public class DocumentServiceImpl extends ServiceImpl<DocumentMapper, Document> i
 
         // 1. 人工重试代表开启新一轮处理，重置本轮自动重试计数
         document.setRetryCount(0);
-        document.setLastRetryTime(LocalDateTime.now());
+        document.setMaxRetryCount(messagingProperties.getMaxReconsumeTimes());
+        document.setLastRetryTime(null);
         document.setProcessEndTime(null);
         document.setFailureStage(null);
         document.setFailureReason(null);
@@ -221,6 +229,8 @@ public class DocumentServiceImpl extends ServiceImpl<DocumentMapper, Document> i
         DocumentPipelineMessageStatus messageStatus = consumedTimes > 1
                 ? DocumentPipelineMessageStatus.RETRYING
                 : DocumentPipelineMessageStatus.PROCESSING;
+        int retryCount = Math.max(consumedTimes - 1, 0);
+        LocalDateTime retryTime = retryCount > 0 ? LocalDateTime.now() : null;
 
         // 1. 仅更新当前处理轮次且尚未进入终态的文档
         return this.lambdaUpdate()
@@ -229,6 +239,8 @@ public class DocumentServiceImpl extends ServiceImpl<DocumentMapper, Document> i
                 .notIn(Document::getStatus, DocumentStatus.INDEXED, DocumentStatus.FAILED)
                 .set(Document::getMessageStatus, messageStatus)
                 .set(Document::getConsumedTimes, consumedTimes)
+                .set(Document::getRetryCount, retryCount)
+                .set(retryCount > 0, Document::getLastRetryTime, retryTime)
                 .set(Document::getLastMessageId, messageId)
                 .update();
     }
@@ -246,11 +258,14 @@ public class DocumentServiceImpl extends ServiceImpl<DocumentMapper, Document> i
 
     @Override
     public boolean markProcessFailed(Long documentId, String processId, String failureStage,
-                                     String failureReason, String failureDetail) {
-        LocalDateTime now = LocalDateTime.now();
+                                     String failureReason, String failureDetail, int consumedTimes,
+                                     String messageId, LocalDateTime failureTime) {
+        int safeConsumedTimes = Math.max(consumedTimes, 1);
+        int retryCount = Math.max(safeConsumedTimes - 1, 0);
+        LocalDateTime now = failureTime == null ? LocalDateTime.now() : failureTime;
 
         // 1. 仅允许当前处理轮次进入最终失败，避免旧消息覆盖人工重试状态
-        boolean updated = this.lambdaUpdate()
+        var updateChain = this.lambdaUpdate()
                 .eq(Document::getDocumentId, documentId)
                 .eq(Document::getProcessId, processId)
                 .notIn(Document::getStatus, DocumentStatus.INDEXED, DocumentStatus.FAILED)
@@ -259,8 +274,12 @@ public class DocumentServiceImpl extends ServiceImpl<DocumentMapper, Document> i
                 .set(Document::getFailureStage, failureStage)
                 .set(Document::getFailureReason, failureReason)
                 .set(Document::getFailureDetail, failureDetail)
-                .set(Document::getProcessEndTime, now)
-                .update();
+                .set(Document::getConsumedTimes, safeConsumedTimes)
+                .set(Document::getRetryCount, retryCount)
+                .set(Document::getLastMessageId, messageId)
+                .set(retryCount > 0, Document::getLastRetryTime, now)
+                .set(Document::getProcessEndTime, now);
+        boolean updated = updateChain.update();
         if (updated) {
             log.error("文档处理轮次已标记为最终失败，documentId={}，processId={}，failureStage={}",
                     documentId, processId, failureStage);
@@ -441,7 +460,7 @@ public class DocumentServiceImpl extends ServiceImpl<DocumentMapper, Document> i
 
     private int normalizeMaxRetryCount(Integer maxRetryCount) {
         if (maxRetryCount == null) {
-            return DEFAULT_MAX_RETRY_COUNT;
+            return messagingProperties.getMaxReconsumeTimes();
         }
         return Math.max(0, maxRetryCount);
     }

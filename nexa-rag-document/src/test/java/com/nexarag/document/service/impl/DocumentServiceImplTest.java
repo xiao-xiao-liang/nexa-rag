@@ -2,6 +2,7 @@ package com.nexarag.document.service.impl;
 
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.baomidou.mybatisplus.extension.conditions.update.LambdaUpdateChainWrapper;
 import com.nexarag.document.dto.CreateDocumentRequest;
 import com.nexarag.document.dto.ProcessDocumentRequest;
 import com.nexarag.document.dto.SplitConfigRequest;
@@ -11,12 +12,22 @@ import com.nexarag.document.enums.SplitStrategy;
 import com.nexarag.common.exception.ClientException;
 import com.nexarag.document.vo.DocumentSummaryVO;
 import com.nexarag.document.vo.PageVO;
+import com.nexarag.infra.config.DocumentPipelineMessagingProperties;
 import org.junit.jupiter.api.Test;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 /**
  * 文档服务实现测试。
@@ -53,6 +64,9 @@ class DocumentServiceImplTest {
         assertThat(document.getStatus()).isEqualTo(DocumentStatus.QUEUED);
         assertThat(document.getQueueStage()).isEqualTo("PIPELINE");
         assertThat(document.getProcessConfigJson()).contains("PARENT_MARKDOWN");
+        assertThat(document.getRetryCount()).isZero();
+        assertThat(document.getMaxRetryCount()).isEqualTo(5);
+        assertThat(document.getLastRetryTime()).isNull();
         assertThat(documentService.updatedDocument).isSameAs(document);
     }
 
@@ -132,12 +146,52 @@ class DocumentServiceImplTest {
         assertThat(document.getStatus()).isEqualTo(DocumentStatus.QUEUED);
         assertThat(document.getQueueStage()).isEqualTo("PIPELINE");
         assertThat(document.getRetryCount()).isZero();
-        assertThat(document.getLastRetryTime()).isNotNull();
+        assertThat(document.getMaxRetryCount()).isEqualTo(5);
+        assertThat(document.getLastRetryTime()).isNull();
         assertThat(document.getProcessEndTime()).isNull();
         assertThat(document.getFailureStage()).isNull();
         assertThat(document.getFailureReason()).isNull();
         assertThat(document.getFailureDetail()).isNull();
         assertThat(documentService.retryUpdatedDocument).isSameAs(document);
+    }
+
+    @Test
+    void recordMessageConsumptionShouldRecordFirstAttemptWithoutRetryTime() {
+        TestableDocumentServiceImpl documentService = new TestableDocumentServiceImpl();
+
+        assertThat(documentService.recordMessageConsumption(1L, "process-1", "message-1", 1)).isTrue();
+
+        verify(documentService.updateChain).set(any(), eq(1));
+        verify(documentService.updateChain).set(any(), eq(0));
+        verify(documentService.updateChain).set(any(), eq("message-1"));
+        verify(documentService.updateChain).set(eq(false), any(), isNull());
+    }
+
+    @Test
+    void recordMessageConsumptionShouldRecordRetryCountAndRetryTime() {
+        TestableDocumentServiceImpl documentService = new TestableDocumentServiceImpl();
+
+        assertThat(documentService.recordMessageConsumption(1L, "process-1", "message-1", 3)).isTrue();
+
+        verify(documentService.updateChain).set(any(), eq(3));
+        verify(documentService.updateChain).set(any(), eq(2));
+        verify(documentService.updateChain).set(any(), eq("message-1"));
+        verify(documentService.updateChain).set(eq(true), any(), any(LocalDateTime.class));
+    }
+
+    @Test
+    void markProcessFailedShouldPersistFinalConsumptionAndRetryContext() {
+        TestableDocumentServiceImpl documentService = new TestableDocumentServiceImpl();
+        LocalDateTime failureTime = LocalDateTime.now();
+
+        assertThat(documentService.markProcessFailed(1L, "process-1", "ROCKETMQ_RETRY_EXHAUSTED",
+                "RocketMQ自动重试已达上限", "消息进入死信队列",
+                6, "message-1", failureTime)).isTrue();
+
+        verify(documentService.updateChain).set(any(), eq(6));
+        verify(documentService.updateChain).set(any(), eq(5));
+        verify(documentService.updateChain).set(any(), eq("message-1"));
+        verify(documentService.updateChain).set(eq(true), any(), eq(failureTime));
     }
 
     @Test
@@ -187,6 +241,27 @@ class DocumentServiceImplTest {
         private Long deleteDocumentId;
         private IPage<Document> documentPage;
         private boolean updateResult = true;
+        private final LambdaUpdateChainWrapper<Document> updateChain = mock(LambdaUpdateChainWrapper.class);
+
+        private TestableDocumentServiceImpl() {
+            super(messagingProperties());
+            when(updateChain.eq(any(), any())).thenReturn(updateChain);
+            when(updateChain.notIn(any(), any(Object[].class))).thenReturn(updateChain);
+            when(updateChain.set(any(), any())).thenReturn(updateChain);
+            when(updateChain.set(anyBoolean(), any(), any())).thenReturn(updateChain);
+            when(updateChain.update()).thenReturn(true);
+        }
+
+        private static DocumentPipelineMessagingProperties messagingProperties() {
+            DocumentPipelineMessagingProperties properties = new DocumentPipelineMessagingProperties();
+            properties.setMaxReconsumeTimes(5);
+            return properties;
+        }
+
+        @Override
+        public LambdaUpdateChainWrapper<Document> lambdaUpdate() {
+            return updateChain;
+        }
 
         @Override
         public boolean save(Document entity) {

@@ -87,10 +87,14 @@ public interface DocumentService extends IService<Document> {
      * @param failureStage 失败阶段
      * @param failureReason 失败原因
      * @param failureDetail 失败详情
+     * @param consumedTimes 实际执行Workflow次数
+     * @param messageId 最近一次实际消费消息ID
+     * @param failureTime 最终失败时间
      * @return true表示更新成功，false表示处理轮次已变化
      */
     boolean markProcessFailed(Long documentId, String processId, String failureStage,
-                              String failureReason, String failureDetail);
+                              String failureReason, String failureDetail, int consumedTimes,
+                              String messageId, java.time.LocalDateTime failureTime);
 
     /**
      * 删除文档。

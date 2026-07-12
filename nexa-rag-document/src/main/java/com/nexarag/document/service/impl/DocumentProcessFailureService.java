@@ -45,7 +45,8 @@ public class DocumentProcessFailureService {
     public boolean markFinalFailure(DocumentPipelineFailureMessage message) {
         // 1. 条件更新当前处理轮次为最终失败
         boolean updated = documentService.markProcessFailed(message.documentId(), message.processId(),
-                message.failureStage(), message.failureReason(), message.failureDetail());
+                message.failureStage(), message.failureReason(), message.failureDetail(),
+                message.consumedTimes(), message.messageId(), message.failureTime());
         if (!updated) {
             return false;
         }

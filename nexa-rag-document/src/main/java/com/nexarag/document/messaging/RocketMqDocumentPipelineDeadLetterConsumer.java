@@ -35,10 +35,11 @@ public class RocketMqDocumentPipelineDeadLetterConsumer implements RocketMQListe
         try {
             // 1. 将重试耗尽的原始消息转换为统一失败消息
             DocumentPipelineMessage message = objectMapper.readValue(messageExt.getBody(), DocumentPipelineMessage.class);
+            int consumedTimes = Math.max(messageExt.getReconsumeTimes(), 1);
             DocumentPipelineFailureMessage failureMessage = new DocumentPipelineFailureMessage(
                     message.documentId(), message.processId(), "ROCKETMQ_RETRY_EXHAUSTED",
                     "RocketMQ自动重试已达上限", "消息进入死信队列",
-                    messageExt.getReconsumeTimes() + 1, messageExt.getMsgId(), LocalDateTime.now());
+                    consumedTimes, messageExt.getMsgId(), LocalDateTime.now());
 
             // 2. 复用最终失败事务和告警逻辑
             failureService.markFinalFailure(failureMessage);

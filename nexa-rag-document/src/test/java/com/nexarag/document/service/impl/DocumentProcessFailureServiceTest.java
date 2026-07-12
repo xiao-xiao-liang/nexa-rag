@@ -25,7 +25,8 @@ class DocumentProcessFailureServiceTest {
         DocumentPipelineAlertService alertService = mock(DocumentPipelineAlertService.class);
         DocumentProcessFailureService service = new DocumentProcessFailureService(documentService, alertService);
         DocumentPipelineFailureMessage message = failureMessage();
-        when(documentService.markProcessFailed(1L, "process-1", "INDEXING", "索引失败", "detail"))
+        when(documentService.markProcessFailed(1L, "process-1", "INDEXING", "索引失败", "detail",
+                6, "message-1", message.failureTime()))
                 .thenReturn(true);
 
         assertThat(service.markFinalFailure(message)).isTrue();
