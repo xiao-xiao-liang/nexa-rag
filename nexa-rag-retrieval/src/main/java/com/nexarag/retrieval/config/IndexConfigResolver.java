@@ -7,6 +7,7 @@ import com.nexarag.document.dto.IndexConfigRequest;
 import com.nexarag.document.dto.ProcessDocumentRequest;
 import com.nexarag.document.entity.Document;
 import com.nexarag.document.error.DocumentErrorCode;
+import com.nexarag.retrieval.model.IndexConfigSnapshot;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;

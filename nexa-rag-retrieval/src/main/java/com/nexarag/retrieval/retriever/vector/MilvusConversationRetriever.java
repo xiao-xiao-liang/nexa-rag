@@ -1,9 +1,9 @@
 package com.nexarag.retrieval.retriever.vector;
 
-import com.nexarag.retrieval.chat.model.ConversationRetrievalRequest;
-import com.nexarag.retrieval.chat.model.RetrievalChunk;
+import com.nexarag.retrieval.dto.req.ConversationRetrievalRequest;
+import com.nexarag.retrieval.model.RetrievalChunk;
 import com.nexarag.retrieval.config.RetrievalProperties;
-import com.nexarag.retrieval.dto.VectorIndexSearchRequest;
+import com.nexarag.retrieval.dto.req.VectorIndexSearchRequest;
 import com.nexarag.retrieval.index.vector.VectorIndexClient;
 import com.nexarag.retrieval.model.VectorIndexSearchResult;
 import com.nexarag.retrieval.retriever.ConversationRetriever;

@@ -2,7 +2,7 @@ package com.nexarag.workflow.node.chat;
 
 import com.alibaba.cloud.ai.graph.OverAllState;
 import com.alibaba.cloud.ai.graph.action.NodeAction;
-import com.nexarag.retrieval.chat.model.RetrievalChunk;
+import com.nexarag.retrieval.model.RetrievalChunk;
 import org.springframework.stereotype.Component;
 
 import java.util.Comparator;

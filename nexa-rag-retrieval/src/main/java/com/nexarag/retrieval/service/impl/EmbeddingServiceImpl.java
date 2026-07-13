@@ -5,7 +5,7 @@ import com.nexarag.model.enums.ModelBizType;
 import com.nexarag.model.gateway.ModelGateway;
 import com.nexarag.model.gateway.embedding.EmbeddingModelRequest;
 import com.nexarag.model.gateway.embedding.EmbeddingModelResponse;
-import com.nexarag.retrieval.config.IndexConfigSnapshot;
+import com.nexarag.retrieval.model.IndexConfigSnapshot;
 import com.nexarag.retrieval.config.RetrievalProperties;
 import com.nexarag.retrieval.model.ChunkEmbedding;
 import com.nexarag.retrieval.model.IndexableChunk;

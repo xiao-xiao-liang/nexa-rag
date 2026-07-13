@@ -1,4 +1,7 @@
-package com.nexarag.retrieval.chat.model;
+package com.nexarag.retrieval.dto.req;
+
+import com.nexarag.retrieval.enums.RetrievalScope;
+import com.nexarag.retrieval.dto.res.IntentRecognitionResult;
 
 /**
  * 对话检索请求。

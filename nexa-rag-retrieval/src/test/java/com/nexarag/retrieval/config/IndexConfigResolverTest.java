@@ -5,6 +5,7 @@ import com.nexarag.common.exception.ServiceException;
 import com.nexarag.document.dto.IndexConfigRequest;
 import com.nexarag.document.dto.ProcessDocumentRequest;
 import com.nexarag.document.entity.Document;
+import com.nexarag.retrieval.model.IndexConfigSnapshot;
 import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;

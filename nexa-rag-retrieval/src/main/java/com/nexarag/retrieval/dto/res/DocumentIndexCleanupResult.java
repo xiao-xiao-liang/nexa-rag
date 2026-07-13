@@ -1,4 +1,4 @@
-package com.nexarag.retrieval.dto;
+package com.nexarag.retrieval.dto.res;
 
 /**
  * 文档索引清理结果，用于描述向量索引和关键词索引的删除统计。

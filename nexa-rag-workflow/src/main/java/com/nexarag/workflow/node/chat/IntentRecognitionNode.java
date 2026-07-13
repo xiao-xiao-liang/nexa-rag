@@ -6,7 +6,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nexarag.model.enums.ModelBizType;
 import com.nexarag.model.gateway.ModelGateway;
 import com.nexarag.model.gateway.chat.ChatModelRequest;
-import com.nexarag.retrieval.chat.model.IntentRecognitionResult;
+import com.nexarag.retrieval.dto.res.IntentRecognitionResult;
 import com.nexarag.workflow.prompt.ChatWorkflowPromptBuilder;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;

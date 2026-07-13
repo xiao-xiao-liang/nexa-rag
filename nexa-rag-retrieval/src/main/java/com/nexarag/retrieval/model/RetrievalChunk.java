@@ -1,4 +1,4 @@
-package com.nexarag.retrieval.chat.model;
+package com.nexarag.retrieval.model;
 
 /**
  * 标准化的对话检索片段。

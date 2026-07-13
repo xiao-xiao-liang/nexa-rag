@@ -1,4 +1,4 @@
-package com.nexarag.retrieval.chat.model;
+package com.nexarag.retrieval.dto.res;
 
 import java.util.List;
 

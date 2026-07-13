@@ -2,7 +2,7 @@ package com.nexarag.workflow.prompt;
 
 import com.nexarag.model.gateway.chat.ChatModelMessage;
 import com.nexarag.chat.domain.ConversationContext;
-import com.nexarag.retrieval.chat.model.RetrievalChunk;
+import com.nexarag.retrieval.model.RetrievalChunk;
 
 import java.util.List;
 import org.springframework.stereotype.Component;

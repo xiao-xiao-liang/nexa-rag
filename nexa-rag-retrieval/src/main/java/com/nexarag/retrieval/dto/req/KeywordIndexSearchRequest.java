@@ -1,4 +1,4 @@
-package com.nexarag.retrieval.dto;
+package com.nexarag.retrieval.dto.req;
 
 /**
  * 关键词索引检索请求。

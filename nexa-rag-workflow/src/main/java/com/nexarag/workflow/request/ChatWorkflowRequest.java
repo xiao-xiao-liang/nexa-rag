@@ -1,6 +1,6 @@
 package com.nexarag.workflow.request;
 
-import com.nexarag.retrieval.chat.model.RetrievalScope;
+import com.nexarag.retrieval.enums.RetrievalScope;
 
 import java.util.LinkedHashMap;
 import java.util.Map;

@@ -1,7 +1,7 @@
 package com.nexarag.retrieval.index.keyword;
 
-import com.nexarag.retrieval.dto.KeywordIndexSearchRequest;
-import com.nexarag.retrieval.dto.KeywordIndexWriteRequest;
+import com.nexarag.retrieval.dto.req.KeywordIndexSearchRequest;
+import com.nexarag.retrieval.dto.req.KeywordIndexWriteRequest;
 import com.nexarag.retrieval.model.KeywordIndexSearchResult;
 import com.nexarag.retrieval.model.KeywordIndexWriteResult;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;

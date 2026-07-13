@@ -1,10 +1,11 @@
 package com.nexarag.retrieval.chat.impl;
 
-import com.nexarag.retrieval.chat.model.ConversationRetrievalRequest;
-import com.nexarag.retrieval.chat.model.RetrievalChunk;
-import com.nexarag.retrieval.chat.model.RetrievalScope;
+import com.nexarag.retrieval.dto.req.ConversationRetrievalRequest;
+import com.nexarag.retrieval.model.RetrievalChunk;
+import com.nexarag.retrieval.enums.RetrievalScope;
 import com.nexarag.retrieval.retriever.keyword.Bm25ConversationRetriever;
 import com.nexarag.retrieval.retriever.vector.MilvusConversationRetriever;
+import com.nexarag.retrieval.service.impl.ConversationRetrievalServiceImpl;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;

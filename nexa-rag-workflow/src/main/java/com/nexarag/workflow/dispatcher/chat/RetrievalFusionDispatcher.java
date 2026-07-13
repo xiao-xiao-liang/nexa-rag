@@ -2,8 +2,8 @@ package com.nexarag.workflow.dispatcher.chat;
 
 import com.alibaba.cloud.ai.graph.OverAllState;
 import com.alibaba.cloud.ai.graph.action.EdgeAction;
-import com.nexarag.retrieval.chat.model.RetrievalChunk;
-import com.nexarag.retrieval.chat.model.RetrievalScope;
+import com.nexarag.retrieval.model.RetrievalChunk;
+import com.nexarag.retrieval.enums.RetrievalScope;
 import org.springframework.stereotype.Component;
 
 import java.util.List;

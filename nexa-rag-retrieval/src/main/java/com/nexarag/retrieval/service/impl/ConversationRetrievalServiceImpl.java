@@ -1,8 +1,8 @@
-package com.nexarag.retrieval.chat.impl;
+package com.nexarag.retrieval.service.impl;
 
-import com.nexarag.retrieval.chat.ConversationRetrievalService;
-import com.nexarag.retrieval.chat.model.ConversationRetrievalRequest;
-import com.nexarag.retrieval.chat.model.RetrievalChunk;
+import com.nexarag.retrieval.service.ConversationRetrievalService;
+import com.nexarag.retrieval.dto.req.ConversationRetrievalRequest;
+import com.nexarag.retrieval.model.RetrievalChunk;
 import com.nexarag.retrieval.retriever.ConversationRetriever;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;

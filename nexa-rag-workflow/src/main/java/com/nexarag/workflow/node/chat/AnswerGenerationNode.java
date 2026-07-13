@@ -9,7 +9,7 @@ import com.nexarag.chat.service.ConversationMessageService;
 import com.nexarag.model.enums.ModelBizType;
 import com.nexarag.model.gateway.ModelGateway;
 import com.nexarag.model.gateway.chat.ChatModelRequest;
-import com.nexarag.retrieval.chat.model.RetrievalChunk;
+import com.nexarag.retrieval.model.RetrievalChunk;
 import com.nexarag.workflow.prompt.ChatWorkflowPromptBuilder;
 import com.nexarag.workflow.stream.ChatGenerationAccumulator;
 import com.nexarag.workflow.stream.ChatGenerationTaskManager;

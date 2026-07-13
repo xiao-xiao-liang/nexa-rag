@@ -3,7 +3,7 @@ package com.nexarag.workflow.node.chat;
 import com.alibaba.cloud.ai.graph.OverAllState;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nexarag.model.gateway.ModelGateway;
-import com.nexarag.retrieval.chat.model.IntentRecognitionResult;
+import com.nexarag.retrieval.dto.res.IntentRecognitionResult;
 import com.nexarag.workflow.prompt.ChatWorkflowPromptBuilder;
 import org.junit.jupiter.api.Test;
 

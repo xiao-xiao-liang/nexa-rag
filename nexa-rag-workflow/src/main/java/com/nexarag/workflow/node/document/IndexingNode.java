@@ -7,7 +7,7 @@ import com.nexarag.document.entity.Document;
 import com.nexarag.document.enums.DocumentStatus;
 import com.nexarag.document.error.DocumentErrorCode;
 import com.nexarag.document.service.DocumentService;
-import com.nexarag.retrieval.dto.DocumentIndexResult;
+import com.nexarag.retrieval.dto.res.DocumentIndexResult;
 import com.nexarag.retrieval.service.DocumentIndexService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;

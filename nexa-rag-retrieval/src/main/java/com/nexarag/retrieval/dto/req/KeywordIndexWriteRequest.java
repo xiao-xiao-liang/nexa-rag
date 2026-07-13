@@ -1,4 +1,4 @@
-package com.nexarag.retrieval.dto;
+package com.nexarag.retrieval.dto.req;
 
 import com.nexarag.retrieval.model.KeywordIndexDocument;
 

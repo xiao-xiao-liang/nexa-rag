@@ -6,7 +6,7 @@ import com.nexarag.model.enums.ModelBizType;
 import com.nexarag.model.gateway.ModelGateway;
 import com.nexarag.model.gateway.rerank.RerankCandidate;
 import com.nexarag.model.gateway.rerank.RerankModelRequest;
-import com.nexarag.retrieval.chat.model.RetrievalChunk;
+import com.nexarag.retrieval.model.RetrievalChunk;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 

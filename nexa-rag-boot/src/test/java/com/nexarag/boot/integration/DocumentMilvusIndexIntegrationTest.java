@@ -9,7 +9,7 @@ import com.nexarag.document.enums.ChunkStatus;
 import com.nexarag.document.enums.DocumentStatus;
 import com.nexarag.document.service.DocumentChunkService;
 import com.nexarag.document.service.DocumentService;
-import com.nexarag.retrieval.dto.DocumentIndexResult;
+import com.nexarag.retrieval.dto.res.DocumentIndexResult;
 import com.nexarag.retrieval.service.DocumentIndexService;
 import io.milvus.v2.client.ConnectConfig;
 import io.milvus.v2.client.MilvusClientV2;

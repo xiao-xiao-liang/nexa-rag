@@ -1,4 +1,4 @@
-package com.nexarag.retrieval.dto;
+package com.nexarag.retrieval.dto.res;
 
 /**
  * 单个文档片段索引结果，用于描述片段是否写入索引以及对应的索引ID。

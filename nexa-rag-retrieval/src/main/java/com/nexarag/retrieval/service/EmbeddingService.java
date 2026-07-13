@@ -1,6 +1,6 @@
 package com.nexarag.retrieval.service;
 
-import com.nexarag.retrieval.config.IndexConfigSnapshot;
+import com.nexarag.retrieval.model.IndexConfigSnapshot;
 import com.nexarag.retrieval.model.ChunkEmbedding;
 import com.nexarag.retrieval.model.IndexableChunk;
 

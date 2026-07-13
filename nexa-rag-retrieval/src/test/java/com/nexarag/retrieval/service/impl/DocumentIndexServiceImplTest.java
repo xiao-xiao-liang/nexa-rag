@@ -9,18 +9,15 @@ import com.nexarag.document.enums.ChunkStatus;
 import com.nexarag.document.enums.DocumentStatus;
 import com.nexarag.document.service.DocumentChunkService;
 import com.nexarag.document.service.DocumentService;
+import com.nexarag.retrieval.model.*;
 import com.nexarag.retrieval.service.DocumentIndexCleaner;
 import com.nexarag.retrieval.config.IndexConfigResolver;
 import com.nexarag.retrieval.config.RetrievalProperties;
-import com.nexarag.retrieval.dto.DocumentIndexResult;
-import com.nexarag.retrieval.dto.KeywordIndexWriteRequest;
-import com.nexarag.retrieval.dto.VectorIndexWriteRequest;
+import com.nexarag.retrieval.dto.res.DocumentIndexResult;
+import com.nexarag.retrieval.dto.req.KeywordIndexWriteRequest;
+import com.nexarag.retrieval.dto.req.VectorIndexWriteRequest;
 import com.nexarag.retrieval.index.keyword.KeywordIndexClient;
 import com.nexarag.retrieval.index.vector.VectorIndexClient;
-import com.nexarag.retrieval.model.ChunkEmbedding;
-import com.nexarag.retrieval.model.IndexableChunk;
-import com.nexarag.retrieval.model.KeywordIndexWriteResult;
-import com.nexarag.retrieval.model.VectorIndexWriteResult;
 import com.nexarag.retrieval.repository.ChunkIndexRepositoryImpl;
 import com.nexarag.retrieval.service.EmbeddingService;
 import com.nexarag.retrieval.service.DocumentIndexService;
@@ -210,7 +207,7 @@ class DocumentIndexServiceImplTest {
 
         @Override
         public List<ChunkEmbedding> embed(List<IndexableChunk> chunks,
-                                          com.nexarag.retrieval.config.IndexConfigSnapshot config) {
+                                          IndexConfigSnapshot config) {
             return chunks.stream()
                     .map(chunk -> new ChunkEmbedding(chunk.chunkId(), new float[]{1.0F, 0.0F}, "test", null))
                     .toList();

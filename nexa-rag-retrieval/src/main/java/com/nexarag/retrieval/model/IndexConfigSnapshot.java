@@ -1,4 +1,4 @@
-package com.nexarag.retrieval.config;
+package com.nexarag.retrieval.model;
 
 /**
  * 索引运行配置快照，用于把文档处理配置转换为索引阶段可直接使用的稳定配置。

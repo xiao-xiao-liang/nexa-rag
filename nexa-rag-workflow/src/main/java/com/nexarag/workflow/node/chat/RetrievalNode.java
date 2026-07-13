@@ -2,10 +2,10 @@ package com.nexarag.workflow.node.chat;
 
 import com.alibaba.cloud.ai.graph.OverAllState;
 import com.alibaba.cloud.ai.graph.action.NodeAction;
-import com.nexarag.retrieval.chat.ConversationRetrievalService;
-import com.nexarag.retrieval.chat.model.ConversationRetrievalRequest;
-import com.nexarag.retrieval.chat.model.IntentRecognitionResult;
-import com.nexarag.retrieval.chat.model.RetrievalScope;
+import com.nexarag.retrieval.service.ConversationRetrievalService;
+import com.nexarag.retrieval.dto.req.ConversationRetrievalRequest;
+import com.nexarag.retrieval.dto.res.IntentRecognitionResult;
+import com.nexarag.retrieval.enums.RetrievalScope;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 

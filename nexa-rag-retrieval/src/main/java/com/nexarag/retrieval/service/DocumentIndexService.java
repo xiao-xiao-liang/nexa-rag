@@ -1,7 +1,7 @@
 package com.nexarag.retrieval.service;
 
-import com.nexarag.retrieval.dto.DocumentIndexCleanupResult;
-import com.nexarag.retrieval.dto.DocumentIndexResult;
+import com.nexarag.retrieval.dto.res.DocumentIndexCleanupResult;
+import com.nexarag.retrieval.dto.res.DocumentIndexResult;
 
 /**
  * 文档索引服务，对 Workflow 暴露文档索引写入和索引清理入口。

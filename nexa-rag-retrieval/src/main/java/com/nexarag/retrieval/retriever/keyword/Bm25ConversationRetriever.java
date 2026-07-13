@@ -1,8 +1,8 @@
 package com.nexarag.retrieval.retriever.keyword;
 
-import com.nexarag.retrieval.chat.model.ConversationRetrievalRequest;
-import com.nexarag.retrieval.chat.model.RetrievalChunk;
-import com.nexarag.retrieval.dto.KeywordIndexSearchRequest;
+import com.nexarag.retrieval.dto.req.ConversationRetrievalRequest;
+import com.nexarag.retrieval.model.RetrievalChunk;
+import com.nexarag.retrieval.dto.req.KeywordIndexSearchRequest;
 import com.nexarag.retrieval.index.keyword.KeywordIndexClient;
 import com.nexarag.retrieval.model.KeywordIndexSearchResult;
 import com.nexarag.retrieval.retriever.ConversationRetriever;

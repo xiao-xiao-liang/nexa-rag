@@ -4,7 +4,7 @@ import com.alibaba.cloud.ai.graph.OverAllState;
 import com.nexarag.model.gateway.ModelGateway;
 import com.nexarag.model.gateway.rerank.RerankModelRequest;
 import com.nexarag.model.gateway.rerank.RerankModelResponse;
-import com.nexarag.retrieval.chat.model.RetrievalChunk;
+import com.nexarag.retrieval.model.RetrievalChunk;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 

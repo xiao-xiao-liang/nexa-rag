@@ -1,7 +1,7 @@
-package com.nexarag.retrieval.chat;
+package com.nexarag.retrieval.service;
 
-import com.nexarag.retrieval.chat.model.ConversationRetrievalRequest;
-import com.nexarag.retrieval.chat.model.RetrievalChunk;
+import com.nexarag.retrieval.dto.req.ConversationRetrievalRequest;
+import com.nexarag.retrieval.model.RetrievalChunk;
 
 import java.util.List;
 

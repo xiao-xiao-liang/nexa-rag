@@ -1,6 +1,6 @@
 package com.nexarag.retrieval.service.impl;
 
-import com.nexarag.retrieval.dto.DocumentIndexCleanupResult;
+import com.nexarag.retrieval.dto.res.DocumentIndexCleanupResult;
 import com.nexarag.retrieval.index.keyword.KeywordIndexClient;
 import com.nexarag.retrieval.index.vector.VectorIndexClient;
 import com.nexarag.retrieval.service.DocumentIndexCleaner;

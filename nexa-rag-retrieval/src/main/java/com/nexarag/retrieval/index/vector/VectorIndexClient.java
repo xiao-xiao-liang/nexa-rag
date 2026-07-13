@@ -1,7 +1,7 @@
 package com.nexarag.retrieval.index.vector;
 
-import com.nexarag.retrieval.dto.VectorIndexSearchRequest;
-import com.nexarag.retrieval.dto.VectorIndexWriteRequest;
+import com.nexarag.retrieval.dto.req.VectorIndexSearchRequest;
+import com.nexarag.retrieval.dto.req.VectorIndexWriteRequest;
 import com.nexarag.retrieval.model.VectorIndexSearchResult;
 import com.nexarag.retrieval.model.VectorIndexWriteResult;
 

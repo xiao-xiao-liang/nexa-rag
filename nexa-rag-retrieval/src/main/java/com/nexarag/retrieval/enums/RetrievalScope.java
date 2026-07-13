@@ -1,4 +1,4 @@
-package com.nexarag.retrieval.chat.model;
+package com.nexarag.retrieval.enums;
 
 /**
  * 对话检索范围。
