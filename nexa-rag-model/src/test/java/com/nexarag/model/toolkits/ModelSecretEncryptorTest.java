@@ -1,4 +1,4 @@
-package com.nexarag.model.security;
+package com.nexarag.model.toolkits;
 
 import org.junit.jupiter.api.Test;
 

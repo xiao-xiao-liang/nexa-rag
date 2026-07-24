@@ -12,7 +12,7 @@ import com.nexarag.model.route.ModelRouter;
 import com.nexarag.model.route.PrimaryFallbackModelRouter;
 import com.nexarag.model.route.RegistryFirstModelRouter;
 import com.nexarag.model.route.WeightedModelRouteSelector;
-import com.nexarag.model.security.ModelSecretEncryptor;
+import com.nexarag.model.toolkits.ModelSecretEncryptor;
 import com.nexarag.model.service.ModelCallLogService;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;

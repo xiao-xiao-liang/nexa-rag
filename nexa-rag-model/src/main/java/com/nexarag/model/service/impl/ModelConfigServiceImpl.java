@@ -16,7 +16,7 @@ import com.nexarag.model.governance.DefaultModelGovernancePolicyFactory;
 import com.nexarag.model.mapper.ModelConfigMapper;
 import com.nexarag.model.mapper.ModelRegistryVersionMapper;
 import com.nexarag.model.refresh.ModelRegistryChangePublisher;
-import com.nexarag.model.security.ModelSecretEncryptor;
+import com.nexarag.model.toolkits.ModelSecretEncryptor;
 import com.nexarag.model.service.ModelConfigService;
 import com.nexarag.model.service.ModelGovernanceConfigService;
 import com.nexarag.model.service.ModelRouteConfigService;

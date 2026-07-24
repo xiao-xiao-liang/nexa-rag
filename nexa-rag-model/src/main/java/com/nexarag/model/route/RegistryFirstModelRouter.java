@@ -8,7 +8,7 @@ import com.nexarag.model.entity.ModelRouteConfig;
 import com.nexarag.model.enums.ModelRouteRole;
 import com.nexarag.model.enums.ModelRouteStrategy;
 import com.nexarag.model.registry.ModelRegistry;
-import com.nexarag.model.security.ModelSecretEncryptor;
+import com.nexarag.model.toolkits.ModelSecretEncryptor;
 import lombok.RequiredArgsConstructor;
 import org.springframework.util.CollectionUtils;
 

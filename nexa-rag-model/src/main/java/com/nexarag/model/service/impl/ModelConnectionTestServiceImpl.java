@@ -22,7 +22,7 @@ import com.nexarag.model.gateway.rerank.RerankCandidate;
 import com.nexarag.model.gateway.rerank.RerankModelRequest;
 import com.nexarag.model.gateway.rerank.RerankModelResponse;
 import com.nexarag.model.route.ModelRouteDecision;
-import com.nexarag.model.security.ModelSecretEncryptor;
+import com.nexarag.model.toolkits.ModelSecretEncryptor;
 import com.nexarag.model.service.ModelConfigService;
 import com.nexarag.model.service.ModelConnectionTestService;
 import com.nexarag.model.service.ModelRouteService;

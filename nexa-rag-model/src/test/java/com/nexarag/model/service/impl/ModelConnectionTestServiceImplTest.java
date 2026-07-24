@@ -15,7 +15,7 @@ import com.nexarag.model.gateway.embedding.EmbeddingModelResponse;
 import com.nexarag.model.gateway.rerank.RerankModelRequest;
 import com.nexarag.model.gateway.rerank.RerankModelResponse;
 import com.nexarag.model.route.ModelRouteDecision;
-import com.nexarag.model.security.ModelSecretEncryptor;
+import com.nexarag.model.toolkits.ModelSecretEncryptor;
 import com.nexarag.model.service.ModelConfigService;
 import com.nexarag.model.service.ModelRouteService;
 import org.junit.jupiter.api.Test;

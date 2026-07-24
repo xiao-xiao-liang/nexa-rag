@@ -405,7 +405,7 @@ git commit -m "feat(model): 新增模型注册表数据结构"
 Create `ModelSecretEncryptorTest`:
 
 ```java
-package com.nexarag.model.security;
+package com.nexarag.model.toolkits;
 
 import org.junit.jupiter.api.Test;
 
@@ -452,7 +452,7 @@ Expected: compile failure because encryptor does not exist.
 Create `ModelSecretEncryptor`:
 
 ```java
-package com.nexarag.model.security;
+package com.nexarag.model.toolkits;
 
 import com.nexarag.common.exception.ServiceException;
 import com.nexarag.common.result.BaseErrorCode;

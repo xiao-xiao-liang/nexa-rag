@@ -10,7 +10,7 @@ import com.nexarag.model.enums.ModelGovernanceBindingMode;
 import com.nexarag.model.enums.ModelProvider;
 import com.nexarag.model.enums.ModelType;
 import com.nexarag.model.governance.DefaultModelGovernancePolicyFactory;
-import com.nexarag.model.security.ModelSecretEncryptor;
+import com.nexarag.model.toolkits.ModelSecretEncryptor;
 import com.nexarag.model.service.ModelGovernanceConfigService;
 import com.nexarag.model.service.ModelRouteConfigService;
 import org.junit.jupiter.api.Test;

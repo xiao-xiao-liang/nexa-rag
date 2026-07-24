@@ -1,4 +1,4 @@
-package com.nexarag.model.security;
+package com.nexarag.model.toolkits;
 
 import com.nexarag.common.error.BaseErrorCode;
 import com.nexarag.common.exception.ServiceException;
