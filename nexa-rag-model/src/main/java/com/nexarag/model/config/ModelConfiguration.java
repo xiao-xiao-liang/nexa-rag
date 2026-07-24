@@ -1,8 +1,6 @@
 package com.nexarag.model.config;
 
-import com.nexarag.model.prompt.LocalPromptTemplateRepository;
-import com.nexarag.model.prompt.PromptTemplateRepository;
-import com.nexarag.model.prompt.PromptTemplateService;
+import com.nexarag.model.toolkits.prompt.PromptSnapshotCache;
 import com.nexarag.model.execution.ModelExecutionTemplate;
 import com.nexarag.model.governance.ModelGovernanceExecutor;
 import com.nexarag.model.governance.ModelGovernanceResolver;
@@ -26,29 +24,19 @@ import org.springframework.context.annotation.Configuration;
 @EnableConfigurationProperties({
         ModelGovernanceProperties.class,
         ModelSecretProperties.class,
-        ModelRegistryRefreshProperties.class
+        ModelRegistryRefreshProperties.class,
+        PromptRefreshProperties.class
 })
 public class ModelConfiguration {
 
     /**
-     * 注册本地 Prompt 模板仓储。
+     * 注册 Prompt 发布和版本的进程内快照缓存。
      *
-     * @return Prompt 模板仓储
+     * @return Prompt 快照缓存
      */
     @Bean
-    public PromptTemplateRepository promptTemplateRepository() {
-        return new LocalPromptTemplateRepository("classpath*:/prompts/**/*.md");
-    }
-
-    /**
-     * 注册 Prompt 模板服务。
-     *
-     * @param repository Prompt 模板仓储
-     * @return Prompt 模板服务
-     */
-    @Bean
-    public PromptTemplateService promptTemplateService(PromptTemplateRepository repository) {
-        return new PromptTemplateService(repository);
+    public PromptSnapshotCache promptSnapshotCache() {
+        return new PromptSnapshotCache();
     }
 
     /**

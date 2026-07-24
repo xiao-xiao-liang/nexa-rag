@@ -7,7 +7,8 @@ import com.nexarag.chat.service.ConversationService;
 import com.nexarag.model.enums.ModelBizType;
 import com.nexarag.model.gateway.ModelGateway;
 import com.nexarag.model.gateway.chat.ChatModelRequest;
-import com.nexarag.workflow.prompt.ChatWorkflowPromptBuilder;
+import com.nexarag.model.toolkits.prompt.PromptBuilder;
+import com.nexarag.model.prompt.domain.PromptExecutionSnapshot;
 import org.apache.ibatis.session.SqlSessionFactory;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -21,6 +22,7 @@ import static com.nexarag.workflow.constants.ChatWorkflowStateKeys.IS_NEW_CONVER
 import static com.nexarag.workflow.constants.ChatWorkflowStateKeys.USER_ID;
 import static com.nexarag.workflow.constants.ChatWorkflowStateKeys.USER_QUESTION;
 import static com.nexarag.workflow.constants.ChatWorkflowStateKeys.TRACE_ID;
+import static com.nexarag.workflow.constants.ChatWorkflowStateKeys.PROMPT_EXECUTION_SNAPSHOT;
 import static com.nexarag.chat.constants.ChatModelRouteConstants.CHAT_TITLE_ROUTE_KEY;
 
 /**
@@ -34,7 +36,7 @@ public class ConversationValidationNode implements NodeAction {
 
     private final ConversationService conversationService;
     private final ModelGateway modelGateway;
-    private final ChatWorkflowPromptBuilder promptBuilder;
+    private final PromptBuilder promptBuilder;
 
     @Override
     public Map<String, Object> apply(OverAllState state) {
@@ -51,11 +53,13 @@ public class ConversationValidationNode implements NodeAction {
         String title = question.length() > 20 ? question.substring(0, 20) : question;
         ChatConversationVO conversation = conversationService.create(userId, title);
         String traceId = state.value(TRACE_ID, "");
-        Thread.startVirtualThread(() -> generateTitle(conversation.getConversationId(), userId, question, traceId));
+        PromptExecutionSnapshot snapshot = state.value(PROMPT_EXECUTION_SNAPSHOT, (PromptExecutionSnapshot) null);
+        Thread.startVirtualThread(() -> generateTitle(conversation.getConversationId(), userId, question, traceId, snapshot));
         return Map.of(CONVERSATION_ID, conversation.getConversationId(), IS_NEW_CONVERSATION, true);
     }
 
-    private void generateTitle(String conversationId, String userId, String question, String traceId) {
+    private void generateTitle(String conversationId, String userId, String question, String traceId,
+                               PromptExecutionSnapshot snapshot) {
         try {
             // 1. 调用轻量模型生成正式标题
             var response = modelGateway.chat(ChatModelRequest.builder()
@@ -63,7 +67,7 @@ public class ConversationValidationNode implements NodeAction {
                     .bizType(ModelBizType.CHAT)
                     .bizId(conversationId)
                     .routeKey(CHAT_TITLE_ROUTE_KEY)
-                    .messages(promptBuilder.buildTitleMessages(question))
+                    .messages(promptBuilder.buildTitleMessages(snapshot, Map.of("question", question == null ? "" : question)))
                     .build());
             if (response != null && response.content() != null && !response.content().isBlank()) {
                 // 2. 标题生成成功后更新会话

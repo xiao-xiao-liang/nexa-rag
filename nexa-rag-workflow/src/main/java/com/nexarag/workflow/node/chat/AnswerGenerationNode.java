@@ -9,8 +9,10 @@ import com.nexarag.chat.service.ConversationMessageService;
 import com.nexarag.model.enums.ModelBizType;
 import com.nexarag.model.gateway.ModelGateway;
 import com.nexarag.model.gateway.chat.ChatModelRequest;
+import com.nexarag.model.gateway.chat.ChatModelMessage;
+import com.nexarag.model.toolkits.prompt.PromptBuilder;
+import com.nexarag.model.prompt.domain.PromptExecutionSnapshot;
 import com.nexarag.retrieval.model.RetrievalChunk;
-import com.nexarag.workflow.prompt.ChatWorkflowPromptBuilder;
 import com.nexarag.workflow.stream.ChatGenerationAccumulator;
 import com.nexarag.workflow.stream.ChatGenerationTaskManager;
 import com.nexarag.workflow.stream.ChatWorkflowStreamingUtil;
@@ -33,6 +35,7 @@ import static com.nexarag.workflow.constants.ChatWorkflowStateKeys.RERANKED_RETR
 import static com.nexarag.workflow.constants.ChatWorkflowStateKeys.REWRITTEN_QUESTION;
 import static com.nexarag.workflow.constants.ChatWorkflowStateKeys.TRACE_ID;
 import static com.nexarag.workflow.constants.ChatWorkflowStateKeys.USER_ID;
+import static com.nexarag.workflow.constants.ChatWorkflowStateKeys.PROMPT_EXECUTION_SNAPSHOT;
 import static com.nexarag.chat.constants.ChatModelRouteConstants.CHAT_ANSWER_ROUTE_KEY;
 
 /**
@@ -45,7 +48,7 @@ public class AnswerGenerationNode implements NodeAction {
 
     private final ConversationMessageService messageService;
     private final ModelGateway modelGateway;
-    private final ChatWorkflowPromptBuilder promptBuilder;
+    private final PromptBuilder promptBuilder;
     private final ChatGenerationTaskManager taskManager;
 
     @Override
@@ -68,9 +71,8 @@ public class AnswerGenerationNode implements NodeAction {
                         .bizType(ModelBizType.CHAT)
                         .bizId(conversationId)
                         .routeKey(CHAT_ANSWER_ROUTE_KEY)
-                        .messages(promptBuilder.buildAnswerMessages(
-                                state.value(REWRITTEN_QUESTION, ""),
-                                state.value(CONVERSATION_CONTEXT, (ConversationContext) null), chunks))
+                        .messages(promptBuilder.buildAnswerMessages(snapshot(state),
+                                state.value(REWRITTEN_QUESTION, ""), summary(state), historyMessages(state), evidence(chunks)))
                         .build())
                 .doOnSubscribe(subscription -> taskManager.bind(generationId, subscription::cancel));
 
@@ -78,5 +80,31 @@ public class AnswerGenerationNode implements NodeAction {
         GraphFlux<?> graphFlux = GraphFlux.of(ANSWER_GENERATION_NODE, MODEL_STREAM_RESULT,
                 ChatWorkflowStreamingUtil.toGraphStream(AnswerGenerationNode.class, state, modelStream, accumulator));
         return Map.of(ASSISTANT_MESSAGE_ID, assistantMessage.messageId(), MODEL_STREAM_RESULT, graphFlux);
+    }
+
+    private PromptExecutionSnapshot snapshot(OverAllState state) {
+        return state.value(PROMPT_EXECUTION_SNAPSHOT, (PromptExecutionSnapshot) null);
+    }
+
+    private String summary(OverAllState state) {
+        ConversationContext context = state.value(CONVERSATION_CONTEXT, (ConversationContext) null);
+        return context == null || context.summary() == null ? "" : context.summary();
+    }
+
+    private List<ChatModelMessage> historyMessages(OverAllState state) {
+        ConversationContext context = state.value(CONVERSATION_CONTEXT, (ConversationContext) null);
+        if (context == null) {
+            return List.of();
+        }
+        return context.recentMessages().stream()
+                .filter(com.nexarag.chat.domain.ChatMessageVO::usableForContext)
+                .map(message -> new ChatModelMessage(message.role().name(), message.content()))
+                .toList();
+    }
+
+    private String evidence(List<RetrievalChunk> chunks) {
+        return chunks.stream()
+                .map(chunk -> "[" + chunk.chunkId() + "] " + chunk.content())
+                .collect(java.util.stream.Collectors.joining("\n"));
     }
 }

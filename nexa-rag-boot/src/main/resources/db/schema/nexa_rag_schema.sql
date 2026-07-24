@@ -349,3 +349,48 @@ CREATE TABLE IF NOT EXISTS chat_conversation_summary (
     KEY idx_chat_summary_conversation_version (conversation_id, summary_version),
     KEY idx_chat_summary_user_conversation_version (user_id, conversation_id, summary_version)
 ) COMMENT='聊天会话摘要';
+
+CREATE TABLE prompt_definition (
+    prompt_id BIGINT NOT NULL COMMENT '提示词定义ID',
+    prompt_code VARCHAR(128) NOT NULL COMMENT '提示词唯一编码',
+    name VARCHAR(128) NOT NULL COMMENT '提示词名称',
+    variable_schema JSON NOT NULL COMMENT '变量契约JSON',
+    enabled TINYINT NOT NULL DEFAULT 1 COMMENT '是否启用',
+    current_release_id BIGINT NULL COMMENT '当前发布记录ID',
+    current_release_revision BIGINT NOT NULL DEFAULT 0 COMMENT '当前发布代次',
+    create_time DATETIME NOT NULL COMMENT '创建时间',
+    update_time DATETIME NOT NULL COMMENT '更新时间',
+    PRIMARY KEY (prompt_id),
+    UNIQUE KEY uk_prompt_definition_code (prompt_code)
+) COMMENT='提示词定义表';
+
+CREATE TABLE prompt_version (
+    version_id BIGINT NOT NULL COMMENT '提示词版本ID',
+    prompt_id BIGINT NOT NULL COMMENT '提示词定义ID',
+    version_no BIGINT NOT NULL COMMENT '定义内版本号',
+    content MEDIUMTEXT NOT NULL COMMENT '模板正文',
+    content_checksum CHAR(64) NOT NULL COMMENT '正文SHA-256摘要',
+    variable_schema_snapshot JSON NOT NULL COMMENT '变量契约快照',
+    created_by VARCHAR(64) NOT NULL COMMENT '创建人',
+    created_at DATETIME NOT NULL COMMENT '创建时间',
+    remark VARCHAR(512) NULL COMMENT '变更说明',
+    PRIMARY KEY (version_id),
+    UNIQUE KEY uk_prompt_version_prompt_no (prompt_id, version_no),
+    KEY idx_prompt_version_prompt (prompt_id)
+) COMMENT='提示词不可变版本表';
+
+CREATE TABLE prompt_release (
+    release_id BIGINT NOT NULL COMMENT '提示词发布记录ID',
+    prompt_id BIGINT NOT NULL COMMENT '提示词定义ID',
+    stable_version_id BIGINT NOT NULL COMMENT '正式版本ID',
+    canary_version_id BIGINT NULL COMMENT '灰度版本ID',
+    canary_rule JSON NULL COMMENT '灰度规则JSON',
+    release_revision BIGINT NOT NULL COMMENT '发布代次',
+    released_by VARCHAR(64) NOT NULL COMMENT '发布人',
+    released_at DATETIME NOT NULL COMMENT '发布时间',
+    rollback_from_release_id BIGINT NULL COMMENT '回滚来源发布记录ID',
+    remark VARCHAR(512) NULL COMMENT '发布说明',
+    PRIMARY KEY (release_id),
+    UNIQUE KEY uk_prompt_release_prompt_revision (prompt_id, release_revision),
+    KEY idx_prompt_release_prompt_time (prompt_id, released_at)
+) COMMENT='提示词发布记录表';

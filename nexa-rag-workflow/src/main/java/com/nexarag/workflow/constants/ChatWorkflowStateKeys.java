@@ -33,6 +33,7 @@ public final class ChatWorkflowStateKeys {
     public static final String RETRIEVAL_VECTOR_THRESHOLD = "retrievalVectorThreshold";
     public static final String RAW_RETRIEVAL_RESULTS = "rawRetrievalResults";
     public static final String MODEL_STREAM_RESULT = "modelStreamResult";
+    public static final String PROMPT_EXECUTION_SNAPSHOT = "promptExecutionSnapshot";
 
     private ChatWorkflowStateKeys() {
     }

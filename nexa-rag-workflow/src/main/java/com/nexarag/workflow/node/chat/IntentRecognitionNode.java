@@ -6,8 +6,9 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nexarag.model.enums.ModelBizType;
 import com.nexarag.model.gateway.ModelGateway;
 import com.nexarag.model.gateway.chat.ChatModelRequest;
+import com.nexarag.model.toolkits.prompt.PromptBuilder;
+import com.nexarag.model.prompt.domain.PromptExecutionSnapshot;
 import com.nexarag.retrieval.dto.res.IntentRecognitionResult;
-import com.nexarag.workflow.prompt.ChatWorkflowPromptBuilder;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -18,6 +19,7 @@ import java.util.UUID;
 
 import static com.nexarag.workflow.constants.ChatWorkflowStateKeys.INTENT_RESULT;
 import static com.nexarag.workflow.constants.ChatWorkflowStateKeys.REWRITTEN_QUESTION;
+import static com.nexarag.workflow.constants.ChatWorkflowStateKeys.PROMPT_EXECUTION_SNAPSHOT;
 import static com.nexarag.chat.constants.ChatModelRouteConstants.CHAT_INTENT_ROUTE_KEY;
 
 /**
@@ -30,7 +32,7 @@ public class IntentRecognitionNode implements NodeAction {
 
     private final ModelGateway modelGateway;
     private final ObjectMapper objectMapper;
-    private final ChatWorkflowPromptBuilder promptBuilder;
+    private final PromptBuilder promptBuilder;
 
     /**
      * 识别改写问题的检索意图，失败时返回低置信度空意图。
@@ -48,7 +50,7 @@ public class IntentRecognitionNode implements NodeAction {
                     .bizType(ModelBizType.CHAT)
                     .bizId(CHAT_INTENT_ROUTE_KEY)
                     .routeKey(CHAT_INTENT_ROUTE_KEY)
-                    .messages(promptBuilder.buildIntentMessages(question))
+                    .messages(promptBuilder.buildIntentMessages(snapshot(state), Map.of("question", safe(question))))
                     .build());
 
             // 2. 解析结构化意图结果
@@ -64,5 +66,13 @@ public class IntentRecognitionNode implements NodeAction {
 
     private IntentRecognitionResult emptyIntent() {
         return new IntentRecognitionResult(List.of(), 0.0D);
+    }
+
+    private PromptExecutionSnapshot snapshot(OverAllState state) {
+        return state.value(PROMPT_EXECUTION_SNAPSHOT, (PromptExecutionSnapshot) null);
+    }
+
+    private String safe(String value) {
+        return value == null ? "" : value;
     }
 }
