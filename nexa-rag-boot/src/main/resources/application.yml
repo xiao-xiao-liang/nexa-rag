@@ -14,15 +14,15 @@ spring:
     enabled: false
   data:
     redis:
-      host: 192.168.0.134
+      host: 127.0.0.1 # 192.168.0.134
       port: 6379
-      password: 
+#      password: 
       timeout: 3s
   datasource:
     driver-class-name: com.mysql.cj.jdbc.Driver
-    url: jdbc:mysql://192.168.0.134:3306/nexa_rag?useUnicode=true&characterEncoding=utf8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true
+    url: jdbc:mysql://127.0.0.1:3306/nexa_rag?useUnicode=true&characterEncoding=utf8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true
     username: root
-    password: 
+    password: root # 
 
 # RocketMQ连接配置。name-server为NameServer地址，多个地址使用分号分隔；producer.group为全局生产者组名称。
 rocketmq:
@@ -31,6 +31,10 @@ rocketmq:
     group: nexa-document-pipeline-producer # 文档流水线生产者组，同一应用集群应保持一致。
 
 nexa:
+  prompt:
+    refresh:
+      topic: nexa.prompt.release.changed
+      reconcile-interval-ms: 60000
   # 文档上传和异步处理流水线配置。
   document:
     upload:
@@ -97,7 +101,7 @@ nexa:
       max-batch-size: 10 # 单次向量化最大片段数量，避免超过云端 Embedding 接口限制。
     vector:
       type: milvus # 向量索引类型，可选值：milvus。
-      host: 192.168.0.134 # 向量索引服务地址。
+      host: 101.132.158.169 # 192.168.0.134 # 向量索引服务地址。
       port: 19530 # 向量索引服务端口。
       database-name: nexa_rag # 向量库数据库名称，为空时使用默认数据库。
       collection-name: nexa_document_chunk # 文档片段向量集合名称。
@@ -106,7 +110,7 @@ nexa:
       password: # 向量索引服务密码，未启用鉴权时为空。
       rpc-deadline-ms: 60000 # 向量索引 RPC 超时时间，单位：毫秒。
     keyword:
-      type: elasticsearch # 关键词索引类型，可选值：none/elasticsearch。
+      type: none # elasticsearch # 关键词索引类型，可选值：none/elasticsearch。
       scheme: http # 关键词索引服务协议。
       host: 192.168.0.134 # Elasticsearch 服务地址。
       port: 9200 # Elasticsearch HTTP 端口。
