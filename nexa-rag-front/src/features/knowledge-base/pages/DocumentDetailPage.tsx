@@ -11,7 +11,7 @@ import { DocumentChunkBrowser } from '../components/DocumentChunkBrowser'
 const CHUNK_PAGE_SIZE = 20
 const EMPTY_CHUNKS: PageVO<DocumentChunk> = { records: [], total: 0, current: 1, size: CHUNK_PAGE_SIZE, pages: 0 }
 
-/** 知识库文档详情页面，展示处理状态、失败原因和已索引文本分块。 */
+/** 知识库文档详情页面，以知识块工作区展示已索引文档。 */
 export function DocumentDetailPage() {
   const { documentId: documentIdParam } = useParams()
   const documentId = parseDocumentId(documentIdParam)
@@ -37,7 +37,7 @@ export function DocumentDetailPage() {
     processControllerRef.current = controller
     setProcessError(null)
     try {
-      // 1. 处理状态独立请求，错误只影响处理区域。
+      // 1. 处理状态独立请求，错误只影响处理状态区域。
       const response = await getDocumentProcessStatus(targetDocumentId, controller.signal)
       if (!controller.signal.aborted) setProcessStatus(response)
     } catch (error) {
@@ -52,7 +52,7 @@ export function DocumentDetailPage() {
     setDetailLoading(true)
     setDetailError(null)
     try {
-      // 1. 仅加载本页展示的元数据，不渲染对象存储文件地址。
+      // 1. 仅加载工作区所需元数据，不展示对象存储文件地址。
       const response = await getDocument(targetDocumentId, controller.signal)
       if (!controller.signal.aborted) setDocument(response)
     } catch (error) {
@@ -123,29 +123,34 @@ export function DocumentDetailPage() {
 
   if (documentId === null) return <InvalidDocumentAddress />
 
-  return <section className="min-w-0 flex-1 overflow-y-auto bg-slate-50 p-6 md:p-10"><div className="mx-auto flex w-full max-w-5xl flex-col gap-6">
-    <Link to="/knowledge-base" className="inline-flex w-fit items-center gap-2 text-sm text-muted-foreground hover:text-foreground"><ArrowLeft className="size-4" />返回文档列表</Link>
-    {detailError && <ErrorPanel message={detailError} onRetry={() => void loadDetail(documentId)} />}
-    {detailLoading && !document && <div className="rounded-2xl border bg-card px-5 py-14 text-center text-sm text-muted-foreground">正在加载文档详情…</div>}
+  return <section className="min-w-0 flex-1 overflow-y-auto bg-slate-50">
+    {detailError && <div className="p-6 md:px-8"><ErrorPanel message={detailError} onRetry={() => void loadDetail(documentId)} /></div>}
+    {detailLoading && !document && <div className="flex min-h-80 items-center justify-center text-sm text-muted-foreground">正在加载文档详情…</div>}
     {document && <>
-      <article className="rounded-2xl border bg-card p-6 shadow-sm"><div className="flex flex-wrap items-start justify-between gap-4"><div className="flex gap-3"><span className="flex size-10 items-center justify-center rounded-xl bg-blue-50 text-blue-600"><FileText className="size-5" /></span><div><h1 className="text-xl font-semibold">{document.title || document.originalFileName || '未命名文档'}</h1><p className="mt-1 text-sm text-muted-foreground">{document.originalFileName || '未提供原始文件名'}</p></div></div><span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-700">{currentStatus ? statusLabel(currentStatus) : '状态未知'}</span></div><dl className="mt-6 grid gap-4 border-t pt-5 text-sm sm:grid-cols-2"><InfoItem label="文档类型" value={document.fileType || '—'} /><InfoItem label="文件大小" value={formatFileSize(document.fileSize)} /><InfoItem label="文档描述" value={document.description || '未填写'} /></dl></article>
-      <article className="rounded-2xl border bg-card p-6 shadow-sm"><div className="flex flex-wrap items-center justify-between gap-3"><div><h2 className="font-semibold">处理进度</h2><p className="mt-1 text-sm text-muted-foreground">处理配置由后端默认策略控制。</p></div>{currentStatus === 'UPLOADED' && <Button onClick={() => void submitProcess('process')} disabled={submitting}>{submitting ? '提交中…' : '开始处理'}</Button>}{currentStatus === 'FAILED' && <Button onClick={() => void submitProcess('retry')} disabled={submitting}>{submitting ? '提交中…' : '重新处理'}</Button>}</div>{processError && <ErrorPanel message={processError} onRetry={() => void loadProcessStatus(documentId)} />}{currentStatus === 'FAILED' && <div className="mt-4 rounded-xl bg-red-50 p-4 text-sm text-red-800"><p>失败阶段：{processStatus?.failureStage || '未知'}</p><p className="mt-1">失败原因：{processStatus?.failureReason || '后端未返回具体原因'}</p></div>}{processStatus?.messageStatus && <p className="mt-4 text-sm text-muted-foreground">任务信息：{processStatus.messageStatus}</p>}</article>
-      <article className="rounded-2xl border bg-card p-6 shadow-sm"><h2 className="font-semibold">文本分块</h2>{currentStatus !== 'INDEXED' && <p className="mt-2 text-sm text-muted-foreground">文档索引完成后可查看文本分块。</p>}{currentStatus === 'INDEXED' && <DocumentChunkBrowser chunks={chunks.records} sourceFileName={document.originalFileName || document.title || '未命名文档'} loading={chunksLoading} error={chunksError} selectedChunk={selectedChunk} pagination={<ChunkPagination page={chunks} pageNum={chunkPage} onChange={handleChunkPageChange} />} onSelect={setSelectedChunk} onClose={() => setSelectedChunk(null)} onRetry={() => void loadChunks(documentId, chunkPage)} />}</article>
+      <header className="border-b bg-white px-6 py-5 md:px-8">
+        <Link to="/knowledge-base" className="inline-flex w-fit items-center gap-2 text-sm text-muted-foreground hover:text-foreground"><ArrowLeft className="size-4" />返回文档列表</Link>
+        <div className="mt-5 flex flex-wrap items-start justify-between gap-5">
+          <div className="flex min-w-0 items-start gap-3"><span className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-blue-600"><FileText className="size-5" /></span><div className="min-w-0"><h1 className="truncate text-xl font-semibold text-slate-950">{document.title || document.originalFileName || '未命名文档'}</h1><div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground"><span>{document.originalFileName || '未提供原始文件名'}</span><span>{document.fileType || '未知类型'}</span><span>{formatFileSize(document.fileSize)}</span><span>{chunks.total} 个知识块</span></div></div></div>
+          <div className="flex flex-wrap items-center gap-3"><span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-700">{currentStatus ? statusLabel(currentStatus) : '状态未知'}</span>{currentStatus === 'UPLOADED' && <Button onClick={() => void submitProcess('process')} disabled={submitting}>{submitting ? '提交中…' : '开始处理'}</Button>}{currentStatus === 'FAILED' && <Button onClick={() => void submitProcess('retry')} disabled={submitting}>{submitting ? '提交中…' : '重新处理'}</Button>}</div>
+        </div>
+        {(document.description || processStatus?.messageStatus || processError || currentStatus === 'FAILED') && <div className="mt-4 border-t pt-4 text-sm"><p className="text-muted-foreground">{document.description || '未填写文档描述'}</p>{processStatus?.messageStatus && <p className="mt-2 text-muted-foreground">任务信息：{processStatus.messageStatus}</p>}{currentStatus === 'FAILED' && <p className="mt-2 text-red-700">失败阶段：{processStatus?.failureStage || '未知'}；失败原因：{processStatus?.failureReason || '后端未返回具体原因'}</p>}{processError && <ErrorPanel message={processError} onRetry={() => void loadProcessStatus(documentId)} />}</div>}
+      </header>
+      <section aria-label="知识块工作区" className="px-6 py-6 md:px-8">
+        {currentStatus !== 'INDEXED' && <p className="text-sm text-muted-foreground">文档索引完成后可查看文本分块。</p>}
+        {currentStatus === 'INDEXED' && <DocumentChunkBrowser chunks={chunks.records} sourceFileName={document.originalFileName || document.title || '未命名文档'} loading={chunksLoading} error={chunksError} selectedChunk={selectedChunk} pagination={<ChunkPagination page={chunks} pageNum={chunkPage} onChange={handleChunkPageChange} />} onSelect={setSelectedChunk} onClose={() => setSelectedChunk(null)} onRetry={() => void loadChunks(documentId, chunkPage)} />}
+      </section>
     </>}
-  </div></section>
+  </section>
 }
 
 /** 非法文档地址提示。 */
 function InvalidDocumentAddress() { return <section className="flex min-w-0 flex-1 items-center justify-center p-6"><div className="text-center"><h1 className="text-xl font-semibold">文档地址无效</h1><Link to="/knowledge-base" className="mt-4 inline-flex text-sm text-blue-600 hover:underline">返回文档列表</Link></div></section> }
 
 /** 独立区域的可重试错误提示。 */
-function ErrorPanel({ message, onRetry }: { message: string; onRetry: () => void }) { return <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700"><span>{message}</span><Button variant="outline" size="sm" onClick={onRetry}><RefreshCw className="size-3.5" />重新加载</Button></div> }
-
-/** 文档元数据信息项。 */
-function InfoItem({ label, value }: { label: string; value: string }) { return <div><dt className="text-muted-foreground">{label}</dt><dd className="mt-1 break-words text-foreground">{value}</dd></div> }
+function ErrorPanel({ message, onRetry }: { message: string; onRetry: () => void }) { return <div className="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700"><span>{message}</span><Button variant="outline" size="sm" onClick={onRetry}><RefreshCw className="size-3.5" />重新加载</Button></div> }
 
 /** 已索引文档的文本分块分页控件。 */
-function ChunkPagination({ page, pageNum, onChange }: { page: PageVO<DocumentChunk>; pageNum: number; onChange: (pageNum: number) => void }) { const totalPages = Math.max(page.pages, 1); return <div className="mt-4 flex items-center justify-end gap-3 text-sm text-muted-foreground"><Button variant="outline" size="sm" disabled={pageNum <= 1} onClick={() => onChange(pageNum - 1)}>上一页</Button><span>第 {pageNum} / {totalPages} 页</span><Button variant="outline" size="sm" disabled={pageNum >= totalPages} onClick={() => onChange(pageNum + 1)}>下一页</Button></div> }
+function ChunkPagination({ page, pageNum, onChange }: { page: PageVO<DocumentChunk>; pageNum: number; onChange: (pageNum: number) => void }) { const totalPages = Math.max(page.pages, 1); return <div className="mt-5 flex items-center justify-end gap-3 text-sm text-muted-foreground"><Button variant="outline" size="sm" disabled={pageNum <= 1} onClick={() => onChange(pageNum - 1)}>上一页</Button><span>第 {pageNum} / {totalPages} 页</span><Button variant="outline" size="sm" disabled={pageNum >= totalPages} onClick={() => onChange(pageNum + 1)}>下一页</Button></div> }
 
 function parseDocumentId(value: string | undefined): number | null { const parsed = Number(value); return Number.isInteger(parsed) && parsed > 0 ? parsed : null }
 function formatFileSize(value: number | null): string { if (value === null || value < 0) return '—'; if (value < 1024) return `${value} B`; if (value < 1024 * 1024) return `${(value / 1024).toFixed(1)} KB`; return `${(value / (1024 * 1024)).toFixed(1)} MB` }

@@ -54,6 +54,16 @@ describe('DocumentChunkBrowser', () => {
     expect(screen.getByRole('region', { name: '分块完整内容' })).toHaveTextContent('员工手册.pdf')
   })
 
+  it('应提供知识块筛选，并保留固定的空白详情栏', async () => {
+    const user = userEvent.setup()
+    render(<ChunkBrowserHarness />)
+
+    expect(screen.getByRole('complementary', { name: '分块详情栏' })).toBeEmptyDOMElement()
+    await user.type(screen.getByRole('textbox', { name: '搜索文本分块' }), '第二段')
+    expect(screen.queryByRole('button', { name: '查看分块 1' })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '查看分块 2' })).toBeInTheDocument()
+  })
+
   it('应在左侧列表显示加载、错误和空状态', () => {
     const { rerender } = render(<DocumentChunkBrowser chunks={[]} sourceFileName="员工手册.pdf" loading error={null} selectedChunk={null} pagination={null} onSelect={vi.fn()} onClose={vi.fn()} onRetry={vi.fn()} />)
     expect(screen.getByText('正在加载文本分块…')).toBeInTheDocument()

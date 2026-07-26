@@ -87,6 +87,15 @@ describe('文档详情页面', () => {
     expect(screen.queryByText('https://example.com/parsed')).not.toBeInTheDocument()
   })
 
+  it('已索引文档应将知识块放入工作区布局', async () => {
+    vi.mocked(getDocument).mockResolvedValue(detail('INDEXED'))
+    vi.mocked(getDocumentProcessStatus).mockResolvedValue(indexedStatus)
+    vi.mocked(getDocumentChunks).mockResolvedValue(chunkPage([]))
+    renderDetail()
+
+    expect(await screen.findByRole('region', { name: '知识块工作区' })).toBeInTheDocument()
+  })
+
   it('切换分块页码时应清空已选分块', async () => {
     vi.mocked(getDocument).mockResolvedValue(detail('INDEXED'))
     vi.mocked(getDocumentProcessStatus).mockResolvedValue(indexedStatus)
