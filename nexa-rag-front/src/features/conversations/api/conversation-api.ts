@@ -41,6 +41,7 @@ export interface GetConversationsParams {
 export interface GetConversationMessagesParams {
   beforeSequence?: number
   size?: number
+  signal?: AbortSignal
 }
 
 /** 查询当前用户的会话列表。 */
@@ -54,7 +55,7 @@ export function getConversations(
 /** 查询指定会话的历史消息。 */
 export function getConversationMessages(
   conversationId: string,
-  { beforeSequence, size = 50 }: GetConversationMessagesParams = {},
+  { beforeSequence, size = 50, signal }: GetConversationMessagesParams = {},
 ): Promise<CursorPageVO<ConversationMessage>> {
   const params = new URLSearchParams()
   if (beforeSequence !== undefined) {
@@ -63,5 +64,6 @@ export function getConversationMessages(
   params.set('size', String(size))
   return request<CursorPageVO<ConversationMessage>>(
     `/api/conversations/${encodeURIComponent(conversationId)}/messages?${params.toString()}`,
+    signal ? { signal } : undefined,
   )
 }
