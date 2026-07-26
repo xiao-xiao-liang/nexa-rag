@@ -1,13 +1,19 @@
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import App from './App'
+import { router } from './app/router'
 
 describe('RAG 对话工作台', () => {
+  beforeEach(async () => {
+    await router.navigate('/chat')
+  })
+
   afterEach(() => {
     cleanup()
     localStorage.clear()
     vi.unstubAllGlobals()
+    window.history.replaceState({}, '', '/chat')
   })
 
   it('空会话时应展示欢迎页和默认 RAG 输入框', async () => {
@@ -21,6 +27,22 @@ describe('RAG 对话工作台', () => {
     expect(screen.getByRole('textbox', { name: '消息内容' })).toBeInTheDocument()
     expect(screen.queryByText('RAG', { exact: true })).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: '新建会话' })).toBeInTheDocument()
+  })
+
+  it('应可从全局导航进入知识库，且一期不展示未接入能力', async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(success({ records: [], total: 0, current: 1, size: 20, pages: 0 }))
+      .mockResolvedValueOnce(success({ records: [], total: 0, current: 1, size: 20, pages: 0 }))
+    vi.stubGlobal('fetch', fetchMock)
+    const user = userEvent.setup()
+    render(<App />)
+
+    await user.click(await screen.findByRole('link', { name: '知识库' }))
+
+    expect(await screen.findByRole('heading', { name: '知识库文档' })).toBeInTheDocument()
+    expect(screen.queryByText('处理状态筛选')).not.toBeInTheDocument()
+    expect(screen.queryByText('查看原文件')).not.toBeInTheDocument()
+    expect(screen.queryByText('OCR 配置')).not.toBeInTheDocument()
   })
 
   it('按 Enter 应发送消息，Shift+Enter 保留换行', async () => {
