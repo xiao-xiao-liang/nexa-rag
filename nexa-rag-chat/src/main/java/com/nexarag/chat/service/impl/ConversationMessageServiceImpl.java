@@ -14,6 +14,7 @@ import com.nexarag.chat.mapper.ChatMessageMapper;
 import com.nexarag.chat.service.ConversationMessageService;
 import com.nexarag.chat.service.ConversationService;
 import com.nexarag.common.exception.ClientException;
+import com.nexarag.common.web.CursorPageVO;
 import lombok.RequiredArgsConstructor;
 import org.apache.ibatis.session.SqlSessionFactory;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
@@ -21,7 +22,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.Comparator;
 import java.util.List;
+
+import static com.nexarag.chat.constants.ConversationQueryConstants.MAX_HISTORY_PAGE_SIZE;
 
 /**
  * 消息生命周期服务，负责消息创建、状态流转和历史查询。
@@ -31,8 +35,6 @@ import java.util.List;
 @RequiredArgsConstructor
 public class ConversationMessageServiceImpl extends ServiceImpl<ChatMessageMapper, ChatMessage>
         implements ConversationMessageService {
-
-    private static final int MAX_HISTORY_LIMIT = 1000;
 
     private final ConversationService conversationService;
     private final ChatIdGenerator chatIdGenerator;
@@ -130,16 +132,52 @@ public class ConversationMessageServiceImpl extends ServiceImpl<ChatMessageMappe
     @Transactional(readOnly = true)
     public List<ChatMessageVO> listHistory(String conversationId, String userId, int limit) {
         requireConversationEntity(conversationId, userId);
-        int safeLimit = Math.min(Math.max(limit, 1), MAX_HISTORY_LIMIT);
+        int safeLimit = Math.min(Math.max(limit, 1), MAX_HISTORY_PAGE_SIZE);
         return baseMapper.selectList(new LambdaQueryWrapper<ChatMessage>()
                 .eq(ChatMessage::getConversationId, conversationId)
                 .eq(ChatMessage::getUserId, userId)
                 .orderByDesc(ChatMessage::getSequence)
                 .last("LIMIT " + safeLimit))
                 .stream()
-                .sorted(java.util.Comparator.comparingLong(ChatMessage::getSequence))
+                .sorted(Comparator.comparingLong(ChatMessage::getSequence))
                 .map(this::toDomain)
                 .toList();
+    }
+
+    /**
+     * 按消息序号向前查询历史消息，并返回前端可继续使用的游标。
+     *
+     * @param conversationId 会话 ID
+     * @param userId 当前用户 ID
+     * @param beforeSequence 仅查询该序号之前的消息；为空时查询最新消息
+     * @param size 本次查询数量
+     * @return 升序排列的历史消息游标页
+     */
+    @Override
+    @Transactional(readOnly = true)
+    public CursorPageVO<ChatMessageVO> pageHistory(String conversationId, String userId,
+                                                    Long beforeSequence, int size) {
+        // 1. 校验会话归属，并限制单次读取数量
+        requireConversationEntity(conversationId, userId);
+        int safeSize = Math.min(Math.max(size, 1), MAX_HISTORY_PAGE_SIZE);
+
+        // 2. 按倒序多读取一条消息，以判断是否仍有更早历史
+        List<ChatMessage> descendingMessages = baseMapper.selectList(new LambdaQueryWrapper<ChatMessage>()
+                .eq(ChatMessage::getConversationId, conversationId)
+                .eq(ChatMessage::getUserId, userId)
+                .lt(beforeSequence != null, ChatMessage::getSequence, beforeSequence)
+                .orderByDesc(ChatMessage::getSequence)
+                .last("LIMIT " + (safeSize + 1)));
+        boolean hasMore = descendingMessages.size() > safeSize;
+        List<ChatMessageVO> records = descendingMessages.stream()
+                .limit(safeSize)
+                .sorted(Comparator.comparingLong(ChatMessage::getSequence))
+                .map(this::toDomain)
+                .toList();
+
+        // 3. 使用当前批次最早消息的序号作为下一页游标
+        Long nextBeforeSequence = records.isEmpty() ? null : records.getFirst().sequence();
+        return new CursorPageVO<>(records, hasMore, nextBeforeSequence);
     }
 
     /**

@@ -5,9 +5,11 @@ import com.nexarag.common.exception.AbstractException;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.validation.FieldError;
+import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 
 import java.util.Optional;
 
@@ -32,6 +34,19 @@ public class GlobalExceptionHandler {
                 .orElse(BaseErrorCode.PARAM_ERROR.message());
         log.error("[{}] {} 参数校验失败，message={}", request.getMethod(), getUrl(request), message);
         return Results.failure(BaseErrorCode.PARAM_ERROR.code(), message);
+    }
+
+    /**
+     * 处理请求参数缺失或类型转换失败异常。
+     *
+     * @param request   HTTP 请求
+     * @param exception 参数绑定异常
+     * @return 统一参数错误响应
+     */
+    @ExceptionHandler({MethodArgumentTypeMismatchException.class, MissingServletRequestParameterException.class})
+    public Result<Void> handleRequestParameterException(HttpServletRequest request, Exception exception) {
+        log.error("[{}] {} 请求参数绑定失败，message={}", request.getMethod(), getUrl(request), exception.getMessage());
+        return Results.failure(BaseErrorCode.PARAM_ERROR.code(), BaseErrorCode.PARAM_ERROR.message());
     }
 
     /**

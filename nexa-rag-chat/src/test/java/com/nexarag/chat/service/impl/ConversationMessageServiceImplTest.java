@@ -1,11 +1,15 @@
 package com.nexarag.chat.service.impl;
 
 import com.nexarag.chat.cache.ConversationContextLock;
+import com.nexarag.chat.domain.ChatMessageVO;
 import com.nexarag.chat.entity.ChatConversation;
 import com.nexarag.chat.entity.ChatMessage;
+import com.nexarag.chat.enums.ChatMessageRole;
+import com.nexarag.chat.enums.ChatMessageStatus;
 import com.nexarag.chat.id.ChatIdGenerator;
 import com.nexarag.chat.mapper.ChatMessageMapper;
 import com.nexarag.chat.service.ConversationService;
+import com.nexarag.common.web.CursorPageVO;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -93,5 +97,37 @@ class ConversationMessageServiceImplTest {
                         "CANCELLED".equals(message.getStatus())
                                 && "已生成内容".equals(message.getContent())),
                 any());
+    }
+
+    @Test
+    void shouldReturnOlderMessagesInAscendingSequenceWithCursor() {
+        when(conversationService.getOwnedConversation("c1", "u1")).thenReturn(conversation("c1", "u1"));
+        when(mapper.selectList(any())).thenReturn(List.of(message("m4", 4L), message("m3", 3L), message("m2", 2L)));
+
+        CursorPageVO<ChatMessageVO> result = messageService.pageHistory("c1", "u1", 5L, 2);
+
+        assertThat(result.getRecords()).extracting(ChatMessageVO::sequence).containsExactly(3L, 4L);
+        assertThat(result.isHasMore()).isTrue();
+        assertThat(result.getNextBeforeSequence()).isEqualTo(3L);
+    }
+
+    private ChatConversation conversation(String conversationId, String userId) {
+        ChatConversation conversation = new ChatConversation();
+        conversation.setConversationId(conversationId);
+        conversation.setUserId(userId);
+        conversation.setStatus("ACTIVE");
+        return conversation;
+    }
+
+    private ChatMessage message(String messageId, long sequence) {
+        ChatMessage message = new ChatMessage();
+        message.setMessageId(messageId);
+        message.setConversationId("c1");
+        message.setUserId("u1");
+        message.setSequence(sequence);
+        message.setRole(ChatMessageRole.ASSISTANT.name());
+        message.setStatus(ChatMessageStatus.COMPLETED.name());
+        message.setContent("回答");
+        return message;
     }
 }

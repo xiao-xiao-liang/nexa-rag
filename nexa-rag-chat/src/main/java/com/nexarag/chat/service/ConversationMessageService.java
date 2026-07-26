@@ -3,6 +3,7 @@ package com.nexarag.chat.service;
 import com.baomidou.mybatisplus.extension.service.IService;
 import com.nexarag.chat.domain.ChatMessageVO;
 import com.nexarag.chat.entity.ChatMessage;
+import com.nexarag.common.web.CursorPageVO;
 
 import java.util.List;
 
@@ -31,4 +32,16 @@ public interface ConversationMessageService extends IService<ChatMessage> {
 
     /** 分页限制查询会话历史消息。 */
     List<ChatMessageVO> listHistory(String conversationId, String userId, int limit);
+
+    /**
+     * 按消息序号向前分页查询会话历史。
+     *
+     * @param conversationId 会话 ID
+     * @param userId 当前用户 ID
+     * @param beforeSequence 仅查询小于该序号的消息；为空时查询最新消息
+     * @param size 本次查询数量
+     * @return 升序排列的历史消息游标页
+     */
+    CursorPageVO<ChatMessageVO> pageHistory(String conversationId, String userId,
+                                            Long beforeSequence, int size);
 }

@@ -20,6 +20,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 
+import static com.nexarag.chat.constants.ConversationQueryConstants.MAX_CONVERSATION_PAGE_SIZE;
+
 
 /**
  * 会话生命周期服务，负责会话创建、查询、改名、归档和删除。
@@ -66,7 +68,7 @@ public class ConversationServiceImpl extends ServiceImpl<ChatConversationMapper,
     public IPage<ChatConversationVO> pageByUser(String userId, long current, long size) {
         validateUserId(userId);
         long safeCurrent = Math.max(current, 1L);
-        long safeSize = Math.min(Math.max(size, 1L), 100L);
+        long safeSize = Math.min(Math.max(size, 1L), MAX_CONVERSATION_PAGE_SIZE);
         IPage<ChatConversation> entityPage = baseMapper.selectPage(Page.of(safeCurrent, safeSize),
                 new LambdaQueryWrapper<ChatConversation>()
                         .eq(ChatConversation::getUserId, userId)
