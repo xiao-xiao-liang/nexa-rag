@@ -39,7 +39,8 @@ describe('知识库上传文件规则', () => {
     expect(validateUploadFile(new File(['x'], '脚本.exe'))).toContain('暂不支持 .exe 格式')
   })
   it('应以 100MB 为客户端校验边界', () => {
-    const file = new File([new Uint8Array(MAX_DOCUMENT_FILE_SIZE_BYTES + 1)], '资料.pdf')
+    const file = new File(['x'], '资料.pdf')
+    Object.defineProperty(file, 'size', { value: MAX_DOCUMENT_FILE_SIZE_BYTES + 1 })
     expect(validateUploadFile(file)).toBe('文件大小超过 100MB 限制，请选择更小的文件。')
   })
   it('应推导标题并格式化大小', () => {
@@ -126,7 +127,7 @@ npm --prefix nexa-rag-front test -- --run src/features/knowledge-base/components
 
 - [ ] **步骤 3：实现组件。**
 
-组件只接收 `file`、`disabled`、`error`、`onFileChange(file)`、`onRemove()`。初始态使用隐藏的单文件 input 和可聚焦 `role="button"` 容器；`accept` 为 `.pdf,.doc,.docx,.xls,.xlsx,.csv,.ppt,.pptx,.md,.markdown,.txt`。点击、Enter、Space 触发原生选择；拖拽事件必须 `preventDefault()`，仅取第一个文件。
+组件只接收 `file`、`disabled`、`error`、`onFileChange(file)`、`onRemove()`。初始态使用与隐藏单文件 input 相邻的、可聚焦 `role="button"` 容器；`accept` 为 `.pdf,.doc,.docx,.xls,.xlsx,.csv,.ppt,.pptx,.md,.markdown,.txt`。点击、Enter、Space 触发原生选择；拖拽事件必须 `preventDefault()`，仅取第一个文件。不得将 input 嵌套进原生 button。
 
 初始态必须显示“拖拽文件到这里”“或点击选择文件”和“支持 PDF、Word、Excel/CSV、PPT、Markdown、TXT，最大 100MB”。已选态显示类型图标、文件名、格式、格式化大小、“更换文件”与“移除 文件名”。错误使用 `role="alert"`。提交中传入 `disabled=true` 时，所有选择、替换和移除入口禁用。
 
