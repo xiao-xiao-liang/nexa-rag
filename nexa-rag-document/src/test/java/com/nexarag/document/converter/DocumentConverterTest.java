@@ -1,6 +1,7 @@
 package com.nexarag.document.converter;
 
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.nexarag.common.web.PageVO;
 import com.nexarag.document.entity.Document;
 import com.nexarag.document.entity.DocumentChunk;
 import com.nexarag.document.enums.ChunkStatus;
@@ -8,7 +9,6 @@ import com.nexarag.document.enums.DocumentStatus;
 import com.nexarag.document.enums.FileType;
 import com.nexarag.document.vo.DocumentChunkVO;
 import com.nexarag.document.vo.DocumentSummaryVO;
-import com.nexarag.document.vo.PageVO;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -52,9 +52,9 @@ class DocumentConverterTest {
 
         PageVO<DocumentChunkVO> result = DocumentConverter.toChunkPageVO(page);
 
-        assertThat(result.current()).isEqualTo(2);
-        assertThat(result.size()).isEqualTo(20);
-        assertThat(result.total()).isEqualTo(41);
-        assertThat(result.records()).extracting(DocumentChunkVO::chunkId).containsExactly("chunk-1");
+        assertThat(result.getCurrent()).isEqualTo(2);
+        assertThat(result.getSize()).isEqualTo(20);
+        assertThat(result.getTotal()).isEqualTo(41);
+        assertThat(result.getRecords()).extracting(DocumentChunkVO::chunkId).containsExactly("chunk-1");
     }
 }

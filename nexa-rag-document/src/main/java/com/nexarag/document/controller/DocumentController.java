@@ -2,6 +2,7 @@ package com.nexarag.document.controller;
 
 import com.nexarag.common.web.Result;
 import com.nexarag.common.web.Results;
+import com.nexarag.common.web.PageVO;
 import com.nexarag.document.converter.DocumentConverter;
 import com.nexarag.document.dto.CreateDocumentRequest;
 import com.nexarag.document.dto.ProcessDocumentRequest;
@@ -14,7 +15,6 @@ import com.nexarag.document.vo.DocumentChunkVO;
 import com.nexarag.document.vo.DocumentDetailVO;
 import com.nexarag.document.vo.DocumentProcessStatusVO;
 import com.nexarag.document.vo.DocumentSummaryVO;
-import com.nexarag.document.vo.PageVO;
 import com.nexarag.document.vo.UploadDocumentResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;

@@ -3,6 +3,7 @@ package com.nexarag.document.service.impl;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.conditions.update.LambdaUpdateChainWrapper;
+import com.nexarag.common.web.PageVO;
 import com.nexarag.document.dto.CreateDocumentRequest;
 import com.nexarag.document.dto.ProcessDocumentRequest;
 import com.nexarag.document.dto.SplitConfigRequest;
@@ -11,7 +12,6 @@ import com.nexarag.document.enums.DocumentStatus;
 import com.nexarag.document.enums.SplitStrategy;
 import com.nexarag.common.exception.ClientException;
 import com.nexarag.document.vo.DocumentSummaryVO;
-import com.nexarag.document.vo.PageVO;
 import com.nexarag.infra.config.DocumentPipelineMessagingProperties;
 import org.junit.jupiter.api.Test;
 
@@ -224,11 +224,11 @@ class DocumentServiceImplTest {
 
         PageVO<DocumentSummaryVO> result = documentService.pageDocuments(1, 20);
 
-        assertThat(result.total()).isEqualTo(1);
-        assertThat(result.current()).isEqualTo(1);
-        assertThat(result.size()).isEqualTo(20);
-        assertThat(result.records()).hasSize(1);
-        assertThat(result.records().getFirst().documentId()).isEqualTo(1L);
+        assertThat(result.getTotal()).isEqualTo(1);
+        assertThat(result.getCurrent()).isEqualTo(1);
+        assertThat(result.getSize()).isEqualTo(20);
+        assertThat(result.getRecords()).hasSize(1);
+        assertThat(result.getRecords().getFirst().documentId()).isEqualTo(1L);
     }
 
     private static class TestableDocumentServiceImpl extends DocumentServiceImpl {

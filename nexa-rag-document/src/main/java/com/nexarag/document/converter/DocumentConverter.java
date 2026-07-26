@@ -1,13 +1,13 @@
 package com.nexarag.document.converter;
 
 import com.baomidou.mybatisplus.core.metadata.IPage;
+import com.nexarag.common.web.PageVO;
 import com.nexarag.document.entity.Document;
 import com.nexarag.document.entity.DocumentChunk;
 import com.nexarag.document.vo.DocumentChunkVO;
 import com.nexarag.document.vo.DocumentDetailVO;
 import com.nexarag.document.vo.DocumentProcessStatusVO;
 import com.nexarag.document.vo.DocumentSummaryVO;
-import com.nexarag.document.vo.PageVO;
 
 /**
  * 文档对象转换器。
@@ -71,12 +71,7 @@ public final class DocumentConverter {
      * @return 文档片段分页响应
      */
     public static PageVO<DocumentChunkVO> toChunkPageVO(IPage<DocumentChunk> page) {
-        return PageVO.<DocumentChunkVO>builder()
-                .records(page.getRecords().stream().map(DocumentConverter::toChunkVO).toList())
-                .total(page.getTotal())
-                .current(page.getCurrent())
-                .size(page.getSize())
-                .pages(page.getPages())
-                .build();
+        return new PageVO<>(page.getRecords().stream().map(DocumentConverter::toChunkVO).toList(),
+                page.getTotal(), page.getCurrent(), page.getSize(), page.getPages());
     }
 }

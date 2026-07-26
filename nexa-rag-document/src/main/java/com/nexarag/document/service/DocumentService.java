@@ -1,11 +1,11 @@
 package com.nexarag.document.service;
 
 import com.baomidou.mybatisplus.extension.service.IService;
+import com.nexarag.common.web.PageVO;
 import com.nexarag.document.dto.CreateDocumentRequest;
 import com.nexarag.document.dto.ProcessDocumentRequest;
 import com.nexarag.document.entity.Document;
 import com.nexarag.document.vo.DocumentSummaryVO;
-import com.nexarag.document.vo.PageVO;
 
 /**
  * 文档服务接口，负责文档记录、处理状态和删除状态的业务操作。

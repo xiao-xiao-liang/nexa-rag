@@ -8,6 +8,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nexarag.common.exception.ClientException;
 import com.nexarag.common.exception.ServiceException;
+import com.nexarag.common.web.PageVO;
 import com.nexarag.document.converter.DocumentConverter;
 import com.nexarag.document.dto.CreateDocumentRequest;
 import com.nexarag.document.dto.ProcessDocumentRequest;
@@ -19,7 +20,6 @@ import com.nexarag.document.error.DocumentErrorCode;
 import com.nexarag.document.mapper.DocumentMapper;
 import com.nexarag.document.service.DocumentService;
 import com.nexarag.document.vo.DocumentSummaryVO;
-import com.nexarag.document.vo.PageVO;
 import com.nexarag.infra.config.DocumentPipelineMessagingProperties;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -86,13 +86,7 @@ public class DocumentServiceImpl extends ServiceImpl<DocumentMapper, Document> i
         List<DocumentSummaryVO> records = page.getRecords().stream()
                 .map(DocumentConverter::toSummaryVO)
                 .toList();
-        return PageVO.<DocumentSummaryVO>builder()
-                .records(records)
-                .total(page.getTotal())
-                .current(page.getCurrent())
-                .size(page.getSize())
-                .pages(page.getPages())
-                .build();
+        return new PageVO<>(records, page.getTotal(), page.getCurrent(), page.getSize(), page.getPages());
     }
 
     /**

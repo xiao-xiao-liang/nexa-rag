@@ -16,6 +16,11 @@
     <dependencies>
         <dependency>
             <groupId>com.nexarag</groupId>
+            <artifactId>nexa-rag-common</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>com.nexarag</groupId>
             <artifactId>nexa-rag-infra</artifactId>
             <version>${project.version}</version>
         </dependency>
