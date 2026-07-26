@@ -21,11 +21,11 @@ export function AppShell() {
             {navigation.map(({ to, label, icon: Icon }) => (
               <Tooltip key={to}>
                 <TooltipTrigger asChild>
-                  <NavLink to={to} aria-label={label} className={({ isActive }) => cn(
-                    'flex size-9 items-center justify-center rounded-xl transition-colors hover:bg-slate-800 hover:text-white',
-                    isActive && 'bg-blue-500 text-white',
-                  )}>
-                    <Icon className="size-4.5" aria-hidden="true" />
+                  <NavLink to={to} aria-label={label} className="block">
+                    {({ isActive }) => <span className={cn(
+                      'flex size-9 items-center justify-center rounded-xl transition-colors hover:bg-slate-800 hover:text-white',
+                      isActive && 'bg-blue-500 text-white',
+                    )}><Icon className="size-4.5" aria-hidden="true" /></span>}
                   </NavLink>
                 </TooltipTrigger>
                 <TooltipContent side="right">{label}</TooltipContent>
