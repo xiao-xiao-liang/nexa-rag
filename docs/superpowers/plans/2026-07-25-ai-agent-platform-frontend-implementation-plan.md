@@ -16,7 +16,7 @@
 - nexa-rag-common/src/main/java/com/nexarag/common/web/CursorPageVO.java：普通游标分页基类。
 - nexa-rag-chat/src/main/java/com/nexarag/chat/controller/ConversationController.java：会话读取入口。
 - nexa-rag-chat/src/main/java/com/nexarag/chat/controller/vo/：会话与消息安全投影、页码/游标领域响应。
-- nexa-rag-web/：独立 React + Vite 工程，不写入 Maven 模块。
+- nexa-rag-front/：独立 React + Vite 工程，不写入 Maven 模块。
 
 ### 任务 1：提取 common 分页对象并迁移 document
 
@@ -153,16 +153,16 @@ ConversationController 使用 @RequestMapping("/api/conversations")。GET /api/c
 ### 任务 4：初始化 React、设计令牌与组件基础
 
 **文件：**
-- 新增：nexa-rag-web/package.json、vite.config.ts、tailwind.config.ts、src/app/main.tsx、src/app/App.tsx、src/app/globals.css
-- 新增：nexa-rag-web/src/components/ui/：shadcn/ui 的 button、textarea、scroll-area、tooltip、dropdown-menu、collapsible、skeleton、sheet、dialog
-- 新增：nexa-rag-web/src/api/types.ts、client.ts、conversation-api.ts、conversation-api.test.ts
+- 新增：nexa-rag-front/package.json、vite.config.ts、tailwind.config.ts、src/app/main.tsx、src/app/App.tsx、src/app/globals.css
+- 新增：nexa-rag-front/src/components/ui/：shadcn/ui 的 button、textarea、scroll-area、tooltip、dropdown-menu、collapsible、skeleton、sheet、dialog
+- 新增：nexa-rag-front/src/api/types.ts、client.ts、conversation-api.ts、conversation-api.test.ts
 
 - [ ] **步骤 1：创建工程、Tailwind、shadcn/ui、Lucide 与测试依赖。**
 
-    npm create vite@latest nexa-rag-web -- --template react-ts
-    npm --prefix nexa-rag-web install
-    npm --prefix nexa-rag-web install tailwindcss @tailwindcss/vite lucide-react clsx tailwind-merge class-variance-authority
-    npm --prefix nexa-rag-web install -D vitest jsdom @testing-library/react @testing-library/jest-dom @testing-library/user-event
+    npm create vite@latest nexa-rag-front -- --template react-ts
+    npm --prefix nexa-rag-front install
+    npm --prefix nexa-rag-front install tailwindcss @tailwindcss/vite lucide-react clsx tailwind-merge class-variance-authority
+    npm --prefix nexa-rag-front install -D vitest jsdom @testing-library/react @testing-library/jest-dom @testing-library/user-event
 
 初始化 shadcn/ui，并只添加上述九个组件；不引入 Ant Design。
 
@@ -180,16 +180,16 @@ types.ts 定义 ApiResult、ConversationListItem、ConversationMessage、PageRes
 
 - [ ] **步骤 3：运行前端基础验证并提交。**
 
-    npm --prefix nexa-rag-web run test -- --run src/api/conversation-api.test.ts
-    npm --prefix nexa-rag-web run build
-    git add nexa-rag-web
+    npm --prefix nexa-rag-front run test -- --run src/api/conversation-api.test.ts
+    npm --prefix nexa-rag-front run build
+    git add nexa-rag-front
     git commit -m "feat(agent-ui): 初始化 RAG 对话前端工程"
 
 ### 任务 5：实现 A 风格的双栏对话工作台
 
 **文件：**
-- 新增：nexa-rag-web/src/api/chat-stream.ts、chat-stream.test.ts
-- 新增：nexa-rag-web/src/features/chat/ChatWorkspace.tsx、ConversationSidebar.tsx、MessageTimeline.tsx、StatusBlock.tsx、Composer.tsx、chat-workspace.test.tsx
+- 新增：nexa-rag-front/src/api/chat-stream.ts、chat-stream.test.ts
+- 新增：nexa-rag-front/src/features/chat/ChatWorkspace.tsx、ConversationSidebar.tsx、MessageTimeline.tsx、StatusBlock.tsx、Composer.tsx、chat-workspace.test.tsx
 
 - [ ] **步骤 1：写 SSE 失败测试。**
 
@@ -208,15 +208,15 @@ chat-stream.ts 通过 POST /api/chat/stream 读取 SSE 并映射 META、TOKEN、
 
 增加默认 RAG 发送、上拉历史、停止保留内容、未来 Agent 不发请求、错误重试入口和键盘可达性测试。
 
-    npm --prefix nexa-rag-web run test -- --run
-    npm --prefix nexa-rag-web run build
-    git add nexa-rag-web/src
+    npm --prefix nexa-rag-front run test -- --run
+    npm --prefix nexa-rag-front run build
+    git add nexa-rag-front/src
     git commit -m "feat(agent-ui): 实现 RAG 对话工作台"
 
 ### 任务 6：联调与发布前验证
 
 **文件：**
-- 修改：README.md、nexa-rag-web/vite.config.ts
+- 修改：README.md、nexa-rag-front/vite.config.ts
 
 - [ ] **步骤 1：配置代理和说明。**
 
@@ -230,7 +230,7 @@ chat-stream.ts 通过 POST /api/chat/stream 读取 SSE 并映射 META、TOKEN、
 
     mvn -pl nexa-rag-boot -am -Dtest=ChatControllerTest "-Dsurefire.failIfNoSpecifiedTests=false" test
     mvn -pl nexa-rag-chat -am -Dtest=ConversationControllerTest "-Dsurefire.failIfNoSpecifiedTests=false" test
-    npm --prefix nexa-rag-web run test -- --run
-    npm --prefix nexa-rag-web run build
-    git add README.md nexa-rag-web/vite.config.ts
+    npm --prefix nexa-rag-front run test -- --run
+    npm --prefix nexa-rag-front run build
+    git add README.md nexa-rag-front/vite.config.ts
     git commit -m "docs(agent-ui): 补充前端联调说明"
