@@ -71,7 +71,7 @@ describe('知识库文档列表页面', () => {
     const router = renderList()
 
     await user.click(await screen.findByRole('button', { name: '上传文档' }))
-    await user.upload(screen.getByLabelText('选择文件'), new File(['内容'], '员工手册.pdf', { type: 'application/pdf' }))
+    await user.upload(screen.getByLabelText('选择本地文件'), new File(['内容'], '员工手册.pdf', { type: 'application/pdf' }))
     const submitButton = screen.getByRole('button', { name: '开始上传' })
     await waitFor(() => expect(submitButton).toBeEnabled())
     await user.click(submitButton)
