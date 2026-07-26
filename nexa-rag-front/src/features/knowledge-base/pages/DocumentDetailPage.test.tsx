@@ -2,7 +2,7 @@ import { cleanup, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { getDocument, getDocumentChunks, getDocumentProcessStatus, processDocument, retryDocument } from '../api/document-api'
+import { getDocument, getDocumentChunks, getDocumentProcessStatus, processDocument, retryDocument, type DocumentChunk } from '../api/document-api'
 import { DocumentDetailPage } from './DocumentDetailPage'
 
 vi.mock('../api/document-api', () => ({
@@ -25,6 +25,12 @@ const detail = (status: 'UPLOADED' | 'FAILED' | 'INDEXED' = 'UPLOADED') => ({
   parsedFileUrl: 'https://example.com/parsed',
   processConfigJson: null,
 })
+
+const indexedStatus = { documentId: 8, processId: 'p-8', status: 'INDEXED' as const, messageStatus: null, consumedTimes: 1, failureStage: null, failureReason: null }
+
+function chunkPage(records: DocumentChunk[], current = 1, pages = 1) {
+  return { records, total: records.length, current, size: 20, pages }
+}
 
 function renderDetail(path = '/knowledge-base/8') {
   render(<MemoryRouter initialEntries={[path]}><Routes><Route path="/knowledge-base/:documentId" element={<DocumentDetailPage />} /><Route path="/knowledge-base" element={<p>知识库文档</p>} /></Routes></MemoryRouter>)
@@ -67,14 +73,35 @@ describe('文档详情页面', () => {
 
   it('仅已索引文档应加载文本分块且不展示文件地址', async () => {
     vi.mocked(getDocument).mockResolvedValue(detail('INDEXED'))
-    vi.mocked(getDocumentProcessStatus).mockResolvedValue({ documentId: 8, processId: 'p-8', status: 'INDEXED', messageStatus: null, consumedTimes: 1, failureStage: null, failureReason: null })
+    vi.mocked(getDocumentProcessStatus).mockResolvedValue(indexedStatus)
     vi.mocked(getDocumentChunks).mockResolvedValue({ records: [{ chunkId: 'c-1', documentId: 8, chunkOrder: 1, text: '员工手册第一段', status: 'INDEXED' }], total: 1, current: 1, size: 20, pages: 1 })
+    const user = userEvent.setup()
     renderDetail()
 
-    expect(await screen.findByText('员工手册第一段')).toBeInTheDocument()
+    const chunkCard = await screen.findByRole('button', { name: '查看分块 1' })
+    expect(screen.queryByRole('region', { name: '分块完整内容' })).not.toBeInTheDocument()
+    await user.click(chunkCard)
+    expect(screen.getByRole('region', { name: '分块完整内容' })).toHaveTextContent('员工手册第一段')
     expect(getDocumentChunks).toHaveBeenCalledWith(8, 1, 20, expect.anything())
     expect(screen.queryByText('https://example.com/original')).not.toBeInTheDocument()
     expect(screen.queryByText('https://example.com/parsed')).not.toBeInTheDocument()
+  })
+
+  it('切换分块页码时应清空已选分块', async () => {
+    vi.mocked(getDocument).mockResolvedValue(detail('INDEXED'))
+    vi.mocked(getDocumentProcessStatus).mockResolvedValue(indexedStatus)
+    vi.mocked(getDocumentChunks)
+      .mockResolvedValueOnce(chunkPage([{ chunkId: 'c-1', documentId: 8, chunkOrder: 1, text: '第一页内容', status: 'INDEXED' }], 1, 2))
+      .mockResolvedValueOnce(chunkPage([{ chunkId: 'c-2', documentId: 8, chunkOrder: 2, text: '第二页内容', status: 'INDEXED' }], 2, 2))
+    const user = userEvent.setup()
+    renderDetail()
+
+    await user.click(await screen.findByRole('button', { name: '查看分块 1' }))
+    expect(screen.getByRole('region', { name: '分块完整内容' })).toHaveTextContent('第一页内容')
+    await user.click(screen.getByRole('button', { name: '下一页' }))
+
+    await waitFor(() => expect(getDocumentChunks).toHaveBeenLastCalledWith(8, 2, 20, expect.anything()))
+    expect(screen.queryByRole('region', { name: '分块完整内容' })).not.toBeInTheDocument()
   })
 
   it('非法文档地址应提供返回列表操作', () => {

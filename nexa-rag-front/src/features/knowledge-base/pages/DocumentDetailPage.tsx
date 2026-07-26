@@ -6,6 +6,7 @@ import type { PageVO } from '@/shared/api/types'
 import { getDocument, getDocumentChunks, getDocumentProcessStatus, processDocument, retryDocument, type DocumentChunk, type DocumentDetail, type DocumentProcessStatus } from '../api/document-api'
 import { statusLabel, type DocumentStatus } from '../document-status'
 import { useDocumentStatusPolling } from '../hooks/useDocumentStatusPolling'
+import { DocumentChunkBrowser } from '../components/DocumentChunkBrowser'
 
 const CHUNK_PAGE_SIZE = 20
 const EMPTY_CHUNKS: PageVO<DocumentChunk> = { records: [], total: 0, current: 1, size: CHUNK_PAGE_SIZE, pages: 0 }
@@ -23,6 +24,7 @@ export function DocumentDetailPage() {
   const [chunkPage, setChunkPage] = useState(1)
   const [chunksLoading, setChunksLoading] = useState(false)
   const [chunksError, setChunksError] = useState<string | null>(null)
+  const [selectedChunk, setSelectedChunk] = useState<DocumentChunk | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const detailControllerRef = useRef<AbortController | null>(null)
   const processControllerRef = useRef<AbortController | null>(null)
@@ -112,6 +114,13 @@ export function DocumentDetailPage() {
     }
   }
 
+  const handleChunkPageChange = (nextPage: number) => {
+    // 1. 翻页前清空当前选择，避免右侧保留上一页分块内容。
+    setSelectedChunk(null)
+    // 2. 更新页码后由现有副作用请求服务端目标页。
+    setChunkPage(nextPage)
+  }
+
   if (documentId === null) return <InvalidDocumentAddress />
 
   return <section className="min-w-0 flex-1 overflow-y-auto bg-slate-50 p-6 md:p-10"><div className="mx-auto flex w-full max-w-5xl flex-col gap-6">
@@ -121,7 +130,7 @@ export function DocumentDetailPage() {
     {document && <>
       <article className="rounded-2xl border bg-card p-6 shadow-sm"><div className="flex flex-wrap items-start justify-between gap-4"><div className="flex gap-3"><span className="flex size-10 items-center justify-center rounded-xl bg-blue-50 text-blue-600"><FileText className="size-5" /></span><div><h1 className="text-xl font-semibold">{document.title || document.originalFileName || '未命名文档'}</h1><p className="mt-1 text-sm text-muted-foreground">{document.originalFileName || '未提供原始文件名'}</p></div></div><span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-700">{currentStatus ? statusLabel(currentStatus) : '状态未知'}</span></div><dl className="mt-6 grid gap-4 border-t pt-5 text-sm sm:grid-cols-2"><InfoItem label="文档类型" value={document.fileType || '—'} /><InfoItem label="文件大小" value={formatFileSize(document.fileSize)} /><InfoItem label="文档描述" value={document.description || '未填写'} /></dl></article>
       <article className="rounded-2xl border bg-card p-6 shadow-sm"><div className="flex flex-wrap items-center justify-between gap-3"><div><h2 className="font-semibold">处理进度</h2><p className="mt-1 text-sm text-muted-foreground">处理配置由后端默认策略控制。</p></div>{currentStatus === 'UPLOADED' && <Button onClick={() => void submitProcess('process')} disabled={submitting}>{submitting ? '提交中…' : '开始处理'}</Button>}{currentStatus === 'FAILED' && <Button onClick={() => void submitProcess('retry')} disabled={submitting}>{submitting ? '提交中…' : '重新处理'}</Button>}</div>{processError && <ErrorPanel message={processError} onRetry={() => void loadProcessStatus(documentId)} />}{currentStatus === 'FAILED' && <div className="mt-4 rounded-xl bg-red-50 p-4 text-sm text-red-800"><p>失败阶段：{processStatus?.failureStage || '未知'}</p><p className="mt-1">失败原因：{processStatus?.failureReason || '后端未返回具体原因'}</p></div>}{processStatus?.messageStatus && <p className="mt-4 text-sm text-muted-foreground">任务信息：{processStatus.messageStatus}</p>}</article>
-      <article className="rounded-2xl border bg-card p-6 shadow-sm"><h2 className="font-semibold">文本分块</h2>{currentStatus !== 'INDEXED' && <p className="mt-2 text-sm text-muted-foreground">文档索引完成后可查看文本分块。</p>}{currentStatus === 'INDEXED' && <><div className="mt-4 grid gap-3">{chunksLoading && <p className="text-sm text-muted-foreground">正在加载文本分块…</p>}{chunksError && <ErrorPanel message={chunksError} onRetry={() => void loadChunks(documentId, chunkPage)} />}{!chunksLoading && !chunksError && chunks.records.length === 0 && <p className="text-sm text-muted-foreground">暂无可展示的文本分块。</p>}{chunks.records.map((chunk) => <div key={chunk.chunkId} className="rounded-xl border bg-slate-50 p-4"><p className="mb-2 text-xs font-medium text-muted-foreground">分块 {chunk.chunkOrder}</p><p className="whitespace-pre-wrap text-sm leading-6">{chunk.text}</p></div>)}</div><ChunkPagination page={chunks} pageNum={chunkPage} onChange={setChunkPage} /></>}</article>
+      <article className="rounded-2xl border bg-card p-6 shadow-sm"><h2 className="font-semibold">文本分块</h2>{currentStatus !== 'INDEXED' && <p className="mt-2 text-sm text-muted-foreground">文档索引完成后可查看文本分块。</p>}{currentStatus === 'INDEXED' && <DocumentChunkBrowser chunks={chunks.records} loading={chunksLoading} error={chunksError} selectedChunk={selectedChunk} pagination={<ChunkPagination page={chunks} pageNum={chunkPage} onChange={handleChunkPageChange} />} onSelect={setSelectedChunk} onClose={() => setSelectedChunk(null)} onRetry={() => void loadChunks(documentId, chunkPage)} />}</article>
     </>}
   </div></section>
 }
