@@ -4,6 +4,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.task.TaskExecutor;
 import org.springframework.core.task.VirtualThreadTaskExecutor;
+import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 
 import java.util.concurrent.Semaphore;
 
@@ -24,6 +25,22 @@ public class ExecutorConfiguration {
     @Bean(name = SUMMARY_EXECUTOR_NAME)
     public TaskExecutor chatSummaryExecutor() {
         return new VirtualThreadTaskExecutor("chat-summary-");
+    }
+
+    /**
+     * 创建 Spring MVC 流式响应执行器。
+     *
+     * @return MVC 流式响应执行器
+     */
+    @Bean(name = "applicationTaskExecutor")
+    public TaskExecutor applicationTaskExecutor() {
+        // 1. 创建与摘要任务隔离的 MVC 流式响应线程池
+        ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
+        executor.setCorePoolSize(80);
+        executor.setMaxPoolSize(80);
+        executor.setQueueCapacity(0);
+        executor.setThreadNamePrefix("mvc-stream-");
+        return executor;
     }
 
     /**
