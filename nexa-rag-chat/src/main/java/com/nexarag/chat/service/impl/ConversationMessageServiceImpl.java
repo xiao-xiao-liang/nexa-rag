@@ -16,8 +16,6 @@ import com.nexarag.chat.service.ConversationService;
 import com.nexarag.common.exception.ClientException;
 import com.nexarag.common.web.CursorPageVO;
 import lombok.RequiredArgsConstructor;
-import org.apache.ibatis.session.SqlSessionFactory;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -31,7 +29,6 @@ import static com.nexarag.chat.constants.ConversationQueryConstants.MAX_HISTORY_
  * 消息生命周期服务，负责消息创建、状态流转和历史查询。
  */
 @Service
-@ConditionalOnBean(SqlSessionFactory.class)
 @RequiredArgsConstructor
 public class ConversationMessageServiceImpl extends ServiceImpl<ChatMessageMapper, ChatMessage>
         implements ConversationMessageService {

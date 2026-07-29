@@ -13,21 +13,15 @@ import com.nexarag.chat.mapper.ChatConversationMapper;
 import com.nexarag.chat.service.ConversationService;
 import com.nexarag.common.exception.ClientException;
 import lombok.RequiredArgsConstructor;
-import org.apache.ibatis.session.SqlSessionFactory;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.LocalDateTime;
-
 import static com.nexarag.chat.constants.ConversationQueryConstants.MAX_CONVERSATION_PAGE_SIZE;
-
 
 /**
  * 会话生命周期服务，负责会话创建、查询、改名、归档和删除。
  */
 @Service
-@ConditionalOnBean(SqlSessionFactory.class)
 @RequiredArgsConstructor
 public class ConversationServiceImpl extends ServiceImpl<ChatConversationMapper, ChatConversation>
         implements ConversationService {

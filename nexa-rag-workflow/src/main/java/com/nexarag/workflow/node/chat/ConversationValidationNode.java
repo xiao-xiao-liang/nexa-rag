@@ -9,11 +9,10 @@ import com.nexarag.model.gateway.ModelGateway;
 import com.nexarag.model.gateway.chat.ChatModelRequest;
 import com.nexarag.model.toolkits.prompt.PromptBuilder;
 import com.nexarag.model.prompt.domain.PromptExecutionSnapshot;
-import org.apache.ibatis.session.SqlSessionFactory;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 
 import java.util.Map;
 
@@ -29,7 +28,7 @@ import static com.nexarag.chat.constants.ChatModelRouteConstants.CHAT_TITLE_ROUT
  * 会话有效性节点，负责校验已有会话或创建新会话。
  */
 @Component
-@ConditionalOnBean(SqlSessionFactory.class)
+@ConditionalOnProperty(prefix = "nexa.chat", name = "enabled", havingValue = "true", matchIfMissing = true)
 @RequiredArgsConstructor
 @Slf4j
 public class ConversationValidationNode implements NodeAction {

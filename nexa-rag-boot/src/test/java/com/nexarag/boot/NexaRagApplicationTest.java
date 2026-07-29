@@ -23,7 +23,8 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
  * NexaRAG 应用启动测试。
  */
 @SpringBootTest(properties = {
-        "spring.autoconfigure.exclude=org.springframework.boot.autoconfigure.jdbc.DataSourceAutoConfiguration"
+        "spring.autoconfigure.exclude=org.springframework.boot.autoconfigure.jdbc.DataSourceAutoConfiguration",
+        "nexa.chat.enabled=false"
 })
 class NexaRagApplicationTest {
 

@@ -16,8 +16,7 @@ import com.nexarag.workflow.node.chat.RetrievalNode;
 import com.nexarag.workflow.util.NodeBeanUtil;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
-import org.apache.ibatis.session.SqlSessionFactory;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -31,7 +30,7 @@ import static com.nexarag.workflow.constants.ChatWorkflowNodeConstants.*;
  * Chat Workflow Graph 配置，负责注册会话对话节点和检索条件边。
  */
 @Configuration
-@ConditionalOnBean(SqlSessionFactory.class)
+@ConditionalOnProperty(prefix = "nexa.chat", name = "enabled", havingValue = "true", matchIfMissing = true)
 public class ChatWorkflowConfiguration {
 
     @Bean("chatConversationGraph")

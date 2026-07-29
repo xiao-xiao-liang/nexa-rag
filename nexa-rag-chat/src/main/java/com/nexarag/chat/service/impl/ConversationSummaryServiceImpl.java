@@ -20,11 +20,8 @@ import com.nexarag.model.gateway.chat.ChatModelRequest;
 import com.nexarag.model.gateway.chat.ChatModelResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.apache.ibatis.session.SqlSessionFactory;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.util.*;
 import java.util.concurrent.Semaphore;
@@ -38,7 +35,6 @@ import static com.nexarag.chat.constants.ChatContextConstants.SUMMARY_ROUTE_KEY;
  */
 @Slf4j
 @Service
-@ConditionalOnBean(SqlSessionFactory.class)
 @RequiredArgsConstructor
 public class ConversationSummaryServiceImpl extends ServiceImpl<ChatConversationSummaryMapper, ChatConversationSummary>
         implements ConversationSummaryService {

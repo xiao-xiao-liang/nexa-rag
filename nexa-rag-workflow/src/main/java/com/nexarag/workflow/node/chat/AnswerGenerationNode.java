@@ -18,8 +18,7 @@ import com.nexarag.workflow.stream.ChatGenerationTaskManager;
 import com.nexarag.workflow.stream.ChatWorkflowStreamingUtil;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
-import org.apache.ibatis.session.SqlSessionFactory;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import reactor.core.publisher.Flux;
 
 import java.util.List;
@@ -42,7 +41,7 @@ import static com.nexarag.chat.constants.ChatModelRouteConstants.CHAT_ANSWER_ROU
  * 回答生成节点，负责创建助手消息占位并返回 Graph 可识别的模型流。
  */
 @Component
-@ConditionalOnBean(SqlSessionFactory.class)
+@ConditionalOnProperty(prefix = "nexa.chat", name = "enabled", havingValue = "true", matchIfMissing = true)
 @RequiredArgsConstructor
 public class AnswerGenerationNode implements NodeAction {
 

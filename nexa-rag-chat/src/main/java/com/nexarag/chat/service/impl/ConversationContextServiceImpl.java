@@ -10,8 +10,6 @@ import com.nexarag.chat.service.ConversationMessageService;
 import com.nexarag.chat.service.ConversationService;
 import com.nexarag.chat.service.ConversationSummaryService;
 import lombok.RequiredArgsConstructor;
-import org.apache.ibatis.session.SqlSessionFactory;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -22,7 +20,6 @@ import java.util.List;
  * 活跃会话上下文服务，优先读取 Redis，未命中时从 MySQL 重建。
  */
 @Service
-@ConditionalOnBean(SqlSessionFactory.class)
 @RequiredArgsConstructor
 public class ConversationContextServiceImpl implements ConversationContextService {
 

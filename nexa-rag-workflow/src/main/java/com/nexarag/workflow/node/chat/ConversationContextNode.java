@@ -8,8 +8,7 @@ import com.nexarag.chat.service.ConversationContextService;
 import com.nexarag.chat.service.ConversationMessageService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
-import org.apache.ibatis.session.SqlSessionFactory;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 
 import java.util.Map;
 
@@ -23,7 +22,7 @@ import static com.nexarag.workflow.constants.ChatWorkflowStateKeys.USER_QUESTION
  * 会话上下文节点，负责加载上下文并保存本轮用户消息。
  */
 @Component
-@ConditionalOnBean(SqlSessionFactory.class)
+@ConditionalOnProperty(prefix = "nexa.chat", name = "enabled", havingValue = "true", matchIfMissing = true)
 @RequiredArgsConstructor
 public class ConversationContextNode implements NodeAction {
 

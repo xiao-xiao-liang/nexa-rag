@@ -12,7 +12,7 @@ import com.nexarag.model.toolkits.prompt.PromptReleaseResolver;
 import com.nexarag.workflow.service.StreamingWorkflowGraphRunner;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import reactor.core.publisher.Flux;
 
 import java.util.Map;
@@ -28,7 +28,7 @@ import static com.nexarag.workflow.constants.ChatWorkflowStateKeys.PROMPT_EXECUT
  * Chat Workflow Runner，负责编译并以请求级线程标识运行对话 Graph。
  */
 @Service
-@ConditionalOnBean(name = "chatConversationGraph")
+@ConditionalOnProperty(prefix = "nexa.chat", name = "enabled", havingValue = "true", matchIfMissing = true)
 public class ChatWorkflowRunner implements StreamingWorkflowGraphRunner {
     private static final Set<String> CHAT_PROMPT_CODES = Set.of(
             PromptBuilder.REWRITE_INSTRUCTION,
