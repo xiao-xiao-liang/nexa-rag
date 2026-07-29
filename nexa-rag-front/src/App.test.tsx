@@ -16,17 +16,30 @@ describe('RAG 对话工作台', () => {
     window.history.replaceState({}, '', '/chat')
   })
 
-  it('空会话时应展示欢迎页和默认 RAG 输入框', async () => {
+  it('空会话时应展示会话优先的欢迎页和默认输入框', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(JSON.stringify({
       code: '0', message: null, data: { records: [], total: 0, current: 1, size: 20, pages: 0 }, traceId: null,
     }))))
 
     render(<App />)
 
-    expect(await screen.findByText('开始一段 RAG 对话')).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: '你好，今天想做什么？' })).toBeInTheDocument()
+    expect(screen.getByText('通过模型与知识库，让复杂信息转化为清晰答案。')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '解读文档' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '检索知识库' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '创建提示词' })).toBeInTheDocument()
     expect(screen.getByRole('textbox', { name: '消息内容' })).toBeInTheDocument()
-    expect(screen.queryByText('RAG', { exact: true })).not.toBeInTheDocument()
-    expect(screen.getByRole('button', { name: '新建会话' })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: '新建对话' })).toBeInTheDocument()
+  })
+
+  it('点击快捷建议应将内容带入输入框', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(success({ records: [], total: 0, current: 1, size: 20, pages: 0 })))
+    const user = userEvent.setup()
+    render(<App />)
+
+    await user.click(await screen.findByRole('button', { name: '检索知识库' }))
+
+    expect(screen.getByRole('textbox', { name: '消息内容' })).toHaveValue('请从知识库中检索与我的问题相关的内容，并给出依据。')
   })
 
   it('应可从全局导航进入知识库，且一期不展示未接入能力', async () => {

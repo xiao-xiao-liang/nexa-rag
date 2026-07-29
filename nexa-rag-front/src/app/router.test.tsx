@@ -17,7 +17,7 @@ describe('应用路由', () => {
     render(<RouterProvider router={router} />)
 
     await waitFor(() => expect(router.state.location.pathname).toBe('/chat'))
-    expect(screen.getByText('开始一段 RAG 对话')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: '你好，今天想做什么？' })).toBeInTheDocument()
   })
 
   it('知识库路由应显示知识库页面', async () => {
