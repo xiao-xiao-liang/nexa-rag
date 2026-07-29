@@ -2,6 +2,7 @@ package com.nexarag.boot.controller;
 
 import com.nexarag.auth.context.CurrentUserContext;
 import com.nexarag.chat.id.ChatIdGenerator;
+import com.nexarag.common.exception.AbstractException;
 import com.nexarag.common.exception.ClientException;
 import com.nexarag.workflow.request.ChatWorkflowRequest;
 import com.nexarag.workflow.service.WorkflowService;
@@ -57,28 +58,32 @@ public class ChatController {
                 userId, request.conversationId(), request.content(), generationId, traceId);
 
         // 2. 将 Graph 流式输出映射为 SSE 协议
-        AtomicBoolean metaSent = new AtomicBoolean();
-        Flux<ServerSentEvent<ChatStreamEvent>> events = workflowService
-                .stream(CHAT_CONVERSATION_GRAPH_NAME, workflowRequest.toInitialState())
-                .handle((response, sink) -> {
-                    if (response.getOutput() == null || response.getOutput().isCompletedExceptionally()) {
-                        return;
-                    }
-                    Object graphOutput = response.getOutput().join();
-                    if (graphOutput instanceof StreamingOutput<?> streamingOutput
-                            && streamingOutput.getOriginData() instanceof ChatStreamEvent event) {
-                        sink.next(toSse(event));
-                    } else if (graphOutput instanceof NodeOutput nodeOutput
-                            && "conversationValidation".equals(nodeOutput.node())
-                            && metaSent.compareAndSet(false, true)) {
-                        String conversationId = nodeOutput.state().value("conversationId", "");
-                        sink.next(toSse(new ChatStreamEvent(ChatStreamEventType.META, null,
-                                conversationId, traceId, generationId, null, null, null)));
-                    }
-                });
-        ChatStreamEvent complete = new ChatStreamEvent(ChatStreamEventType.COMPLETE, null,
-                request.conversationId(), traceId, generationId, null, null, null);
-        return events.concatWithValues(toSse(complete))
+        return Flux.defer(() -> {
+                    AtomicBoolean metaSent = new AtomicBoolean();
+                    Flux<ServerSentEvent<ChatStreamEvent>> events = workflowService
+                            .stream(CHAT_CONVERSATION_GRAPH_NAME, workflowRequest.toInitialState())
+                            .handle((response, sink) -> {
+                                if (response.getOutput() == null || response.getOutput().isCompletedExceptionally()) {
+                                    return;
+                                }
+                                Object graphOutput = response.getOutput().join();
+                                if (graphOutput instanceof StreamingOutput<?> streamingOutput
+                                        && streamingOutput.getOriginData() instanceof ChatStreamEvent event) {
+                                    sink.next(toSse(event));
+                                } else if (graphOutput instanceof NodeOutput nodeOutput
+                                        && "conversationValidation".equals(nodeOutput.node())
+                                        && metaSent.compareAndSet(false, true)) {
+                                    String conversationId = nodeOutput.state().value("conversationId", "");
+                                    sink.next(toSse(new ChatStreamEvent(ChatStreamEventType.META, null,
+                                            conversationId, traceId, generationId, null, null, null)));
+                                }
+                            });
+                    ChatStreamEvent complete = new ChatStreamEvent(ChatStreamEventType.COMPLETE, null,
+                            request.conversationId(), traceId, generationId, null, null, null);
+                    return events.concatWithValues(toSse(complete));
+                })
+                .onErrorResume(AbstractException.class, exception -> Flux.just(
+                        toSse(ChatStreamEvent.error(exception.getErrorCode(), exception.getErrorMessage()))))
                 .doOnCancel(() -> taskManager.cancel(generationId, userId));
     }
 

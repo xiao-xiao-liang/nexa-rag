@@ -6,6 +6,7 @@ import com.alibaba.cloud.ai.graph.streaming.StreamingOutput;
 import com.nexarag.auth.context.CurrentUser;
 import com.nexarag.auth.context.CurrentUserContext;
 import com.nexarag.chat.id.ChatIdGenerator;
+import com.nexarag.common.exception.ServiceException;
 import com.nexarag.workflow.service.WorkflowService;
 import com.nexarag.workflow.stream.ChatGenerationTaskManager;
 import com.nexarag.workflow.stream.ChatStreamEvent;
@@ -56,5 +57,25 @@ class ChatControllerTest {
         ArgumentCaptor<Map<String, Object>> captor = ArgumentCaptor.forClass(Map.class);
         verify(workflowService).stream(eq("chat-conversation"), captor.capture());
         assertThat(captor.getValue()).containsEntry(USER_ID, "u1");
+    }
+
+    @Test
+    void streamShouldReturnErrorEventWhenWorkflowCannotBeStarted() {
+        WorkflowService workflowService = mock(WorkflowService.class);
+        ChatIdGenerator idGenerator = mock(ChatIdGenerator.class);
+        when(idGenerator.nextId()).thenReturn("g1");
+        when(workflowService.stream(eq("chat-conversation"), any()))
+                .thenThrow(new ServiceException("未找到流式工作流图"));
+        ChatController controller = new ChatController(
+                workflowService, mock(ChatGenerationTaskManager.class), idGenerator);
+        CurrentUserContext.set(new CurrentUser("u1"));
+
+        StepVerifier.create(controller.stream(new ChatStreamRequest(null, "你好")))
+                .assertNext(event -> {
+                    assertThat(event.data().type().name()).isEqualTo("ERROR");
+                    assertThat(event.data().errorCode()).isEqualTo("B000001");
+                    assertThat(event.data().errorMessage()).isEqualTo("未找到流式工作流图");
+                })
+                .verifyComplete();
     }
 }
