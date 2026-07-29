@@ -1,8 +1,8 @@
-import { FileText, Trash2 } from 'lucide-react'
+import { MoreHorizontal, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import type { PageVO } from '@/shared/api/types'
-import { statusLabel } from '../document-status'
+import { DocumentStatusBadge } from './DocumentStatusBadge'
 import type { DocumentSummary } from '../api/document-api'
 
 interface DocumentListTableProps {
@@ -10,6 +10,7 @@ interface DocumentListTableProps {
   pageNum: number
   loading: boolean
   deleting: boolean
+  query: string
   onView: (documentId: number) => void
   onDelete: (document: DocumentSummary) => void
   onPrevious: () => void
@@ -18,51 +19,20 @@ interface DocumentListTableProps {
   onDeleteTargetChange: (document: DocumentSummary | null) => void
 }
 
-/** 知识库文档服务端分页表格与删除确认操作。 */
-export function DocumentListTable({
-  page, pageNum, loading, deleting, onView, onDelete, onPrevious, onNext, deleteTarget, onDeleteTargetChange,
-}: DocumentListTableProps) {
+/** 完整文档列表，以原型的表格、操作区和分页结构呈现服务端数据。 */
+export function DocumentListTable({ page, pageNum, loading, deleting, query, onView, onDelete, onPrevious, onNext, deleteTarget, onDeleteTargetChange }: DocumentListTableProps) {
   const totalPages = Math.max(page.pages, 1)
-  const canPrevious = pageNum > 1
-  const canNext = pageNum < totalPages
+  const keyword = query.trim().toLocaleLowerCase()
+  const records = !keyword ? page.records : page.records.filter((document) => `${document.title || ''} ${document.originalFileName || ''} ${document.fileType || ''}`.toLocaleLowerCase().includes(keyword))
 
-  return (
-    <>
-      <div className="overflow-hidden rounded-2xl border bg-card shadow-sm">
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[680px] text-left text-sm">
-            <thead className="bg-muted/70 text-muted-foreground">
-              <tr><th className="px-5 py-3 font-medium">文档</th><th className="px-5 py-3 font-medium">类型</th><th className="px-5 py-3 font-medium">处理状态</th><th className="px-5 py-3 text-right font-medium">操作</th></tr>
-            </thead>
-            <tbody className="divide-y">
-              {page.records.map((document) => (
-                <tr key={document.documentId} className="hover:bg-muted/40">
-                  <td className="px-5 py-4">
-                    <button type="button" className="flex items-center gap-3 text-left" onClick={() => onView(document.documentId)}>
-                      <span className="flex size-9 items-center justify-center rounded-lg bg-blue-50 text-blue-600"><FileText className="size-4" /></span>
-                      <span><span className="block font-medium text-foreground">{document.title || document.originalFileName || '未命名文档'}</span><span className="block text-xs text-muted-foreground">{document.originalFileName || '未提供原始文件名'}</span></span>
-                    </button>
-                  </td>
-                  <td className="px-5 py-4 text-muted-foreground">{document.fileType || '—'}</td>
-                  <td className="px-5 py-4"><span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-700">{statusLabel(document.status)}</span></td>
-                  <td className="px-5 py-4"><div className="flex justify-end gap-1"><Button variant="ghost" size="sm" onClick={() => onView(document.documentId)}>查看详情</Button><Button variant="ghost" size="icon" aria-label={`删除 ${document.originalFileName || document.title || '文档'}`} onClick={() => onDeleteTargetChange(document)}><Trash2 className="size-4 text-red-600" /></Button></div></td>
-                </tr>
-              ))}
-              {!loading && page.records.length === 0 && <tr><td colSpan={4} className="px-5 py-14 text-center text-muted-foreground">暂无文档，上传文件后即可开始构建知识库。</td></tr>}
-            </tbody>
-          </table>
-        </div>
-        <div className="flex items-center justify-between border-t px-5 py-3 text-sm text-muted-foreground">
-          <span>共 {page.total} 个文档</span>
-          <div className="flex items-center gap-3"><Button variant="outline" size="sm" disabled={!canPrevious || loading} onClick={onPrevious}>上一页</Button><span>第 {pageNum} / {totalPages} 页</span><Button variant="outline" size="sm" disabled={!canNext || loading} onClick={onNext}>下一页</Button></div>
-        </div>
-      </div>
-      <Dialog open={deleteTarget !== null} onOpenChange={(open) => !open && onDeleteTargetChange(null)}>
-        <DialogContent>
-          <DialogHeader><DialogTitle>确认删除文档？</DialogTitle><DialogDescription>删除后将无法恢复该文档及其已生成的处理数据。</DialogDescription></DialogHeader>
-          <div className="flex justify-end gap-2"><Button variant="outline" onClick={() => onDeleteTargetChange(null)} disabled={deleting}>取消</Button><Button onClick={() => deleteTarget && onDelete(deleteTarget)} disabled={deleting}>{deleting ? '删除中…' : '确认删除'}</Button></div>
-        </DialogContent>
-      </Dialog>
-    </>
-  )
+  return <>
+    <section className="mt-3 overflow-x-auto rounded-xl border border-[#e1e6ee] bg-white"><div className="min-w-[680px]"><div className="grid grid-cols-[2.4fr_0.65fr_0.85fr_1fr] items-center gap-[14px] bg-[#fafbfc] px-[17px] py-[15px] text-[10px] font-semibold text-[#9ea7b4]"><span>文档</span><span>类型</span><span>处理状态</span><span className="text-right">操作</span></div>{loading && <p className="px-5 py-12 text-center text-sm text-[#8e98a7]">正在加载文档…</p>}{!loading && records.length === 0 && <p className="px-5 py-14 text-center text-sm text-[#8e98a7]">{keyword ? '未找到匹配的文档' : '暂无文档，上传文件后即可开始构建知识库。'}</p>}{!loading && records.map((document) => <article key={document.documentId} className="grid grid-cols-[2.4fr_0.65fr_0.85fr_1fr] items-center gap-[14px] border-t border-[#edf0f4] px-[17px] py-[15px] text-xs text-[#69768c] hover:bg-[#fcfcff]"><div className="flex min-w-0 items-center gap-2.5"><span aria-hidden="true" className="size-[15px] shrink-0 rounded border border-[#d7dde8]" /><span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-[#eef0ff] text-[9px] font-bold text-[#5b61cc]">{document.fileType || '文件'}</span><button type="button" onClick={() => onView(document.documentId)} className="min-w-0 text-left"><b className="block truncate text-xs font-medium text-[#3d4a60]">{document.title || document.originalFileName || '未命名文档'}</b><small className="mt-1 block truncate text-[10px] text-[#9aa3b1]">{document.originalFileName || '未提供原始文件名'}</small></button></div><span>{document.fileType || '—'}</span><DocumentStatusBadge status={document.status} /><div className="flex justify-end gap-2 text-[11px] text-[#5b61c8]"><button type="button" onClick={() => onView(document.documentId)} className="hover:text-[#4549b5]">查看</button><button type="button" aria-label={`删除 ${document.originalFileName || document.title || '文档'}`} onClick={() => onDeleteTargetChange(document)} className="inline-flex items-center hover:text-[#bd5252]"><MoreHorizontal className="size-4" /></button></div></article>)}<footer className="flex items-center justify-between border-t border-[#edf0f4] px-4 py-3 text-[11px] text-[#818c9e]"><span>显示第 {(pageNum - 1) * page.size + (page.records.length ? 1 : 0)}–{(pageNum - 1) * page.size + page.records.length} 项，共 {page.total} 项</span><div className="flex items-center gap-2"><button type="button" onClick={onPrevious} disabled={pageNum <= 1 || loading} className="flex size-7 items-center justify-center rounded-md border border-[#e0e5ee] bg-white disabled:cursor-not-allowed disabled:opacity-40">‹</button>{paginationItems(pageNum, totalPages).map((item) => <span key={item} className={`flex size-7 items-center justify-center rounded-md border text-[11px] ${item === pageNum ? 'border-[#5b5ed2] bg-[#5b5ed2] text-white' : 'border-[#e0e5ee] bg-white text-[#68758b]'}`}>{item}</span>)}<button type="button" onClick={onNext} disabled={pageNum >= totalPages || loading} className="flex size-7 items-center justify-center rounded-md border border-[#e0e5ee] bg-white disabled:cursor-not-allowed disabled:opacity-40">›</button></div></footer></div></section>
+    <Dialog open={deleteTarget !== null} onOpenChange={(open) => !open && onDeleteTargetChange(null)}><DialogContent><DialogHeader><DialogTitle>确认删除文档？</DialogTitle><DialogDescription>删除后将无法恢复该文档及其已生成的处理数据。</DialogDescription></DialogHeader><div className="flex justify-end gap-2"><Button variant="outline" onClick={() => onDeleteTargetChange(null)} disabled={deleting}>取消</Button><Button onClick={() => deleteTarget && onDelete(deleteTarget)} disabled={deleting} className="bg-[#b95552] hover:bg-[#9e4543]">{deleting ? '删除中…' : <><Trash2 className="size-4" />确认删除</>}</Button></div></DialogContent></Dialog>
+  </>
+}
+
+function paginationItems(pageNum: number, totalPages: number): number[] {
+  if (totalPages <= 3) return Array.from({ length: totalPages }, (_, index) => index + 1)
+  const start = Math.min(Math.max(pageNum - 1, 1), totalPages - 2)
+  return [start, start + 1, start + 2]
 }
