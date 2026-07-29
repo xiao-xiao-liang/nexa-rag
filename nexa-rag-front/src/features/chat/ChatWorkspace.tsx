@@ -1,17 +1,17 @@
 import { useCallback, useEffect, useRef, useState, type KeyboardEvent } from 'react'
 import {
-  Bot, ChevronUp, CircleStop, Database, Menu, Plane, Plus, RefreshCw, Send, Sparkles,
+  ArrowUp, BookOpen, ChevronUp, CircleStop, Compass, FileText, HelpCircle, Paperclip, RefreshCw, Sparkles,
 } from 'lucide-react'
+import { useSearchParams } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
-import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Textarea } from '@/components/ui/textarea'
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { cancelGeneration, streamChat, type ChatStreamEvent } from '@/features/chat/api/chat-api'
 import { DEFAULT_CONVERSATION_AGENT, type ConversationAgentMeta } from '@/features/agents/agent-registry'
 import {
-  getConversationMessages, getConversations, type ConversationListItem, type ConversationMessage,
+  getConversationMessages, type ConversationMessage,
 } from '@/features/conversations/api/conversation-api'
+import { useConversationNavigation } from '@/features/conversations/ConversationNavigationContext'
 import { cn } from '@/lib/utils'
 
 interface TimelineMessage extends ConversationMessage {
@@ -34,14 +34,13 @@ const initialAssistant = (): TimelineMessage => ({
 
 /** RAG 对话工作台，承载会话列表、历史消息与流式回复。 */
 export default function ChatWorkspace() {
-  const [conversations, setConversations] = useState<ConversationListItem[]>([])
-  const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [searchParams, setSearchParams] = useSearchParams()
+  const { conversations, refresh: refreshConversations } = useConversationNavigation()
+  const selectedId = searchParams.get('conversation')
   const [messages, setMessages] = useState<TimelineMessage[]>([])
   const [nextBeforeSequence, setNextBeforeSequence] = useState<number | null>(null)
   const [hasMore, setHasMore] = useState(false)
   const [draft, setDraft] = useState('')
-  const [conversationLoading, setConversationLoading] = useState(true)
-  const [conversationError, setConversationError] = useState<string | null>(null)
   const [historyLoading, setHistoryLoading] = useState(false)
   const [historyError, setHistoryError] = useState<string | null>(null)
   const [olderHistoryError, setOlderHistoryError] = useState<string | null>(null)
@@ -61,34 +60,19 @@ export default function ChatWorkspace() {
     localStorage.setItem(CONVERSATION_AGENT_STORAGE_KEY, JSON.stringify(conversationAgents))
   }, [conversationAgents])
 
-  const loadConversations = useCallback(async () => {
-    setConversationLoading(true)
-    setConversationError(null)
-    try {
-      const page = await getConversations()
-      setConversations(page.records)
-    } catch (error) {
-      setConversationError(error instanceof Error ? error.message : '会话加载失败，请稍后重试')
-    } finally {
-      setConversationLoading(false)
-    }
-  }, [])
-
   useEffect(() => {
-    void loadConversations()
     return () => {
       abortRef.current?.abort()
       historyAbortRef.current?.abort()
     }
-  }, [loadConversations])
+  }, [])
 
-  const selectConversation = useCallback(async (conversationId: string) => {
+  const loadConversation = useCallback(async (conversationId: string) => {
     abortRef.current?.abort()
     historyAbortRef.current?.abort()
     const requestId = ++historyRequestRef.current
     const controller = new AbortController()
     historyAbortRef.current = controller
-    setSelectedId(conversationId)
     setConversationAgents((current) => ({ ...current, [conversationId]: current[conversationId] ?? DEFAULT_CONVERSATION_AGENT }))
     setMessages([])
     setNextBeforeSequence(null)
@@ -147,18 +131,24 @@ export default function ChatWorkspace() {
     }
   }
 
-  const createConversation = () => {
+  useEffect(() => {
+    if (selectedId) {
+      void loadConversation(selectedId)
+      return
+    }
+    // 1. 中断已有请求，避免返回到欢迎页后被旧会话内容覆盖。
     abortRef.current?.abort()
     historyAbortRef.current?.abort()
     historyRequestRef.current += 1
-    setSelectedId(null)
+    // 2. 重置消息相关状态，恢复新建对话的初始界面。
     setMessages([])
     setNextBeforeSequence(null)
     setHasMore(false)
+    setHistoryLoading(false)
     setStreamError(null)
     setHistoryError(null)
     setOlderHistoryError(null)
-  }
+  }, [loadConversation, selectedId])
 
   const cancelGenerationOnce = async (currentGenerationId: string) => {
     if (cancelledGenerationIdsRef.current.has(currentGenerationId)) {
@@ -182,7 +172,7 @@ export default function ChatWorkspace() {
   const handleStreamEvent = (assistantId: string, event: ChatStreamEvent) => {
     if (event.type === 'META') {
       if (event.conversationId) {
-        setSelectedId(event.conversationId)
+        setSearchParams({ conversation: event.conversationId }, { replace: true })
         setConversationAgents((current) => ({ ...current, [event.conversationId!]: current[event.conversationId!] ?? DEFAULT_CONVERSATION_AGENT }))
       }
       if (event.generationId) {
@@ -245,7 +235,7 @@ export default function ChatWorkspace() {
     try {
       await streamChat({ conversationId: selectedId ?? undefined, content: normalizedContent },
         (event) => handleStreamEvent(assistant.messageId, event), controller.signal)
-      await loadConversations()
+      await refreshConversations()
     } catch (error) {
       if ((error as { name?: string }).name !== 'AbortError') {
         const errorMessage = error instanceof Error ? error.message : '生成失败，请重试'
@@ -281,78 +271,46 @@ export default function ChatWorkspace() {
     }
   }
 
-  const sidebar = (
-    <aside className="flex h-full w-full flex-col bg-card">
-      <div className="flex items-center justify-between border-b px-4 py-4">
-        <div className="flex items-center gap-2 font-semibold"><Sparkles className="size-5 text-primary" aria-hidden="true" />Nexa AI</div>
-        <Button variant="outline" size="icon" aria-label="新建会话" onClick={createConversation}><Plus className="size-4" /></Button>
-      </div>
-      <div className="px-3 pb-2 pt-4 text-xs font-medium text-muted-foreground">会话</div>
-      <div className="min-h-0 flex-1 overflow-y-auto px-2 pb-4">
-        {conversationLoading && <ConversationSkeleton />}
-        {conversationError && <SidebarError message={conversationError} onRetry={() => void loadConversations()} />}
-        {!conversationLoading && !conversationError && conversations.length === 0 && (
-          <p className="px-3 py-8 text-center text-sm text-muted-foreground">暂时没有会话</p>
-        )}
-        {conversations.map((conversation) => (
-          <button key={conversation.conversationId} type="button" aria-label={`打开会话 ${conversation.title || '未命名会话'}`} onClick={() => void selectConversation(conversation.conversationId)}
-            className={cn('mb-1 w-full rounded-xl px-3 py-2.5 text-left transition-colors hover:bg-muted', selectedId === conversation.conversationId && 'bg-blue-50 text-primary')}>
-            <span className="block truncate text-sm font-medium">{conversation.title || '未命名会话'}</span>
-            <span className="mt-1 block text-xs text-muted-foreground">{formatTime(conversation.updatedTime)}</span>
-          </button>
-        ))}
-      </div>
-    </aside>
-  )
-
   return (
-    <TooltipProvider delayDuration={300}>
-      <section className="flex h-dvh min-h-[560px] min-w-0 flex-1 bg-background text-foreground">
-        <div className="hidden w-72 shrink-0 border-r md:block">{sidebar}</div>
-        <section className="flex min-w-0 flex-1 flex-col">
-          <header className="flex h-16 items-center gap-3 border-b bg-card px-4 md:px-8">
-            <Sheet><SheetTrigger asChild><Button variant="ghost" size="icon" className="md:hidden" aria-label="打开会话列表"><Menu className="size-5" /></Button></SheetTrigger>
-              <SheetContent side="left" className="p-0"><SheetHeader className="sr-only"><SheetTitle>会话列表</SheetTitle><SheetDescription>选择或创建会话</SheetDescription></SheetHeader>{sidebar}</SheetContent>
-            </Sheet>
-            <div><p className="text-sm font-semibold">{selectedId ? 'RAG 对话' : '新对话'}</p><p className="text-xs text-muted-foreground">知识库问答</p></div>
-          </header>
-          <div className="min-h-0 flex-1 overflow-y-auto">
-            <div className="mx-auto flex min-h-full w-full max-w-4xl flex-col px-4 py-8 sm:px-8">
-              {messages.length === 0 && !historyLoading && !historyError && <Welcome />}
-              {historyLoading && messages.length === 0 && <TimelineSkeleton />}
-              {historyError && <HistoryError message={historyError} onRetry={() => selectedId && void selectConversation(selectedId)} />}
-              {hasMore && <div className="mb-5 text-center"><Button variant="ghost" size="sm" onClick={() => void loadOlderMessages()}><ChevronUp className="size-4" />加载更早消息</Button></div>}
-              {olderHistoryError && <HistoryError message={olderHistoryError} onRetry={() => void loadOlderMessages()} />}
-              {messages.map((message, index) => <MessageBubble key={message.messageId} message={message}
-                onRetry={() => void sendMessage(findQuestionForRetry(messages, index))} />)}
-              {streamError && <div role="status" className="mt-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{streamError}</div>}
-            </div>
-          </div>
-          <Composer draft={draft} streaming={streaming} onDraftChange={setDraft} onKeyDown={onComposerKeyDown}
-            agent={activeAgent} onSend={() => void sendMessage()} onStop={() => void stopStreaming()} />
-        </section>
-      </section>
-    </TooltipProvider>
+    <section className="flex h-full min-h-[560px] min-w-0 flex-col bg-[#fbfbfd]">
+      <header className="flex h-[68px] shrink-0 items-center justify-between border-b border-[#ebeaf0] bg-white/80 px-5 backdrop-blur sm:px-8">
+        <div><p className="text-sm font-semibold text-[#373541]">{selectedId ? conversations.find((conversation) => conversation.conversationId === selectedId)?.title || '新对话' : '新对话'}</p><p className="mt-0.5 text-xs text-[#a09eaa]">智能问答工作台</p></div>
+        <div className="flex items-center gap-4 text-xs text-[#757280]"><button type="button" className="flex items-center gap-1.5 hover:text-[#6256da]"><HelpCircle className="size-3.5" />帮助</button><button type="button" className="flex items-center gap-1.5 hover:text-[#6256da]"><Compass className="size-3.5" />我的工作区</button></div>
+      </header>
+      <div className="min-h-0 flex-1 overflow-y-auto">
+        <div className="mx-auto flex min-h-full w-full max-w-[920px] flex-col px-5 py-8 sm:px-10">
+          {messages.length === 0 && !historyLoading && !historyError && <Welcome onSuggestion={setDraft} />}
+          {historyLoading && messages.length === 0 && <TimelineSkeleton />}
+          {historyError && <HistoryError message={historyError} onRetry={() => selectedId && void loadConversation(selectedId)} />}
+          {hasMore && <div className="mb-5 text-center"><Button variant="ghost" size="sm" onClick={() => void loadOlderMessages()}><ChevronUp className="size-4" />加载更早消息</Button></div>}
+          {olderHistoryError && <HistoryError message={olderHistoryError} onRetry={() => void loadOlderMessages()} />}
+          {messages.map((message, index) => <MessageBubble key={message.messageId} message={message} onRetry={() => void sendMessage(findQuestionForRetry(messages, index))} />)}
+          {streamError && <div role="status" className="mt-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{streamError}</div>}
+        </div>
+      </div>
+      <Composer draft={draft} streaming={streaming} onDraftChange={setDraft} onKeyDown={onComposerKeyDown} agent={activeAgent} onSend={() => void sendMessage()} onStop={() => void stopStreaming()} />
+    </section>
   )
 }
 
-function Welcome() {
-  return <div className="m-auto max-w-xl text-center"><div className="mx-auto mb-5 flex size-12 items-center justify-center rounded-2xl bg-blue-50 text-primary"><Bot className="size-6" /></div><h1 className="text-2xl font-semibold tracking-tight">开始一段 RAG 对话</h1><p className="mt-3 text-sm leading-6 text-muted-foreground">基于已接入的知识库，为你查找、归纳并回答问题。</p></div>
+function Welcome({ onSuggestion }: { onSuggestion: (value: string) => void }) {
+  const suggestions = [
+    { title: '解读文档', description: '总结一份材料的要点', prompt: '请帮我解读这份文档，并总结其中的关键要点。', icon: FileText },
+    { title: '检索知识库', description: '从已有资料中查找依据', prompt: '请从知识库中检索与我的问题相关的内容，并给出依据。', icon: BookOpen },
+    { title: '创建提示词', description: '沉淀可复用的工作模板', prompt: '请帮我创建一份可复用的提示词模板。', icon: Sparkles },
+  ]
+  return <div className="m-auto w-full max-w-[760px] text-center"><div className="mx-auto mb-5 flex size-12 items-center justify-center rounded-2xl bg-[#eeecff] text-[#6f62e8]"><Sparkles className="size-5" /></div><h1 className="text-[28px] font-semibold tracking-[-0.04em] text-[#302e39]">你好，今天想做什么？</h1><p className="mt-3 text-sm leading-6 text-[#8c8997]">通过模型与知识库，让复杂信息转化为清晰答案。</p><div className="mt-8 grid gap-3 text-left sm:grid-cols-3">{suggestions.map(({ description, icon: Icon, prompt, title }) => <button key={title} type="button" aria-label={title} onClick={() => onSuggestion(prompt)} className="group rounded-2xl border border-[#e8e6ee] bg-white p-4 shadow-[0_1px_1px_rgba(27,25,39,0.02)] transition-all hover:-translate-y-0.5 hover:border-[#b9b1f7] hover:shadow-[0_10px_24px_rgba(96,83,200,0.09)]"><span className="mb-4 flex size-8 items-center justify-center rounded-xl bg-[#f3f1ff] text-[#7568ed]"><Icon className="size-4" /></span><p className="text-sm font-medium text-[#45424f]">{title}</p><p className="mt-1 text-xs leading-5 text-[#9895a1]">{description}</p></button>)}</div></div>
 }
 
 function Composer({ draft, streaming, agent: _agent, onDraftChange, onKeyDown, onSend, onStop }: {
   draft: string; streaming: boolean; agent: ConversationAgentMeta; onDraftChange: (value: string) => void; onKeyDown: (event: KeyboardEvent<HTMLTextAreaElement>) => void; onSend: () => void; onStop: () => void
 }) {
-  return <div className="border-t bg-background px-4 pb-5 pt-3 sm:px-8"><div className="mx-auto max-w-4xl rounded-[28px] border border-blue-200 bg-card p-2 shadow-sm transition-shadow focus-within:border-blue-400 focus-within:ring-4 focus-within:ring-blue-100">
-    <Textarea aria-label="消息内容" value={draft} onChange={(event) => onDraftChange(event.target.value)} onKeyDown={onKeyDown} disabled={streaming} placeholder="发送消息，向知识库提问…" className="min-h-24 resize-none border-0 px-3 py-2 shadow-none focus-visible:ring-0" />
-    <div className="flex items-center justify-between gap-2 px-1 pb-1"><div className="flex min-w-0 items-center gap-1.5"><FutureAgent icon={<Database className="size-4" />} label="数据分析" /><FutureAgent icon={<Plane className="size-4" />} label="智能差旅" /></div>
-      {streaming ? <Button type="button" variant="outline" size="icon" aria-label="停止生成" onClick={onStop}><CircleStop className="size-4" /></Button> : <Button type="button" size="icon" aria-label="发送消息" disabled={!draft.trim()} onClick={onSend}><Send className="size-4" /></Button>}
+  return <div className="shrink-0 bg-[#fbfbfd] px-5 pb-5 pt-3 sm:px-10"><div className="mx-auto max-w-[920px] rounded-[22px] border border-[#dedbe8] bg-white p-2 shadow-[0_12px_30px_rgba(38,32,77,0.08)] transition-all focus-within:border-[#a89ff5] focus-within:ring-4 focus-within:ring-[#eeebff]">
+    <Textarea aria-label="消息内容" value={draft} onChange={(event) => onDraftChange(event.target.value)} onKeyDown={onKeyDown} disabled={streaming} placeholder="输入你的问题，或选择上方的快捷任务…" className="min-h-[92px] resize-none border-0 px-3 py-2 text-sm leading-6 shadow-none placeholder:text-[#aaa7b2] focus-visible:ring-0" />
+    <div className="flex items-center justify-between gap-3 px-1 pb-1"><div className="flex min-w-0 items-center gap-2"><button type="button" className="flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-xs text-[#666370] hover:bg-[#f4f2f8]"><Sparkles className="size-3.5 text-[#7166f7]" />Qwen 3</button><button type="button" className="hidden items-center gap-1.5 rounded-lg px-2 py-1.5 text-xs text-[#777481] hover:bg-[#f4f2f8] sm:flex"><BookOpen className="size-3.5" />未选择知识库</button><button type="button" aria-label="添加附件" className="flex size-7 items-center justify-center rounded-lg text-[#8f8c99] hover:bg-[#f4f2f8]"><Paperclip className="size-3.5" /></button></div>
+      {streaming ? <Button type="button" variant="outline" size="icon" aria-label="停止生成" onClick={onStop}><CircleStop className="size-4" /></Button> : <Button type="button" size="icon" aria-label="发送消息" disabled={!draft.trim()} onClick={onSend} className="size-8 rounded-xl bg-[#6f62e8] hover:bg-[#5f52d9]"><ArrowUp className="size-4" /></Button>}
     </div>
-  </div><p className="mx-auto mt-2 max-w-4xl px-2 text-xs text-muted-foreground">Enter 发送，Shift + Enter 换行</p></div>
-}
-
-function FutureAgent({ icon, label }: { icon: React.ReactNode; label: string }) {
-  return <Tooltip><TooltipTrigger asChild><button type="button" disabled className="flex items-center gap-1 rounded-lg px-2 py-1 text-xs text-muted-foreground disabled:cursor-not-allowed">{icon}{label}</button></TooltipTrigger><TooltipContent>即将推出</TooltipContent></Tooltip>
+  </div><p className="mx-auto mt-2 max-w-[920px] px-2 text-[11px] text-[#aaa7b2]">Enter 发送，Shift + Enter 换行</p></div>
 }
 
 function MessageBubble({ message, onRetry }: { message: TimelineMessage; onRetry: () => void }) {
@@ -365,11 +323,8 @@ function MessageBubble({ message, onRetry }: { message: TimelineMessage; onRetry
   </div></article>
 }
 
-function ConversationSkeleton() { return <div className="space-y-2 px-2">{Array.from({ length: 5 }, (_, index) => <Skeleton key={index} className="h-14 w-full" />)}</div> }
 function TimelineSkeleton() { return <div className="space-y-5"><Skeleton className="h-20 w-3/4" /><Skeleton className="ml-auto h-16 w-2/3" /><Skeleton className="h-28 w-4/5" /></div> }
-function SidebarError({ message, onRetry }: { message: string; onRetry: () => void }) { return <div className="mx-2 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700"><p>{message}</p><Button variant="ghost" size="sm" className="mt-2" onClick={onRetry}><RefreshCw className="size-3.5" />重试</Button></div> }
 function HistoryError({ message, onRetry }: { message: string; onRetry: () => void }) { return <div role="status" className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700"><p>{message}</p><Button variant="ghost" size="sm" className="mt-2" onClick={onRetry}>重试加载历史</Button></div> }
-function formatTime(time: string | null) { if (!time) return '暂无消息'; const date = new Date(time); return Number.isNaN(date.getTime()) ? '刚刚' : date.toLocaleDateString('zh-CN', { month: 'numeric', day: 'numeric' }) }
 function findQuestionForRetry(messages: TimelineMessage[], failedMessageIndex: number) { return messages.slice(0, failedMessageIndex).reverse().find((message) => message.role === 'USER')?.content ?? '' }
 
 function readConversationAgents(): Record<string, ConversationAgentMeta> {
