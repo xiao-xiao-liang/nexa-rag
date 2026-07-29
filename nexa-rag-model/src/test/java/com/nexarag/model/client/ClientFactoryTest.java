@@ -3,6 +3,8 @@ package com.nexarag.model.client;
 import com.nexarag.model.config.ModelProfileProperties;
 import com.nexarag.model.route.ModelRouteDecision;
 import org.junit.jupiter.api.Test;
+import org.springframework.ai.openai.OpenAiChatModel;
+import org.springframework.ai.openai.OpenAiChatOptions;
 import org.springframework.web.client.RestClient;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -30,6 +32,16 @@ class ClientFactoryTest {
         Object versionTwo = factory.getChatClient(decision(1001L, 2L));
 
         assertThat(versionOne).isNotSameAs(versionTwo);
+    }
+
+    @Test
+    void chatClientShouldNotEnableStreamUsageByDefault() {
+        ChatClientFactory factory = new ChatClientFactory();
+
+        OpenAiChatModel client = factory.getChatClient(decision("/chat/completions", "gpt-4o-mini"));
+
+        OpenAiChatOptions options = (OpenAiChatOptions) client.getDefaultOptions();
+        assertThat(options.getStreamUsage()).isFalse();
     }
 
     @Test

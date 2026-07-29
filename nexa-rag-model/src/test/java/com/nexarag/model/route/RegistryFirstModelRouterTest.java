@@ -1,5 +1,6 @@
 package com.nexarag.model.route;
 
+import com.nexarag.common.exception.ServiceException;
 import com.nexarag.model.config.ModelGovernanceProperties;
 import com.nexarag.model.config.ModelProfileProperties;
 import com.nexarag.model.config.ModelRouteProperties;
@@ -18,6 +19,7 @@ import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
  * 数据库优先模型路由器测试。
@@ -75,6 +77,29 @@ class RegistryFirstModelRouterTest {
         assertThat(decision.configId()).isEqualTo(1L);
     }
 
+    @Test
+    void shouldRejectRegistryRouteWhenNoAvailableCandidates() {
+        ModelRegistry registry = new ModelRegistry();
+        registry.replace(new ModelRegistrySnapshot(1L,
+                Map.of(), Map.of(1301L, emptyRegistryRoute()), Map.of()));
+
+        ModelGovernanceProperties properties = new ModelGovernanceProperties();
+        ModelProfileProperties profile = new ModelProfileProperties();
+        profile.setProvider("CUSTOM_OPENAI");
+        profile.setModelName("qwen2.5:7b");
+        properties.getProfiles().put("chat-primary", profile);
+        ModelRouteProperties route = new ModelRouteProperties();
+        route.setPrimary("chat-primary");
+        properties.getRoutes().put("chat-answer", route);
+
+        RegistryFirstModelRouter router = new RegistryFirstModelRouter(
+                registry, new PrimaryFallbackModelRouter(properties));
+
+        assertThatThrownBy(() -> router.plan(new ModelRouteContext("chat-answer", false)))
+                .isInstanceOf(ServiceException.class)
+                .hasMessage("数据库模型路由没有可用候选: chat-answer");
+    }
+
     private ModelConfig registryConfig() {
         return ModelConfig.builder()
                 .configId(1L)
@@ -94,6 +119,16 @@ class RegistryFirstModelRouterTest {
         return ModelRoute.builder()
                 .routeId(10L)
                 .routeKey("chat")
+                .modelType(ModelType.CHAT)
+                .strategy(ModelRouteStrategy.PRIMARY_BACKUP)
+                .enabled(true)
+                .build();
+    }
+
+    private ModelRoute emptyRegistryRoute() {
+        return ModelRoute.builder()
+                .routeId(1301L)
+                .routeKey("chat-answer")
                 .modelType(ModelType.CHAT)
                 .strategy(ModelRouteStrategy.PRIMARY_BACKUP)
                 .enabled(true)

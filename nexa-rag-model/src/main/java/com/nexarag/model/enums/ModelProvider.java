@@ -68,8 +68,14 @@ public enum ModelProvider {
             return null;
         }
 
-        // 2. 非空值按枚举名称解析
-        return ModelProvider.valueOf(value.trim().toUpperCase(Locale.ROOT));
+        // 2. 兼容历史 OpenAI 协议配置名称，统一映射为当前枚举值
+        String normalizedValue = value.trim().toUpperCase(Locale.ROOT);
+        if ("OPENAI_COMPATIBLE".equals(normalizedValue)) {
+            return CUSTOM_OPENAI;
+        }
+
+        // 3. 非空值按枚举名称解析
+        return ModelProvider.valueOf(normalizedValue);
     }
 
     /**

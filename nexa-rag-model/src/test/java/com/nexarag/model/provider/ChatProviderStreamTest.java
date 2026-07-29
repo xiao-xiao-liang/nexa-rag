@@ -13,14 +13,17 @@ import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.ai.chat.model.Generation;
 import org.springframework.ai.chat.prompt.Prompt;
 import org.springframework.ai.openai.OpenAiChatModel;
+import org.springframework.ai.openai.OpenAiChatOptions;
 import reactor.core.publisher.Flux;
 import reactor.test.StepVerifier;
 
 import java.util.List;
 import java.util.Map;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /**
@@ -44,6 +47,23 @@ class ChatProviderStreamTest {
                 .expectNextMatches(chunk -> "你".equals(chunk.content()))
                 .expectNextMatches(chunk -> "好".equals(chunk.content()))
                 .verifyComplete();
+    }
+
+    @Test
+    void streamChatShouldRequestTokenUsage() {
+        ChatClientFactory factory = mock(ChatClientFactory.class);
+        OpenAiChatModel chatModel = mock(OpenAiChatModel.class);
+        when(factory.getChatClient(any())).thenReturn(chatModel);
+        when(chatModel.stream(any(Prompt.class))).thenReturn(Flux.empty());
+        ChatProvider provider = new ChatProvider(factory);
+
+        StepVerifier.create(provider.streamChat(decision(), request()))
+                .verifyComplete();
+
+        org.mockito.ArgumentCaptor<Prompt> captor = org.mockito.ArgumentCaptor.forClass(Prompt.class);
+        verify(chatModel).stream(captor.capture());
+        OpenAiChatOptions options = (OpenAiChatOptions) captor.getValue().getOptions();
+        assertThat(options.getStreamUsage()).isTrue();
     }
 
     private ChatModelRequest request() {

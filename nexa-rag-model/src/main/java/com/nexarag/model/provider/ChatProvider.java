@@ -17,6 +17,7 @@ import org.springframework.ai.chat.metadata.ChatResponseMetadata;
 import org.springframework.ai.chat.metadata.Usage;
 import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.ai.chat.prompt.Prompt;
+import org.springframework.ai.openai.OpenAiChatOptions;
 import org.springframework.ai.support.UsageCalculator;
 import org.springframework.stereotype.Component;
 import org.springframework.util.CollectionUtils;
@@ -66,7 +67,9 @@ public class ChatProvider implements ModelProviderAdapter {
      */
     public Flux<ChatModelStreamResponse> streamChat(ModelRouteDecision decision, ChatModelRequest request) {
         // 1. 将统一网关消息转换为 Spring AI Prompt
-        Prompt prompt = new Prompt(messages(request.messages()));
+        Prompt prompt = new Prompt(messages(request.messages()), OpenAiChatOptions.builder()
+                .streamUsage(true)
+                .build());
 
         // 2. 将 Spring AI 流式响应转换为模型网关统一分片
         return chatClientFactory.getChatClient(decision)

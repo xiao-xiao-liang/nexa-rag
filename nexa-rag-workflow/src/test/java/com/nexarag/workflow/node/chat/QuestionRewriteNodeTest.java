@@ -47,7 +47,7 @@ class QuestionRewriteNodeTest {
         ArgumentCaptor<com.nexarag.model.gateway.chat.ChatModelRequest> captor =
                 ArgumentCaptor.forClass(com.nexarag.model.gateway.chat.ChatModelRequest.class);
         verify(modelGateway).chat(captor.capture());
-        assertThat(captor.getValue().routeKey()).isEqualTo("chat-rewrite");
+        assertThat(captor.getValue().routeKey()).isEqualTo("chat");
     }
 
     private PromptExecutionSnapshot snapshot() {

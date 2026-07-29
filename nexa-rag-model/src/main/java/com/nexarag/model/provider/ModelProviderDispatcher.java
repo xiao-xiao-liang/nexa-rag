@@ -86,8 +86,12 @@ public class ModelProviderDispatcher {
 
     private ModelProvider parseProvider(String provider) {
         try {
-            // 1. 将配置中的厂商字符串转换为受控枚举
-            return ModelProvider.valueOf(provider);
+            // 1. 将配置中的厂商字符串转换为受控枚举，并兼容历史配置名称
+            ModelProvider modelProvider = ModelProvider.fromJson(provider);
+            if (modelProvider == null) {
+                throw new IllegalArgumentException("模型厂商不能为空");
+            }
+            return modelProvider;
         } catch (IllegalArgumentException exception) {
             throw new ServiceException("不支持的模型厂商，provider=" + provider,
                     exception, BaseErrorCode.SERVICE_ERROR);
