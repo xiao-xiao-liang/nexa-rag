@@ -1,3 +1,4 @@
+@import "katex/dist/katex.min.css";
 @import "tailwindcss";
 
 @theme inline {
@@ -44,4 +45,83 @@ body {
   background: var(--background);
   color: var(--foreground);
   font-family: Inter, "PingFang SC", "Microsoft YaHei", sans-serif;
+}
+
+.assistant-markdown {
+  overflow-wrap: anywhere;
+}
+
+.assistant-markdown > :first-child {
+  margin-top: 0;
+}
+
+.assistant-markdown > :last-child {
+  margin-bottom: 0;
+}
+
+.assistant-markdown h1,
+.assistant-markdown h2,
+.assistant-markdown h3,
+.assistant-markdown h4 {
+  margin: 1.25rem 0 0.5rem;
+  font-weight: 600;
+  line-height: 1.45;
+}
+
+.assistant-markdown h1 { font-size: 1.5rem; }
+.assistant-markdown h2 { font-size: 1.25rem; }
+.assistant-markdown h3 { font-size: 1.125rem; }
+
+.assistant-markdown p,
+.assistant-markdown ul,
+.assistant-markdown ol,
+.assistant-markdown blockquote {
+  margin: 0.75rem 0;
+}
+
+.assistant-markdown ul,
+.assistant-markdown ol {
+  padding-left: 1.5rem;
+}
+
+.assistant-markdown ul { list-style: disc; }
+.assistant-markdown ol { list-style: decimal; }
+
+.assistant-markdown blockquote {
+  border-left: 3px solid var(--border);
+  padding-left: 0.875rem;
+  color: var(--muted-foreground);
+}
+
+.assistant-markdown :not(pre) > code {
+  border-radius: 0.25rem;
+  background: var(--muted);
+  padding: 0.1rem 0.3rem;
+  font-size: 0.875em;
+}
+
+.assistant-markdown table {
+  display: block;
+  max-width: 100%;
+  overflow-x: auto;
+  border-collapse: collapse;
+}
+
+.assistant-markdown th,
+.assistant-markdown td {
+  border: 1px solid var(--border);
+  padding: 0.45rem 0.7rem;
+  text-align: left;
+}
+
+.assistant-markdown th {
+  background: var(--muted);
+  font-weight: 600;
+}
+
+.assistant-markdown .katex-display {
+  max-width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 0.25rem 0;
 }

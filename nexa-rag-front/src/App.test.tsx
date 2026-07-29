@@ -78,6 +78,30 @@ describe('RAG 对话工作台', () => {
     }))
   })
 
+  it('流式助手回答应渲染 Markdown，用户消息保持纯文本', async () => {
+    const encoder = new TextEncoder()
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(success({ records: [], total: 0, current: 1, size: 20, pages: 0 }))
+      .mockResolvedValueOnce(new Response(new ReadableStream({
+        start(controller) {
+          controller.enqueue(encoder.encode('event: TOKEN\ndata: {"content":"## 流式标题"}\n\n'))
+          controller.enqueue(encoder.encode('event: COMPLETE\ndata: {}\n\n'))
+          controller.close()
+        },
+      }), { status: 200 }))
+      .mockResolvedValueOnce(success({ records: [], total: 0, current: 1, size: 20, pages: 0 }))
+    vi.stubGlobal('fetch', fetchMock)
+    render(<App />)
+    const input = await screen.findByRole('textbox', { name: '消息内容' })
+
+    await userEvent.type(input, '**用户原文**')
+    await userEvent.keyboard('{Enter}')
+
+    expect(await screen.findByRole('heading', { name: '流式标题' })).toBeInTheDocument()
+    const userMessage = screen.getByText('**用户原文**')
+    expect(userMessage.closest('article')?.querySelector('strong')).toBeNull()
+  })
+
   it('流式错误后即使收到 COMPLETE 也应保留失败状态和已输出内容', async () => {
     const encoder = new TextEncoder()
     const fetchMock = vi.fn()
