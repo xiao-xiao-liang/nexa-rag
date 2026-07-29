@@ -2,12 +2,7 @@ package com.nexarag.chat.controller;
 
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.nexarag.auth.context.CurrentUserContext;
-import com.nexarag.chat.controller.vo.ConversationHistoryPageVO;
-import com.nexarag.chat.controller.vo.ConversationListItemVO;
-import com.nexarag.chat.controller.vo.ConversationMessageItemVO;
-import com.nexarag.chat.controller.vo.ConversationPageVO;
-import com.nexarag.chat.domain.ChatConversationVO;
-import com.nexarag.chat.domain.ChatMessageVO;
+import com.nexarag.chat.domain.*;
 import com.nexarag.chat.service.ConversationMessageService;
 import com.nexarag.chat.service.ConversationService;
 import com.nexarag.common.error.BaseErrorCode;
@@ -16,15 +11,9 @@ import com.nexarag.common.web.CursorPageVO;
 import com.nexarag.common.web.Result;
 import com.nexarag.common.web.Results;
 import lombok.RequiredArgsConstructor;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
-import static com.nexarag.chat.constants.ConversationQueryConstants.MAX_CONVERSATION_PAGE_CURRENT;
-import static com.nexarag.chat.constants.ConversationQueryConstants.MAX_CONVERSATION_PAGE_SIZE;
-import static com.nexarag.chat.constants.ConversationQueryConstants.MAX_HISTORY_PAGE_SIZE;
+import static com.nexarag.chat.constants.ConversationQueryConstants.*;
 
 /**
  * 会话读取控制器，负责返回当前用户的会话列表和历史消息安全投影。

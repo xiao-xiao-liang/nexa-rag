@@ -1,4 +1,4 @@
-package com.nexarag.chat.controller.vo;
+package com.nexarag.chat.domain;
 
 import com.nexarag.chat.enums.ConversationStatus;
 import lombok.AllArgsConstructor;
