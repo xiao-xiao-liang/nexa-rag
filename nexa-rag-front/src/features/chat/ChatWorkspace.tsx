@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Textarea } from '@/components/ui/textarea'
 import { cancelGeneration, streamChat, type ChatStreamEvent } from '@/features/chat/api/chat-api'
+import { AssistantMarkdown } from '@/features/chat/components/AssistantMarkdown'
 import { DEFAULT_CONVERSATION_AGENT, type ConversationAgentMeta } from '@/features/agents/agent-registry'
 import {
   getConversationMessages, type ConversationMessage,
@@ -317,7 +318,9 @@ function MessageBubble({ message, onRetry }: { message: TimelineMessage; onRetry
   const isUser = message.role === 'USER'
   return <article className={cn('mb-6 flex gap-3', isUser && 'justify-end')}><div className={cn('max-w-[86%] rounded-2xl px-4 py-3 text-sm leading-7', isUser ? 'bg-primary text-primary-foreground' : 'border bg-card')}>
     {!isUser && <div className="mb-1 flex items-center gap-1.5 text-xs font-medium text-primary"><Sparkles className="size-3.5" />RAG</div>}
-    <p className="whitespace-pre-wrap break-words">{message.content || (message.status === 'GENERATING' ? '正在生成…' : '')}</p>
+    {isUser
+      ? <p className="whitespace-pre-wrap break-words">{message.content}</p>
+      : <AssistantMarkdown content={message.content || (message.status === 'GENERATING' ? '正在生成…' : '')} status={message.status} />}
     {message.status === 'FAILED' && <div className="mt-2 flex items-center gap-2 text-xs text-red-600"><span>{message.errorMessage || '生成失败'}</span><Button variant="ghost" size="sm" onClick={onRetry}><RefreshCw className="size-3.5" />重试</Button></div>}
     {message.status === 'CANCELLED' && <p className="mt-2 text-xs text-muted-foreground">已停止生成</p>}
   </div></article>
