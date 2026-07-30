@@ -29,12 +29,11 @@ public class RedisModelRegistryRefreshConfiguration {
      * @return Redis PubSub 刷新消息发布客户端
      */
     @Bean
-    @ConditionalOnBean(StringRedisTemplate.class)
     public RedisModelRegistryRefreshMessageClient redisModelRegistryRefreshMessageClient(
             StringRedisTemplate redisTemplate,
             ObjectMapper objectMapper) {
         return new RedisModelRegistryRefreshMessageClient(redisTemplate, objectMapper);
-    }
+      }
 
     /**
      * 注册 Redis PubSub 刷新消息订阅器。
@@ -55,11 +54,10 @@ public class RedisModelRegistryRefreshConfiguration {
      *
      * @param redisConnectionFactory Redis 连接工厂
      * @param subscriber             Redis 刷新消息订阅器
-     * @param properties             模型注册表刷新配置
+     * @param properties             Model 注册表刷新配置
      * @return Redis PubSub 消息监听容器
      */
     @Bean
-    @ConditionalOnBean(RedisConnectionFactory.class)
     public RedisMessageListenerContainer modelRegistryRefreshRedisMessageListenerContainer(
             RedisConnectionFactory redisConnectionFactory,
             RedisModelRegistryRefreshSubscriber subscriber,

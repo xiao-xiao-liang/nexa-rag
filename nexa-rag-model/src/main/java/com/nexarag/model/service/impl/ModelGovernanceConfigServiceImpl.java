@@ -314,28 +314,28 @@ public class ModelGovernanceConfigServiceImpl
     }
 
     private void applyRequest(ModelGovernanceConfig config, ModelGovernanceConfigRequest request) {
-        config.setEnabled(request.enabled());
-        config.setRetryEnabled(request.retryEnabled());
-        config.setMaxAttempts(request.maxAttempts());
-        config.setRetryWaitMs(request.retryWaitMs());
-        config.setCircuitEnabled(request.circuitEnabled());
-        config.setFailureRateThreshold(request.failureRateThreshold());
-        config.setSlowCallRateThreshold(request.slowCallRateThreshold());
-        config.setSlowCallDurationMs(request.slowCallDurationMs());
-        config.setMinimumNumberOfCalls(request.minimumNumberOfCalls());
-        config.setSlidingWindowSize(request.slidingWindowSize());
-        config.setWaitDurationInOpenStateMs(request.waitDurationInOpenStateMs());
-        config.setRateLimitEnabled(request.rateLimitEnabled());
-        config.setLimitForPeriod(request.limitForPeriod());
-        config.setLimitRefreshPeriodMs(request.limitRefreshPeriodMs());
-        config.setTimeoutDurationMs(request.timeoutDurationMs());
-        config.setBulkheadEnabled(request.bulkheadEnabled());
-        config.setTimeLimiterEnabled(request.timeLimiterEnabled());
-        config.setTimeLimiterTimeoutMs(request.timeLimiterTimeoutMs());
-        config.setStreamFirstChunkTimeoutMs(request.streamFirstChunkTimeoutMs());
-        config.setStreamMaxDurationMs(request.streamMaxDurationMs());
-        config.setMaxConcurrentCalls(request.maxConcurrentCalls());
-        config.setMaxWaitDurationMs(request.maxWaitDurationMs());
+        if (request.enabled() != null) config.setEnabled(request.enabled());
+        if (request.retryEnabled() != null) config.setRetryEnabled(request.retryEnabled());
+        if (request.maxAttempts() != null) config.setMaxAttempts(request.maxAttempts());
+        if (request.retryWaitMs() != null) config.setRetryWaitMs(request.retryWaitMs());
+        if (request.circuitEnabled() != null) config.setCircuitEnabled(request.circuitEnabled());
+        if (request.failureRateThreshold() != null) config.setFailureRateThreshold(request.failureRateThreshold());
+        config.setSlowCallRateThreshold(request.slowCallRateThreshold() != null ? request.slowCallRateThreshold() : (config.getSlowCallRateThreshold() != null ? config.getSlowCallRateThreshold() : 100));
+        if (request.slowCallDurationMs() != null) config.setSlowCallDurationMs(request.slowCallDurationMs());
+        config.setMinimumNumberOfCalls(request.minimumNumberOfCalls() != null ? request.minimumNumberOfCalls() : (config.getMinimumNumberOfCalls() != null ? config.getMinimumNumberOfCalls() : 10));
+        config.setSlidingWindowSize(request.slidingWindowSize() != null ? request.slidingWindowSize() : (config.getSlidingWindowSize() != null ? config.getSlidingWindowSize() : 20));
+        config.setWaitDurationInOpenStateMs(request.waitDurationInOpenStateMs() != null ? request.waitDurationInOpenStateMs() : (config.getWaitDurationInOpenStateMs() != null ? config.getWaitDurationInOpenStateMs() : 30000));
+        if (request.rateLimitEnabled() != null) config.setRateLimitEnabled(request.rateLimitEnabled());
+        if (request.limitForPeriod() != null) config.setLimitForPeriod(request.limitForPeriod());
+        config.setLimitRefreshPeriodMs(request.limitRefreshPeriodMs() != null ? request.limitRefreshPeriodMs() : (config.getLimitRefreshPeriodMs() != null ? config.getLimitRefreshPeriodMs() : 1000));
+        config.setTimeoutDurationMs(request.timeoutDurationMs() != null ? request.timeoutDurationMs() : (config.getTimeoutDurationMs() != null ? config.getTimeoutDurationMs() : 0));
+        if (request.bulkheadEnabled() != null) config.setBulkheadEnabled(request.bulkheadEnabled());
+        if (request.timeLimiterEnabled() != null) config.setTimeLimiterEnabled(request.timeLimiterEnabled());
+        config.setTimeLimiterTimeoutMs(request.timeLimiterTimeoutMs() != null ? request.timeLimiterTimeoutMs() : (config.getTimeLimiterTimeoutMs() != null ? config.getTimeLimiterTimeoutMs() : 60000));
+        if (request.streamFirstChunkTimeoutMs() != null) config.setStreamFirstChunkTimeoutMs(request.streamFirstChunkTimeoutMs());
+        if (request.streamMaxDurationMs() != null) config.setStreamMaxDurationMs(request.streamMaxDurationMs());
+        if (request.maxConcurrentCalls() != null) config.setMaxConcurrentCalls(request.maxConcurrentCalls());
+        config.setMaxWaitDurationMs(request.maxWaitDurationMs() != null ? request.maxWaitDurationMs() : (config.getMaxWaitDurationMs() != null ? config.getMaxWaitDurationMs() : 0));
     }
 
     private boolean isExistingBinding(ModelGovernanceConfig config) {
