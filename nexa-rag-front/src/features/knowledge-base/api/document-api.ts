@@ -31,6 +31,16 @@ export interface DocumentProcessStatus {
   failureReason: string | null
 }
 
+/** 文本切分策略类型。 */
+export type SplitStrategy = 'CHARACTER' | 'MARKDOWN' | 'REGEX' | 'EXCEL'
+
+/** 文本切分配置输入。 */
+export interface SplitConfigInput {
+  splitStrategy: SplitStrategy
+  chunkSize?: number
+  chunkOverlap?: number
+}
+
 /** 文本分块。 */
 export interface DocumentChunk {
   chunkId: string
@@ -52,6 +62,7 @@ export interface UploadDocumentInput {
   file: File
   title: string
   description: string
+  splitConfig?: SplitConfigInput | null
 }
 
 /** 查询文档服务端分页列表。 */
@@ -59,11 +70,21 @@ export function listDocuments(pageNum = 1, pageSize = 20, signal?: AbortSignal):
   return request<PageVO<DocumentSummary>>(`/api/documents?pageNum=${pageNum}&pageSize=${pageSize}`, signal ? { signal } : undefined)
 }
 
-/** 上传文档并使用后端默认处理配置。 */
+/** 上传文档并提交处理配置。 */
 export function uploadDocument(input: UploadDocumentInput, signal?: AbortSignal): Promise<UploadDocumentResponse> {
   const body = new FormData()
   body.append('file', input.file)
-  body.append('request', new Blob([JSON.stringify({ title: input.title || null, description: input.description || null })], { type: 'application/json' }))
+
+  const requestPayload: Record<string, unknown> = {
+    title: input.title || null,
+    description: input.description || null,
+  }
+
+  if (input.splitConfig) {
+    requestPayload.splitConfig = input.splitConfig
+  }
+
+  body.append('request', new Blob([JSON.stringify(requestPayload)], { type: 'application/json' }))
   return request<UploadDocumentResponse>('/api/documents/upload', { method: 'POST', body, signal })
 }
 

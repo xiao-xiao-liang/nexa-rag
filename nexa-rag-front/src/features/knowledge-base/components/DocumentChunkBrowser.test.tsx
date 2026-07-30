@@ -13,7 +13,7 @@ const chunks: DocumentChunk[] = [
 /** 分块浏览组件的交互测试宿主。 */
 function ChunkBrowserHarness() {
   const [selectedChunk, setSelectedChunk] = useState<DocumentChunk | null>(null)
-  return <DocumentChunkBrowser chunks={chunks} sourceFileName="员工手册.pdf" loading={false} error={null} selectedChunk={selectedChunk} pagination={null} onSelect={setSelectedChunk} onClose={() => setSelectedChunk(null)} onRetry={vi.fn()} />
+  return <DocumentChunkBrowser chunks={chunks} sourceFileName="员工手册.md" fileDescription="手工验收写入：真实 Markdown 文件切分结果" loading={false} error={null} selectedChunk={selectedChunk} pagination={null} onSelect={setSelectedChunk} onClose={() => setSelectedChunk(null)} onRetry={vi.fn()} onSave={vi.fn()} />
 }
 
 /** 文本分块主从浏览组件测试。 */
@@ -33,13 +33,13 @@ describe('DocumentChunkBrowser', () => {
     expect(screen.queryByRole('region', { name: '分块完整内容' })).not.toBeInTheDocument()
   })
 
-  it('选中卡片应暴露选中态，摘要最多占三行样式', async () => {
+  it('选中卡片应暴露选中态，摘要最多占四行样式', async () => {
     const user = userEvent.setup()
     render(<ChunkBrowserHarness />)
     const card = screen.getByRole('button', { name: '查看分块 1' })
 
     expect(card).toHaveAttribute('aria-pressed', 'false')
-    expect(card.querySelector('.line-clamp-3')).toHaveTextContent('第一段完整内容')
+    expect(card.querySelector('.line-clamp-4')).toHaveTextContent('第一段完整内容')
     await user.click(card)
     expect(card).toHaveAttribute('aria-pressed', 'true')
   })
@@ -49,30 +49,40 @@ describe('DocumentChunkBrowser', () => {
     const { container } = render(<ChunkBrowserHarness />)
 
     expect(container.querySelector('.lg\\:grid-cols-3')).toBeInTheDocument()
-    expect(screen.getAllByText('员工手册.pdf')).toHaveLength(2)
+    expect(screen.getAllByText('员工手册.md')).toHaveLength(3)
     await user.click(screen.getByRole('button', { name: '查看分块 1' }))
-    expect(screen.getByRole('region', { name: '分块完整内容' })).toHaveTextContent('员工手册.pdf')
+    expect(screen.getByRole('region', { name: '分块完整内容' })).toHaveTextContent('员工手册.md')
   })
 
   it('应提供知识块筛选，并保留固定的空白详情栏', async () => {
     const user = userEvent.setup()
     render(<ChunkBrowserHarness />)
 
-    expect(screen.getByRole('complementary', { name: '分块详情栏' })).toBeEmptyDOMElement()
-    await user.type(screen.getByRole('textbox', { name: '搜索文本分块' }), '第二段')
+    expect(screen.getByRole('complementary', { name: '分块详情栏' })).toHaveTextContent('选择一个分块后，可在这里预览并修改内容。')
+    await user.type(screen.getByRole('textbox', { name: '搜索当前页分块' }), '第二段')
     expect(screen.queryByRole('button', { name: '查看分块 1' })).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: '查看分块 2' })).toBeInTheDocument()
   })
 
+  it('应在分块上方展示文件基础信息，并收紧搜索框', () => {
+    render(<ChunkBrowserHarness />)
+
+    expect(screen.getByText('手工验收写入：真实 Markdown 文件切分结果')).toBeInTheDocument()
+    expect(screen.getByRole('textbox', { name: '搜索当前页分块' }).parentElement).toHaveClass('max-w-[330px]')
+    expect(screen.getByRole('complementary', { name: '分块详情栏' })).toHaveTextContent('选择一个分块后，可在这里预览并修改内容。')
+    expect(screen.getByRole('region', { name: '文本分块工作区' })).toHaveClass('xl:grid-cols-[minmax(0,1fr)_360px]')
+  })
+
   it('应在左侧列表显示加载、错误和空状态', () => {
-    const { rerender } = render(<DocumentChunkBrowser chunks={[]} sourceFileName="员工手册.pdf" loading error={null} selectedChunk={null} pagination={null} onSelect={vi.fn()} onClose={vi.fn()} onRetry={vi.fn()} />)
+    const props = { chunks: [], sourceFileName: '员工手册.pdf', fileDescription: null, selectedChunk: null, pagination: null, onSelect: vi.fn(), onClose: vi.fn(), onRetry: vi.fn(), onSave: vi.fn() }
+    const { rerender } = render(<DocumentChunkBrowser {...props} loading error={null} />)
     expect(screen.getByText('正在加载文本分块…')).toBeInTheDocument()
 
-    rerender(<DocumentChunkBrowser chunks={[]} sourceFileName="员工手册.pdf" loading={false} error="加载失败" selectedChunk={null} pagination={null} onSelect={vi.fn()} onClose={vi.fn()} onRetry={vi.fn()} />)
+    rerender(<DocumentChunkBrowser {...props} loading={false} error="加载失败" />)
     expect(screen.getByText('加载失败')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: '重新加载' })).toBeInTheDocument()
 
-    rerender(<DocumentChunkBrowser chunks={[]} sourceFileName="员工手册.pdf" loading={false} error={null} selectedChunk={null} pagination={null} onSelect={vi.fn()} onClose={vi.fn()} onRetry={vi.fn()} />)
+    rerender(<DocumentChunkBrowser {...props} loading={false} error={null} />)
     expect(screen.getByText('暂无可展示的文本分块。')).toBeInTheDocument()
   })
 })

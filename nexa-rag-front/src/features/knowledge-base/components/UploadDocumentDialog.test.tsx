@@ -62,7 +62,11 @@ describe('UploadDocumentDialog', () => {
     await user.upload(screen.getByLabelText('选择本地文件'), file)
     await user.click(screen.getByRole('button', { name: '开始上传' }))
 
-    await waitFor(() => expect(uploadDocument).toHaveBeenCalledWith({ file, title: '员工手册', description: '' }))
+    await waitFor(() =>
+      expect(uploadDocument).toHaveBeenCalledWith(
+        expect.objectContaining({ file, title: '员工手册', description: '' })
+      )
+    )
     expect(onUploaded).toHaveBeenCalledWith(18)
   })
 })
