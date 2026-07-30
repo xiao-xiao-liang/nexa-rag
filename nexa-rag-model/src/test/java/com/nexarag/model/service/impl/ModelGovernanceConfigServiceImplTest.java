@@ -1,10 +1,12 @@
 package com.nexarag.model.service.impl;
 
 import com.nexarag.model.dto.ModelGovernanceConfigRequest;
+import com.nexarag.model.converter.ModelGovernanceConfigConverter;
 import com.nexarag.model.entity.ModelGovernanceConfig;
 import com.nexarag.model.enums.ModelGovernanceBindingMode;
 import com.nexarag.model.refresh.ModelRegistryChangePublisher;
 import org.junit.jupiter.api.Test;
+import org.mapstruct.factory.Mappers;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
@@ -89,8 +91,8 @@ class ModelGovernanceConfigServiceImplTest {
 
         service.resetDefault(100L);
 
-        assertThat(service.updatedConfig.getGovernanceId()).isEqualTo(100L);
-        assertThat(service.updatedConfig.getMaxConcurrentCalls()).isEqualTo(10);
+        assertThat(service.savedConfig.getGovernanceId()).isEqualTo(100L);
+        assertThat(service.savedConfig.getMaxConcurrentCalls()).isEqualTo(10);
         verify(publisher).publish(1L);
     }
 
@@ -131,7 +133,7 @@ class ModelGovernanceConfigServiceImplTest {
         }
 
         private TestableModelGovernanceConfigServiceImpl(ModelRegistryChangePublisher publisher) {
-            super(null, publisher, null);
+            super(null, publisher, null, Mappers.getMapper(ModelGovernanceConfigConverter.class));
             this.publisher = publisher;
         }
 
@@ -167,6 +169,7 @@ class ModelGovernanceConfigServiceImplTest {
         @Override
         protected boolean saveGovernanceConfig(ModelGovernanceConfig config) {
             this.savedConfig = config;
+            this.existingConfig = config;
             return true;
         }
 
@@ -174,6 +177,11 @@ class ModelGovernanceConfigServiceImplTest {
         protected boolean updateGovernanceConfig(ModelGovernanceConfig config) {
             this.updatedConfig = config;
             return true;
+        }
+
+        @Override
+        protected void deleteGovernanceConfigPhysically(Long governanceId) {
+            // 1. 单元测试不执行数据库物理删除
         }
 
         @Override

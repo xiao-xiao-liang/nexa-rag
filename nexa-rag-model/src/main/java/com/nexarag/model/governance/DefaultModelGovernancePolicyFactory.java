@@ -47,31 +47,9 @@ public class DefaultModelGovernancePolicyFactory {
     }
 
     private ModelGovernanceConfig createBase(ModelType modelType) {
-        // 1. 先给出聊天模型的保守默认值
+        // 1. 仅创建数据库默认值之外的基础标识
         ModelGovernanceConfig config = ModelGovernanceConfig.builder()
                 .governanceId(IdWorker.getId())
-                .enabled(Boolean.TRUE)
-                .retryEnabled(Boolean.FALSE)
-                .maxAttempts(1)
-                .retryWaitMs(200)
-                .circuitEnabled(Boolean.TRUE)
-                .failureRateThreshold(50)
-                .slowCallRateThreshold(50)
-                .slowCallDurationMs(30000)
-                .minimumNumberOfCalls(10)
-                .slidingWindowSize(20)
-                .waitDurationInOpenStateMs(30000)
-                .rateLimitEnabled(Boolean.TRUE)
-                .limitForPeriod(60)
-                .limitRefreshPeriodMs(60000)
-                .timeoutDurationMs(0)
-                .bulkheadEnabled(Boolean.TRUE)
-                .timeLimiterEnabled(Boolean.TRUE)
-                .timeLimiterTimeoutMs(60000)
-                .streamFirstChunkTimeoutMs(30000)
-                .streamMaxDurationMs(300000)
-                .maxConcurrentCalls(8)
-                .maxWaitDurationMs(0)
                 .build();
 
         // 2. 按不同模型类型调整吞吐和超时参数
