@@ -52,6 +52,8 @@ export default function ChatWorkspace() {
   const abortRef = useRef<AbortController | null>(null)
   const stopRequestedRef = useRef(false)
   const generationIdRef = useRef<string | null>(null)
+  const streamActiveRef = useRef(false)
+  const activeStreamConversationIdRef = useRef<string | null>(null)
   const cancelledGenerationIdsRef = useRef(new Set<string>())
   const historyAbortRef = useRef<AbortController | null>(null)
   const historyRequestRef = useRef(0)
@@ -134,6 +136,11 @@ export default function ChatWorkspace() {
 
   useEffect(() => {
     if (selectedId) {
+      // 1. 新建会话的 META 仅补充地址中的会话标识，不能把当前 SSE 误判为切换会话。
+      if (streamActiveRef.current && activeStreamConversationIdRef.current === selectedId) {
+        return
+      }
+      // 2. 用户切换到其他会话时，继续加载历史消息并中断旧会话的流。
       void loadConversation(selectedId)
       return
     }
@@ -173,6 +180,8 @@ export default function ChatWorkspace() {
   const handleStreamEvent = (assistantId: string, event: ChatStreamEvent) => {
     if (event.type === 'META') {
       if (event.conversationId) {
+        // 1. 新会话在收到 META 后才取得会话标识，供地址更新时识别当前流的归属。
+        activeStreamConversationIdRef.current = event.conversationId
         setSearchParams({ conversation: event.conversationId }, { replace: true })
         setConversationAgents((current) => ({ ...current, [event.conversationId!]: current[event.conversationId!] ?? DEFAULT_CONVERSATION_AGENT }))
       }
@@ -228,6 +237,8 @@ export default function ChatWorkspace() {
     abortRef.current = controller
     stopRequestedRef.current = false
     generationIdRef.current = null
+    streamActiveRef.current = true
+    activeStreamConversationIdRef.current = selectedId
     setDraft('')
     setMessages((current) => [...current, userMessage, assistant])
     setStreaming(true)
@@ -247,6 +258,8 @@ export default function ChatWorkspace() {
     } finally {
       setStreaming(false)
       generationIdRef.current = null
+      streamActiveRef.current = false
+      activeStreamConversationIdRef.current = null
       setActiveAssistantId((current) => current === assistant.messageId ? null : current)
       abortRef.current = null
     }

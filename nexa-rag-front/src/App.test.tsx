@@ -203,6 +203,34 @@ describe('RAG 对话工作台', () => {
     expect(fetchMock).toHaveBeenCalledWith('/api/chat/generations/g-current', { method: 'DELETE' })
   })
 
+  it('新会话 META 更新地址时不应中断当前 SSE', async () => {
+    const encoder = new TextEncoder()
+    let streamController: ReadableStreamDefaultController<Uint8Array>
+    let streamAborted = false
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(success({ records: [], total: 0, current: 1, size: 20, pages: 0 }))
+      .mockImplementationOnce((_url: string, init?: RequestInit) => Promise.resolve(new Response(new ReadableStream({
+        start(controller) {
+          streamController = controller
+          init?.signal?.addEventListener('abort', () => {
+            streamAborted = true
+            controller.error(new DOMException('请求已取消', 'AbortError'))
+          }, { once: true })
+        },
+      }), { status: 200 })))
+    vi.stubGlobal('fetch', fetchMock)
+    render(<App />)
+    const input = await screen.findByRole('textbox', { name: '消息内容' })
+    await userEvent.type(input, '创建新会话')
+    await userEvent.keyboard('{Enter}')
+
+    streamController!.enqueue(encoder.encode('event: META\ndata: {"conversationId":"c-new","generationId":"g-new"}\n\n'))
+
+    await waitFor(() => expect(router.state.location.search).toBe('?conversation=c-new'))
+    expect(streamAborted).toBe(false)
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+  })
+
   it('META 在停止后到达时仍应取消对应生成任务', async () => {
     const encoder = new TextEncoder()
     let streamController: ReadableStreamDefaultController<Uint8Array>

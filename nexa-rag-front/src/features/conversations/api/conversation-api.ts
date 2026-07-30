@@ -44,12 +44,50 @@ export interface GetConversationMessagesParams {
   signal?: AbortSignal
 }
 
+/** 创建会话请求体。 */
+export interface CreateConversationParams {
+  title?: string
+}
+
+/** 修改会话标题请求体。 */
+export interface UpdateConversationParams {
+  title: string
+}
+
 /** 查询当前用户的会话列表。 */
 export function getConversations(
   { current = 1, size = 20 }: GetConversationsParams = {},
 ): Promise<PageVO<ConversationListItem>> {
   const params = new URLSearchParams({ current: String(current), size: String(size) })
   return request<PageVO<ConversationListItem>>(`/api/conversations?${params.toString()}`)
+}
+
+/** 创建新会话。 */
+export function createConversation(params?: CreateConversationParams): Promise<ConversationListItem> {
+  return request<ConversationListItem>('/api/conversations', {
+    method: 'POST',
+    body: JSON.stringify(params || {}),
+  })
+}
+
+/** 查询单条会话详情。 */
+export function getConversation(conversationId: string): Promise<ConversationListItem> {
+  return request<ConversationListItem>(`/api/conversations/${encodeURIComponent(conversationId)}`)
+}
+
+/** 修改指定会话标题。 */
+export function updateConversation(conversationId: string, params: UpdateConversationParams): Promise<void> {
+  return request<void>(`/api/conversations/${encodeURIComponent(conversationId)}`, {
+    method: 'PUT',
+    body: JSON.stringify(params),
+  })
+}
+
+/** 删除指定会话。 */
+export function deleteConversation(conversationId: string): Promise<void> {
+  return request<void>(`/api/conversations/${encodeURIComponent(conversationId)}`, {
+    method: 'DELETE',
+  })
 }
 
 /** 查询指定会话的历史消息。 */
