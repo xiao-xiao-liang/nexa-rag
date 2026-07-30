@@ -7,6 +7,7 @@ import com.nexarag.chat.domain.ConversationContext;
 import com.nexarag.chat.service.ConversationContextService;
 import com.nexarag.chat.service.ConversationMessageService;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 
@@ -17,6 +18,7 @@ import static com.nexarag.workflow.constants.ChatWorkflowStateKeys.CONVERSATION_
 import static com.nexarag.workflow.constants.ChatWorkflowStateKeys.USER_ID;
 import static com.nexarag.workflow.constants.ChatWorkflowStateKeys.USER_MESSAGE_ID;
 import static com.nexarag.workflow.constants.ChatWorkflowStateKeys.USER_QUESTION;
+import static com.nexarag.workflow.constants.ChatWorkflowStateKeys.TRACE_ID;
 
 /**
  * 会话上下文节点，负责加载上下文并保存本轮用户消息。
@@ -24,6 +26,7 @@ import static com.nexarag.workflow.constants.ChatWorkflowStateKeys.USER_QUESTION
 @Component
 @ConditionalOnProperty(prefix = "nexa.chat", name = "enabled", havingValue = "true", matchIfMissing = true)
 @RequiredArgsConstructor
+@Slf4j
 public class ConversationContextNode implements NodeAction {
 
     private final ConversationContextService contextService;
@@ -38,6 +41,7 @@ public class ConversationContextNode implements NodeAction {
         // 2. 保存本轮用户消息
         ChatMessageVO message = messageService.appendUserMessage(
                 conversationId, userId, state.value(USER_QUESTION, ""));
+        log.debug("会话上下文加载完成，conversationId={}，context={}", conversationId, context);
         return Map.of(CONVERSATION_CONTEXT, context, USER_MESSAGE_ID, message.messageId());
     }
 }

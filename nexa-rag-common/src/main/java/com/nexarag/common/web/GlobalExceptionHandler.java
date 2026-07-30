@@ -3,7 +3,9 @@ package com.nexarag.common.web;
 import com.nexarag.common.error.BaseErrorCode;
 import com.nexarag.common.exception.AbstractException;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.MediaType;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
@@ -11,6 +13,7 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 
+import java.io.IOException;
 import java.util.Optional;
 
 /**
@@ -79,6 +82,36 @@ public class GlobalExceptionHandler {
     public Result<Void> handleThrowable(HttpServletRequest request, Throwable throwable) {
         log.error("[{}] {} 未处理异常", request.getMethod(), getUrl(request), throwable);
         return Results.failure();
+    }
+
+    /**
+     * 处理 HTTP 输出异常，避免 SSE 客户端断连后继续写入统一 JSON 响应。
+     *
+     * @param request HTTP 请求
+     * @param response HTTP 响应
+     * @param exception IO 异常
+     */
+    @ExceptionHandler(IOException.class)
+    public void handleIOException(HttpServletRequest request, HttpServletResponse response, IOException exception) {
+        if (shouldIgnoreSseClientDisconnect(request, response)) {
+            log.info("SSE 客户端连接已断开，停止写入响应，uri={}", getUrl(request));
+            return;
+        }
+        log.error("[{}] {} 响应写入失败", request.getMethod(), getUrl(request), exception);
+    }
+
+    /**
+     * 判断是否应忽略已提交 SSE 响应的客户端断连异常。
+     *
+     * @param request HTTP 请求
+     * @param response HTTP 响应
+     * @return 是否应忽略
+     */
+    boolean shouldIgnoreSseClientDisconnect(HttpServletRequest request, HttpServletResponse response) {
+        String contentType = response.getContentType();
+        return response.isCommitted()
+                && contentType != null
+                && contentType.startsWith(MediaType.TEXT_EVENT_STREAM_VALUE);
     }
 
     /**

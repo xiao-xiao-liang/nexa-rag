@@ -4,6 +4,7 @@ import com.alibaba.cloud.ai.graph.OverAllState;
 import com.alibaba.cloud.ai.graph.action.EdgeAction;
 import com.nexarag.retrieval.model.RetrievalChunk;
 import com.nexarag.retrieval.enums.RetrievalScope;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
@@ -17,11 +18,13 @@ import static com.nexarag.workflow.constants.ChatWorkflowStateKeys.RETRIEVAL_ROU
 import static com.nexarag.workflow.constants.ChatWorkflowStateKeys.RETRIEVAL_SCOPE;
 import static com.nexarag.workflow.constants.ChatWorkflowStateKeys.RETRIEVAL_TOP_K;
 import static com.nexarag.workflow.constants.ChatWorkflowStateKeys.RETRIEVAL_VECTOR_THRESHOLD;
+import static com.nexarag.workflow.constants.ChatWorkflowStateKeys.TRACE_ID;
 
 /**
  * 检索融合路由器，负责判断候选质量并准备一次扩召参数。
  */
 @Component
+@Slf4j
 public class RetrievalFusionDispatcher implements EdgeAction {
 
     private static final int EXPANSION_FACTOR = 3;
@@ -50,6 +53,9 @@ public class RetrievalFusionDispatcher implements EdgeAction {
                 RETRIEVAL_TOP_K, topK * EXPANSION_FACTOR,
                 RETRIEVAL_VECTOR_THRESHOLD, Math.max(0D, threshold - THRESHOLD_REDUCTION),
                 RETRIEVAL_SCOPE, RetrievalScope.INTENT_AND_GLOBAL));
+        log.info("检索结果为空，触发扩召，traceId={}，nextRound={}，topK={}，vectorThreshold={}，scope={}",
+                state.value(TRACE_ID, ""), round + 1, topK * EXPANSION_FACTOR,
+                Math.max(0D, threshold - THRESHOLD_REDUCTION), RetrievalScope.INTENT_AND_GLOBAL);
 
         // 2. 返回检索节点执行唯一一次扩召
         return RETRIEVAL_NODE;

@@ -7,6 +7,7 @@ import com.nexarag.chat.service.ConversationContextService;
 import com.nexarag.chat.service.ConversationMessageService;
 import com.nexarag.chat.service.ConversationSummaryService;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 
@@ -23,6 +24,8 @@ import static com.nexarag.workflow.constants.ChatWorkflowStateKeys.PROMPT_TOKENS
 import static com.nexarag.workflow.constants.ChatWorkflowStateKeys.STREAM_STATUS;
 import static com.nexarag.workflow.constants.ChatWorkflowStateKeys.TOTAL_TOKENS;
 import static com.nexarag.workflow.constants.ChatWorkflowStateKeys.USER_ID;
+import static com.nexarag.workflow.constants.ChatWorkflowStateKeys.TRACE_ID;
+import static com.nexarag.workflow.constants.ChatWorkflowStateKeys.GENERATION_ID;
 
 /**
  * 助手消息最终化节点，负责持久化生成结果并刷新成功上下文。
@@ -30,6 +33,7 @@ import static com.nexarag.workflow.constants.ChatWorkflowStateKeys.USER_ID;
 @Component
 @ConditionalOnProperty(prefix = "nexa.chat", name = "enabled", havingValue = "true", matchIfMissing = true)
 @RequiredArgsConstructor
+@Slf4j
 public class AssistantMessagePersistenceNode implements NodeAction {
     private final ConversationMessageService messageService;
     private final ConversationContextService contextService;
@@ -56,6 +60,9 @@ public class AssistantMessagePersistenceNode implements NodeAction {
             messageService.failAssistantMessage(messageId, content,
                     (String) result.get(ERROR_CODE), (String) result.get(ERROR_MESSAGE));
         }
+        log.info("回答生成结束，会话ID：{}，内容长度：{}，总Token：{}",
+               state.value(CONVERSATION_ID, ""), content.length(), result.getOrDefault(TOTAL_TOKENS, 0));
+        log.debug("模型回答：{}", result);
         return result;
     }
 

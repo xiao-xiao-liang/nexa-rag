@@ -15,10 +15,10 @@ import org.springframework.stereotype.Component;
 
 import java.util.List;
 import java.util.Map;
-import java.util.UUID;
 
 import static com.nexarag.workflow.constants.ChatWorkflowStateKeys.INTENT_RESULT;
 import static com.nexarag.workflow.constants.ChatWorkflowStateKeys.REWRITTEN_QUESTION;
+import static com.nexarag.workflow.constants.ChatWorkflowStateKeys.TRACE_ID;
 import static com.nexarag.workflow.constants.ChatWorkflowStateKeys.PROMPT_EXECUTION_SNAPSHOT;
 import static com.nexarag.chat.constants.ChatModelRouteConstants.CHAT_INTENT_ROUTE_KEY;
 
@@ -46,7 +46,7 @@ public class IntentRecognitionNode implements NodeAction {
         try {
             // 1. 调用意图识别模型路由
             var response = modelGateway.chat(ChatModelRequest.builder()
-                    .traceId(UUID.randomUUID().toString())
+                    .traceId(state.value(TRACE_ID, ""))
                     .bizType(ModelBizType.CHAT)
                     .bizId(CHAT_INTENT_ROUTE_KEY)
                     .routeKey(CHAT_INTENT_ROUTE_KEY)
@@ -56,10 +56,12 @@ public class IntentRecognitionNode implements NodeAction {
             // 2. 解析结构化意图结果
             IntentRecognitionResult intentResult = response == null ? null
                     : objectMapper.readValue(response.content(), IntentRecognitionResult.class);
-            return Map.of(INTENT_RESULT, intentResult == null ? emptyIntent() : intentResult);
+            IntentRecognitionResult result = intentResult == null ? emptyIntent() : intentResult;
+            log.info("意图识别结果：{}，置信度：{}", result.intentIds(), result.confidence());
+            return Map.of(INTENT_RESULT, result);
         } catch (Exception exception) {
             // 3. 识别失败时交由后续节点扩大检索范围
-            log.warn("意图识别失败，将使用全局检索范围", exception);
+            log.warn("意图识别失败，进行全局检索", exception);
             return Map.of(INTENT_RESULT, emptyIntent());
         }
     }

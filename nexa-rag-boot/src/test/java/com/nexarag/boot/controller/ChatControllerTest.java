@@ -6,6 +6,7 @@ import com.alibaba.cloud.ai.graph.streaming.StreamingOutput;
 import com.nexarag.auth.context.CurrentUser;
 import com.nexarag.auth.context.CurrentUserContext;
 import com.nexarag.chat.id.ChatIdGenerator;
+import com.nexarag.common.trace.TraceIdContext;
 import com.nexarag.common.exception.ServiceException;
 import com.nexarag.workflow.service.WorkflowService;
 import com.nexarag.workflow.stream.ChatGenerationTaskManager;
@@ -19,6 +20,7 @@ import reactor.test.StepVerifier;
 import java.util.Map;
 
 import static com.nexarag.workflow.constants.ChatWorkflowStateKeys.USER_ID;
+import static com.nexarag.workflow.constants.ChatWorkflowStateKeys.TRACE_ID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
@@ -34,6 +36,7 @@ class ChatControllerTest {
     @AfterEach
     void clearContext() {
         CurrentUserContext.clear();
+        TraceIdContext.clear();
     }
 
     @Test
@@ -47,6 +50,7 @@ class ChatControllerTest {
         ChatController controller = new ChatController(
                 workflowService, mock(ChatGenerationTaskManager.class), idGenerator);
         CurrentUserContext.set(new CurrentUser("u1"));
+        TraceIdContext.setTraceId("trace-001");
 
         StepVerifier.create(controller.stream(new ChatStreamRequest(null, "你好")))
                 .assertNext(event -> assertThat(event.data().type().name()).isEqualTo("TOKEN"))
@@ -56,7 +60,9 @@ class ChatControllerTest {
         @SuppressWarnings("unchecked")
         ArgumentCaptor<Map<String, Object>> captor = ArgumentCaptor.forClass(Map.class);
         verify(workflowService).stream(eq("chat-conversation"), captor.capture());
-        assertThat(captor.getValue()).containsEntry(USER_ID, "u1");
+        assertThat(captor.getValue())
+                .containsEntry(USER_ID, "u1")
+                .containsEntry(TRACE_ID, "trace-001");
     }
 
     @Test

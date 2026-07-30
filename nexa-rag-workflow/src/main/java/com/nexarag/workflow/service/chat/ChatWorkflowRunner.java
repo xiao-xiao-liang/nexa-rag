@@ -10,6 +10,7 @@ import com.nexarag.common.exception.ServiceException;
 import com.nexarag.model.toolkits.prompt.PromptBuilder;
 import com.nexarag.model.toolkits.prompt.PromptReleaseResolver;
 import com.nexarag.workflow.service.StreamingWorkflowGraphRunner;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -23,12 +24,16 @@ import static com.nexarag.workflow.constants.ChatWorkflowGraphConstants.CHAT_THR
 import static com.nexarag.workflow.constants.ChatWorkflowStateKeys.TRACE_ID;
 import static com.nexarag.workflow.constants.ChatWorkflowStateKeys.USER_ID;
 import static com.nexarag.workflow.constants.ChatWorkflowStateKeys.PROMPT_EXECUTION_SNAPSHOT;
+import static com.nexarag.workflow.constants.ChatWorkflowStateKeys.CONVERSATION_ID;
+import static com.nexarag.workflow.constants.ChatWorkflowStateKeys.GENERATION_ID;
+import static com.nexarag.workflow.constants.ChatWorkflowStateKeys.USER_QUESTION;
 
 /**
  * Chat Workflow Runner，负责编译并以请求级线程标识运行对话 Graph。
  */
 @Service
 @ConditionalOnProperty(prefix = "nexa.chat", name = "enabled", havingValue = "true", matchIfMissing = true)
+@Slf4j
 public class ChatWorkflowRunner implements StreamingWorkflowGraphRunner {
     private static final Set<String> CHAT_PROMPT_CODES = Set.of(
             PromptBuilder.REWRITE_INSTRUCTION,
@@ -67,7 +72,16 @@ public class ChatWorkflowRunner implements StreamingWorkflowGraphRunner {
         // 2. 使用链路标识构造唯一 Graph 线程，并传入已绑定 Prompt 快照的初始状态
         String traceId = String.valueOf(state.get(TRACE_ID));
         RunnableConfig config = RunnableConfig.builder().threadId(CHAT_THREAD_PREFIX + traceId).build();
-        return compiledGraph.graphResponseStream(state, config)
-                .map(response -> (GraphResponse<StreamingOutput<?>>) (GraphResponse) response);
+        return Flux.defer(() -> {
+            long workflowStart = System.currentTimeMillis();
+            log.info("对话工作流开始，traceId={}，userId={}，conversationId={}", traceId, state.get(USER_ID), state.get(CONVERSATION_ID));
+
+            return compiledGraph.graphResponseStream(state, config)
+                    .doOnComplete(() -> log.info("对话工作流结束，traceId={}，totalDurationMs={}", traceId,
+                            Math.max(0, System.currentTimeMillis() - workflowStart)))
+                    .doOnError(exception -> log.error("对话工作流执行失败，traceId={}，totalDurationMs={}", traceId,
+                            Math.max(0, System.currentTimeMillis() - workflowStart), exception))
+                    .map(response -> (GraphResponse<StreamingOutput<?>>) (GraphResponse) response);
+        });
     }
 }

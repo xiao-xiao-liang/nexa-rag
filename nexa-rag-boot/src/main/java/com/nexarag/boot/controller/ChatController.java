@@ -4,6 +4,7 @@ import com.nexarag.auth.context.CurrentUserContext;
 import com.nexarag.chat.id.ChatIdGenerator;
 import com.nexarag.common.exception.AbstractException;
 import com.nexarag.common.exception.ClientException;
+import com.nexarag.common.trace.TraceIdContext;
 import com.nexarag.workflow.request.ChatWorkflowRequest;
 import com.nexarag.workflow.service.WorkflowService;
 import com.nexarag.workflow.stream.ChatGenerationTaskManager;
@@ -12,6 +13,7 @@ import com.nexarag.workflow.stream.ChatStreamEventType;
 import com.alibaba.cloud.ai.graph.NodeOutput;
 import com.alibaba.cloud.ai.graph.streaming.StreamingOutput;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.MediaType;
 import org.springframework.http.codec.ServerSentEvent;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -22,7 +24,6 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import reactor.core.publisher.Flux;
 
-import java.util.UUID;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import static com.nexarag.workflow.constants.ChatWorkflowGraphConstants.CHAT_CONVERSATION_GRAPH_NAME;
@@ -33,6 +34,7 @@ import static com.nexarag.workflow.constants.ChatWorkflowGraphConstants.CHAT_CON
 @RestController
 @RequestMapping("/api/chat")
 @RequiredArgsConstructor
+@Slf4j
 public class ChatController {
 
     private final WorkflowService workflowService;
@@ -53,7 +55,8 @@ public class ChatController {
         // 1. 从鉴权上下文读取用户并生成请求级标识
         String userId = CurrentUserContext.getRequired().userId();
         String generationId = idGenerator.nextId();
-        String traceId = UUID.randomUUID().toString().replace("-", "");
+        String traceId = TraceIdContext.getTraceId();
+        log.debug("用户原始问题：{}", request.content());
         ChatWorkflowRequest workflowRequest = new ChatWorkflowRequest(
                 userId, request.conversationId(), request.content(), generationId, traceId);
 

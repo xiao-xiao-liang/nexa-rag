@@ -14,6 +14,7 @@ import java.util.Map;
 import static com.nexarag.workflow.constants.ChatWorkflowStateKeys.FUSED_RETRIEVAL_RESULTS;
 import static com.nexarag.workflow.constants.ChatWorkflowStateKeys.RERANKED_RETRIEVAL_RESULTS;
 import static com.nexarag.workflow.constants.ChatWorkflowStateKeys.REWRITTEN_QUESTION;
+import static com.nexarag.workflow.constants.ChatWorkflowStateKeys.TRACE_ID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
@@ -54,11 +55,13 @@ class RerankNodeTest {
 
         Map<String, Object> result = node.apply(new OverAllState(Map.of(
                 REWRITTEN_QUESTION, "退款规则",
+                TRACE_ID, "trace-001",
                 FUSED_RETRIEVAL_RESULTS, chunks)));
 
         assertThat((List<?>) result.get(RERANKED_RETRIEVAL_RESULTS)).hasSize(5);
         ArgumentCaptor<RerankModelRequest> captor = ArgumentCaptor.forClass(RerankModelRequest.class);
         verify(modelGateway).rerank(captor.capture());
         assertThat(captor.getValue().routeKey()).isEqualTo("rerank");
+        assertThat(captor.getValue().traceId()).isEqualTo("trace-001");
     }
 }

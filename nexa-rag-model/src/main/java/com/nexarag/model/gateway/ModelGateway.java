@@ -12,6 +12,7 @@ import com.nexarag.model.gateway.rerank.RerankModelResponse;
 import com.nexarag.model.provider.ModelProviderDispatcher;
 import com.nexarag.model.route.ModelRouteDecision;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
 
@@ -20,6 +21,7 @@ import reactor.core.publisher.Flux;
  */
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class ModelGateway {
 
     private final ModelExecutionTemplate executionTemplate;
@@ -33,6 +35,7 @@ public class ModelGateway {
      */
     public ChatModelResponse chat(ChatModelRequest request) {
         // 1. 交给执行模板统一处理路由、日志和后续治理能力
+        logChatPrompt(request);
         return executionTemplate.execute(ModelExecutionCommand.ofChat(request,
                 decision -> providerDispatcher.chat(decision, request)));
     }
@@ -46,6 +49,7 @@ public class ModelGateway {
      */
     public ChatModelResponse chat(ModelRouteDecision decision, ChatModelRequest request) {
         // 1. 用指定路由决策执行，主要用于模型配置连接测试
+        logChatPrompt(request);
         return executionTemplate.execute(ModelExecutionCommand.ofChat(request,
                 ignored -> providerDispatcher.chat(decision, request)), decision);
     }
@@ -58,6 +62,7 @@ public class ModelGateway {
      */
     public Flux<ChatModelStreamResponse> streamChat(ChatModelRequest request) {
         // 1. 交给执行模板统一处理路由、日志和后续治理能力
+        logChatPrompt(request);
         return executionTemplate.executeStream(ModelExecutionCommand.ofChatStream(request,
                 decision -> providerDispatcher.streamChat(decision, request)));
     }
@@ -110,5 +115,17 @@ public class ModelGateway {
         // 1. 用指定路由决策执行，主要用于模型配置连接测试
         return executionTemplate.execute(ModelExecutionCommand.ofRerank(request,
                 ignored -> providerDispatcher.rerank(decision, request)), decision);
+    }
+
+    /**
+     * 输出渲染完成后的 Chat 模型消息，便于排查提示词加载与变量替换结果。
+     *
+     * @param request Chat 模型请求
+     */
+    private void logChatPrompt(ChatModelRequest request) {
+        if (log.isDebugEnabled()) {
+            log.debug("模型提示词已加载，traceId={}，bizType={}，bizId={}，routeKey={}，messages={}",
+                    request.traceId(), request.bizType(), request.bizId(), request.routeKey(), request.messages());
+        }
     }
 }

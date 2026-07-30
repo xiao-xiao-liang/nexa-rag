@@ -17,6 +17,7 @@ import com.nexarag.workflow.stream.ChatGenerationAccumulator;
 import com.nexarag.workflow.stream.ChatGenerationTaskManager;
 import com.nexarag.workflow.stream.ChatWorkflowStreamingUtil;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import reactor.core.publisher.Flux;
@@ -43,6 +44,7 @@ import static com.nexarag.chat.constants.ChatModelRouteConstants.CHAT_ANSWER_ROU
 @Component
 @ConditionalOnProperty(prefix = "nexa.chat", name = "enabled", havingValue = "true", matchIfMissing = true)
 @RequiredArgsConstructor
+@Slf4j
 public class AnswerGenerationNode implements NodeAction {
 
     private final ConversationMessageService messageService;
@@ -64,6 +66,7 @@ public class AnswerGenerationNode implements NodeAction {
 
         // 2. 调用最终回答模型并绑定取消句柄
         List<RetrievalChunk> chunks = state.value(RERANKED_RETRIEVAL_RESULTS, List.of());
+        log.info("准备调用模型生成回答");
         Flux<com.nexarag.model.gateway.chat.ChatModelStreamResponse> modelStream = modelGateway.streamChat(
                 ChatModelRequest.builder()
                         .traceId(state.value(TRACE_ID, ""))

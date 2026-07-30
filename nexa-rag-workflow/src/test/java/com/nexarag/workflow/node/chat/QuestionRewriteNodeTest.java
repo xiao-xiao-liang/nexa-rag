@@ -18,6 +18,7 @@ import java.util.Map;
 import static com.nexarag.workflow.constants.ChatWorkflowStateKeys.CONVERSATION_CONTEXT;
 import static com.nexarag.workflow.constants.ChatWorkflowStateKeys.PROMPT_EXECUTION_SNAPSHOT;
 import static com.nexarag.workflow.constants.ChatWorkflowStateKeys.REWRITTEN_QUESTION;
+import static com.nexarag.workflow.constants.ChatWorkflowStateKeys.TRACE_ID;
 import static com.nexarag.workflow.constants.ChatWorkflowStateKeys.USER_QUESTION;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.verify;
@@ -40,6 +41,7 @@ class QuestionRewriteNodeTest {
 
         Map<String, Object> result = node.apply(new OverAllState(Map.of(
                 USER_QUESTION, "原问题",
+                TRACE_ID, "trace-001",
                 CONVERSATION_CONTEXT, new com.nexarag.chat.domain.ConversationContext("c1", "u1", "", "", List.of(), "", 1L),
                 PROMPT_EXECUTION_SNAPSHOT, snapshot())));
 
@@ -48,6 +50,7 @@ class QuestionRewriteNodeTest {
                 ArgumentCaptor.forClass(com.nexarag.model.gateway.chat.ChatModelRequest.class);
         verify(modelGateway).chat(captor.capture());
         assertThat(captor.getValue().routeKey()).isEqualTo("chat");
+        assertThat(captor.getValue().traceId()).isEqualTo("trace-001");
     }
 
     private PromptExecutionSnapshot snapshot() {

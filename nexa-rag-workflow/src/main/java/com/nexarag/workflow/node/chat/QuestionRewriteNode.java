@@ -12,11 +12,11 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 import java.util.Map;
-import java.util.UUID;
 
 import static com.nexarag.workflow.constants.ChatWorkflowStateKeys.CONVERSATION_CONTEXT;
 import static com.nexarag.workflow.constants.ChatWorkflowStateKeys.REWRITTEN_QUESTION;
 import static com.nexarag.workflow.constants.ChatWorkflowStateKeys.USER_QUESTION;
+import static com.nexarag.workflow.constants.ChatWorkflowStateKeys.TRACE_ID;
 import static com.nexarag.workflow.constants.ChatWorkflowStateKeys.PROMPT_EXECUTION_SNAPSHOT;
 import static com.nexarag.chat.constants.ChatModelRouteConstants.CHAT_REWRITE_ROUTE_KEY;
 
@@ -46,7 +46,7 @@ public class QuestionRewriteNode implements NodeAction {
         try {
             // 2. 调用问题改写模型路由
             var response = modelGateway.chat(ChatModelRequest.builder()
-                    .traceId(UUID.randomUUID().toString())
+                    .traceId(state.value(TRACE_ID, ""))
                     .bizType(ModelBizType.CHAT)
                     .bizId(CHAT_REWRITE_ROUTE_KEY)
                     .routeKey(CHAT_REWRITE_ROUTE_KEY)
@@ -57,6 +57,7 @@ public class QuestionRewriteNode implements NodeAction {
                     .build());
             String rewrittenQuestion = response == null || response.content() == null || response.content().isBlank()
                     ? question : response.content().trim();
+            log.info("问题改写结果：{}", rewrittenQuestion);
             return Map.of(REWRITTEN_QUESTION, rewrittenQuestion);
         } catch (RuntimeException exception) {
             // 3. 模型调用失败时回退原问题，保证检索链路继续执行

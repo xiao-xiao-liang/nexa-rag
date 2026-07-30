@@ -49,4 +49,5 @@ class ChatWorkflowRunnerTest {
         assertThat(stateCaptor.getValue().get(PROMPT_EXECUTION_SNAPSHOT)).isSameAs(snapshot);
         assertThat(configCaptor.getValue().threadId()).contains("chat:t1");
     }
+
 }

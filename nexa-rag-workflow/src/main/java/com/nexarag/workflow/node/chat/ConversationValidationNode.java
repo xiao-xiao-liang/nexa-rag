@@ -44,6 +44,7 @@ public class ConversationValidationNode implements NodeAction {
         if (!conversationId.isBlank()) {
             // 1. 校验已有会话归属
             conversationService.getOwned(conversationId, userId);
+            log.debug("会话校验完成，traceId={}，conversationId={}", state.value(TRACE_ID, ""), conversationId);
             return Map.of(IS_NEW_CONVERSATION, false);
         }
 

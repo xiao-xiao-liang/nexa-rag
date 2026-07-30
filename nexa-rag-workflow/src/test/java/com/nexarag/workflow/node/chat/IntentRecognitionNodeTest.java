@@ -9,6 +9,7 @@ import com.nexarag.model.toolkits.prompt.PromptRender;
 import com.nexarag.model.prompt.domain.PromptVariableSchema;
 import com.nexarag.retrieval.dto.res.IntentRecognitionResult;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 
 import java.util.List;
 import java.util.Map;
@@ -16,9 +17,11 @@ import java.util.Map;
 import static com.nexarag.workflow.constants.ChatWorkflowStateKeys.INTENT_RESULT;
 import static com.nexarag.workflow.constants.ChatWorkflowStateKeys.PROMPT_EXECUTION_SNAPSHOT;
 import static com.nexarag.workflow.constants.ChatWorkflowStateKeys.REWRITTEN_QUESTION;
+import static com.nexarag.workflow.constants.ChatWorkflowStateKeys.TRACE_ID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /**
@@ -34,9 +37,14 @@ class IntentRecognitionNodeTest {
                 modelGateway, new ObjectMapper(), new PromptBuilder(new PromptRender()));
 
         Map<String, Object> result = node.apply(new OverAllState(Map.of(
-                REWRITTEN_QUESTION, "退款规则", PROMPT_EXECUTION_SNAPSHOT, snapshot())));
+                REWRITTEN_QUESTION, "退款规则", TRACE_ID, "trace-001",
+                PROMPT_EXECUTION_SNAPSHOT, snapshot())));
 
         assertThat(result.get(INTENT_RESULT)).isEqualTo(new IntentRecognitionResult(List.of(), 0.0D));
+        ArgumentCaptor<com.nexarag.model.gateway.chat.ChatModelRequest> captor =
+                ArgumentCaptor.forClass(com.nexarag.model.gateway.chat.ChatModelRequest.class);
+        verify(modelGateway).chat(captor.capture());
+        assertThat(captor.getValue().traceId()).isEqualTo("trace-001");
     }
 
     private PromptExecutionSnapshot snapshot() {
