@@ -1,0 +1,27 @@
+﻿<h2>校准版：Controller 启动图 + 通用 WorkflowService</h2>
+<p class="subtitle">不把文档入库 Graph 绑定到 DocumentPipelineExecutor；WorkflowService 作为通用图运行入口，未来可承载在线检索图。</p>
+
+<div class="mockup">
+  <div class="mockup-header">入口变化：显式启动 Graph，而不是替换 Local Worker Executor</div>
+  <div class="mockup-body">
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;">
+      <div class="placeholder" style="border-left:5px solid #5b8def;"><strong>document/controller</strong><br>DocumentController / 内部接口<br><small>提交处理或手动触发入库图</small></div>
+      <div class="placeholder" style="border-left:5px solid #f59f00;"><strong>workflow</strong><br>WorkflowService<br><small>compile/cache graphs<br>run(graphName, initialState)</small></div>
+      <div class="placeholder" style="border-left:5px solid #2fb344;"><strong>StateGraph Beans</strong><br>documentIngestionGraph<br>future: retrievalGraph<br><small>Spring AI Alibaba Graph</small></div>
+    </div>
+
+    <div style="height:18px"></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:12px;">
+      <div class="placeholder"><strong>START</strong><br>→ StatusRouter</div>
+      <div class="placeholder"><strong>StatusRouter</strong><br>状态路由</div>
+      <div class="placeholder"><strong>Nodes</strong><br>ParsingNode<br>ChunkingNode<br>IndexingNode</div>
+      <div class="placeholder"><strong>END</strong><br>返回 WorkflowRunResult</div>
+    </div>
+
+    <div style="height:18px"></div>
+    <div class="pros-cons">
+      <div class="pros"><h4>认可后的原则</h4><ul><li>WorkflowService 名称通用</li><li>Controller 可直接启动图</li><li>Graph 仍使用 StateGraph/CompiledGraph</li><li>ParsingNode 直接调用 infra DocumentParseService</li></ul></div>
+      <div class="cons"><h4>待定点</h4><ul><li>Redis Worker 是否仍自动消费</li><li>Controller 启动是同步阻塞还是异步提交</li><li>WorkflowService 返回结果结构</li></ul></div>
+    </div>
+  </div>
+</div>

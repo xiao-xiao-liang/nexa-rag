@@ -1,0 +1,61 @@
+<style>
+  .comparison { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+  .chat-card { border: 1px solid #dedbe8; border-radius: 16px; overflow: hidden; background: #fff; }
+  .chat-title { padding: 12px 16px; background: #f7f6fc; border-bottom: 1px solid #e8e6ee; font-weight: 700; color: #373541; }
+  .chat-body { min-height: 390px; padding: 18px; color: #1f2430; font-size: 14px; line-height: 1.75; }
+  .raw { white-space: pre-wrap; }
+  .rendered h3 { margin: 0 0 8px; font-size: 17px; }
+  .rendered p { margin: 0 0 10px; }
+  .rendered ul { margin: 6px 0 12px; padding-left: 22px; }
+  .rendered li { margin: 4px 0; }
+  .inline-code { padding: 1px 5px; border-radius: 4px; background: #f1f0f6; color: #6b58c8; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+  .code { margin: 12px 0; padding: 12px 14px; border-radius: 9px; background: #1f2430; color: #e6edf3; font: 12px/1.65 ui-monospace, SFMono-Regular, Menlo, monospace; white-space: pre-wrap; }
+  .table { width: 100%; border-collapse: collapse; margin-top: 12px; font-size: 13px; }
+  .table th, .table td { border: 1px solid #e4e2ea; padding: 7px 9px; text-align: left; }
+  .table th { background: #f7f6fc; }
+  @media (max-width: 760px) { .comparison { grid-template-columns: 1fr; } }
+</style>
+
+<h2>对话回答的 Markdown 呈现</h2>
+<p class="subtitle">左侧是当前把原文当纯文本输出的效果；右侧是建议的阅读效果。</p>
+
+<div class="comparison">
+  <div class="chat-card">
+    <div class="chat-title">当前：原文输出</div>
+    <div class="chat-body raw">## 微调参数建议
+
+- **--model**：指定基座模型
+- **--learning_rate**：建议 `1e-5`
+
+```bash
+python train.py --model qwen
+```
+
+| 参数 | 建议 |
+| --- | --- |
+| batch_size | 2 |</div>
+  </div>
+  <div class="chat-card">
+    <div class="chat-title">建议：安全 Markdown 渲染</div>
+    <div class="chat-body rendered">
+      <h3>微调参数建议</h3>
+      <ul>
+        <li><strong>--model</strong>：指定基座模型</li>
+        <li><strong>--learning_rate</strong>：建议 <span class="inline-code">1e-5</span></li>
+      </ul>
+      <div class="code">python train.py --model qwen</div>
+      <table class="table"><thead><tr><th>参数</th><th>建议</th></tr></thead><tbody><tr><td>batch_size</td><td>2</td></tr></tbody></table>
+    </div>
+  </div>
+</div>
+
+<div class="options" style="margin-top:22px">
+  <div class="option" data-choice="safe-markdown" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content"><h3>推荐：标准 Markdown + 代码高亮</h3><p>支持标题、列表、引用、表格、链接和代码块；不解析原始 HTML，避免模型回答带来的 XSS 风险。</p></div>
+  </div>
+  <div class="option" data-choice="minimal-markdown" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content"><h3>轻量：仅标题、列表和行内样式</h3><p>依赖更少，但代码块、表格、引用等 RAG 常见回答的可读性会明显受限。</p></div>
+  </div>
+</div>

@@ -1,0 +1,27 @@
+﻿<h2>Phase 2.5-06：采用 B 方向后的节点拆分</h2>
+<p class="subtitle">LocalDocumentPipelineExecutor 作为过渡编排器应被替换；Workflow Graph 拆成 ParsingNode、ChunkingNode、IndexingNode。</p>
+
+<div class="mockup">
+  <div class="mockup-header">B 方向：ParsingNode 直接调用 infra DocumentParseService，但不接触具体解析器 SDK</div>
+  <div class="mockup-body">
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:12px;align-items:stretch;">
+      <div class="placeholder" style="border-left:5px solid #5b8def;"><strong>boot</strong><br>LocalDocumentPipelineWorker<br><small>poll / ack / release</small></div>
+      <div class="placeholder" style="border-left:5px solid #2fb344;"><strong>document API</strong><br>DocumentPipelineExecutor<br><small>Worker 稳定入口</small></div>
+      <div class="placeholder" style="border-left:5px solid #f59f00;"><strong>workflow</strong><br>GraphDocumentPipelineExecutor<br><small>替换 LocalDocumentPipelineExecutor</small></div>
+      <div class="placeholder" style="border-left:5px solid #e03131;"><strong>Graph</strong><br>Parsing → Chunking → Indexing<br><small>状态驱动</small></div>
+    </div>
+
+    <div style="height:16px"></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;">
+      <div class="placeholder"><strong>ParsingNode</strong><br>DocumentService<br>DocumentParseService<br>ObjectMapper/processConfig<br><small>QUEUED/PARSING → PARSED</small></div>
+      <div class="placeholder"><strong>ChunkingNode</strong><br>DocumentChunkingService<br><small>PARSED/CHUNKING → CHUNKED</small></div>
+      <div class="placeholder"><strong>IndexingNode</strong><br>DocumentIndexService<br><small>CHUNKED/INDEXING → INDEXED</small></div>
+    </div>
+
+    <div style="height:16px"></div>
+    <div class="pros-cons">
+      <div class="pros"><h4>保留</h4><ul><li>Worker 不感知 Graph</li><li>Node 不直接调用 MinerU/Tika/ES/Milvus SDK</li><li>Graph State 不传大文本</li></ul></div>
+      <div class="cons"><h4>需要明确</h4><ul><li>节点失败后是否抛异常</li><li>重试回 QUEUED 时如何停止当前 Graph</li><li>幂等时是否跳过已完成阶段</li></ul></div>
+    </div>
+  </div>
+</div>

@@ -1,0 +1,65 @@
+﻿<h2>Phase 2.5-06 文档入库 Workflow Graph：当前地形图</h2>
+<p class="subtitle">先看边界，再讨论实现方式。推荐方向是让 Worker 仍只依赖 DocumentPipelineExecutor，由 workflow 模块替换执行器实现。</p>
+
+<div class="mockup">
+  <div class="mockup-header">推荐候选结构：上传/排队不进 Graph，Graph 从 QUEUED 文档开始</div>
+  <div class="mockup-body">
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;align-items:stretch;">
+      <div class="placeholder" style="border-left:5px solid #5b8def;">
+        <strong>boot</strong><br>
+        LocalDocumentPipelineWorker<br>
+        poll Redis lease<br>
+        ack / release
+      </div>
+      <div class="placeholder" style="border-left:5px solid #2fb344;">
+        <strong>document API</strong><br>
+        DocumentPipelineExecutor<br>
+        Worker 只认识这个接口
+      </div>
+      <div class="placeholder" style="border-left:5px solid #f59f00;">
+        <strong>workflow</strong><br>
+        GraphDocumentPipelineExecutor<br>
+        DocumentIngestionWorkflow
+      </div>
+    </div>
+    <div style="text-align:center;margin:16px 0;font-weight:700;">↓ Graph Nodes</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;">
+      <div class="placeholder">ParsingNode<br><small>QUEUED/PARSING -> PARSED</small></div>
+      <div class="placeholder">ChunkingNode<br><small>PARSED/CHUNKING -> CHUNKED</small></div>
+      <div class="placeholder">IndexingNode<br><small>CHUNKED/INDEXING -> INDEXED</small></div>
+    </div>
+    <div style="text-align:center;margin:16px 0;font-weight:700;">↓ 只调用模块服务，不下沉业务</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;">
+      <div class="placeholder">document parsing service<br><small>当前待设计：是否抽出</small></div>
+      <div class="placeholder">DocumentChunkingService</div>
+      <div class="placeholder">DocumentIndexService</div>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <h3>两个关键决策</h3>
+  <div class="options">
+    <div class="option" data-choice="a" onclick="toggleSelect(this)">
+      <div class="letter">A</div>
+      <div class="content">
+        <h3>先补齐阶段服务，再接 Graph（推荐）</h3>
+        <p>新增 DocumentParsingService，把 LocalDocumentPipelineExecutor 中解析编排下沉回 document；三个 Node 对称地只调用 parse/chunk/index。</p>
+      </div>
+    </div>
+    <div class="option" data-choice="b" onclick="toggleSelect(this)">
+      <div class="letter">B</div>
+      <div class="content">
+        <h3>ParsingNode 暂时承接解析逻辑</h3>
+        <p>改动少，但 workflow 会直接依赖 infra parser 和解析配置细节，违反“workflow 只编排”的味道会重一点。</p>
+      </div>
+    </div>
+    <div class="option" data-choice="c" onclick="toggleSelect(this)">
+      <div class="letter">C</div>
+      <div class="content">
+        <h3>先做轻量自研 Graph 门面</h3>
+        <p>节点链路先稳定，Spring AI Alibaba Graph API 作为适配层稍后接入；风险低，但“使用 Graph 框架”的目标会延后。</p>
+      </div>
+    </div>
+  </div>
+</div>

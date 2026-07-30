@@ -1,0 +1,36 @@
+<style>
+  .agent-shell { height:470px; display:flex; border:1px solid #dce3ee; border-radius:16px; overflow:hidden; background:#fff; box-shadow:0 10px 30px rgba(25,40,70,.08); color:#182235; }
+  .agent-history { width:205px; padding:18px 12px; background:#f7f9fc; border-right:1px solid #e5eaf1; }
+  .brand { font-weight:750; letter-spacing:.2px; margin:0 6px 22px; color:#30405b; }
+  .new-chat { display:block; width:100%; padding:9px 10px; margin-bottom:18px; border:1px solid #ccd7e8; border-radius:8px; background:#fff; color:#27364d; font-size:12px; text-align:left; }
+  .history-title { margin:0 7px 8px; font-size:10px; color:#94a0b2; text-transform:uppercase; }
+  .history-item { padding:9px 8px; margin:2px 0; border-radius:7px; font-size:12px; color:#59667a; }
+  .history-item.active { background:#e9efff; color:#315dc7; font-weight:650; }
+  .agent-chat { flex:1; min-width:0; display:flex; flex-direction:column; }
+  .chat-header { display:flex; align-items:center; justify-content:space-between; padding:15px 22px; border-bottom:1px solid #edf0f5; font-size:13px; }
+  .chat-header small { color:#8b97a7; }
+  .messages { flex:1; padding:24px 12%; display:flex; flex-direction:column; gap:15px; }
+  .msg { max-width:74%; padding:12px 14px; border-radius:12px; font-size:12px; line-height:1.55; }
+  .msg.user { align-self:flex-end; background:#e7edff; color:#284997; border-bottom-right-radius:3px; }
+  .msg.bot { background:#f4f6f9; border-bottom-left-radius:3px; color:#3b485a; }
+  .ref { margin-top:8px; padding-top:8px; border-top:1px solid #e1e6ee; color:#748195; font-size:10px; }
+  .composer-wrap { padding:0 18px 18px; }
+  .composer { border:1.5px solid #a8c8ff; border-radius:18px; padding:13px 15px 10px; box-shadow:0 3px 12px rgba(60,117,220,.08); }
+  .placeholder { color:#a2acbb; font-size:13px; min-height:25px; }
+  .tool-row { display:flex; gap:13px; align-items:center; margin-top:7px; overflow:hidden; white-space:nowrap; }
+  .attach { font-size:22px; color:#637087; padding-right:12px; border-right:1px solid #e2e8f0; }
+  .tool { font-size:12px; color:#253144; }
+  .tool.selected { padding:7px 11px; background:#edf4ff; color:#2468e9; border-radius:11px; font-weight:700; }
+  .send { margin-left:auto; width:31px; height:31px; border-radius:50%; background:#f2f4f7; display:grid; place-items:center; font-size:16px; color:#425166; }
+  .note { margin-top:18px; padding:12px 15px; border-radius:10px; background:#f7f9fd; color:#627086; font-size:13px; line-height:1.6; }
+  @media(max-width:800px){.agent-history{display:none}.messages{padding:18px}.tool:nth-of-type(n+5){display:none}}
+</style>
+
+<h2>统一会话 + 底部功能选择</h2>
+<p class="subtitle">按你的参考图：Agent 是输入时选用的能力，而不是侧栏中的固定分区。</p>
+
+<div class="agent-shell">
+  <aside class="agent-history"><div class="brand">Nexa AI</div><button class="new-chat">＋ 新建对话</button><p class="history-title">今天</p><div class="history-item active">研发规范问答</div><div class="history-item">向量检索方案</div><p class="history-title" style="margin-top:18px">昨天</p><div class="history-item">文档处理问题</div><div class="history-item">模型配置说明</div></aside>
+  <main class="agent-chat"><div class="chat-header"><span>研发规范问答</span><small>RAG 知识问答</small></div><div class="messages"><div class="msg user">请说明文档上传后的处理流程。</div><div class="msg bot">文件上传后将依次经历解析、切分和索引，处理进度可在当前会话中持续返回。<div class="ref">▣ 引用：文档处理流水线设计 · 第 2 节</div></div></div><div class="composer-wrap"><div class="composer"><div class="placeholder">继续提问，或选择一个功能开始……</div><div class="tool-row"><span class="attach">＋</span><span class="tool selected">◉ RAG 知识问答 ×</span><span class="tool">▦ 数据分析</span><span class="tool">✦ 智能差旅</span><span class="tool">▧ 更多</span><span class="send">↑</span></div></div></div></main>
+</div>
+<div class="note">选择功能后，输入框显示能力标签；提交首条消息时创建带 <code>agentId</code> 的独立会话。已有会话仍在左栏统一呈现，并以其创建时的 Agent 继续执行。</div>

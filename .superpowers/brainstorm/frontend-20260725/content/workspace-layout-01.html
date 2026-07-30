@@ -1,0 +1,45 @@
+<style>
+  .workspace-cards { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:18px; }
+  .workspace-card { cursor:pointer; border:1px solid #dfe4ea; border-radius:14px; overflow:hidden; background:#fff; transition:.2s; }
+  .workspace-card:hover { border-color:#4f46e5; box-shadow:0 8px 24px rgba(79,70,229,.12); }
+  .workspace-card.selected { border:2px solid #4f46e5; }
+  .workspace-card h3 { margin:14px 16px 6px; font-size:16px; }
+  .workspace-card p { margin:0 16px 16px; color:#687386; font-size:13px; line-height:1.5; }
+  .mini { height:230px; margin:12px; display:flex; border:1px solid #e6eaf0; border-radius:9px; overflow:hidden; background:#fbfcfe; font-size:9px; color:#7a8596; }
+  .mini-nav { width:48px; padding:12px 6px; background:#182235; color:#c8d1df; display:flex; flex-direction:column; gap:15px; align-items:center; }
+  .mini-side { width:74px; padding:10px 7px; border-right:1px solid #e6eaf0; }
+  .mini-main { flex:1; padding:12px; display:flex; flex-direction:column; gap:9px; }
+  .mini-head { height:15px; width:55%; border-radius:4px; background:#dbe3f0; }
+  .mini-chat { align-self:flex-end; width:64%; height:32px; border-radius:8px 8px 2px 8px; background:#e3e8ff; }
+  .mini-answer { width:82%; height:45px; border-radius:8px 8px 8px 2px; background:#f0f3f7; }
+  .mini-input { margin-top:auto; height:25px; border:1px solid #d9e0ea; border-radius:6px; background:#fff; }
+  .mini-panel { width:68px; padding:10px 6px; border-left:1px solid #e6eaf0; background:#fff; }
+  .mini-card { height:34px; margin-bottom:8px; border-radius:5px; background:#f0f3f7; }
+  .mini-stack { display:flex; flex-direction:column; gap:6px; }
+  .mini-app { height:28px; border-radius:5px; background:#eef2ff; }
+  @media(max-width:900px){ .workspace-cards{grid-template-columns:1fr;} }
+</style>
+
+<h2>统一 Agent 对话工作台：选一个布局方向</h2>
+<p class="subtitle">第一期仅接入 RAG；结构需能自然容纳数据分析、智能差旅等后续 Agent。</p>
+
+<div class="workspace-cards">
+  <div class="workspace-card selected" data-choice="a" onclick="toggleSelect(this)">
+    <div class="mini">
+      <div class="mini-nav">⌁<br>◉<br>▦<br>⚙</div><div class="mini-side">会话<br><br>＋ 新对话<br><br>RAG 问答<br><br>研发资料</div><div class="mini-main"><div class="mini-head"></div><div class="mini-chat"></div><div class="mini-answer"></div><div class="mini-input"></div></div><div class="mini-panel">检索引用<div class="mini-card"></div>生成过程<div class="mini-card"></div></div>
+    </div>
+    <h3>A. 三栏工作台（推荐）</h3><p>会话、对话、动态信息并列；检索来源与过程可按事件类型展开或收起。</p>
+  </div>
+  <div class="workspace-card" data-choice="b" onclick="toggleSelect(this)">
+    <div class="mini">
+      <div class="mini-nav">⌁<br>◉<br>▦<br>⚙</div><div class="mini-side">应用<br><br>RAG 问答<br><br>数据分析<br><br>智能差旅</div><div class="mini-main"><div class="mini-head"></div><div class="mini-chat"></div><div class="mini-answer"></div><div class="mini-input"></div></div>
+    </div>
+    <h3>B. 双栏聚焦对话</h3><p>信息以消息卡片内联展示，阅读干扰最少，但复杂过程的纵向浏览较长。</p>
+  </div>
+  <div class="workspace-card" data-choice="c" onclick="toggleSelect(this)">
+    <div class="mini">
+      <div class="mini-nav">⌁<br>◉<br>▦<br>⚙</div><div class="mini-side mini-stack">RAG 问答<div class="mini-app"></div>数据分析<div class="mini-app"></div>智能差旅<div class="mini-app"></div></div><div class="mini-main"><div class="mini-head"></div><div class="mini-chat"></div><div class="mini-answer"></div><div class="mini-input"></div></div>
+    </div>
+    <h3>C. 应用门户式</h3><p>强调多 Agent 品牌与入口，适合应用数量多时，但会话管理要额外弹层或二级页面。</p>
+  </div>
+</div>

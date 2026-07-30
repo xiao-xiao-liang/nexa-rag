@@ -1,0 +1,27 @@
+﻿<h2>参考 liang-data-agent 后的校准版入口设计</h2>
+<p class="subtitle">data-agent 的模式：WorkflowConfiguration 创建 StateGraph，GraphService 构造时 compile，执行时 compiledGraph.stream(initialState, RunnableConfig)。</p>
+
+<div class="mockup">
+  <div class="mockup-header">NexaRAG 06 推荐形态：DocumentIngestionWorkflowService 直接作为 Worker 入口</div>
+  <div class="mockup-body">
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;">
+      <div class="placeholder" style="border-left:5px solid #5b8def;"><strong>boot</strong><br>LocalDocumentPipelineWorker<br><small>不变：调用 DocumentPipelineExecutor.execute(documentId)</small></div>
+      <div class="placeholder" style="border-left:5px solid #f59f00;"><strong>workflow service</strong><br>DocumentIngestionWorkflowService<br><small>implements DocumentPipelineExecutor<br>compile StateGraph<br>stream 到完成</small></div>
+      <div class="placeholder" style="border-left:5px solid #2fb344;"><strong>workflow config</strong><br>DocumentIngestionWorkflowConfiguration<br><small>创建 StateGraph<br>注册 Node + Dispatcher</small></div>
+    </div>
+
+    <div style="height:18px"></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:12px;">
+      <div class="placeholder"><strong>START</strong><br>→ StatusRouter</div>
+      <div class="placeholder"><strong>StatusRouterDispatcher</strong><br>QUEUED/PARSING → Parsing<br>PARSED/CHUNKING → Chunking<br>CHUNKED/INDEXING → Indexing<br>INDEXED/FAILED/UPLOADED → END</div>
+      <div class="placeholder"><strong>Nodes</strong><br>ParsingNode<br>ChunkingNode<br>IndexingNode</div>
+      <div class="placeholder"><strong>END</strong><br>Graph 完成后 Worker ack</div>
+    </div>
+
+    <div style="height:18px"></div>
+    <div class="pros-cons">
+      <div class="pros"><h4>贴合 data-agent</h4><ul><li>StateGraph Bean</li><li>NodeAction / EdgeAction</li><li>AsyncNodeAction.node_async</li><li>RunnableConfig.threadId</li></ul></div>
+      <div class="cons"><h4>不再采用</h4><ul><li>不单独设计 GraphDocumentPipelineExecutor</li><li>不保留 LocalDocumentPipelineExecutor</li><li>不让 Worker 感知 Graph 细节</li></ul></div>
+    </div>
+  </div>
+</div>

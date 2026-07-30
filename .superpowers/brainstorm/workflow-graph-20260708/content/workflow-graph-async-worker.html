@@ -1,0 +1,21 @@
+﻿<h2>确定：异步队列 + Worker 调用 WorkflowService</h2>
+<p class="subtitle">Controller 不跑重活，只提交处理；Worker 获得 Redis 租约后启动 document-ingestion 图。</p>
+
+<div class="mockup">
+  <div class="mockup-header">真实文档入库链路</div>
+  <div class="mockup-body">
+    <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:10px;align-items:stretch;">
+      <div class="placeholder" style="border-left:5px solid #5b8def;"><strong>Controller</strong><br>submitProcess<br><small>状态置 QUEUED</small></div>
+      <div class="placeholder" style="border-left:5px solid #5b8def;"><strong>Redis Queue</strong><br>pipeline queue<br><small>等待人数/租约</small></div>
+      <div class="placeholder" style="border-left:5px solid #f59f00;"><strong>Worker</strong><br>LocalDocumentPipelineWorker<br><small>poll lease</small></div>
+      <div class="placeholder" style="border-left:5px solid #f59f00;"><strong>WorkflowService</strong><br>run("document-ingestion")<br><small>CompiledGraph.stream</small></div>
+      <div class="placeholder" style="border-left:5px solid #2fb344;"><strong>StateGraph</strong><br>Router → Nodes<br><small>ack/release 由 Worker 决定</small></div>
+    </div>
+
+    <div style="height:18px"></div>
+    <div class="pros-cons">
+      <div class="pros"><h4>保留</h4><ul><li>Controller 快速返回队列信息</li><li>Redis 保存实时队列态和租约</li><li>MySQL 保存稳定状态</li><li>Worker 失败时 release 回队尾</li></ul></div>
+      <div class="cons"><h4>需要改动</h4><ul><li>Worker 从 DocumentPipelineExecutor 切到 WorkflowService 或适配器</li><li>删除 LocalDocumentPipelineExecutor</li><li>新增 document-ingestion graph 配置</li></ul></div>
+    </div>
+  </div>
+</div>

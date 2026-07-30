@@ -1,0 +1,18 @@
+<style>
+  .style-grid { display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:18px; }
+  .style-card {overflow:hidden;border:1px solid #dce4ef;border-radius:14px;background:white;cursor:pointer;transition:.18s;}
+  .style-card:hover{border-color:#4f7ff0;box-shadow:0 10px 24px rgba(54,96,180,.13)}
+  .style-card h3{margin:14px 15px 5px;font-size:16px}.style-card p{margin:0 15px 15px;color:#69778c;font-size:13px;line-height:1.55}
+  .demo{height:220px;padding:12px;display:flex;gap:9px}.side{width:62px;padding:12px 7px;font-size:8px;line-height:2.5}.main{flex:1;display:flex;flex-direction:column;gap:10px;padding:11px}.line{height:10px;width:52%;border-radius:4px}.bubble{height:35px;width:70%;border-radius:9px}.bubble.user{align-self:flex-end}.composer-demo{margin-top:auto;height:40px;border-radius:12px;padding:8px;font-size:8px}.chip{display:inline-block;padding:3px 5px;border-radius:6px}.label{font-size:10px;letter-spacing:.06em;color:#8290a4;text-transform:uppercase;margin:11px 15px 0}
+  .quiet .demo{background:#f7f9fc}.quiet .side{background:#fff;color:#71809a;border-radius:8px}.quiet .main{background:#fff;border:1px solid #e3eaf4;border-radius:10px}.quiet .line{background:#dce7f8}.quiet .bubble{background:#f1f4f8}.quiet .user{background:#e1ecff}.quiet .composer-demo{border:1.5px solid #9bc2ff;color:#7d8da6}.quiet .chip{background:#eaf3ff;color:#2563eb}
+  .dark .demo{background:#0d1322}.dark .side{background:#151e31;color:#91a0bc;border-radius:8px}.dark .main{background:#121a2b;border:1px solid #26334b;border-radius:10px}.dark .line{background:#344561}.dark .bubble{background:#202c42}.dark .user{background:#343071}.dark .composer-demo{border:1px solid #655ce8;color:#9faed0}.dark .chip{background:#312d68;color:#c7c1ff}
+  .enterprise .demo{background:#f4f6f8}.enterprise .side{background:#001529;color:#d5e2f2}.enterprise .main{background:#fff;border:1px solid #d9dfe7;border-radius:3px}.enterprise .line{background:#d8e2f0}.enterprise .bubble{background:#f5f5f5;border-radius:3px}.enterprise .user{background:#e6f4ff}.enterprise .composer-demo{border:1px solid #1677ff;border-radius:5px;color:#7d8da6}.enterprise .chip{background:#e6f4ff;color:#1677ff;border-radius:3px}
+  @media(max-width:900px){.style-grid{grid-template-columns:1fr}}
+</style>
+<h2>选择首期组件库与视觉系统</h2>
+<p class="subtitle">三个方案均为双栏工作台；区别在于产品气质、可定制性和未来后台能力。</p>
+<div class="style-grid">
+  <div class="style-card quiet" data-choice="quiet" onclick="toggleSelect(this)"><div class="demo"><div class="side">Nexa<br>＋ 新对话<br>研发问答<br>文档处理</div><div class="main"><div class="line"></div><div class="bubble user"></div><div class="bubble"></div><div class="composer-demo">输入消息…　 <span class="chip">数据分析</span></div></div></div><p class="label">shadcn/ui + Tailwind + Lucide</p><h3>安静专业（推荐）</h3><p>延续你的参考图：亮色、蓝色焦点和圆角输入框。组件可控，适合逐步长成 AI 中台。</p></div>
+  <div class="style-card dark" data-choice="dark" onclick="toggleSelect(this)"><div class="demo"><div class="side">Nexa<br>＋ 新对话<br>研发问答<br>文档处理</div><div class="main"><div class="line"></div><div class="bubble user"></div><div class="bubble"></div><div class="composer-demo">输入消息…　 <span class="chip">数据分析</span></div></div></div><p class="label">shadcn/ui + Tailwind + Lucide</p><h3>深色智能台</h3><p>更有开发者和 AI 工具感，适合长时间使用；需同步设计完整亮色模式与对比度。</p></div>
+  <div class="style-card enterprise" data-choice="enterprise" onclick="toggleSelect(this)"><div class="demo"><div class="side">Nexa<br>＋ 新对话<br>研发问答<br>文档处理</div><div class="main"><div class="line"></div><div class="bubble user"></div><div class="bubble"></div><div class="composer-demo">输入消息…　 <span class="chip">数据分析</span></div></div></div><p class="label">Ant Design 5 + Ant Design Icons</p><h3>企业管理台</h3><p>表单、表格和配置页最快，但默认气质偏后台管理，需要额外定制才能接近参考图。</p></div>
+</div>

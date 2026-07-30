@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>NexaRAG 视觉方向</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { margin: 0; background: #eef1f6; color: #152033; font-family: Inter, "PingFang SC", "Microsoft YaHei", sans-serif; }
+    main { max-width: 1480px; margin: 0 auto; padding: 40px 32px 56px; }
+    h1 { margin: 0; font-size: 30px; letter-spacing: -.04em; }
+    .lead { max-width: 760px; margin: 12px 0 28px; color: #58667c; line-height: 1.7; }
+    .grid { display: grid; grid-template-columns: repeat(3, minmax(280px, 1fr)); gap: 20px; }
+    .choice { overflow: hidden; border: 1px solid #dfe5ef; border-radius: 18px; background: #fff; cursor: pointer; box-shadow: 0 10px 24px rgba(31, 47, 70, .06); transition: .2s ease; }
+    .choice:hover, .choice.selected { transform: translateY(-3px); border-color: #6266d9; box-shadow: 0 16px 35px rgba(62, 72, 143, .16); }
+    .preview { min-height: 300px; padding: 14px; }
+    .copy { padding: 18px 20px 21px; border-top: 1px solid #edf0f5; }
+    .copy h2 { margin: 0 0 7px; font-size: 17px; }
+    .copy p { margin: 0; color: #64718a; font-size: 13px; line-height: 1.55; }
+    .tag { display: inline-flex; margin-bottom: 10px; border-radius: 99px; padding: 4px 8px; background: #eef0ff; color: #565bc8; font-size: 11px; font-weight: 700; }
+    .screen { height: 280px; overflow: hidden; border-radius: 11px; display: flex; font-size: 9px; }
+    .dark { background: #161a22; color: #e7eaf0; }
+    .dark-nav { width: 50px; padding: 12px 10px; background: #10131a; }
+    .brand { width: 22px; height: 22px; margin-bottom: 22px; border-radius: 7px; background: linear-gradient(135deg, #8877ff, #4cc5ff); }
+    .nav-dot { height: 22px; margin: 8px 0; border-radius: 6px; background: #242b38; }
+    .dark-main { flex: 1; padding: 18px; background: radial-gradient(circle at 88% 15%, #273551, #161a22 48%); }
+    .screen-title { font-size: 14px; font-weight: 700; }
+    .muted { margin-top: 5px; color: #8893a7; }
+    .dark-card { margin-top: 17px; padding: 12px; border: 1px solid #30384a; border-radius: 9px; background: rgba(30, 36, 48, .86); }
+    .bars { display: grid; grid-template-columns: 1.5fr 1fr; gap: 8px; margin-top: 12px; }
+    .bar { height: 42px; border-radius: 6px; background: #273043; } .bar b { display: block; width: 55%; height: 5px; margin: 8px; border-radius: 4px; background: #8c97ae; }
+    .workspace { background: #f8f9fc; color: #192238; }
+    .workspace-nav { width: 82px; padding: 13px 10px; background: #1f2740; color: #aeb8d0; }
+    .workspace-nav .brand { background: #716cdf; } .workspace-nav .nav-dot { background: #3e4967; }
+    .workspace-list { width: 105px; padding: 14px 9px; border-right: 1px solid #e6eaf1; background: #fff; }
+    .mini-title { margin-bottom: 12px; font-size: 9px; font-weight: 800; }
+    .mini-row { margin: 7px 0; padding: 8px; border-radius: 6px; background: #f4f6fa; color: #67738a; }
+    .mini-row.active { background: #e8e9ff; color: #5257c3; }
+    .workspace-main { flex: 1; padding: 17px; }
+    .header-line { display: flex; align-items: center; justify-content: space-between; }
+    .pill { display: inline-block; margin-top: 12px; margin-right: 4px; padding: 5px 7px; border-radius: 12px; background: #eceefd; color: #555bc6; font-size: 8px; }
+    .chat-line { width: 80%; margin-top: 16px; padding: 9px; border: 1px solid #e2e6ee; border-radius: 8px; background: #fff; color: #758096; }
+    .chat-line.small { width: 53%; margin-left: auto; border: 0; background: #5b5bd6; color: white; }
+    .composer { margin-top: 18px; padding: 9px; border: 1px solid #bfc3f4; border-radius: 12px; background: #fff; color: #9aa4b7; }
+    .minimal { background: #fbfbfc; color: #1d2029; }
+    .minimal-nav { width: 49px; padding: 12px; background: #fff; border-right: 1px solid #ededf0; }
+    .minimal-main { flex: 1; padding: 20px; background: linear-gradient(135deg, #fbfbfc, #f4f4f8); }
+    .minimal-title { font-size: 16px; font-weight: 700; text-align: center; margin-top: 8px; }
+    .welcome { margin: 48px auto 0; text-align: center; color: #797c87; font-size: 10px; }
+    .spark { width: 26px; height: 26px; margin: 0 auto 10px; border-radius: 50%; background: linear-gradient(135deg, #ffad82, #927cff); }
+    .suggestions { display: flex; gap: 6px; justify-content: center; margin-top: 15px; }
+    .suggestions span { padding: 7px; border: 1px solid #e3e4e9; border-radius: 8px; background: #fff; font-size: 8px; }
+    .minimal .composer { margin: 34px auto 0; width: 83%; border-color: #dedee7; }
+    .recommend { margin-top: 24px; padding: 18px 20px; border-radius: 14px; background: #e8ebff; color: #303775; line-height: 1.65; font-size: 14px; }
+    @media (max-width: 900px) { .grid { grid-template-columns: 1fr; } main { padding: 25px 16px; } }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>选择 NexaRAG 的整体气质</h1>
+    <p class="lead">三种方向都能承载对话、知识库和模型治理。请选择最符合你期待的主基调；后续页面会以此为基础统一细节。</p>
+    <div class="grid">
+      <article class="choice" data-choice="a" onclick="toggleSelect(this)">
+        <div class="preview dark"><div class="screen"><aside class="dark-nav"><div class="brand"></div><div class="nav-dot"></div><div class="nav-dot"></div><div class="nav-dot"></div></aside><section class="dark-main"><div class="screen-title">知识库 · 文档处理</div><div class="muted">13 个文件正在构建索引</div><div class="dark-card"><b>处理队列</b><div class="bars"><div class="bar"><b></b></div><div class="bar"><b></b></div><div class="bar"><b></b></div><div class="bar"><b></b></div></div></div></section></div></div>
+        <div class="copy"><span class="tag">A · 工程控制台</span><h2>深色、密集、技术感强</h2><p>接近 RAGFlow。突出流程、指标和配置，适合主要由研发或算法团队使用。</p></div>
+      </article>
+      <article class="choice" data-choice="b" onclick="toggleSelect(this)">
+        <div class="preview workspace"><div class="screen"><aside class="workspace-nav"><div class="brand"></div><div class="nav-dot"></div><div class="nav-dot"></div><div class="nav-dot"></div></aside><aside class="workspace-list"><div class="mini-title">工作台</div><div class="mini-row active">对话</div><div class="mini-row">知识库</div><div class="mini-row">模型中心</div></aside><section class="workspace-main"><div class="header-line"><div class="screen-title">项目知识助手</div><span class="tag">已就绪</span></div><span class="pill">Qwen 3</span><span class="pill">产品文档库</span><div class="chat-line">根据文档，为你整理了三个关键结论…</div><div class="chat-line small">给我看具体依据</div><div class="composer">向知识库提问…</div></section></div></div>
+        <div class="copy"><span class="tag">B · 推荐</span><h2>清爽、专业、以任务为中心</h2><p>融合 Dify 的模块结构与 Open WebUI 的对话体验；既适合业务用户，也能容纳模型治理。</p></div>
+      </article>
+      <article class="choice" data-choice="c" onclick="toggleSelect(this)">
+        <div class="preview minimal"><div class="screen"><aside class="minimal-nav"><div class="brand"></div><div class="nav-dot"></div><div class="nav-dot"></div></aside><section class="minimal-main"><div class="minimal-title">今天想完成什么？</div><div class="welcome"><div class="spark"></div>让知识与模型能力为你服务</div><div class="suggestions"><span>解读文档</span><span>创建助手</span><span>探索知识库</span></div><div class="composer">输入你的问题…</div></section></div></div>
+        <div class="copy"><span class="tag">C · 极简助手</span><h2>温和、留白多、偏消费级</h2><p>接近 LobeChat。对话很轻松，但模型路由与治理会显得不够严肃、信息承载也偏弱。</p></div>
+      </article>
+    </div>
+    <div class="recommend"><strong>我的建议：B。</strong> 它能把“知识库问答”保留为核心体验，同时为模型中心、提示词与治理能力留下清晰扩展位；A 的状态可见性会作为知识库详情页的局部特征，而不是铺满整个产品。</div>
+  </main>
+</body>
+</html>
