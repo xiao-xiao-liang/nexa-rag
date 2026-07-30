@@ -10,13 +10,16 @@ import com.nexarag.common.exception.ClientException;
 import com.nexarag.common.web.CursorPageVO;
 import com.nexarag.common.web.Result;
 import com.nexarag.common.web.Results;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
+
+import java.util.Optional;
 
 import static com.nexarag.chat.constants.ConversationQueryConstants.*;
 
 /**
- * 会话读取控制器，负责返回当前用户的会话列表和历史消息安全投影。
+ * 会话控制器，负责管理当前用户的会话生命周期（增删改查）与历史消息读取。
  */
 @RestController
 @RequestMapping("/api/conversations")
@@ -25,6 +28,20 @@ public class ConversationController {
 
     private final ConversationService conversationService;
     private final ConversationMessageService messageService;
+
+    /**
+     * 创建新会话。
+     *
+     * @param request 创建会话请求
+     * @return 新建会话数据
+     */
+    @PostMapping
+    public Result<ConversationListItemVO> create(@RequestBody(required = false) @Valid CreateConversationRequest request) {
+        String userId = CurrentUserContext.getRequired().userId();
+        String title = Optional.ofNullable(request).map(CreateConversationRequest::title).orElse(null);
+        ChatConversationVO conversation = conversationService.create(userId, title);
+        return Results.success(toConversationItem(conversation));
+    }
 
     /**
      * 分页查询当前用户的会话列表。
@@ -51,6 +68,47 @@ public class ConversationController {
         response.setSize(page.getSize());
         response.setPages(page.getPages());
         return Results.success(response);
+    }
+
+    /**
+     * 获取指定会话详情。
+     *
+     * @param conversationId 会话 ID
+     * @return 会话详情
+     */
+    @GetMapping("/{conversationId}")
+    public Result<ConversationListItemVO> get(@PathVariable String conversationId) {
+        String userId = CurrentUserContext.getRequired().userId();
+        ChatConversationVO conversation = conversationService.getOwned(conversationId, userId);
+        return Results.success(toConversationItem(conversation));
+    }
+
+    /**
+     * 修改指定会话标题。
+     *
+     * @param conversationId 会话 ID
+     * @param request 修改请求
+     * @return 操作结果
+     */
+    @PutMapping("/{conversationId}")
+    public Result<Void> update(@PathVariable String conversationId,
+                               @RequestBody @Valid UpdateConversationRequest request) {
+        String userId = CurrentUserContext.getRequired().userId();
+        conversationService.rename(conversationId, userId, request.title());
+        return Results.success();
+    }
+
+    /**
+     * 删除指定会话。
+     *
+     * @param conversationId 会话 ID
+     * @return 操作结果
+     */
+    @DeleteMapping("/{conversationId}")
+    public Result<Void> delete(@PathVariable String conversationId) {
+        String userId = CurrentUserContext.getRequired().userId();
+        conversationService.delete(conversationId, userId);
+        return Results.success();
     }
 
     /**
