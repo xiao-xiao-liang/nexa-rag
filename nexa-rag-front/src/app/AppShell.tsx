@@ -21,7 +21,7 @@ const utilityNavigation = [
   { label: '提示词管理', icon: FileText },
   { label: '模型配置', icon: Bot, to: '/models' },
   { label: '路由管理', icon: Network },
-  { label: '模型治理', icon: SlidersHorizontal },
+  { label: '模型治理', icon: SlidersHorizontal, to: '/models/governance' },
   { label: '设置', icon: Settings },
 ]
 

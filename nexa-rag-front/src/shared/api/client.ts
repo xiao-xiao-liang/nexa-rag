@@ -23,9 +23,17 @@ export class ApiError extends Error {
  * @returns 成功响应中的 data 字段
  */
 export async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  const headers = new Headers(init?.headers)
+  if (init?.body && !headers.has('Content-Type')) {
+    headers.set('Content-Type', 'application/json')
+  }
+
   let response: Response
   try {
-    response = await fetch(path, init)
+    response = await fetch(path, {
+      ...init,
+      headers,
+    })
   } catch (error) {
     // 1. 取消请求属于调用方控制流，必须保留原始 AbortError。
     if (isAbortError(error)) {

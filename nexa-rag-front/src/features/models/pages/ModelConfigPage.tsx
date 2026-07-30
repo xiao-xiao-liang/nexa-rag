@@ -1,11 +1,11 @@
 import { useEffect, useMemo, useState } from 'react'
 import {
   Activity, CheckCircle2, ChevronRight, Copy, Cpu, Database, Eye, EyeOff, Key,
-  Layers, Link2, MoreHorizontal, Plus, RefreshCw, Search, Server, ShieldCheck,
-  SlidersHorizontal, Sparkles, Trash2, Zap, X, Check, Globe, HelpCircle, Wrench,
-  ToggleLeft, ToggleRight, Edit3, ExternalLink, AlertCircle, Loader2, ShieldAlert,
-  Scale, ArrowRightLeft, Shield
+  Layers, Link2, MoreHorizontal, Plus, RefreshCw, Search, Server, Sparkles, Trash2, Zap, X, Check, Globe, HelpCircle, Wrench,
+  ToggleLeft, ToggleRight, Edit3, ExternalLink, AlertCircle, Loader2,
+  Scale, ArrowRightLeft, Shield, SlidersHorizontal
 } from 'lucide-react'
+import { NavLink } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import {
   Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle,
@@ -19,11 +19,11 @@ import {
   createModelConfig,
   deleteModelConfig,
   testModelConfig,
-  getModelGovernanceConfig,
-  updateModelGovernanceConfig,
+  getModelRoutes,
+  updateModelRoute,
   type ModelProviderCatalogItem,
   type ModelConfigItem,
-  type ModelGovernanceConfigDTO,
+  type ModelRouteItem,
 } from '../api/model-api'
 
 // 对应 LobeHub 官方图片 CDN 镜像
@@ -81,6 +81,7 @@ const CATEGORY_OPTIONS: SelectOption[] = [
 export default function ModelConfigPage() {
   const [catalogProviders, setCatalogProviders] = useState<ModelProviderCatalogItem[]>([])
   const [realConfigs, setRealConfigs] = useState<ModelConfigItem[]>([])
+  const [realRoutes, setRealRoutes] = useState<ModelRouteItem[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -98,18 +99,6 @@ export default function ModelConfigPage() {
   // Modals 控制
   const [credentialsModalOpen, setCredentialsModalOpen] = useState(false)
   const [addModelModalOpen, setAddModelModalOpen] = useState(false)
-  const [governanceModalOpen, setGovernanceModalOpen] = useState(false)
-
-  // 当前治理配置状态
-  const [activeGovernanceConfig, setActiveGovernanceConfig] = useState<ModelConfigItem | null>(null)
-  const [govStrategyMode, setGovStrategyMode] = useState<'FAILOVER' | 'WEIGHTED' | 'PROTECTION'>('FAILOVER')
-  const [govTimeoutSec, setGovTimeoutSec] = useState<number>(30)
-  const [govMaxRetries, setGovMaxRetries] = useState<number>(3)
-  const [govMaxConcurrency, setGovMaxConcurrency] = useState<number>(10)
-  const [govRateLimitRpm, setGovRateLimitRpm] = useState<number>(60)
-  const [govFallbackModel, setGovFallbackModel] = useState<string>('deepseek-chat')
-  const [govPrimaryWeight, setGovPrimaryWeight] = useState<number>(70)
-  const [govCircuitBreaker, setGovCircuitBreaker] = useState<boolean>(true)
 
   // 表单状态
   const [formBaseUrl, setFormBaseUrl] = useState('')
@@ -122,14 +111,27 @@ export default function ModelConfigPage() {
     setLoading(true)
     setError(null)
     try {
-      const [catalogRes, configsRes] = await Promise.all([
+      const [catalogRes, configsRes, routesRes] = await Promise.all([
         getModelProviderCatalog(),
         getModelConfigs(),
+        getModelRoutes().catch(() => []),
       ])
       setCatalogProviders(catalogRes || [])
       setRealConfigs(configsRes || [])
+      setRealRoutes(routesRes || [])
+
       if (catalogRes && catalogRes.length > 0) {
         setSelectedProviderId(catalogRes[0].provider)
+      }
+
+      // 如果有路由数据，设置系统默认模型
+      if (routesRes && routesRes.length > 0) {
+        const llmRoute = routesRes.find((r) => r.modelType === 'CHAT' || r.routeKey === 'DEFAULT_LLM')
+        const embRoute = routesRes.find((r) => r.modelType === 'EMBEDDING' || r.routeKey === 'DEFAULT_EMBEDDING')
+        const rnkRoute = routesRes.find((r) => r.modelType === 'RERANK' || r.routeKey === 'DEFAULT_RERANK')
+        if (llmRoute?.routeKey) setDefaultLLM(llmRoute.routeKey)
+        if (embRoute?.routeKey) setDefaultEmbedding(embRoute.routeKey)
+        if (rnkRoute?.routeKey) setDefaultRerank(rnkRoute.routeKey)
       }
     } catch (err: any) {
       console.error('加载模型配置失败:', err)
@@ -142,6 +144,31 @@ export default function ModelConfigPage() {
   useEffect(() => {
     loadData()
   }, [])
+
+  // 根据真实的已配置模型动态生成下拉可选项
+  const dynamicLLMOptions = useMemo(() => {
+    const customList = realConfigs
+      .filter((c) => c.modelType === 'Chat' || c.modelType === 'LLM')
+      .map((c) => ({ value: c.modelName, label: `${c.modelName} (${c.provider})` }))
+    if (customList.length > 0) return customList
+    return LLM_OPTIONS
+  }, [realConfigs])
+
+  const dynamicEmbeddingOptions = useMemo(() => {
+    const customList = realConfigs
+      .filter((c) => c.modelType === 'Embedding' || c.modelType === 'Text Embedding')
+      .map((c) => ({ value: c.modelName, label: `${c.modelName} (${c.provider})` }))
+    if (customList.length > 0) return customList
+    return EMBEDDING_OPTIONS
+  }, [realConfigs])
+
+  const dynamicRerankOptions = useMemo(() => {
+    const customList = realConfigs
+      .filter((c) => c.modelType === 'Rerank')
+      .map((c) => ({ value: c.modelName, label: `${c.modelName} (${c.provider})` }))
+    if (customList.length > 0) return customList
+    return RERANK_OPTIONS
+  }, [realConfigs])
 
   const selectedCatalog = useMemo(() => {
     return catalogProviders.find((p) => p.provider === selectedProviderId) || catalogProviders[0]
@@ -208,47 +235,146 @@ export default function ModelConfigPage() {
     setAddModelModalOpen(true)
   }
 
-  const handleOpenGovernanceModal = async (config: ModelConfigItem) => {
-    setActiveGovernanceConfig(config)
-    setGovernanceModalOpen(true)
-    try {
-      const res = await getModelGovernanceConfig(config.configId)
-      if (res) {
-        setGovStrategyMode(res.strategyMode || 'FAILOVER')
-        setGovTimeoutSec(res.timeoutMs ? Math.round(res.timeoutMs / 1000) : 30)
-        setGovMaxRetries(res.maxRetries ?? 3)
-        setGovMaxConcurrency(res.maxConcurrency ?? 10)
-        setGovRateLimitRpm(res.rateLimitRpm ?? 60)
-        setGovFallbackModel(res.fallbackModel || 'deepseek-chat')
-        setGovPrimaryWeight(res.primaryWeight ?? 70)
-        setGovCircuitBreaker(res.circuitBreakerEnabled !== false)
+  // 路由更改事件处理
+  const handleSelectDefaultLLM = async (val: string) => {
+    setDefaultLLM(val)
+    const route = realRoutes.find((r) => r.modelType === 'CHAT' || r.routeKey === 'DEFAULT_LLM')
+    if (route) {
+      try {
+        await updateModelRoute(route.routeId, { routeKey: val })
+        showToast(`对话模型全局路由已成功保存为 [${val}]`)
+      } catch (e) {
+        showToast(`保存对话模型路由失败`)
       }
-    } catch (err: any) {
-      console.warn('获取治理参数失败，使用默认配置:', err)
     }
   }
 
-  const handleSaveGovernanceSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!activeGovernanceConfig) return
+  const handleSelectDefaultEmbedding = async (val: string) => {
+    setDefaultEmbedding(val)
+    const route = realRoutes.find((r) => r.modelType === 'EMBEDDING' || r.routeKey === 'DEFAULT_EMBEDDING')
+    if (route) {
+      try {
+        await updateModelRoute(route.routeId, { routeKey: val })
+        showToast(`向量检索全局路由已成功保存为 [${val}]`)
+      } catch (e) {
+        showToast(`保存向量检索路由失败`)
+      }
+    }
+  }
 
+  const handleSelectDefaultRerank = async (val: string) => {
+    setDefaultRerank(val)
+    const route = realRoutes.find((r) => r.modelType === 'RERANK' || r.routeKey === 'DEFAULT_RERANK')
+    if (route) {
+      try {
+        await updateModelRoute(route.routeId, { routeKey: val })
+        showToast(`精细重排全局路由已成功保存为 [${val}]`)
+      } catch (e) {
+        showToast(`保存精细重排路由失败`)
+      }
+    }
+  }
+
+  // 打开特定节点的独占治理配置 Modal
+  const handleOpenNodeGovernance = async (config: ModelConfigItem) => {
+    setTargetGovConfig(config)
+    setNodeGovModalOpen(true)
     try {
-      await updateModelGovernanceConfig(activeGovernanceConfig.configId, {
-        configId: activeGovernanceConfig.configId,
-        strategyMode: govStrategyMode,
-        timeoutMs: govTimeoutSec * 1000,
-        maxRetries: govMaxRetries,
-        maxConcurrency: govMaxConcurrency,
-        rateLimitRpm: govRateLimitRpm,
-        fallbackModel: govFallbackModel,
-        primaryWeight: govPrimaryWeight,
-        fallbackWeight: 100 - govPrimaryWeight,
-        circuitBreakerEnabled: govCircuitBreaker,
+      const gov = await getModelGovernanceConfig(config.configId)
+      if (gov) {
+        setGovBindingMode(gov.bindingMode || 'CONFIG')
+        setGovRetryEnabled(gov.retryEnabled !== false)
+        setGovMaxAttempts(gov.maxAttempts || 3)
+        setGovRetryWaitMs(gov.retryWaitMs || 1000)
+        setGovCircuitEnabled(gov.circuitEnabled !== false)
+        setGovFailureRateThreshold(gov.failureRateThreshold || 50)
+        setGovSlowCallDurationMs(gov.slowCallDurationMs || 3000)
+        setGovRateLimitEnabled(gov.rateLimitEnabled !== false)
+        setGovLimitForPeriod(gov.limitForPeriod || 120)
+        setGovStreamFirstChunkTimeoutMs(gov.streamFirstChunkTimeoutMs || 30000)
+        setGovStreamMaxDurationMs(gov.streamMaxDurationMs || 300000)
+        setGovMaxConcurrentCalls(gov.maxConcurrentCalls || 20)
+      }
+    } catch (e) {
+      console.warn('获取节点治理配置:', e)
+    }
+  }
+
+  // 提交特定节点的治理配置修改
+  const handleSaveNodeGovernance = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!targetGovConfig) return
+    try {
+      await updateModelGovernanceConfig(targetGovConfig.configId, {
+        configId: targetGovConfig.configId,
+        bindingMode: govBindingMode,
+        enabled: true,
+        retryEnabled: govRetryEnabled,
+        maxAttempts: govMaxAttempts,
+        retryWaitMs: govRetryWaitMs,
+        circuitEnabled: govCircuitEnabled,
+        failureRateThreshold: govFailureRateThreshold,
+        slowCallDurationMs: govSlowCallDurationMs,
+        rateLimitEnabled: govRateLimitEnabled,
+        limitForPeriod: govLimitForPeriod,
+        streamFirstChunkTimeoutMs: govStreamFirstChunkTimeoutMs,
+        streamMaxDurationMs: govStreamMaxDurationMs,
+        maxConcurrentCalls: govMaxConcurrentCalls,
       })
-      setGovernanceModalOpen(false)
-      showToast(`已将【${govStrategyMode === 'FAILOVER' ? '主备降级' : govStrategyMode === 'WEIGHTED' ? '加权负载' : '严格限流'}】策略应用至模型 [${activeGovernanceConfig.modelName}]`)
+      setNodeGovModalOpen(false)
+      showToast(`已成功保存模型节点 [${targetGovConfig.modelName}] 的精细治理策略！`)
     } catch (err: any) {
-      showToast(`保存治理配置失败: ${err?.message || '服务器未响应'}`)
+      showToast(`保存失败: ${err?.message || '服务器拒绝'}`)
+    }
+  }
+
+  // 打开全局治理 Modal，拉取真实治理配置
+  const handleOpenGlobalGovernance = async () => {
+    setGlobalGovModalOpen(true)
+    const targetConfig = currentProviderConfigs[0] || realConfigs[0]
+    if (targetConfig) {
+      try {
+        const gov = await getModelGovernanceConfig(targetConfig.configId)
+        if (gov) {
+          if (gov.strategyMode) setGlobalStrategyMode(gov.strategyMode)
+          if (gov.timeLimiterTimeoutMs) setGlobalTimeoutSec(Math.round(gov.timeLimiterTimeoutMs / 1000))
+          if (gov.maxAttempts) setGlobalMaxRetries(gov.maxAttempts)
+          if (gov.limitForPeriod) setGlobalRateLimitRpm(gov.limitForPeriod)
+          if (gov.circuitEnabled !== undefined) setGlobalCircuitBreaker(gov.circuitEnabled)
+          if (gov.fallbackModel) setGlobalFallbackLLM(gov.fallbackModel)
+          if (gov.primaryWeight !== undefined) setGlobalPrimaryWeight(gov.primaryWeight)
+        }
+      } catch (e) {
+        console.warn('获取目标模型治理配置:', e)
+      }
+    }
+  }
+
+  // 提交全局治理配置并调用后端 API 持久化
+  const handleSaveGlobalGovernance = async (e: React.FormEvent) => {
+    e.preventDefault()
+    try {
+      const targetConfig = currentProviderConfigs[0] || realConfigs[0]
+      if (targetConfig) {
+        await updateModelGovernanceConfig(targetConfig.configId, {
+          configId: targetConfig.configId,
+          strategyMode: globalStrategyMode,
+          retryEnabled: globalMaxRetries > 0,
+          maxAttempts: globalMaxRetries,
+          circuitEnabled: globalCircuitBreaker,
+          rateLimitEnabled: true,
+          limitForPeriod: globalRateLimitRpm,
+          timeLimiterTimeoutMs: globalTimeoutSec * 1000,
+          fallbackModel: globalFallbackLLM,
+          primaryWeight: globalPrimaryWeight,
+          fallbackWeight: 100 - globalPrimaryWeight,
+        })
+      }
+      setGlobalGovModalOpen(false)
+      const modeText = globalStrategyMode === 'FAILOVER' ? '主备故障转移' : globalStrategyMode === 'WEIGHTED' ? '加权负载均衡' : '严格限流高压熔断'
+      showToast(`已成功同步并应用后端【${modeText}】治理策略！`)
+    } catch (err: any) {
+      showToast(`保存治理策略失败: ${err?.message || '服务器未响应'}`)
     }
   }
 
@@ -267,7 +393,7 @@ export default function ModelConfigPage() {
       setRealConfigs((prev) => [created, ...prev])
       setAddModelModalOpen(false)
       setCredentialsModalOpen(false)
-      showToast(`保存模型配置 [${created.modelName}] 成功！`)
+      showToast(`保存模型节点 [${created.modelName}] 成功！`)
     } catch (err: any) {
       showToast(`创建失败: ${err?.message || '服务器未响应'}`)
     }
@@ -293,7 +419,7 @@ export default function ModelConfigPage() {
     try {
       await deleteModelConfig(configId)
       setRealConfigs((prev) => prev.filter((c) => c.configId !== configId))
-      showToast(`已成功删除模型配置 [${modelName}]`)
+      showToast(`已成功删除模型节点配置 [${modelName}]`)
     } catch (err: any) {
       showToast(`删除失败: ${err?.message}`)
     }
@@ -312,8 +438,8 @@ export default function ModelConfigPage() {
 
   return (
     <div className="flex h-full min-h-0 flex-1 flex-col overflow-y-auto bg-[#f8f9fc] text-slate-800">
-      {/* 顶部 Header & 全局系统默认模型设置 */}
-      <header className="border-b border-[#e8ebf1] bg-white px-6 py-5 sm:px-8">
+      {/* 顶部 Header：干净利落 */}
+      <header className="border-b border-[#e8ebf1] bg-white px-6 py-4 sm:px-8">
         <div className="mx-auto max-w-[1500px]">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
@@ -321,9 +447,9 @@ export default function ModelConfigPage() {
                 <Cpu className="size-5" />
               </span>
               <div>
-                <h1 className="text-xl font-bold tracking-tight text-slate-900">模型供应商与接入配置</h1>
-                <p className="mt-0.5 text-xs text-slate-500">
-                  真实接入后端 API 数据，管理模型连接凭据、脱敏密钥及路由调度。
+                <h1 className="text-lg font-bold tracking-tight text-slate-900">模型供应商与治理网关</h1>
+                <p className="text-[11px] text-slate-500">
+                  真实接入后端 API，统一管理厂商连接凭据与全站模型调度路由。
                 </p>
               </div>
             </div>
@@ -337,46 +463,72 @@ export default function ModelConfigPage() {
             </Button>
           </div>
 
-          {/* 全局默认系统模型选择 */}
-          <div className="mt-4 rounded-xl border border-purple-100 bg-gradient-to-r from-[#fbfaff] via-[#f8f6ff] to-[#f4f2ff] p-3.5 shadow-sm">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Sparkles className="size-4 text-[#6f62e8]" />
-                <span className="text-xs font-bold text-slate-800">全站 RAG 默认模型调度 (System Defaults)</span>
-              </div>
-              <span className="text-[11px] text-[#7166f7]">控制全站问答与向量检索的默认引擎</span>
-            </div>
+          {/* 全局默认系统模型选择 & 全局治理控制台（紧凑双栏设计，解决横向拉伸留白问题） */}
+          <div className="mt-3.5 rounded-xl border border-purple-100 bg-gradient-to-r from-[#fbfaff] via-[#f8f6ff] to-[#f4f2ff] p-3.5 shadow-sm">
+            <div className="grid grid-cols-1 items-center gap-4 lg:grid-cols-[1fr_auto]">
+              
+              {/* 左侧紧凑默认模型下拉区 */}
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <Sparkles className="size-3.5 text-[#6f62e8]" />
+                  <span className="text-xs font-bold text-slate-800">全站 RAG 默认模型调度引擎 (System Defaults)</span>
+                </div>
 
-            <div className="mt-2.5 grid grid-cols-1 gap-3 sm:grid-cols-3">
-              <div className="flex items-center justify-between gap-2 rounded-lg border border-white bg-white/90 px-3 py-2 text-xs shadow-sm">
-                <span className="font-bold text-purple-600 shrink-0">对话生成 (LLM)</span>
-                <CustomSelect
-                  value={defaultLLM}
-                  onChange={setDefaultLLM}
-                  options={LLM_OPTIONS}
-                  className="w-48"
-                />
+                <div className="flex flex-wrap items-center gap-2.5">
+                  <div className="flex items-center gap-2 rounded-lg border border-white bg-white/90 px-2.5 py-1 text-xs shadow-2xs">
+                    <span className="font-bold text-purple-600 shrink-0 text-[11px]">对话生成</span>
+                    <CustomSelect
+                      value={defaultLLM}
+                      onChange={handleSelectDefaultLLM}
+                      options={dynamicLLMOptions}
+                      className="w-44"
+                    />
+                  </div>
+
+                  <div className="flex items-center gap-2 rounded-lg border border-white bg-white/90 px-2.5 py-1 text-xs shadow-2xs">
+                    <span className="font-bold text-emerald-600 shrink-0 text-[11px]">向量检索</span>
+                    <CustomSelect
+                      value={defaultEmbedding}
+                      onChange={handleSelectDefaultEmbedding}
+                      options={dynamicEmbeddingOptions}
+                      className="w-48"
+                    />
+                  </div>
+
+                  <div className="flex items-center gap-2 rounded-lg border border-white bg-white/90 px-2.5 py-1 text-xs shadow-2xs">
+                    <span className="font-bold text-amber-600 shrink-0 text-[11px]">精细重排</span>
+                    <CustomSelect
+                      value={defaultRerank}
+                      onChange={handleSelectDefaultRerank}
+                      options={dynamicRerankOptions}
+                      className="w-44"
+                    />
+                  </div>
+                </div>
               </div>
 
-              <div className="flex items-center justify-between gap-2 rounded-lg border border-white bg-white/90 px-3 py-2 text-xs shadow-sm">
-                <span className="font-bold text-emerald-600 shrink-0">向量检索 (Embedding)</span>
-                <CustomSelect
-                  value={defaultEmbedding}
-                  onChange={setDefaultEmbedding}
-                  options={EMBEDDING_OPTIONS}
-                  className="w-52"
-                />
+              {/* 右侧跳转至独立模型治理控制台卡片 */}
+              <div className="flex flex-col items-start gap-2 border-t border-purple-100/60 pt-3 lg:items-end lg:border-l lg:border-t-0 lg:pl-5 lg:pt-0">
+                <div className="flex items-center gap-2">
+                  <span className="rounded-md bg-purple-100 px-2 py-0.5 text-[10px] font-bold text-[#5649ce]">
+                    Resilience4j 物理防护
+                  </span>
+
+                  <NavLink to="/models/governance">
+                    <Button
+                      className="gap-2 rounded-xl bg-[#6f62e8] px-3.5 py-1.5 text-xs font-bold text-white shadow-md shadow-purple-200 transition-all hover:bg-[#5f52d9] hover:shadow-lg"
+                    >
+                      <SlidersHorizontal className="size-3.5 text-purple-200" />
+                      前往【模型治理控制台】
+                    </Button>
+                  </NavLink>
+                </div>
+
+                <p className="text-[11px] text-slate-500">
+                  配置物理节点的限流、慢调用熔断判定、并发隔离与流式超时规则。
+                </p>
               </div>
 
-              <div className="flex items-center justify-between gap-2 rounded-lg border border-white bg-white/90 px-3 py-2 text-xs shadow-sm">
-                <span className="font-bold text-amber-600 shrink-0">精细重排 (Rerank)</span>
-                <CustomSelect
-                  value={defaultRerank}
-                  onChange={setDefaultRerank}
-                  options={RERANK_OPTIONS}
-                  className="w-48"
-                />
-              </div>
             </div>
           </div>
         </div>
@@ -507,7 +659,7 @@ export default function ModelConfigPage() {
                         </span>
                       </div>
                       <p className="mt-1 text-xs text-slate-500">
-                        {selectedCatalog.defaultGovernanceDescription || '统一模型连接凭据与服务质量 Governance 治理。'}
+                        {selectedCatalog.defaultGovernanceDescription || '统一模型连接凭据与节点能力提供商。'}
                       </p>
                     </div>
                   </div>
@@ -615,7 +767,7 @@ export default function ModelConfigPage() {
                         <th className="px-4 py-3">类型 (TYPE)</th>
                         <th className="px-4 py-3">端点 (BASE URL)</th>
                         <th className="px-4 py-3">脱敏密钥</th>
-                        <th className="px-4 py-3 text-right">操作与治理</th>
+                        <th className="px-4 py-3 text-right">操作</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100 bg-white">
@@ -676,22 +828,12 @@ export default function ModelConfigPage() {
                                 </div>
                               </td>
                               <td className="px-4 py-3 text-right">
-                                <div className="flex items-center justify-end gap-2">
-                                  <button
-                                    type="button"
-                                    onClick={() => handleOpenGovernanceModal(config)}
-                                    className="flex items-center gap-1 rounded-lg bg-purple-50 px-2 py-1 text-[11px] font-semibold text-[#6f62e8] transition-colors hover:bg-purple-100"
-                                    title="设置主备降级、加权负载均衡与限流"
-                                  >
-                                    <SlidersHorizontal className="size-3" />
-                                    治理设置
-                                  </button>
-
+                                <div className="flex items-center justify-end gap-2.5">
                                   <button
                                     type="button"
                                     disabled={testingConfigId === config.configId}
                                     onClick={() => handleTestConnectionReal(config.configId, config.modelName)}
-                                    className="flex items-center gap-1 font-semibold text-slate-600 hover:text-[#6f62e8] hover:underline"
+                                    className="flex items-center gap-1 font-semibold text-[#6f62e8] hover:underline"
                                   >
                                     <RefreshCw className={cn('size-3', testingConfigId === config.configId && 'animate-spin')} />
                                     {testingConfigId === config.configId ? '探针测试' : '测试连接'}
@@ -719,183 +861,6 @@ export default function ModelConfigPage() {
           </section>
         </div>
       </main>
-
-      {/* 支持【主备降级】与【加权负载均衡】的多模式模型治理 Modal */}
-      <Dialog open={governanceModalOpen} onOpenChange={setGovernanceModalOpen}>
-        <DialogContent className="max-w-xl rounded-2xl bg-white p-6 shadow-2xl">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-base font-bold text-slate-900">
-              <SlidersHorizontal className="size-4 text-[#6f62e8]" />
-              模型治理与路由策略 (Governance & Routing) - [{activeGovernanceConfig?.modelName}]
-            </DialogTitle>
-            <DialogDescription className="text-xs text-slate-500">
-              由用户自定义配置【主备故障转移】、【加权负载均衡】或【严格限流保护】模式。
-            </DialogDescription>
-          </DialogHeader>
-
-          <form onSubmit={handleSaveGovernanceSubmit} className="mt-4 space-y-4">
-            {/* 治理模式切换三选一 Card Radio */}
-            <div>
-              <label className="mb-2 block text-xs font-bold text-slate-800">1. 选择核心治理与路由模式 (Strategy Mode)</label>
-              <div className="grid grid-cols-3 gap-2.5">
-                {/* 模式 A: 主备降级 */}
-                <div
-                  onClick={() => setGovStrategyMode('FAILOVER')}
-                  className={cn(
-                    'flex cursor-pointer flex-col justify-between rounded-xl border p-3 transition-all',
-                    govStrategyMode === 'FAILOVER'
-                      ? 'border-[#6f62e8] bg-[#f5f3ff] ring-2 ring-[#eeecff]'
-                      : 'border-slate-200 bg-white hover:border-slate-300',
-                  )}
-                >
-                  <div className="flex items-center gap-1.5 font-bold text-xs text-slate-800">
-                    <ArrowRightLeft className="size-3.5 text-[#6f62e8]" />
-                    主备降级 (Failover)
-                  </div>
-                  <p className="mt-1 text-[10px] text-slate-500">主模型超时或报错时，秒级自动降级至备用模型。</p>
-                </div>
-
-                {/* 模式 B: 加权负载 */}
-                <div
-                  onClick={() => setGovStrategyMode('WEIGHTED')}
-                  className={cn(
-                    'flex cursor-pointer flex-col justify-between rounded-xl border p-3 transition-all',
-                    govStrategyMode === 'WEIGHTED'
-                      ? 'border-[#6f62e8] bg-[#f5f3ff] ring-2 ring-[#eeecff]'
-                      : 'border-slate-200 bg-white hover:border-slate-300',
-                  )}
-                >
-                  <div className="flex items-center gap-1.5 font-bold text-xs text-slate-800">
-                    <Scale className="size-3.5 text-purple-600" />
-                    加权负载 (Weighted)
-                  </div>
-                  <p className="mt-1 text-[10px] text-slate-500">按设定的权重比例（如 70%:30%）分发全站流量。</p>
-                </div>
-
-                {/* 模式 C: 严格限流保护 */}
-                <div
-                  onClick={() => setGovStrategyMode('PROTECTION')}
-                  className={cn(
-                    'flex cursor-pointer flex-col justify-between rounded-xl border p-3 transition-all',
-                    govStrategyMode === 'PROTECTION'
-                      ? 'border-[#6f62e8] bg-[#f5f3ff] ring-2 ring-[#eeecff]'
-                      : 'border-slate-200 bg-white hover:border-slate-300',
-                  )}
-                >
-                  <div className="flex items-center gap-1.5 font-bold text-xs text-slate-800">
-                    <Shield className="size-3.5 text-emerald-600" />
-                    严格限流 (Protected)
-                  </div>
-                  <p className="mt-1 text-[10px] text-slate-500">对并发与 RPM 限制，防止调用超出 API 配额。</p>
-                </div>
-              </div>
-            </div>
-
-            {/* 模式特定配置面板 */}
-            {govStrategyMode === 'FAILOVER' && (
-              <div className="rounded-xl border border-purple-100 bg-[#f7f5ff] p-3.5 space-y-3">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-purple-900">🛡️ 主备故障转移降级配置</span>
-                  <button
-                    type="button"
-                    onClick={() => setGovCircuitBreaker(!govCircuitBreaker)}
-                    className="flex items-center gap-1 text-xs text-[#6f62e8]"
-                  >
-                    {govCircuitBreaker ? <ToggleRight className="size-5 text-emerald-600" /> : <ToggleLeft className="size-5 text-slate-300" />}
-                    <span className="text-[11px]">{govCircuitBreaker ? '自动熔断已开启' : '熔断已关闭'}</span>
-                  </button>
-                </div>
-
-                <div>
-                  <label className="mb-1 block text-[11px] text-slate-600">主模型发生异常时自动降级的备用模型 (Fallback Model)</label>
-                  <CustomSelect
-                    value={govFallbackModel}
-                    onChange={setGovFallbackModel}
-                    options={LLM_OPTIONS}
-                  />
-                </div>
-              </div>
-            )}
-
-            {govStrategyMode === 'WEIGHTED' && (
-              <div className="rounded-xl border border-blue-100 bg-[#f4f8ff] p-3.5 space-y-3">
-                <span className="text-xs font-bold text-blue-900">⚖️ 流量加权轮询权重比例设置</span>
-
-                <div className="space-y-2">
-                  <div className="flex justify-between text-xs text-slate-700">
-                    <span>主节点 [{activeGovernanceConfig?.modelName}] 权重: <strong className="text-[#6f62e8]">{govPrimaryWeight}%</strong></span>
-                    <span>备用节点 [{govFallbackModel}] 权重: <strong className="text-blue-600">{100 - govPrimaryWeight}%</strong></span>
-                  </div>
-                  <input
-                    type="range"
-                    min={10}
-                    max={90}
-                    step={5}
-                    value={govPrimaryWeight}
-                    onChange={(e) => setGovPrimaryWeight(Number(e.target.value))}
-                    className="w-full accent-[#6f62e8]"
-                  />
-                </div>
-
-                <div>
-                  <label className="mb-1 block text-[11px] text-slate-600">关联负载的次级并发模型</label>
-                  <CustomSelect
-                    value={govFallbackModel}
-                    onChange={setGovFallbackModel}
-                    options={LLM_OPTIONS}
-                  />
-                </div>
-              </div>
-            )}
-
-            {/* 通用 QoS 参数：超时、重试、RPM */}
-            <div className="rounded-xl border border-slate-100 bg-[#f8f8fc] p-3.5">
-              <p className="text-xs font-bold text-slate-800">2. 服务质量 QoS 与速率阈值限制 (QoS Limits)</p>
-              <div className="mt-2.5 grid grid-cols-3 gap-3">
-                <div>
-                  <label className="mb-1 block text-[11px] text-slate-500">超时时间 (秒)</label>
-                  <input
-                    type="number"
-                    min={1}
-                    value={govTimeoutSec}
-                    onChange={(e) => setGovTimeoutSec(Number(e.target.value))}
-                    className="w-full rounded-xl border border-slate-200 bg-white px-3 py-1 text-xs text-slate-800 outline-none focus:border-[#6f62e8]"
-                  />
-                </div>
-                <div>
-                  <label className="mb-1 block text-[11px] text-slate-500">重试上限 (Retries)</label>
-                  <input
-                    type="number"
-                    min={0}
-                    value={govMaxRetries}
-                    onChange={(e) => setGovMaxRetries(Number(e.target.value))}
-                    className="w-full rounded-xl border border-slate-200 bg-white px-3 py-1 text-xs text-slate-800 outline-none focus:border-[#6f62e8]"
-                  />
-                </div>
-                <div>
-                  <label className="mb-1 block text-[11px] text-slate-500">每分钟 RPM 限额</label>
-                  <input
-                    type="number"
-                    min={1}
-                    value={govRateLimitRpm}
-                    onChange={(e) => setGovRateLimitRpm(Number(e.target.value))}
-                    className="w-full rounded-xl border border-slate-200 bg-white px-3 py-1 text-xs text-slate-800 outline-none focus:border-[#6f62e8]"
-                  />
-                </div>
-              </div>
-            </div>
-
-            <div className="mt-6 flex justify-end gap-2.5 pt-2">
-              <Button type="button" variant="outline" size="sm" onClick={() => setGovernanceModalOpen(false)}>
-                取消
-              </Button>
-              <Button type="submit" size="sm" className="bg-[#6f62e8] text-white hover:bg-[#5f52d9]">
-                应用此治理策略
-              </Button>
-            </div>
-          </form>
-        </DialogContent>
-      </Dialog>
 
       {/* 凭据 Modal */}
       <Dialog open={credentialsModalOpen} onOpenChange={setCredentialsModalOpen}>
