@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.toolkit.IdWorker;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.nexarag.common.error.BaseErrorCode;
 import com.nexarag.common.exception.ClientException;
+import com.nexarag.model.converter.ModelGovernanceConfigConverter;
 import com.nexarag.model.dto.ModelGovernanceConfigRequest;
 import com.nexarag.model.dto.ModelGovernanceConfigResponse;
 import com.nexarag.model.entity.ModelGovernanceConfig;
@@ -34,14 +35,22 @@ public class ModelGovernanceConfigServiceImpl
     private final ModelRegistryVersionMapper modelRegistryVersionMapper;
     private final ModelRegistryChangePublisher modelRegistryChangePublisher;
     private final DefaultModelGovernancePolicyFactory defaultModelGovernancePolicyFactory;
+    private final ModelGovernanceConfigConverter modelGovernanceConfigConverter;
 
     @Override
     public ModelGovernanceConfig getByConfigId(Long configId) {
         validateConfigId(configId);
 
-        // 1. 查询已有治理配置，缺失时返回默认关闭配置，方便前端回显
-        ModelGovernanceConfig config = findByConfigId(configId);
-        return config == null ? defaultConfig(configId) : config;
+        // 1. 查询已保存治理配置，不创建内存默认值
+        return findByConfigId(configId);
+    }
+
+    @Override
+    public ModelGovernanceConfig getByRouteKey(String routeKey) {
+        validateRouteKey(routeKey);
+
+        // 1. 查询已保存路由级治理配置
+        return findByRouteKey(routeKey);
     }
 
     @Override
@@ -52,23 +61,70 @@ public class ModelGovernanceConfigServiceImpl
             throw new ClientException("模型治理配置请求不能为空", BaseErrorCode.PARAM_ERROR);
         }
 
-        // 1. 查询已有配置，存在则更新，不存在则创建
+        // 1. 查询已有配置，存在则更新，不存在则创建最小绑定实体
         ModelGovernanceConfig config = findByConfigId(configId);
         boolean create = config == null;
         if (create) {
-            config = defaultConfig(configId);
-            config.setGovernanceId(IdWorker.getId());
+            config = ModelGovernanceConfig.builder()
+                    .governanceId(IdWorker.getId())
+                    .bindingMode(ModelGovernanceBindingMode.CONFIG)
+                    .configId(configId)
+                    .build();
         }
 
-        // 2. 应用请求参数并持久化
-        applyRequest(config, request);
+        // 2. 应用非空策略字段并持久化
+        modelGovernanceConfigConverter.patch(request, config);
         if (create) {
             saveGovernanceConfig(config);
         } else {
             updateGovernanceConfig(config);
         }
         bumpRegistryVersionAndPublish();
-        return config;
+        return create ? findByConfigId(configId) : config;
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public ModelGovernanceConfig saveByRouteKey(String routeKey, ModelGovernanceConfigRequest request) {
+        validateRouteKey(routeKey);
+        if (request == null) {
+            throw new ClientException("模型治理配置请求不能为空", BaseErrorCode.PARAM_ERROR);
+        }
+
+        // 1. 查询已有路由级配置，缺失时创建最小绑定实体
+        ModelGovernanceConfig config = findByRouteKey(routeKey);
+        boolean create = config == null;
+        if (create) {
+            config = ModelGovernanceConfig.builder()
+                    .governanceId(IdWorker.getId())
+                    .bindingMode(ModelGovernanceBindingMode.ROUTE)
+                    .routeKey(routeKey)
+                    .build();
+        }
+
+        // 2. 应用非空策略字段并持久化
+        modelGovernanceConfigConverter.patch(request, config);
+        if (create) {
+            saveGovernanceConfig(config);
+        } else {
+            updateGovernanceConfig(config);
+        }
+        bumpRegistryVersionAndPublish();
+        return create ? findByRouteKey(routeKey) : config;
+    }
+
+    @Override
+    public void renameRouteBinding(String oldRouteKey, String newRouteKey) {
+        if (oldRouteKey == null || oldRouteKey.equals(newRouteKey)) {
+            return;
+        }
+
+        // 1. 仅迁移对应旧路由标识的路由级治理配置
+        this.lambdaUpdate()
+                .eq(ModelGovernanceConfig::getBindingMode, ModelGovernanceBindingMode.ROUTE)
+                .eq(ModelGovernanceConfig::getRouteKey, oldRouteKey)
+                .set(ModelGovernanceConfig::getRouteKey, newRouteKey)
+                .update();
     }
 
     @Override
@@ -128,9 +184,10 @@ public class ModelGovernanceConfigServiceImpl
         // 1. 基于现有绑定信息生成默认治理配置
         ModelGovernanceConfig defaults = createDefault(existing);
 
-        // 2. 保留原治理配置ID并覆盖治理参数
+        // 2. 保留原治理配置ID，以数据库默认值重建治理配置
         defaults.setGovernanceId(existing.getGovernanceId());
-        updateGovernanceConfig(defaults);
+        deleteGovernanceConfigPhysically(existing.getGovernanceId());
+        saveGovernanceConfig(defaults);
 
         // 3. 发布模型注册表刷新
         bumpRegistryVersionAndPublish();
@@ -138,34 +195,7 @@ public class ModelGovernanceConfigServiceImpl
 
     @Override
     public ModelGovernanceConfigResponse toResponse(ModelGovernanceConfig config) {
-        return ModelGovernanceConfigResponse.builder()
-                .governanceId(config.getGovernanceId())
-                .bindingMode(config.getBindingMode())
-                .configId(config.getConfigId())
-                .routeKey(config.getRouteKey())
-                .enabled(config.getEnabled())
-                .retryEnabled(config.getRetryEnabled())
-                .maxAttempts(config.getMaxAttempts())
-                .retryWaitMs(config.getRetryWaitMs())
-                .circuitEnabled(config.getCircuitEnabled())
-                .failureRateThreshold(config.getFailureRateThreshold())
-                .slowCallRateThreshold(config.getSlowCallRateThreshold())
-                .slowCallDurationMs(config.getSlowCallDurationMs())
-                .minimumNumberOfCalls(config.getMinimumNumberOfCalls())
-                .slidingWindowSize(config.getSlidingWindowSize())
-                .waitDurationInOpenStateMs(config.getWaitDurationInOpenStateMs())
-                .rateLimitEnabled(config.getRateLimitEnabled())
-                .limitForPeriod(config.getLimitForPeriod())
-                .limitRefreshPeriodMs(config.getLimitRefreshPeriodMs())
-                .timeoutDurationMs(config.getTimeoutDurationMs())
-                .bulkheadEnabled(config.getBulkheadEnabled())
-                .timeLimiterEnabled(config.getTimeLimiterEnabled())
-                .timeLimiterTimeoutMs(config.getTimeLimiterTimeoutMs())
-                .streamFirstChunkTimeoutMs(config.getStreamFirstChunkTimeoutMs())
-                .streamMaxDurationMs(config.getStreamMaxDurationMs())
-                .maxConcurrentCalls(config.getMaxConcurrentCalls())
-                .maxWaitDurationMs(config.getMaxWaitDurationMs())
-                .build();
+        return modelGovernanceConfigConverter.toResponse(config);
     }
 
     /**
@@ -178,6 +208,19 @@ public class ModelGovernanceConfigServiceImpl
         return this.lambdaQuery()
                 .eq(ModelGovernanceConfig::getBindingMode, ModelGovernanceBindingMode.CONFIG)
                 .eq(ModelGovernanceConfig::getConfigId, configId)
+                .one();
+    }
+
+    /**
+     * 按路由标识查询治理配置。
+     *
+     * @param routeKey 路由标识
+     * @return 治理配置
+     */
+    protected ModelGovernanceConfig findByRouteKey(String routeKey) {
+        return this.lambdaQuery()
+                .eq(ModelGovernanceConfig::getBindingMode, ModelGovernanceBindingMode.ROUTE)
+                .eq(ModelGovernanceConfig::getRouteKey, routeKey)
                 .one();
     }
 
@@ -208,34 +251,16 @@ public class ModelGovernanceConfigServiceImpl
      * @return true 表示更新成功
      */
     protected boolean updateGovernanceConfig(ModelGovernanceConfig config) {
-        return this.lambdaUpdate()
-                .eq(ModelGovernanceConfig::getGovernanceId, config.getGovernanceId())
-                .set(ModelGovernanceConfig::getEnabled, config.getEnabled())
-                .set(ModelGovernanceConfig::getBindingMode, config.getBindingMode())
-                .set(ModelGovernanceConfig::getConfigId, config.getConfigId())
-                .set(ModelGovernanceConfig::getRouteKey, config.getRouteKey())
-                .set(ModelGovernanceConfig::getRetryEnabled, config.getRetryEnabled())
-                .set(ModelGovernanceConfig::getMaxAttempts, config.getMaxAttempts())
-                .set(ModelGovernanceConfig::getRetryWaitMs, config.getRetryWaitMs())
-                .set(ModelGovernanceConfig::getCircuitEnabled, config.getCircuitEnabled())
-                .set(ModelGovernanceConfig::getFailureRateThreshold, config.getFailureRateThreshold())
-                .set(ModelGovernanceConfig::getSlowCallRateThreshold, config.getSlowCallRateThreshold())
-                .set(ModelGovernanceConfig::getSlowCallDurationMs, config.getSlowCallDurationMs())
-                .set(ModelGovernanceConfig::getMinimumNumberOfCalls, config.getMinimumNumberOfCalls())
-                .set(ModelGovernanceConfig::getSlidingWindowSize, config.getSlidingWindowSize())
-                .set(ModelGovernanceConfig::getWaitDurationInOpenStateMs, config.getWaitDurationInOpenStateMs())
-                .set(ModelGovernanceConfig::getRateLimitEnabled, config.getRateLimitEnabled())
-                .set(ModelGovernanceConfig::getLimitForPeriod, config.getLimitForPeriod())
-                .set(ModelGovernanceConfig::getLimitRefreshPeriodMs, config.getLimitRefreshPeriodMs())
-                .set(ModelGovernanceConfig::getTimeoutDurationMs, config.getTimeoutDurationMs())
-                .set(ModelGovernanceConfig::getBulkheadEnabled, config.getBulkheadEnabled())
-                .set(ModelGovernanceConfig::getTimeLimiterEnabled, config.getTimeLimiterEnabled())
-                .set(ModelGovernanceConfig::getTimeLimiterTimeoutMs, config.getTimeLimiterTimeoutMs())
-                .set(ModelGovernanceConfig::getStreamFirstChunkTimeoutMs, config.getStreamFirstChunkTimeoutMs())
-                .set(ModelGovernanceConfig::getStreamMaxDurationMs, config.getStreamMaxDurationMs())
-                .set(ModelGovernanceConfig::getMaxConcurrentCalls, config.getMaxConcurrentCalls())
-                .set(ModelGovernanceConfig::getMaxWaitDurationMs, config.getMaxWaitDurationMs())
-                .update();
+        return this.updateById(config);
+    }
+
+    /**
+     * 物理删除治理配置，以便重建时由数据库填充默认值。
+     *
+     * @param governanceId 治理配置ID
+     */
+    protected void deleteGovernanceConfigPhysically(Long governanceId) {
+        baseMapper.deletePhysicallyByGovernanceId(governanceId);
     }
 
     /**
@@ -284,58 +309,10 @@ public class ModelGovernanceConfigServiceImpl
         }
     }
 
-    private ModelGovernanceConfig defaultConfig(Long configId) {
-        return ModelGovernanceConfig.builder()
-                .bindingMode(ModelGovernanceBindingMode.CONFIG)
-                .configId(configId)
-                .enabled(false)
-                .retryEnabled(false)
-                .maxAttempts(1)
-                .retryWaitMs(0)
-                .circuitEnabled(false)
-                .failureRateThreshold(50)
-                .slowCallRateThreshold(100)
-                .slowCallDurationMs(3000)
-                .minimumNumberOfCalls(10)
-                .slidingWindowSize(20)
-                .waitDurationInOpenStateMs(30000)
-                .rateLimitEnabled(false)
-                .limitForPeriod(100)
-                .limitRefreshPeriodMs(1000)
-                .timeoutDurationMs(0)
-                .bulkheadEnabled(false)
-                .timeLimiterEnabled(false)
-                .timeLimiterTimeoutMs(60000)
-                .streamFirstChunkTimeoutMs(30000)
-                .streamMaxDurationMs(300000)
-                .maxConcurrentCalls(20)
-                .maxWaitDurationMs(0)
-                .build();
-    }
-
-    private void applyRequest(ModelGovernanceConfig config, ModelGovernanceConfigRequest request) {
-        config.setEnabled(request.enabled());
-        config.setRetryEnabled(request.retryEnabled());
-        config.setMaxAttempts(request.maxAttempts());
-        config.setRetryWaitMs(request.retryWaitMs());
-        config.setCircuitEnabled(request.circuitEnabled());
-        config.setFailureRateThreshold(request.failureRateThreshold());
-        config.setSlowCallRateThreshold(request.slowCallRateThreshold());
-        config.setSlowCallDurationMs(request.slowCallDurationMs());
-        config.setMinimumNumberOfCalls(request.minimumNumberOfCalls());
-        config.setSlidingWindowSize(request.slidingWindowSize());
-        config.setWaitDurationInOpenStateMs(request.waitDurationInOpenStateMs());
-        config.setRateLimitEnabled(request.rateLimitEnabled());
-        config.setLimitForPeriod(request.limitForPeriod());
-        config.setLimitRefreshPeriodMs(request.limitRefreshPeriodMs());
-        config.setTimeoutDurationMs(request.timeoutDurationMs());
-        config.setBulkheadEnabled(request.bulkheadEnabled());
-        config.setTimeLimiterEnabled(request.timeLimiterEnabled());
-        config.setTimeLimiterTimeoutMs(request.timeLimiterTimeoutMs());
-        config.setStreamFirstChunkTimeoutMs(request.streamFirstChunkTimeoutMs());
-        config.setStreamMaxDurationMs(request.streamMaxDurationMs());
-        config.setMaxConcurrentCalls(request.maxConcurrentCalls());
-        config.setMaxWaitDurationMs(request.maxWaitDurationMs());
+    private void validateRouteKey(String routeKey) {
+        if (routeKey == null || routeKey.isBlank()) {
+            throw new ClientException("模型路由标识不能为空", BaseErrorCode.PARAM_ERROR);
+        }
     }
 
     private boolean isExistingBinding(ModelGovernanceConfig config) {

@@ -52,17 +52,33 @@ public class ModelGovernanceResolver {
      * @return 模型治理执行参数
      */
     public ModelGovernanceSettings resolve(String routeKey, ModelRouteDecision decision) {
-        // 1. 按当前全局绑定模式读取治理配置，同一时间只生效一种模式
-        ModelGovernanceBindingMode bindingMode = properties.getGovernance().getBindingMode();
+        // 1. 优先读取路由级治理配置
         Long configId = decision == null ? null : decision.configId();
-        ModelGovernanceConfig config = modelRegistry.getGovernanceConfig(bindingMode, configId, routeKey);
+        ModelGovernanceConfig routeConfig = modelRegistry.getGovernanceConfig(
+                ModelGovernanceBindingMode.ROUTE, null, routeKey);
+        if (routeConfig != null) {
+            return toSettings(routeConfig);
+        }
 
-        // 2. 未配置或未启用治理时，返回关闭全部治理能力的运行时参数
+        // 2. 路由级配置缺失时回退到模型配置级治理配置
+        ModelGovernanceConfig config = modelRegistry.getGovernanceConfig(
+                ModelGovernanceBindingMode.CONFIG, configId, null);
+        return toSettings(config);
+    }
+
+    /**
+     * 将持久化治理配置转换为运行时参数。
+     *
+     * @param config 治理配置
+     * @return 运行时治理参数
+     */
+    private ModelGovernanceSettings toSettings(ModelGovernanceConfig config) {
+        // 1. 未配置或显式关闭治理时，返回关闭全部治理能力的运行时参数
         if (config == null || !Boolean.TRUE.equals(config.getEnabled())) {
             return ModelGovernanceSettings.disabled();
         }
 
-        // 3. 将数据库治理配置转换为执行器可消费的运行时参数
+        // 2. 将数据库治理配置转换为执行器可消费的运行时参数
         return ModelGovernanceSettings.builder()
                 .retryEnabled(config.getRetryEnabled())
                 .maxAttempts(config.getMaxAttempts())

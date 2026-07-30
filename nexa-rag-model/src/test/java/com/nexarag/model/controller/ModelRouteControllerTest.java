@@ -7,6 +7,7 @@ import com.nexarag.model.entity.ModelRoute;
 import com.nexarag.model.enums.ModelRouteStrategy;
 import com.nexarag.model.enums.ModelType;
 import com.nexarag.model.service.ModelConnectionTestService;
+import com.nexarag.model.service.ModelGovernanceConfigService;
 import com.nexarag.model.service.ModelRouteService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -48,6 +49,9 @@ class ModelRouteControllerTest {
 
     @MockitoBean
     private ModelConnectionTestService modelConnectionTestService;
+
+    @MockitoBean
+    private ModelGovernanceConfigService modelGovernanceConfigService;
 
     @Test
     void listRoutesShouldReturnRouteResponses() throws Exception {

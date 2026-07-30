@@ -13,30 +13,30 @@ import static org.assertj.core.api.Assertions.assertThat;
 class DefaultModelGovernancePolicyFactoryTest {
 
     @Test
-    void chatDefaultShouldUseConservativeConcurrencyAndStreamTimeout() {
+    void chatDefaultShouldOnlyProvideBindingIdentity() {
         DefaultModelGovernancePolicyFactory factory = new DefaultModelGovernancePolicyFactory();
 
         ModelGovernanceConfig config = factory.createForConfig(1001L, ModelType.CHAT);
 
         assertThat(config.getBindingMode()).isEqualTo(ModelGovernanceBindingMode.CONFIG);
         assertThat(config.getConfigId()).isEqualTo(1001L);
-        assertThat(config.getCircuitEnabled()).isTrue();
-        assertThat(config.getRateLimitEnabled()).isTrue();
-        assertThat(config.getBulkheadEnabled()).isTrue();
-        assertThat(config.getTimeLimiterEnabled()).isTrue();
-        assertThat(config.getStreamFirstChunkTimeoutMs()).isGreaterThan(0);
-        assertThat(config.getStreamMaxDurationMs()).isGreaterThan(config.getStreamFirstChunkTimeoutMs());
+        assertThat(config.getGovernanceId()).isNotNull();
+        assertThat(config.getEnabled()).isNull();
+        assertThat(config.getMaxAttempts()).isNull();
+        assertThat(config.getMaxConcurrentCalls()).isNull();
     }
 
     @Test
-    void embeddingDefaultShouldAllowMoreConcurrencyThanChat() {
+    void embeddingDefaultShouldOnlyOverrideChatBaselineDifferences() {
         DefaultModelGovernancePolicyFactory factory = new DefaultModelGovernancePolicyFactory();
 
-        ModelGovernanceConfig chat = factory.createForConfig(1001L, ModelType.CHAT);
         ModelGovernanceConfig embedding = factory.createForConfig(1002L, ModelType.EMBEDDING);
 
-        assertThat(embedding.getMaxConcurrentCalls()).isGreaterThan(chat.getMaxConcurrentCalls());
+        assertThat(embedding.getEnabled()).isNull();
         assertThat(embedding.getRetryEnabled()).isTrue();
+        assertThat(embedding.getMaxAttempts()).isEqualTo(2);
+        assertThat(embedding.getLimitForPeriod()).isEqualTo(200);
+        assertThat(embedding.getMaxConcurrentCalls()).isEqualTo(30);
     }
 
     @Test

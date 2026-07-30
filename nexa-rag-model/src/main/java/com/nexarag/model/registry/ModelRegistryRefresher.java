@@ -61,9 +61,7 @@ public class ModelRegistryRefresher {
         List<ModelRouteConfig> routeConfigs = modelRouteConfigService.list().stream()
                 .filter(routeConfig -> Boolean.TRUE.equals(routeConfig.getEnabled()))
                 .toList();
-        List<ModelGovernanceConfig> governanceConfigs = modelGovernanceConfigService.list().stream()
-                .filter(governanceConfig -> Boolean.TRUE.equals(governanceConfig.getEnabled()))
-                .toList();
+        List<ModelGovernanceConfig> governanceConfigs = modelGovernanceConfigService.list();
 
         // 2. 构建不可变快照
         ModelRegistrySnapshot snapshot = new ModelRegistrySnapshot(

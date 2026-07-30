@@ -96,6 +96,7 @@ public class ModelRouteServiceImpl extends ServiceImpl<ModelRouteMapper, ModelRo
 
         // 1. 查询已有模型路由
         ModelRoute route = getRequiredRoute(routeId);
+        String oldRouteKey = route.getRouteKey();
         String routeKey = StringUtils.hasText(request.routeKey()) ? request.routeKey() : route.getRouteKey();
         if (!route.getRouteKey().equals(routeKey) && existsByRouteKey(routeKey, routeId)) {
             throw new ClientException("模型路由标识已存在，routeKey=" + routeKey, BaseErrorCode.PARAM_ERROR);
@@ -116,7 +117,12 @@ public class ModelRouteServiceImpl extends ServiceImpl<ModelRouteMapper, ModelRo
             route.setRemark(request.remark());
         }
 
-        // 3. 更新模型路由并发布注册表刷新
+        // 3. 路由标识变更时迁移关联路由级治理配置
+        if (!oldRouteKey.equals(routeKey)) {
+            modelGovernanceConfigService.renameRouteBinding(oldRouteKey, routeKey);
+        }
+
+        // 4. 更新模型路由并发布注册表刷新
         updateRouteById(route);
         bumpRegistryVersionAndPublish();
         return route;

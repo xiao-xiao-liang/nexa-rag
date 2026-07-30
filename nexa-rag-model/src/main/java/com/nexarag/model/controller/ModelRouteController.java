@@ -4,17 +4,21 @@ import com.nexarag.common.web.Result;
 import com.nexarag.common.web.Results;
 import com.nexarag.model.dto.ModelConnectionTestRequest;
 import com.nexarag.model.dto.ModelConnectionTestResponse;
+import com.nexarag.model.dto.ModelGovernanceConfigRequest;
+import com.nexarag.model.dto.ModelGovernanceConfigResponse;
 import com.nexarag.model.dto.ModelRouteCreateRequest;
 import com.nexarag.model.dto.ModelRouteResponse;
 import com.nexarag.model.dto.ModelRouteUpdateRequest;
 import com.nexarag.model.service.ModelRouteService;
 import com.nexarag.model.service.ModelConnectionTestService;
+import com.nexarag.model.service.ModelGovernanceConfigService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -31,6 +35,7 @@ public class ModelRouteController {
 
     private final ModelRouteService modelRouteService;
     private final ModelConnectionTestService modelConnectionTestService;
+    private final ModelGovernanceConfigService modelGovernanceConfigService;
 
     /**
      * 查询模型路由列表。
@@ -79,6 +84,40 @@ public class ModelRouteController {
                                                   @RequestBody ModelRouteUpdateRequest request) {
         // 1. 更新模型路由并返回响应对象
         return Results.success(modelRouteService.toResponse(modelRouteService.updateRoute(routeId, request)));
+    }
+
+    /**
+     * 查询路由级模型治理配置。
+     *
+     * @param routeId 模型路由ID
+     * @return 路由级治理配置，不存在时 data 为 null
+     */
+    @GetMapping("/{routeId}/governance")
+    public Result<ModelGovernanceConfigResponse> getGovernance(@PathVariable Long routeId) {
+        // 1. 根据稳定路由ID查询当前路由标识
+        ModelRouteResponse route = modelRouteService.getRouteResponse(routeId);
+
+        // 2. 查询并转换路由级治理配置
+        return Results.success(modelGovernanceConfigService.toResponse(
+                modelGovernanceConfigService.getByRouteKey(route.routeKey())));
+    }
+
+    /**
+     * 保存路由级模型治理配置。
+     *
+     * @param routeId 模型路由ID
+     * @param request 治理配置局部更新请求
+     * @return 保存后的路由级治理配置
+     */
+    @PutMapping("/{routeId}/governance")
+    public Result<ModelGovernanceConfigResponse> saveGovernance(@PathVariable Long routeId,
+                                                                @RequestBody ModelGovernanceConfigRequest request) {
+        // 1. 根据稳定路由ID查询当前路由标识
+        ModelRouteResponse route = modelRouteService.getRouteResponse(routeId);
+
+        // 2. 保存并转换路由级治理配置
+        return Results.success(modelGovernanceConfigService.toResponse(
+                modelGovernanceConfigService.saveByRouteKey(route.routeKey(), request)));
     }
 
     /**

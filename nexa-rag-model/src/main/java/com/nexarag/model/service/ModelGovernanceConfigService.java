@@ -19,6 +19,14 @@ public interface ModelGovernanceConfigService extends IService<ModelGovernanceCo
     ModelGovernanceConfig getByConfigId(Long configId);
 
     /**
+     * 根据路由标识查询治理配置。
+     *
+     * @param routeKey 路由标识
+     * @return 治理配置，不存在时返回 null
+     */
+    ModelGovernanceConfig getByRouteKey(String routeKey);
+
+    /**
      * 根据模型配置ID保存治理配置。
      *
      * @param configId 模型配置ID
@@ -26,6 +34,23 @@ public interface ModelGovernanceConfigService extends IService<ModelGovernanceCo
      * @return 治理配置
      */
     ModelGovernanceConfig saveByConfigId(Long configId, ModelGovernanceConfigRequest request);
+
+    /**
+     * 根据路由标识保存治理配置。
+     *
+     * @param routeKey 路由标识
+     * @param request  治理配置局部更新请求
+     * @return 保存后的治理配置
+     */
+    ModelGovernanceConfig saveByRouteKey(String routeKey, ModelGovernanceConfigRequest request);
+
+    /**
+     * 迁移路由标识关联的治理配置。
+     *
+     * @param oldRouteKey 旧路由标识
+     * @param newRouteKey 新路由标识
+     */
+    void renameRouteBinding(String oldRouteKey, String newRouteKey);
 
     /**
      * 判断模型配置级治理配置是否存在。
