@@ -167,6 +167,11 @@ nexa:
         primary: chat-primary
         # 备用模型 Profile 名称，仅主用调用失败时使用。
         fallback: chat-backup
+      answer:
+        # Answer 节点路由，和数据库默认路由保持一致。
+        type: PRIMARY_FALLBACK
+        primary: chat-primary
+        fallback: chat-backup
       embedding:
         # 路由类型，可选值：PRIMARY_FALLBACK。
         type: PRIMARY_FALLBACK
@@ -177,3 +182,11 @@ nexa:
         type: PRIMARY_FALLBACK
         # 主用模型 Profile 名称。
         primary: rerank-primary
+
+# 对话排查日志：DEBUG 会输出原始问题、节点完整结果和渲染后的提示词。
+logging:
+  level:
+    com.nexarag.boot.controller.ChatController: INFO
+    com.nexarag.workflow.node.chat: INFO
+    com.nexarag.workflow.dispatcher.chat: INFO
+    com.nexarag.model.gateway.ModelGateway: INFO
