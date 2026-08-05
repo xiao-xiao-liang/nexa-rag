@@ -3,6 +3,7 @@ package com.nexarag.model.service.impl;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.nexarag.common.exception.ClientException;
 import com.nexarag.model.dto.prompt.PromptResponse;
+import com.nexarag.model.dto.prompt.PromptUpdateDTO;
 import com.nexarag.model.entity.prompt.PromptDefinition;
 import com.nexarag.model.entity.prompt.PromptRelease;
 import com.nexarag.model.entity.prompt.PromptVersion;
@@ -95,6 +96,42 @@ public class PromptManagementServiceImpl implements PromptManagementService {
 
         // 3. 本地渲染正文，不写数据库且不调用模型
         return Mustache.compiler().escapeHTML(false).compile(content).execute(maskedVariables);
+    }
+
+    /**
+     * 更新 Prompt 基础定义（名称、变量契约与启用状态）。
+     *
+     * @param promptCode Prompt 编码
+     * @param request    更新请求
+     * @return 更新后的 Prompt 详情
+     */
+    @Override
+    public PromptResponse updatePrompt(String promptCode, PromptUpdateDTO request) {
+        // 1. 查询 Prompt 稳定定义
+        PromptDefinition definition = getDefinition(promptCode);
+
+        // 2. 按需更新名称
+        if (StringUtils.hasText(request.name())) {
+            definition.setName(request.name().trim());
+        }
+
+        // 3. 按需更新变量契约（校验合法 JSON）
+        if (StringUtils.hasText(request.variableSchema())) {
+            PromptVariableSchema.fromJson(request.variableSchema().trim());
+            definition.setVariableSchema(request.variableSchema().trim());
+        }
+
+        // 4. 按需更新启用状态
+        if (request.enabled() != null) {
+            definition.setEnabled(request.enabled());
+        }
+
+        // 5. 更新定义落库
+        definition.setUpdateTime(java.time.LocalDateTime.now());
+        definitionMapper.updateById(definition);
+
+        // 6. 返回最新管理详情
+        return getPrompt(promptCode);
     }
 
     private PromptDefinition getDefinition(String promptCode) {

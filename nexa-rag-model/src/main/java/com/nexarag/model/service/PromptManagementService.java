@@ -1,6 +1,7 @@
 package com.nexarag.model.service;
 
 import com.nexarag.model.dto.prompt.PromptResponse;
+import com.nexarag.model.dto.prompt.PromptUpdateDTO;
 
 import java.util.List;
 import java.util.Map;
@@ -34,4 +35,13 @@ public interface PromptManagementService {
      * @return 脱敏渲染后的正文
      */
     String preview(String promptCode, String content, Map<String, Object> variables);
+
+    /**
+     * 更新 Prompt 基础定义（名称、变量契约与启用状态）。
+     *
+     * @param promptCode Prompt 编码
+     * @param request 更新请求
+     * @return 更新后的 Prompt 详情
+     */
+    PromptResponse updatePrompt(String promptCode, PromptUpdateDTO request);
 }

@@ -9,6 +9,7 @@ import com.nexarag.model.dto.prompt.PromptReleaseResponse;
 import com.nexarag.model.dto.prompt.PromptResponse;
 import com.nexarag.model.dto.prompt.PromptRollbackRequest;
 import com.nexarag.model.dto.prompt.PromptSubmitRequest;
+import com.nexarag.model.dto.prompt.PromptUpdateDTO;
 import com.nexarag.model.prompt.domain.PromptCanaryRule;
 import com.nexarag.model.service.PromptManagementService;
 import com.nexarag.model.prompt.PromptOperatorProvider;
@@ -19,6 +20,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -59,6 +61,19 @@ public class PromptController {
     public Result<PromptResponse> getPrompt(@PathVariable String promptCode) {
         // 1. 查询 Prompt 定义、版本和发布历史
         return Results.success(promptManagementService.getPrompt(promptCode));
+    }
+
+    /**
+     * 更新 Prompt 基础定义（名称、变量契约与启用状态）。
+     *
+     * @param promptCode Prompt 编码
+     * @param request 更新请求
+     * @return 更新后的 Prompt 详情
+     */
+    @PutMapping("/{promptCode}")
+    public Result<PromptResponse> updatePrompt(@PathVariable String promptCode,
+                                               @Valid @RequestBody PromptUpdateDTO request) {
+        return Results.success(promptManagementService.updatePrompt(promptCode, request));
     }
 
     /**

@@ -18,7 +18,7 @@ import { cn } from '@/lib/utils'
 
 const utilityNavigation = [
   { label: '知识库', icon: LibraryBig, to: '/knowledge-base' },
-  { label: '提示词管理', icon: FileText },
+  { label: '提示词管理', icon: FileText, to: '/prompts' },
   { label: '模型配置', icon: Bot, to: '/models' },
   { label: '路由管理', icon: Network },
   { label: '模型治理', icon: SlidersHorizontal, to: '/models/governance' },
@@ -418,7 +418,7 @@ function AppShellContent() {
               取消
             </Button>
             <Button
-              variant="destructive"
+              variant="default"
               size="sm"
               disabled={isDeleting}
               onClick={() => void handleConfirmDelete()}
