@@ -13,7 +13,7 @@ export interface ModelProviderCatalogItem {
 }
 
 export interface ModelConfigItem {
-  configId: number
+  configId: number | string
   configKey?: string
   modelName: string
   provider: string
@@ -34,8 +34,20 @@ export interface CreateModelConfigRequest {
   apiKey: string
 }
 
+export interface UpdateModelConfigRequest {
+  modelName?: string
+  provider?: string
+  modelType?: string
+  baseUrl?: string
+  apiKey?: string
+  enabled?: boolean
+  timeoutMs?: number
+  remark?: string
+}
+
+
 export interface ModelRouteItem {
-  routeId: number
+  routeId: number | string
   routeKey: string
   modelType: string
   strategy: string
@@ -53,8 +65,8 @@ export interface ModelRouteUpdateRequest {
 }
 
 export interface ModelGovernanceConfigDTO {
-  governanceId?: number
-  configId?: number
+  governanceId?: number | string
+  configId?: number | string
   bindingMode?: 'CONFIG' | 'ROUTE'
   routeKey?: string
   enabled?: boolean
@@ -97,15 +109,24 @@ export function createModelConfig(data: CreateModelConfigRequest): Promise<Model
   })
 }
 
+/** 更新指定模型配置 */
+export function updateModelConfig(configId: number | string, data: UpdateModelConfigRequest): Promise<ModelConfigItem> {
+  return request<ModelConfigItem>(`/api/model/configs/${configId}`, {
+    method: 'PUT',
+    body: JSON.stringify(data),
+  })
+}
+
+
 /** 删除指定模型配置 */
-export function deleteModelConfig(configId: number): Promise<void> {
+export function deleteModelConfig(configId: number | string): Promise<void> {
   return request<void>(`/api/model/configs/${configId}`, {
     method: 'DELETE',
   })
 }
 
 /** 测试模型配置连接 */
-export function testModelConfig(configId: number): Promise<{ success: boolean; message: string }> {
+export function testModelConfig(configId: number | string): Promise<{ success: boolean; message: string }> {
   return request<{ success: boolean; message: string }>(`/api/model/configs/${configId}/test`, {
     method: 'POST',
   })
@@ -117,7 +138,7 @@ export function getModelRoutes(): Promise<ModelRouteItem[]> {
 }
 
 /** 更新指定模型路由 */
-export function updateModelRoute(routeId: number, data: ModelRouteUpdateRequest): Promise<ModelRouteItem> {
+export function updateModelRoute(routeId: number | string, data: ModelRouteUpdateRequest): Promise<ModelRouteItem> {
   return request<ModelRouteItem>(`/api/model/routes/${routeId}`, {
     method: 'PATCH',
     body: JSON.stringify(data),
@@ -125,12 +146,12 @@ export function updateModelRoute(routeId: number, data: ModelRouteUpdateRequest)
 }
 
 /** 查询指定模型的治理配置 */
-export function getModelGovernanceConfig(configId: number): Promise<ModelGovernanceConfigDTO> {
+export function getModelGovernanceConfig(configId: number | string): Promise<ModelGovernanceConfigDTO> {
   return request<ModelGovernanceConfigDTO>(`/api/model/configs/${configId}/governance`)
 }
 
 /** 更新指定模型的治理配置 */
-export function updateModelGovernanceConfig(configId: number, data: ModelGovernanceConfigDTO): Promise<ModelGovernanceConfigDTO> {
+export function updateModelGovernanceConfig(configId: number | string, data: ModelGovernanceConfigDTO): Promise<ModelGovernanceConfigDTO> {
   return request<ModelGovernanceConfigDTO>(`/api/model/configs/${configId}/governance`, {
     method: 'PUT',
     body: JSON.stringify(data),
@@ -143,7 +164,7 @@ export function listModelGovernanceConfigs(): Promise<ModelGovernanceConfigDTO[]
 }
 
 /** 重置指定模型治理配置为系统默认值 */
-export function resetModelGovernanceDefault(governanceId: number): Promise<void> {
+export function resetModelGovernanceDefault(governanceId: number | string): Promise<void> {
   return request<void>(`/api/model/governance-configs/${governanceId}/reset-default`, {
     method: 'POST',
   })

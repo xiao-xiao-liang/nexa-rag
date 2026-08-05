@@ -1,9 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import {
-  Activity, CheckCircle2, ChevronRight, Copy, Cpu, Database, Eye, EyeOff, Key,
-  Layers, Link2, MoreHorizontal, Plus, RefreshCw, Search, Server, Sparkles, Trash2, Zap, X, Check, Globe, HelpCircle, Wrench,
-  ToggleLeft, ToggleRight, Edit3, ExternalLink, AlertCircle, Loader2,
-  Scale, ArrowRightLeft, Shield, SlidersHorizontal
+  CheckCircle2, Copy, Cpu, Database, Eye, EyeOff, Key,
+  Link2, Plus, RefreshCw, Search, Sparkles, Trash2, Wrench,
+  Edit3, Loader2, SlidersHorizontal
 } from 'lucide-react'
 import { NavLink } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
@@ -17,6 +16,7 @@ import {
   getModelProviderCatalog,
   getModelConfigs,
   createModelConfig,
+  updateModelConfig,
   deleteModelConfig,
   testModelConfig,
   getModelRoutes,
@@ -89,7 +89,7 @@ export default function ModelConfigPage() {
   const [searchKeyword, setSearchKeyword] = useState('')
   const [categoryFilter, setCategoryFilter] = useState<'all' | 'joined' | 'domestic' | 'international' | 'compatible'>('all')
   const [toastMessage, setToastMessage] = useState<string | null>(null)
-  const [testingConfigId, setTestingConfigId] = useState<number | null>(null)
+  const [testingConfigId, setTestingConfigId] = useState<number | string | null>(null)
 
   // 全局默认系统模型设置
   const [defaultLLM, setDefaultLLM] = useState('qwen-plus')
@@ -99,6 +99,7 @@ export default function ModelConfigPage() {
   // Modals 控制
   const [credentialsModalOpen, setCredentialsModalOpen] = useState(false)
   const [addModelModalOpen, setAddModelModalOpen] = useState(false)
+  const [editModelModalOpen, setEditModelModalOpen] = useState(false)
 
   // 表单状态
   const [formBaseUrl, setFormBaseUrl] = useState('')
@@ -106,6 +107,15 @@ export default function ModelConfigPage() {
   const [showApiKey, setShowApiKey] = useState(false)
   const [newModelName, setNewModelName] = useState('')
   const [newModelCategory, setNewModelCategory] = useState<'Chat' | 'Embedding' | 'Rerank'>('Chat')
+
+  // 编辑表单状态
+  const [editingConfigId, setEditingConfigId] = useState<number | string | null>(null)
+  const [editModelName, setEditModelName] = useState('')
+  const [editModelCategory, setEditModelCategory] = useState<'Chat' | 'Embedding' | 'Rerank'>('Chat')
+  const [editBaseUrl, setEditBaseUrl] = useState('')
+  const [editApiKey, setEditApiKey] = useState('')
+  const [showEditApiKey, setShowEditApiKey] = useState(false)
+
 
   const loadData = async () => {
     setLoading(true)
@@ -235,6 +245,22 @@ export default function ModelConfigPage() {
     setAddModelModalOpen(true)
   }
 
+  const handleOpenEditModel = (config: ModelConfigItem) => {
+    setEditingConfigId(config.configId)
+    setEditModelName(config.modelName || '')
+    const cat = (config.modelType?.toUpperCase().includes('EMBEDD')
+      ? 'Embedding'
+      : config.modelType?.toUpperCase().includes('RERANK')
+        ? 'Rerank'
+        : 'Chat') as 'Chat' | 'Embedding' | 'Rerank'
+    setEditModelCategory(cat)
+    setEditBaseUrl(config.baseUrl || '')
+    setEditApiKey('')
+    setShowEditApiKey(false)
+    setEditModelModalOpen(true)
+  }
+
+
   // 路由更改事件处理
   const handleSelectDefaultLLM = async (val: string) => {
     setDefaultLLM(val)
@@ -275,108 +301,7 @@ export default function ModelConfigPage() {
     }
   }
 
-  // 打开特定节点的独占治理配置 Modal
-  const handleOpenNodeGovernance = async (config: ModelConfigItem) => {
-    setTargetGovConfig(config)
-    setNodeGovModalOpen(true)
-    try {
-      const gov = await getModelGovernanceConfig(config.configId)
-      if (gov) {
-        setGovBindingMode(gov.bindingMode || 'CONFIG')
-        setGovRetryEnabled(gov.retryEnabled !== false)
-        setGovMaxAttempts(gov.maxAttempts || 3)
-        setGovRetryWaitMs(gov.retryWaitMs || 1000)
-        setGovCircuitEnabled(gov.circuitEnabled !== false)
-        setGovFailureRateThreshold(gov.failureRateThreshold || 50)
-        setGovSlowCallDurationMs(gov.slowCallDurationMs || 3000)
-        setGovRateLimitEnabled(gov.rateLimitEnabled !== false)
-        setGovLimitForPeriod(gov.limitForPeriod || 120)
-        setGovStreamFirstChunkTimeoutMs(gov.streamFirstChunkTimeoutMs || 30000)
-        setGovStreamMaxDurationMs(gov.streamMaxDurationMs || 300000)
-        setGovMaxConcurrentCalls(gov.maxConcurrentCalls || 20)
-      }
-    } catch (e) {
-      console.warn('获取节点治理配置:', e)
-    }
-  }
-
-  // 提交特定节点的治理配置修改
-  const handleSaveNodeGovernance = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!targetGovConfig) return
-    try {
-      await updateModelGovernanceConfig(targetGovConfig.configId, {
-        configId: targetGovConfig.configId,
-        bindingMode: govBindingMode,
-        enabled: true,
-        retryEnabled: govRetryEnabled,
-        maxAttempts: govMaxAttempts,
-        retryWaitMs: govRetryWaitMs,
-        circuitEnabled: govCircuitEnabled,
-        failureRateThreshold: govFailureRateThreshold,
-        slowCallDurationMs: govSlowCallDurationMs,
-        rateLimitEnabled: govRateLimitEnabled,
-        limitForPeriod: govLimitForPeriod,
-        streamFirstChunkTimeoutMs: govStreamFirstChunkTimeoutMs,
-        streamMaxDurationMs: govStreamMaxDurationMs,
-        maxConcurrentCalls: govMaxConcurrentCalls,
-      })
-      setNodeGovModalOpen(false)
-      showToast(`已成功保存模型节点 [${targetGovConfig.modelName}] 的精细治理策略！`)
-    } catch (err: any) {
-      showToast(`保存失败: ${err?.message || '服务器拒绝'}`)
-    }
-  }
-
-  // 打开全局治理 Modal，拉取真实治理配置
-  const handleOpenGlobalGovernance = async () => {
-    setGlobalGovModalOpen(true)
-    const targetConfig = currentProviderConfigs[0] || realConfigs[0]
-    if (targetConfig) {
-      try {
-        const gov = await getModelGovernanceConfig(targetConfig.configId)
-        if (gov) {
-          if (gov.strategyMode) setGlobalStrategyMode(gov.strategyMode)
-          if (gov.timeLimiterTimeoutMs) setGlobalTimeoutSec(Math.round(gov.timeLimiterTimeoutMs / 1000))
-          if (gov.maxAttempts) setGlobalMaxRetries(gov.maxAttempts)
-          if (gov.limitForPeriod) setGlobalRateLimitRpm(gov.limitForPeriod)
-          if (gov.circuitEnabled !== undefined) setGlobalCircuitBreaker(gov.circuitEnabled)
-          if (gov.fallbackModel) setGlobalFallbackLLM(gov.fallbackModel)
-          if (gov.primaryWeight !== undefined) setGlobalPrimaryWeight(gov.primaryWeight)
-        }
-      } catch (e) {
-        console.warn('获取目标模型治理配置:', e)
-      }
-    }
-  }
-
-  // 提交全局治理配置并调用后端 API 持久化
-  const handleSaveGlobalGovernance = async (e: React.FormEvent) => {
-    e.preventDefault()
-    try {
-      const targetConfig = currentProviderConfigs[0] || realConfigs[0]
-      if (targetConfig) {
-        await updateModelGovernanceConfig(targetConfig.configId, {
-          configId: targetConfig.configId,
-          strategyMode: globalStrategyMode,
-          retryEnabled: globalMaxRetries > 0,
-          maxAttempts: globalMaxRetries,
-          circuitEnabled: globalCircuitBreaker,
-          rateLimitEnabled: true,
-          limitForPeriod: globalRateLimitRpm,
-          timeLimiterTimeoutMs: globalTimeoutSec * 1000,
-          fallbackModel: globalFallbackLLM,
-          primaryWeight: globalPrimaryWeight,
-          fallbackWeight: 100 - globalPrimaryWeight,
-        })
-      }
-      setGlobalGovModalOpen(false)
-      const modeText = globalStrategyMode === 'FAILOVER' ? '主备故障转移' : globalStrategyMode === 'WEIGHTED' ? '加权负载均衡' : '严格限流高压熔断'
-      showToast(`已成功同步并应用后端【${modeText}】治理策略！`)
-    } catch (err: any) {
-      showToast(`保存治理策略失败: ${err?.message || '服务器未响应'}`)
-    }
-  }
+  // 路由更改事件处理
 
   const handleCreateSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -399,7 +324,27 @@ export default function ModelConfigPage() {
     }
   }
 
-  const handleTestConnectionReal = async (configId: number, modelName: string) => {
+  const handleEditSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!editingConfigId || !editModelName.trim()) return
+
+    try {
+      const updated = await updateModelConfig(editingConfigId, {
+        modelName: editModelName.trim(),
+        modelType: editModelCategory,
+        baseUrl: editBaseUrl.trim() || undefined,
+        apiKey: editApiKey.trim() || undefined,
+      })
+      setRealConfigs((prev) => prev.map((c) => (c.configId === editingConfigId ? updated : c)))
+      setEditModelModalOpen(false)
+      showToast(`已成功修改模型 [${updated.modelName}] 的配置与 API Key！`)
+    } catch (err: any) {
+      showToast(`修改失败: ${err?.message || '服务器拒绝'}`)
+    }
+  }
+
+
+  const handleTestConnectionReal = async (configId: number | string, modelName: string) => {
     setTestingConfigId(configId)
     try {
       const res = await testModelConfig(configId)
@@ -415,7 +360,7 @@ export default function ModelConfigPage() {
     }
   }
 
-  const handleDeleteConfigReal = async (configId: number, modelName: string) => {
+  const handleDeleteConfigReal = async (configId: number | string, modelName: string) => {
     try {
       await deleteModelConfig(configId)
       setRealConfigs((prev) => prev.filter((c) => c.configId !== configId))
@@ -438,6 +383,13 @@ export default function ModelConfigPage() {
 
   return (
     <div className="flex h-full min-h-0 flex-1 flex-col overflow-y-auto bg-[#f8f9fc] text-slate-800">
+      {error && (
+        <div className="mx-auto mt-4 w-full max-w-[1500px] px-6 sm:px-8">
+          <div className="rounded-xl border border-red-200 bg-red-50 p-3.5 text-xs text-red-700">
+            {error}
+          </div>
+        </div>
+      )}
       {/* 顶部 Header：干净利落 */}
       <header className="border-b border-[#e8ebf1] bg-white px-6 py-4 sm:px-8">
         <div className="mx-auto max-w-[1500px]">
@@ -737,21 +689,23 @@ export default function ModelConfigPage() {
                     <span className="flex items-center gap-1.5 font-medium">
                       <Link2 className="size-3.5 text-[#6f62e8]" />
                       Base URL: <span className="font-mono text-slate-800">{selectedCatalog.defaultBaseUrl}</span>
-                      <Copy
-                        className="size-3 cursor-pointer text-slate-400 hover:text-[#6f62e8]"
-                        onClick={() => handleCopyText(selectedCatalog.defaultBaseUrl, 'Base URL 端点')}
-                        title="复制端点"
-                      />
+                      <span title="复制端点">
+                        <Copy
+                          className="size-3 cursor-pointer text-slate-400 hover:text-[#6f62e8]"
+                          onClick={() => handleCopyText(selectedCatalog.defaultBaseUrl, 'Base URL 端点')}
+                        />
+                      </span>
                     </span>
                     <span className="flex items-center gap-1.5 font-medium">
                       <Key className="size-3.5 text-slate-400" />
                       凭据 Key: <span className="font-mono text-slate-800">{currentProviderConfigs[0]?.apiKeyMask || currentProviderConfigs[0]?.apiKeyMasked || 'sk-****default'}</span>
                       {currentProviderConfigs[0] && (
-                        <Copy
-                          className="size-3 cursor-pointer text-slate-400 hover:text-[#6f62e8]"
-                          onClick={() => handleCopyText(currentProviderConfigs[0]?.apiKeyMask || currentProviderConfigs[0]?.apiKeyMasked || '', '脱敏密钥')}
-                          title="复制脱敏密钥"
-                        />
+                        <span title="复制脱敏密钥">
+                          <Copy
+                            className="size-3 cursor-pointer text-slate-400 hover:text-[#6f62e8]"
+                            onClick={() => handleCopyText(currentProviderConfigs[0]?.apiKeyMask || currentProviderConfigs[0]?.apiKeyMasked || '', '脱敏密钥')}
+                          />
+                        </span>
                       )}
                     </span>
                   </div>
@@ -786,11 +740,12 @@ export default function ModelConfigPage() {
                               <td className="px-4 py-3 font-mono font-bold text-slate-800">
                                 <div className="flex items-center gap-2">
                                   <span>{config.modelName}</span>
-                                  <Copy
-                                    className="size-3 cursor-pointer text-slate-300 transition-colors hover:text-[#6f62e8]"
-                                    onClick={() => handleCopyText(config.modelName, '模型名称')}
-                                    title="复制模型标识"
-                                  />
+                                  <span title="复制模型标识">
+                                    <Copy
+                                      className="size-3 cursor-pointer text-slate-300 transition-colors hover:text-[#6f62e8]"
+                                      onClick={() => handleCopyText(config.modelName, '模型名称')}
+                                    />
+                                  </span>
                                 </div>
                               </td>
                               <td className="px-4 py-3">
@@ -810,21 +765,23 @@ export default function ModelConfigPage() {
                               <td className="max-w-[240px] truncate px-4 py-3 font-mono text-slate-600" title={config.baseUrl}>
                                 <div className="flex items-center gap-1.5">
                                   <span className="truncate">{config.baseUrl}</span>
-                                  <Copy
-                                    className="size-3 shrink-0 cursor-pointer text-slate-300 transition-colors hover:text-[#6f62e8]"
-                                    onClick={() => handleCopyText(config.baseUrl, 'Base URL 端点')}
-                                    title="复制端点"
-                                  />
+                                  <span title="复制端点">
+                                    <Copy
+                                      className="size-3 shrink-0 cursor-pointer text-slate-300 transition-colors hover:text-[#6f62e8]"
+                                      onClick={() => handleCopyText(config.baseUrl, 'Base URL 端点')}
+                                    />
+                                  </span>
                                 </div>
                               </td>
                               <td className="px-4 py-3 font-mono text-slate-600">
                                 <div className="flex items-center gap-1.5">
                                   <span>{maskKey}</span>
-                                  <Copy
-                                    className="size-3 cursor-pointer text-slate-300 transition-colors hover:text-[#6f62e8]"
-                                    onClick={() => handleCopyText(maskKey, '脱敏密钥')}
-                                    title="复制脱敏密钥"
-                                  />
+                                  <span title="复制脱敏密钥">
+                                    <Copy
+                                      className="size-3 cursor-pointer text-slate-300 transition-colors hover:text-[#6f62e8]"
+                                      onClick={() => handleCopyText(maskKey, '脱敏密钥')}
+                                    />
+                                  </span>
                                 </div>
                               </td>
                               <td className="px-4 py-3 text-right">
@@ -837,6 +794,16 @@ export default function ModelConfigPage() {
                                   >
                                     <RefreshCw className={cn('size-3', testingConfigId === config.configId && 'animate-spin')} />
                                     {testingConfigId === config.configId ? '探针测试' : '测试连接'}
+                                  </button>
+
+                                  <button
+                                    type="button"
+                                    onClick={() => handleOpenEditModel(config)}
+                                    className="flex items-center gap-1 font-semibold text-slate-600 hover:text-[#6f62e8] hover:underline"
+                                    title="编辑模型标识与 API Key"
+                                  >
+                                    <Edit3 className="size-3.5" />
+                                    编辑
                                   </button>
 
                                   <button
@@ -996,6 +963,84 @@ export default function ModelConfigPage() {
               </Button>
               <Button type="submit" size="sm" className="bg-[#6f62e8] text-white hover:bg-[#5f52d9]">
                 添加真实配置
+              </Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* 编辑模型配置 Modal */}
+      <Dialog open={editModelModalOpen} onOpenChange={setEditModelModalOpen}>
+        <DialogContent className="max-w-md rounded-2xl bg-white p-6 shadow-2xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-base font-bold text-slate-900">
+              <Edit3 className="size-4 text-[#6f62e8]" />
+              编辑模型配置 [{editModelName}]
+            </DialogTitle>
+            <DialogDescription className="text-xs text-slate-500">
+              直接修改当前模型的 API Key 密钥、Base URL 及配置参数。
+            </DialogDescription>
+          </DialogHeader>
+
+          <form onSubmit={handleEditSubmit} className="mt-4 space-y-4">
+            <div>
+              <label className="mb-1 block text-xs font-semibold text-slate-700">模型标识名称 (Model ID)</label>
+              <input
+                required
+                value={editModelName}
+                onChange={(e) => setEditModelName(e.target.value)}
+                placeholder="例如: qwen-plus, gpt-4o 等"
+                className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-mono text-slate-800 outline-none focus:border-[#6f62e8]"
+              />
+            </div>
+
+            <div>
+              <label className="mb-1 block text-xs font-semibold text-slate-700">模型类别 (Category)</label>
+              <CustomSelect
+                value={editModelCategory}
+                onChange={(v) => setEditModelCategory(v as any)}
+                options={CATEGORY_OPTIONS}
+              />
+            </div>
+
+            <div>
+              <label className="mb-1 block text-xs font-semibold text-slate-700">
+                新 API Key 密钥 <span className="font-normal text-slate-400">（若不修改请留空）</span>
+              </label>
+              <div className="relative">
+                <input
+                  type={showEditApiKey ? 'text' : 'password'}
+                  value={editApiKey}
+                  onChange={(e) => setEditApiKey(e.target.value)}
+                  placeholder="留空则保持现有 Key 不变 (sk-...)"
+                  className="w-full rounded-xl border border-slate-200 bg-white py-2 pl-3 pr-10 text-xs font-mono text-slate-800 outline-none focus:border-[#6f62e8]"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowEditApiKey(!showEditApiKey)}
+                  className="absolute right-3 top-2.5 text-slate-400 hover:text-slate-600"
+                >
+                  {showEditApiKey ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+                </button>
+              </div>
+            </div>
+
+            <div>
+              <label className="mb-1 block text-xs font-semibold text-slate-700">API Base URL 端点</label>
+              <input
+                value={editBaseUrl}
+                onChange={(e) => setEditBaseUrl(e.target.value)}
+                placeholder="https://api.openai.com/v1"
+                className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-mono text-slate-800 outline-none focus:border-[#6f62e8]"
+              />
+            </div>
+
+            <div className="mt-6 flex justify-end gap-2.5">
+              <Button type="button" variant="outline" size="sm" onClick={() => setEditModelModalOpen(false)}>
+                取消
+              </Button>
+              <Button type="submit" size="sm" className="bg-[#6f62e8] text-white hover:bg-[#5f52d9]">
+                保存配置修改
               </Button>
             </div>
           </form>

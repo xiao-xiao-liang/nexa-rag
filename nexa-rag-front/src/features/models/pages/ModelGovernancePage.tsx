@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import {
-  Activity, CheckCircle2, Cpu, Loader2, RefreshCw, ShieldCheck,
+  Activity, CheckCircle2, Loader2, RefreshCw, ShieldCheck,
   ShieldAlert, SlidersHorizontal, ToggleLeft, ToggleRight, Wrench, RotateCcw
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -28,8 +28,7 @@ export default function ModelGovernancePage() {
 
   // 治理编辑 Modal 控制
   const [editModalOpen, setEditModalOpen] = useState(false)
-  const [currentConfigId, setCurrentConfigId] = useState<number | null>(null)
-  const [currentGovernanceId, setCurrentGovernanceId] = useState<number | null>(null)
+  const [currentConfigId, setCurrentConfigId] = useState<number | string | null>(null)
   const [targetModelName, setTargetModelName] = useState<string>('')
 
   // 20+ 精细防护表单 State
@@ -87,9 +86,8 @@ export default function ModelGovernancePage() {
   }
 
   // 打开编辑指定模型节点治理参数 Modal
-  const handleOpenEdit = async (configId: number, modelName: string, governanceId?: number) => {
+  const handleOpenEdit = async (configId: number | string, modelName: string) => {
     setCurrentConfigId(configId)
-    setCurrentGovernanceId(governanceId || null)
     setTargetModelName(modelName)
     setEditModalOpen(true)
     try {
@@ -145,7 +143,7 @@ export default function ModelGovernancePage() {
   }
 
   // 一键重置为系统默认值
-  const handleResetDefault = async (governanceId: number, name: string) => {
+  const handleResetDefault = async (governanceId: number | string, name: string) => {
     try {
       await resetModelGovernanceDefault(governanceId)
       showToast(`已成功重置节点 [${name}] 的治理配置为系统默认规则！`)
@@ -309,7 +307,7 @@ export default function ModelGovernancePage() {
                           <div className="flex items-center justify-end gap-3">
                             <button
                               type="button"
-                              onClick={() => handleOpenEdit(config.configId, config.modelName, gov?.governanceId)}
+                              onClick={() => handleOpenEdit(config.configId, config.modelName)}
                               className="flex items-center gap-1 font-semibold text-[#6f62e8] hover:underline"
                             >
                               <Wrench className="size-3" />
