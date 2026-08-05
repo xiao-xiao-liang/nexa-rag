@@ -55,7 +55,7 @@ describe('文档详情页面', () => {
 
     await user.click(await screen.findByRole('button', { name: '开始处理' }))
 
-    await waitFor(() => expect(processDocument).toHaveBeenCalledWith(8, expect.anything()))
+    await waitFor(() => expect(processDocument).toHaveBeenCalledWith('8', expect.anything()))
   })
 
   it('失败文档应显示失败原因并调用专用重试接口', async () => {
@@ -68,7 +68,7 @@ describe('文档详情页面', () => {
     expect(await screen.findByText(/向量写入失败/)).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: '重新处理' }))
 
-    expect(retryDocument).toHaveBeenCalledWith(8, expect.anything())
+    expect(retryDocument).toHaveBeenCalledWith('8', expect.anything())
   })
 
   it('仅已索引文档应加载文本分块且不展示文件地址', async () => {
@@ -82,7 +82,7 @@ describe('文档详情页面', () => {
     expect(screen.queryByRole('region', { name: '分块完整内容' })).not.toBeInTheDocument()
     await user.click(chunkCard)
     expect(screen.getByRole('region', { name: '分块完整内容' })).toHaveTextContent('员工手册第一段')
-    expect(getDocumentChunks).toHaveBeenCalledWith(8, 1, 20, expect.anything())
+    expect(getDocumentChunks).toHaveBeenCalledWith('8', 1, 20, expect.anything())
     expect(screen.queryByText('https://example.com/original')).not.toBeInTheDocument()
     expect(screen.queryByText('https://example.com/parsed')).not.toBeInTheDocument()
   })
@@ -109,7 +109,7 @@ describe('文档详情页面', () => {
     expect(screen.getByRole('region', { name: '分块完整内容' })).toHaveTextContent('第一页内容')
     await user.click(screen.getByRole('button', { name: '下一页' }))
 
-    await waitFor(() => expect(getDocumentChunks).toHaveBeenLastCalledWith(8, 2, 20, expect.anything()))
+    await waitFor(() => expect(getDocumentChunks).toHaveBeenLastCalledWith('8', 2, 20, expect.anything()))
     expect(screen.queryByRole('region', { name: '分块完整内容' })).not.toBeInTheDocument()
   })
 

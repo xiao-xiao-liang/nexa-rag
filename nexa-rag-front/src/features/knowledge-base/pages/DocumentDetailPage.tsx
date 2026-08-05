@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { ArrowLeft, ChevronRight, Clock, Database, Download, ExternalLink, FileText, HardDrive, Info, Layers, RefreshCw, Sparkles } from 'lucide-react'
 import { Link, useParams } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
@@ -33,7 +33,7 @@ export function DocumentDetailPage() {
   const chunksControllerRef = useRef<AbortController | null>(null)
   const currentStatus: DocumentStatus | null = processStatus?.status ?? document?.status ?? null
 
-  const loadProcessStatus = useCallback(async (targetDocumentId: number) => {
+  const loadProcessStatus = useCallback(async (targetDocumentId: string | number) => {
     processControllerRef.current?.abort()
     const controller = new AbortController()
     processControllerRef.current = controller
@@ -46,7 +46,7 @@ export function DocumentDetailPage() {
     }
   }, [])
 
-  const loadDetail = useCallback(async (targetDocumentId: number) => {
+  const loadDetail = useCallback(async (targetDocumentId: string | number) => {
     detailControllerRef.current?.abort()
     const controller = new AbortController()
     detailControllerRef.current = controller
@@ -62,7 +62,7 @@ export function DocumentDetailPage() {
     }
   }, [])
 
-  const loadChunks = useCallback(async (targetDocumentId: number, targetPage: number) => {
+  const loadChunks = useCallback(async (targetDocumentId: string | number, targetPage: number) => {
     chunksControllerRef.current?.abort()
     const controller = new AbortController()
     chunksControllerRef.current = controller
@@ -122,7 +122,7 @@ export function DocumentDetailPage() {
 
   if (documentId === null) return <InvalidDocumentAddress />
 
-  const isProcessing = isProcessingStatus(currentStatus)
+  const isProcessing = currentStatus !== null && isProcessingStatus(currentStatus)
 
   return (
     <section className="min-h-full min-w-0 overflow-y-auto bg-gradient-to-b from-slate-50 via-slate-50/60 to-slate-100/80 px-4 py-6 sm:px-6 lg:px-10">
@@ -247,7 +247,7 @@ export function DocumentDetailPage() {
                   <span className={`rounded-lg py-1.5 transition-colors ${currentStatus === 'QUEUED' || currentStatus === 'PARSING' ? 'bg-indigo-600 text-white shadow-sm' : 'bg-emerald-100 text-emerald-700'}`}>
                     1. 格式解析
                   </span>
-                  <span className={`rounded-lg py-1.5 transition-colors ${currentStatus === 'SPLITTING' ? 'bg-indigo-600 text-white shadow-sm' : currentStatus === 'INDEXING' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-200/60 text-slate-500'}`}>
+                  <span className={`rounded-lg py-1.5 transition-colors ${currentStatus === 'CHUNKING' ? 'bg-indigo-600 text-white shadow-sm' : currentStatus === 'INDEXING' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-200/60 text-slate-500'}`}>
                     2. 智能切分
                   </span>
                   <span className={`rounded-lg py-1.5 transition-colors ${currentStatus === 'INDEXING' ? 'bg-indigo-600 text-white shadow-sm' : 'bg-slate-200/60 text-slate-500'}`}>
@@ -417,9 +417,10 @@ function ChunkPagination({ page, pageNum, onChange }: { page: PageVO<DocumentChu
   )
 }
 
-function parseDocumentId(value: string | undefined): number | null {
-  const parsed = Number(value)
-  return Number.isInteger(parsed) && parsed > 0 ? parsed : null
+function parseDocumentId(value: string | undefined): string | null {
+  const normalized = value?.trim()
+  if (!normalized || !/^[1-9]\d*$/.test(normalized)) return null
+  return normalized
 }
 
 function formatFileSize(value: number | null): string {

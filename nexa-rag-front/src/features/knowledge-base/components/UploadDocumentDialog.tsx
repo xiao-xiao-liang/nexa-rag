@@ -11,7 +11,7 @@ import { FileDropzone } from './FileDropzone'
 interface UploadDocumentDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
-  onUploaded: (documentId: number) => void
+  onUploaded: (documentId: number | string) => void
 }
 
 /** 上传知识库文档的单文件表单，大屏宽与精炼切分设置。 */

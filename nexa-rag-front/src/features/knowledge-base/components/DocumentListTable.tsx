@@ -16,7 +16,7 @@ interface DocumentListTableProps {
   deleting: boolean
   query: string
   statusFilter?: StatusFilterType
-  onView: (documentId: number) => void
+  onView: (documentId: number | string) => void
   onDelete: (document: DocumentSummary) => void
   onRetryItem?: () => void
   onPrevious: () => void
@@ -41,7 +41,7 @@ export function DocumentListTable({
   deleteTarget,
   onDeleteTargetChange,
 }: DocumentListTableProps) {
-  const [retryingId, setRetryingId] = useState<number | null>(null)
+  const [retryingId, setRetryingId] = useState<number | string | null>(null)
   const totalPages = Math.max(page.pages, 1)
   const keyword = query.trim().toLocaleLowerCase()
 
@@ -55,7 +55,7 @@ export function DocumentListTable({
     return true
   })
 
-  const handleRowRetry = async (documentId: number) => {
+  const handleRowRetry = async (documentId: number | string) => {
     if (retryingId !== null) return
     setRetryingId(documentId)
     try {

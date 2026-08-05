@@ -4,7 +4,7 @@ import { isProcessingStatus, type DocumentStatus } from '../document-status'
 
 /** 在文档处于处理中时每五秒刷新一次服务端处理状态。 */
 export function useDocumentStatusPolling(
-  documentId: number | null,
+  documentId: number | string | null,
   status: DocumentStatus | null,
   onStatus: (value: DocumentProcessStatus) => void,
   onError: (error: Error) => void,

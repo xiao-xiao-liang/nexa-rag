@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { ArrowRight, BookOpen, CheckCircle2, CircleAlert, FileUp, RefreshCw, Search, Sparkles, X } from 'lucide-react'
+import { ArrowRight, BookOpen, CircleAlert, FileUp, RefreshCw, Search, Sparkles, X } from 'lucide-react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import type { PageVO } from '@/shared/api/types'
-import { isProcessingStatus, type DocumentStatus } from '../document-status'
+import { isProcessingStatus } from '../document-status'
 import { DocumentListTable } from '../components/DocumentListTable'
 import { DocumentStatusBadge } from '../components/DocumentStatusBadge'
 import { FileTypeIcon } from '../components/FileTypeIcon'
@@ -83,7 +83,7 @@ export function KnowledgeBaseListPage() {
   const processingDocuments = page.records.filter((document) => isProcessingStatus(document.status))
   const indexedCount = page.records.filter((document) => document.status === 'INDEXED').length
   const failedCount = page.records.filter((document) => document.status === 'FAILED').length
-  const openDocument = (documentId: number) => navigate(`/knowledge-base/${documentId}`)
+  const openDocument = (documentId: number | string) => navigate(`/knowledge-base/${documentId}`)
 
   return (
     <section className="min-h-full min-w-0 overflow-y-auto bg-gradient-to-b from-slate-50 via-slate-50/60 to-slate-100/80 px-4 py-6 sm:px-6 lg:px-10">
@@ -154,7 +154,7 @@ function KnowledgeOverview({
   onRetry: () => void
   onUpload: () => void
   onShowAll: () => void
-  onView: (documentId: number) => void
+  onView: (documentId: number | string) => void
 }) {
   return (
     <div className="space-y-6">
@@ -329,7 +329,7 @@ function DocumentLibrary({
   onRetry: () => void
   onUpload: () => void
   onBack: () => void
-  onView: (documentId: number) => void
+  onView: (documentId: number | string) => void
   onDelete: (document: DocumentSummary) => void
   onPrevious: () => void
   onNext: () => void

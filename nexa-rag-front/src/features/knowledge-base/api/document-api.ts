@@ -4,7 +4,7 @@ import type { DocumentStatus } from '../document-status'
 
 /** 文档列表项。 */
 export interface DocumentSummary {
-  documentId: number
+  documentId: number | string
   title: string | null
   originalFileName: string | null
   fileType: string | null
@@ -22,7 +22,7 @@ export interface DocumentDetail extends DocumentSummary {
 
 /** 文档处理状态。 */
 export interface DocumentProcessStatus {
-  documentId: number
+  documentId: number | string
   processId: string | null
   status: DocumentStatus
   messageStatus: string | null
@@ -44,7 +44,7 @@ export interface SplitConfigInput {
 /** 文本分块。 */
 export interface DocumentChunk {
   chunkId: string
-  documentId: number
+  documentId: number | string
   chunkOrder: number
   text: string
   status: string
@@ -52,7 +52,7 @@ export interface DocumentChunk {
 
 /** 上传成功后的文档处理批次。 */
 export interface UploadDocumentResponse {
-  documentId: number
+  documentId: number | string
   processId: string | null
   status: DocumentStatus
 }
@@ -89,35 +89,35 @@ export function uploadDocument(input: UploadDocumentInput, signal?: AbortSignal)
 }
 
 /** 查询文档详情。 */
-export function getDocument(documentId: number, signal?: AbortSignal): Promise<DocumentDetail> {
+export function getDocument(documentId: number | string, signal?: AbortSignal): Promise<DocumentDetail> {
   return request<DocumentDetail>(`/api/documents/${encodeDocumentId(documentId)}`, signal ? { signal } : undefined)
 }
 
 /** 查询文档处理状态。 */
-export function getDocumentProcessStatus(documentId: number, signal?: AbortSignal): Promise<DocumentProcessStatus> {
+export function getDocumentProcessStatus(documentId: number | string, signal?: AbortSignal): Promise<DocumentProcessStatus> {
   return request<DocumentProcessStatus>(`/api/documents/${encodeDocumentId(documentId)}/process-status`, signal ? { signal } : undefined)
 }
 
 /** 查询文档文本分块。 */
-export function getDocumentChunks(documentId: number, pageNum = 1, pageSize = 20, signal?: AbortSignal): Promise<PageVO<DocumentChunk>> {
+export function getDocumentChunks(documentId: number | string, pageNum = 1, pageSize = 20, signal?: AbortSignal): Promise<PageVO<DocumentChunk>> {
   return request<PageVO<DocumentChunk>>(`/api/documents/${encodeDocumentId(documentId)}/chunks?pageNum=${pageNum}&pageSize=${pageSize}`, signal ? { signal } : undefined)
 }
 
 /** 为已上传文档提交处理任务。 */
-export function processDocument(documentId: number, signal?: AbortSignal): Promise<DocumentProcessStatus> {
+export function processDocument(documentId: number | string, signal?: AbortSignal): Promise<DocumentProcessStatus> {
   return request<DocumentProcessStatus>(`/api/documents/${encodeDocumentId(documentId)}/process`, signal ? { method: 'POST', signal } : { method: 'POST' })
 }
 
 /** 重试失败文档的处理任务。 */
-export function retryDocument(documentId: number, signal?: AbortSignal): Promise<DocumentProcessStatus> {
+export function retryDocument(documentId: number | string, signal?: AbortSignal): Promise<DocumentProcessStatus> {
   return request<DocumentProcessStatus>(`/api/documents/${encodeDocumentId(documentId)}/retry`, signal ? { method: 'POST', signal } : { method: 'POST' })
 }
 
 /** 删除文档。 */
-export function deleteDocument(documentId: number, signal?: AbortSignal): Promise<boolean> {
+export function deleteDocument(documentId: number | string, signal?: AbortSignal): Promise<boolean> {
   return request<boolean>(`/api/documents/${encodeDocumentId(documentId)}`, signal ? { method: 'DELETE', signal } : { method: 'DELETE' })
 }
 
-function encodeDocumentId(documentId: number): string {
+function encodeDocumentId(documentId: number | string): string {
   return encodeURIComponent(String(documentId))
 }
