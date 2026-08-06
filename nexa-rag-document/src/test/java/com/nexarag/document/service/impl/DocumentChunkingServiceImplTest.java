@@ -10,6 +10,8 @@ import com.nexarag.document.service.DocumentService;
 import com.nexarag.document.service.DocumentSplitContextBuilder;
 import com.nexarag.document.splitter.ChunkDraft;
 import com.nexarag.document.splitter.DocumentSplitContext;
+import com.nexarag.document.splitter.DocumentSplitResult;
+import com.nexarag.document.splitter.DocumentSectionDraft;
 import com.nexarag.document.splitter.DocumentSplitter;
 import com.nexarag.document.splitter.DocumentSplitterFactory;
 import org.junit.jupiter.api.Test;
@@ -43,13 +45,16 @@ class DocumentChunkingServiceImplTest {
         SplitConfigRequest splitConfig = new SplitConfigRequest(SplitStrategy.PARENT_MARKDOWN, 1000, 100);
         DocumentSplitContext context = new DocumentSplitContext(1L, "测试", "demo.md", FileType.MARKDOWN,
                 "original/demo.md", null, "parsed/demo.md", null, "text/markdown", "# title", null, splitConfig);
-        List<ChunkDraft> drafts = List.of(new ChunkDraft("chunk_1", null, "# title", null, Map.of(), false));
+        List<ChunkDraft> drafts = List.of(new ChunkDraft("chunk_1", null, 11L, "# title", "标题 > # title", null,
+                Map.of(), false));
+        DocumentSplitResult splitResult = new DocumentSplitResult(List.of(
+                new DocumentSectionDraft(11L, null, "标题", List.of("标题"), 1, 1, 2)), drafts, true);
 
         when(documentService.getRequiredDocument(1L)).thenReturn(document);
         when(documentService.markChunking(1L)).thenReturn(true);
         when(contextBuilder.build(document)).thenReturn(context);
         when(splitterFactory.getRequired(SplitStrategy.PARENT_MARKDOWN)).thenReturn(splitter);
-        when(splitter.split(context)).thenReturn(drafts);
+        when(splitter.split(context)).thenReturn(splitResult);
         DocumentChunkingServiceImpl service = new DocumentChunkingServiceImpl(documentService, contextBuilder,
                 splitterFactory, documentChunkService, chunkPersistenceService);
 
@@ -57,6 +62,6 @@ class DocumentChunkingServiceImplTest {
 
         assertThat(count).isEqualTo(1);
         verify(documentService).markChunking(1L);
-        verify(chunkPersistenceService).replaceChunksAndMarkChunked(1L, drafts);
+        verify(chunkPersistenceService).replaceDocumentStructure(1L, splitResult);
     }
 }

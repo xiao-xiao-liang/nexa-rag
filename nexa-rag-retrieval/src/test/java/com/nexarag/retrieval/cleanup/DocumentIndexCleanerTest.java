@@ -3,6 +3,7 @@ package com.nexarag.retrieval.cleanup;
 import com.nexarag.retrieval.dto.res.DocumentIndexCleanupResult;
 import com.nexarag.retrieval.index.keyword.KeywordIndexClient;
 import com.nexarag.retrieval.index.vector.VectorIndexClient;
+import com.nexarag.retrieval.repository.SectionNavigationIndexRepository;
 import com.nexarag.retrieval.service.DocumentIndexCleaner;
 import com.nexarag.retrieval.service.impl.DocumentIndexCleanerImpl;
 import org.junit.jupiter.api.Test;
@@ -21,9 +22,11 @@ class DocumentIndexCleanerTest {
     void cleanupShouldDeleteVectorAndKeywordIndex() {
         VectorIndexClient vectorIndexClient = mock(VectorIndexClient.class);
         KeywordIndexClient keywordIndexClient = mock(KeywordIndexClient.class);
+        SectionNavigationIndexRepository navigationIndexRepository = mock(SectionNavigationIndexRepository.class);
         when(vectorIndexClient.deleteByDocumentId(1L)).thenReturn(2);
         when(keywordIndexClient.deleteByDocumentId(1L)).thenReturn(3);
-        DocumentIndexCleaner cleaner = new DocumentIndexCleanerImpl(vectorIndexClient, keywordIndexClient);
+        DocumentIndexCleaner cleaner = new DocumentIndexCleanerImpl(vectorIndexClient, keywordIndexClient,
+                navigationIndexRepository);
 
         DocumentIndexCleanupResult result = cleaner.cleanup(1L);
 
@@ -32,15 +35,18 @@ class DocumentIndexCleanerTest {
         assertThat(result.keywordDeletedCount()).isEqualTo(3);
         verify(vectorIndexClient).deleteByDocumentId(1L);
         verify(keywordIndexClient).deleteByDocumentId(1L);
+        verify(navigationIndexRepository).deleteByDocumentId(1L);
     }
 
     @Test
     void cleanupShouldContinueKeywordCleanupWhenVectorCleanupFails() {
         VectorIndexClient vectorIndexClient = mock(VectorIndexClient.class);
         KeywordIndexClient keywordIndexClient = mock(KeywordIndexClient.class);
+        SectionNavigationIndexRepository navigationIndexRepository = mock(SectionNavigationIndexRepository.class);
         when(vectorIndexClient.deleteByDocumentId(1L)).thenThrow(new IllegalStateException("Milvus不可用"));
         when(keywordIndexClient.deleteByDocumentId(1L)).thenReturn(3);
-        DocumentIndexCleaner cleaner = new DocumentIndexCleanerImpl(vectorIndexClient, keywordIndexClient);
+        DocumentIndexCleaner cleaner = new DocumentIndexCleanerImpl(vectorIndexClient, keywordIndexClient,
+                navigationIndexRepository);
 
         DocumentIndexCleanupResult result = cleaner.cleanup(1L);
 
@@ -55,9 +61,11 @@ class DocumentIndexCleanerTest {
     void cleanupShouldKeepVectorResultWhenKeywordCleanupFails() {
         VectorIndexClient vectorIndexClient = mock(VectorIndexClient.class);
         KeywordIndexClient keywordIndexClient = mock(KeywordIndexClient.class);
+        SectionNavigationIndexRepository navigationIndexRepository = mock(SectionNavigationIndexRepository.class);
         when(vectorIndexClient.deleteByDocumentId(1L)).thenReturn(2);
         when(keywordIndexClient.deleteByDocumentId(1L)).thenThrow(new IllegalStateException("Elasticsearch不可用"));
-        DocumentIndexCleaner cleaner = new DocumentIndexCleanerImpl(vectorIndexClient, keywordIndexClient);
+        DocumentIndexCleaner cleaner = new DocumentIndexCleanerImpl(vectorIndexClient, keywordIndexClient,
+                navigationIndexRepository);
 
         DocumentIndexCleanupResult result = cleaner.cleanup(1L);
 

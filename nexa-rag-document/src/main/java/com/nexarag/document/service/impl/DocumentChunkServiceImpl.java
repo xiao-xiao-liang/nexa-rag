@@ -73,10 +73,25 @@ public class DocumentChunkServiceImpl extends ServiceImpl<DocumentChunkMapper, D
                     DocumentErrorCode.DOCUMENT_PROCESS_CONFIG_INVALID);
         }
 
-        // 1. 先逻辑删除旧片段，再保存新片段
+        // 1. 先删除旧片段，再保存新片段
+        deleteByDocumentId(documentId);
+
+        return saveDocumentChunks(documentId, drafts);
+    }
+
+    @Override
+    public void deleteByDocumentId(Long documentId) {
         this.lambdaUpdate()
                 .eq(DocumentChunk::getDocumentId, documentId)
                 .remove();
+    }
+
+    @Override
+    public List<DocumentChunk> saveDocumentChunks(Long documentId, List<ChunkDraft> drafts) {
+        if (documentId == null || drafts == null || drafts.isEmpty()) {
+            throw new ServiceException("文档片段不能为空，documentId=" + documentId,
+                    DocumentErrorCode.DOCUMENT_PROCESS_CONFIG_INVALID);
+        }
 
         List<DocumentChunk> chunks = new ArrayList<>();
         for (int i = 0; i < drafts.size(); i++) {
@@ -156,12 +171,21 @@ public class DocumentChunkServiceImpl extends ServiceImpl<DocumentChunkMapper, D
                 .documentId(documentId)
                 .chunkOrder(order)
                 .parentChunkId(draft.parentChunkId())
+                .sectionId(draft.sectionId())
                 .text(draft.text())
+                .indexContent(requireIndexContent(documentId, draft.indexContent()))
                 .metadataJson(toMetadataJson(draft.metadata()))
                 .tokenCount(draft.tokenCount())
                 .status(draft.skipIndex() ? ChunkStatus.SKIP_INDEX : ChunkStatus.PENDING_INDEX)
                 .skipIndex(draft.skipIndex() ? 1 : 0)
                 .build();
+    }
+
+    private String requireIndexContent(Long documentId, String indexContent) {
+        if (!StringUtils.hasText(indexContent)) {
+            throw new IllegalArgumentException("文档片段索引内容不能为空，documentId=" + documentId);
+        }
+        return indexContent;
     }
 
     private String toMetadataJson(Map<String, Object> metadata) {

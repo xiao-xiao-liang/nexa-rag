@@ -99,6 +99,19 @@ nexa:
       type: model # 向量化类型，可选值：model。由 ModelGateway 调用模型。
       route-key: embedding # ModelGateway 向量化路由Key。
       max-batch-size: 10 # 单次向量化最大片段数量，避免超过云端 Embedding 接口限制。
+    # 候选阶段初始召回导向参数，后续应根据 RAGAS 评估结果持续校准，不能视为单一案例常量。
+    candidate:
+      vector-candidate-limit: 20 # 向量通道初始候选数量。
+      keyword-candidate-limit: 20 # 关键词通道初始候选数量。
+      coarse-score-floor: 0.0 # 初筛保留分数下限，优先保障召回。
+      rrf-candidate-limit: 20 # RRF 融合后保留的候选数量。
+      rerank-candidate-limit: 12 # 重排序后保留的候选数量。
+      expansion-candidate-limit: 8 # 触发扩召时使用的候选数量。
+      expansion-evidence-limit: 3 # 章节范围扩展最多补充的原始正文数量。
+      evidence-token-budget: 1800 # 最终回答允许使用的原始正文 Token 预算。
+      expansion-minimum-body-tokens: 64 # 初始正文少于此估算 Token 数时触发章节扩展。
+      expansion-confidence-threshold: 0.1 # 初始正文最高相关度低于此值时触发章节扩展。
+      accepted-rerank-score: 0.0 # 重排序结果最低可接受分数。
     vector:
       type: milvus # 向量索引类型，可选值：milvus。
       host: 101.132.158.169 # 192.168.0.134 # 向量索引服务地址。

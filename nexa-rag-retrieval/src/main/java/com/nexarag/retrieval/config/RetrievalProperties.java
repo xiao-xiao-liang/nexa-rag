@@ -1,9 +1,13 @@
 package com.nexarag.retrieval.config;
 
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.DecimalMin;
+import jakarta.validation.constraints.Min;
 import lombok.Getter;
 import lombok.Setter;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.stereotype.Component;
+import org.springframework.validation.annotation.Validated;
 
 /**
  * 检索模块运行配置，用于控制 Embedding、向量索引和关键词索引的真实适配器开关。
@@ -11,6 +15,7 @@ import org.springframework.stereotype.Component;
 @Getter
 @Setter
 @Component
+@Validated
 @ConfigurationProperties(prefix = "nexa.retrieval")
 public class RetrievalProperties {
 
@@ -28,6 +33,12 @@ public class RetrievalProperties {
      * 关键词索引配置。
      */
     private Keyword keyword = new Keyword();
+
+    /**
+     * 对话检索候选集配置。
+     */
+    @Valid
+    private Candidate candidate = new Candidate();
 
     /**
      * Embedding 生成配置。
@@ -85,6 +96,11 @@ public class RetrievalProperties {
         private String collectionName = "nexa_document_chunk";
 
         /**
+         * 章节导航向量集合名称，保留给独立导航通道使用。
+         */
+        private String navigationCollectionName = "nexa_document_section_navigation";
+
+        /**
          * 向量维度，0 表示按首次写入向量维度创建集合。
          */
         private int dimension = 0;
@@ -138,6 +154,11 @@ public class RetrievalProperties {
         private String indexName = "nexa_document_chunk";
 
         /**
+         * 章节导航关键词索引名称，与正文片段索引物理隔离。
+         */
+        private String navigationIndexName = "nexa_document_section_navigation";
+
+        /**
          * 关键词索引服务用户名。
          */
         private String username = "elastic";
@@ -151,5 +172,79 @@ public class RetrievalProperties {
          * 请求超时时间，单位毫秒。
          */
         private long requestTimeoutMs = 30000;
+    }
+
+    /**
+     * 候选召回、融合、重排序和证据组装的运行参数。
+     */
+    @Getter
+    @Setter
+    public static class Candidate {
+
+        /**
+         * 向量检索通道的候选数量。
+         */
+        @Min(1)
+        private int vectorCandidateLimit = 20;
+
+        /**
+         * 关键词检索通道的候选数量。
+         */
+        @Min(1)
+        private int keywordCandidateLimit = 20;
+
+        /**
+         * 初筛保留分数下限。
+         */
+        @DecimalMin("0.0")
+        private double coarseScoreFloor = 0D;
+
+        /**
+         * RRF 融合后保留的候选数量。
+         */
+        @Min(1)
+        private int rrfCandidateLimit = 20;
+
+        /**
+         * 重排序后保留的候选数量。
+         */
+        @Min(1)
+        private int rerankCandidateLimit = 12;
+
+        /**
+         * 触发扩召时使用的候选数量。
+         */
+        @Min(1)
+        private int expansionCandidateLimit = 8;
+
+        /**
+         * 章节扩展时最多补充的正文证据数量。
+         */
+        @Min(1)
+        private int expansionEvidenceLimit = 3;
+
+        /**
+         * 证据正文的 Token 预算。
+         */
+        @Min(1)
+        private int evidenceTokenBudget = 1800;
+
+        /**
+         * 初始正文证据不足此 Token 数时触发章节扩展。
+         */
+        @Min(1)
+        private int expansionMinimumBodyTokens = 64;
+
+        /**
+         * 初始正文证据最高相关度低于此值时触发章节扩展。
+         */
+        @DecimalMin("0.0")
+        private double expansionConfidenceThreshold = 0.1D;
+
+        /**
+         * 重排序结果可接受的最低分数。
+         */
+        @DecimalMin("0.0")
+        private double acceptedRerankScore = 0D;
     }
 }

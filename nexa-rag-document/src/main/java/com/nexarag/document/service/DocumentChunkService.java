@@ -40,6 +40,22 @@ public interface DocumentChunkService extends IService<DocumentChunk> {
     List<DocumentChunk> replaceDocumentChunks(Long documentId, List<ChunkDraft> drafts);
 
     /**
+     * 删除指定文档的全部片段。
+     *
+     * @param documentId 文档ID
+     */
+    void deleteByDocumentId(Long documentId);
+
+    /**
+     * 保存指定文档的新片段。
+     *
+     * @param documentId 文档ID
+     * @param drafts     片段草稿
+     * @return 保存后的片段列表
+     */
+    List<DocumentChunk> saveDocumentChunks(Long documentId, List<ChunkDraft> drafts);
+
+    /**
      * 统计指定文档的片段数量。
      *
      * @param documentId 文档ID
