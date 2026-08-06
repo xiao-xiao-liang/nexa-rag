@@ -23,26 +23,52 @@ public class TextWindowSplitter {
      * @return 文本片段列表
      */
     public List<String> split(String text, int chunkSize, int overlap) {
+        return splitRanges(text, chunkSize, overlap).stream()
+                .map(range -> text.substring(range.startOffset(), range.endOffset()))
+                .toList();
+    }
+
+    /**
+     * 切分文本并返回每个非空窗口在原文中的偏移范围。
+     *
+     * @param text      文本内容
+     * @param chunkSize 片段大小
+     * @param overlap   片段重叠大小
+     * @return 文本窗口范围列表
+     */
+    public List<TextWindowRange> splitRanges(String text, int chunkSize, int overlap) {
         validateConfig(chunkSize, overlap);
         if (!StringUtils.hasText(text)) {
             return List.of();
         }
 
         // 1. 按窗口切分，并尽量在自然边界处截断
-        List<String> chunks = new ArrayList<>();
+        List<TextWindowRange> ranges = new ArrayList<>();
         int start = 0;
         while (start < text.length()) {
             int end = chooseEnd(text, start, chunkSize);
-            String chunk = text.substring(start, end).trim();
-            if (StringUtils.hasText(chunk)) {
-                chunks.add(chunk);
+            TextWindowRange range = trimRange(text, start, end);
+            if (range != null) {
+                ranges.add(range);
             }
             if (end >= text.length()) {
                 break;
             }
-            start = Math.max(0, end - overlap);
+            start = Math.max(start + 1, end - overlap);
         }
-        return chunks;
+        return ranges;
+    }
+
+    private TextWindowRange trimRange(String text, int start, int end) {
+        int trimmedStart = start;
+        while (trimmedStart < end && text.charAt(trimmedStart) <= ' ') {
+            trimmedStart++;
+        }
+        int trimmedEnd = end;
+        while (trimmedEnd > trimmedStart && text.charAt(trimmedEnd - 1) <= ' ') {
+            trimmedEnd--;
+        }
+        return trimmedStart == trimmedEnd ? null : new TextWindowRange(trimmedStart, trimmedEnd);
     }
 
     private void validateConfig(int chunkSize, int overlap) {

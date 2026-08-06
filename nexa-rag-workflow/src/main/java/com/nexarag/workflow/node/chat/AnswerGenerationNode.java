@@ -31,7 +31,7 @@ import static com.nexarag.workflow.constants.ChatWorkflowStateKeys.CONVERSATION_
 import static com.nexarag.workflow.constants.ChatWorkflowStateKeys.CONVERSATION_ID;
 import static com.nexarag.workflow.constants.ChatWorkflowStateKeys.GENERATION_ID;
 import static com.nexarag.workflow.constants.ChatWorkflowStateKeys.MODEL_STREAM_RESULT;
-import static com.nexarag.workflow.constants.ChatWorkflowStateKeys.RERANKED_RETRIEVAL_RESULTS;
+import static com.nexarag.workflow.constants.ChatWorkflowStateKeys.ACCEPTED_EVIDENCE_RESULTS;
 import static com.nexarag.workflow.constants.ChatWorkflowStateKeys.REWRITTEN_QUESTION;
 import static com.nexarag.workflow.constants.ChatWorkflowStateKeys.TRACE_ID;
 import static com.nexarag.workflow.constants.ChatWorkflowStateKeys.USER_ID;
@@ -65,8 +65,8 @@ public class AnswerGenerationNode implements NodeAction {
                         assistantMessage.messageId(), accumulator.snapshot().content()));
 
         // 2. 调用最终回答模型并绑定取消句柄
-        List<RetrievalChunk> chunks = state.value(RERANKED_RETRIEVAL_RESULTS, List.of());
-        log.info("准备调用模型生成回答");
+        List<RetrievalChunk> chunks = state.value(ACCEPTED_EVIDENCE_RESULTS, List.of());
+        log.info("准备调用模型生成回答，traceId={}，已接纳正文数={}", state.value(TRACE_ID, ""), chunks.size());
         Flux<com.nexarag.model.gateway.chat.ChatModelStreamResponse> modelStream = modelGateway.streamChat(
                 ChatModelRequest.builder()
                         .traceId(state.value(TRACE_ID, ""))

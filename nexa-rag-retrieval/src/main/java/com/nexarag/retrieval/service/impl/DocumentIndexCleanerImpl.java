@@ -3,6 +3,7 @@ package com.nexarag.retrieval.service.impl;
 import com.nexarag.retrieval.dto.res.DocumentIndexCleanupResult;
 import com.nexarag.retrieval.index.keyword.KeywordIndexClient;
 import com.nexarag.retrieval.index.vector.VectorIndexClient;
+import com.nexarag.retrieval.repository.SectionNavigationIndexRepository;
 import com.nexarag.retrieval.service.DocumentIndexCleaner;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
@@ -16,6 +17,7 @@ public class DocumentIndexCleanerImpl implements DocumentIndexCleaner {
 
     private final VectorIndexClient vectorIndexClient;
     private final KeywordIndexClient keywordIndexClient;
+    private final SectionNavigationIndexRepository sectionNavigationIndexRepository;
 
     /**
      * 清理指定文档的外部索引。
@@ -29,6 +31,7 @@ public class DocumentIndexCleanerImpl implements DocumentIndexCleaner {
         int keywordDeletedCount = 0;
         String vectorFailure = null;
         String keywordFailure = null;
+        String navigationFailure = null;
 
         // 1. 独立清理向量索引，失败后仍继续执行关键词索引清理
         try {
@@ -44,8 +47,15 @@ public class DocumentIndexCleanerImpl implements DocumentIndexCleaner {
             keywordFailure = "关键词索引清理失败：" + exception.getMessage();
         }
 
-        // 3. 聚合两个阶段的删除数量和失败原因
-        String failureReason = java.util.stream.Stream.of(vectorFailure, keywordFailure)
+        // 3. 独立清理章节导航索引，保留正文索引清理结果
+        try {
+            sectionNavigationIndexRepository.deleteByDocumentId(documentId);
+        } catch (RuntimeException exception) {
+            navigationFailure = "章节导航索引清理失败：" + exception.getMessage();
+        }
+
+        // 4. 聚合各索引阶段的失败原因
+        String failureReason = java.util.stream.Stream.of(vectorFailure, keywordFailure, navigationFailure)
                 .filter(java.util.Objects::nonNull)
                 .collect(java.util.stream.Collectors.joining("；"));
         return new DocumentIndexCleanupResult(documentId, vectorDeletedCount, keywordDeletedCount,

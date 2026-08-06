@@ -4,6 +4,7 @@ import com.alibaba.cloud.ai.graph.OverAllState;
 import com.nexarag.model.gateway.ModelGateway;
 import com.nexarag.model.gateway.rerank.RerankModelRequest;
 import com.nexarag.model.gateway.rerank.RerankModelResponse;
+import com.nexarag.retrieval.config.RetrievalProperties;
 import com.nexarag.retrieval.model.RetrievalChunk;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -29,7 +30,7 @@ class RerankNodeTest {
     @Test
     void applyShouldReturnEmptyResultWithoutCallingModelForEmptyCandidates() {
         ModelGateway modelGateway = mock(ModelGateway.class);
-        RerankNode node = new RerankNode(modelGateway);
+        RerankNode node = new RerankNode(modelGateway, new RetrievalProperties());
 
         Map<String, Object> result = node.apply(new OverAllState(Map.of(
                 REWRITTEN_QUESTION, "退款规则",
@@ -40,7 +41,7 @@ class RerankNodeTest {
     }
 
     @Test
-    void applyShouldUseRerankRouteAndKeepFinalTopFive() {
+    void applyShouldUseConfiguredRerankCandidateLimit() {
         ModelGateway modelGateway = mock(ModelGateway.class);
         List<RetrievalChunk> chunks = java.util.stream.IntStream.rangeClosed(1, 6)
                 .mapToObj(index -> new RetrievalChunk("c" + index, 1L, index, null,
@@ -51,14 +52,16 @@ class RerankNodeTest {
                 .toList();
         when(modelGateway.rerank(org.mockito.ArgumentMatchers.any()))
                 .thenReturn(new RerankModelResponse(scores, "rerank-profile", 10));
-        RerankNode node = new RerankNode(modelGateway);
+        RetrievalProperties properties = new RetrievalProperties();
+        properties.getCandidate().setRerankCandidateLimit(3);
+        RerankNode node = new RerankNode(modelGateway, properties);
 
         Map<String, Object> result = node.apply(new OverAllState(Map.of(
                 REWRITTEN_QUESTION, "退款规则",
                 TRACE_ID, "trace-001",
                 FUSED_RETRIEVAL_RESULTS, chunks)));
 
-        assertThat((List<?>) result.get(RERANKED_RETRIEVAL_RESULTS)).hasSize(5);
+        assertThat((List<?>) result.get(RERANKED_RETRIEVAL_RESULTS)).hasSize(3);
         ArgumentCaptor<RerankModelRequest> captor = ArgumentCaptor.forClass(RerankModelRequest.class);
         verify(modelGateway).rerank(captor.capture());
         assertThat(captor.getValue().routeKey()).isEqualTo("rerank");

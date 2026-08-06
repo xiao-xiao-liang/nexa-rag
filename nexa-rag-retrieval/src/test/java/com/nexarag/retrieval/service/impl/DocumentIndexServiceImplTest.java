@@ -19,6 +19,7 @@ import com.nexarag.retrieval.dto.req.VectorIndexWriteRequest;
 import com.nexarag.retrieval.index.keyword.KeywordIndexClient;
 import com.nexarag.retrieval.index.vector.VectorIndexClient;
 import com.nexarag.retrieval.repository.ChunkIndexRepositoryImpl;
+import com.nexarag.retrieval.repository.SectionNavigationIndexRepository;
 import com.nexarag.retrieval.service.EmbeddingService;
 import com.nexarag.retrieval.service.DocumentIndexService;
 import org.junit.jupiter.api.Test;
@@ -57,6 +58,15 @@ class DocumentIndexServiceImplTest {
         assertThat(fixture.chunks.getFirst().getVectorId()).isEqualTo("mock-vector-1-chunk-1");
         assertThat(fixture.chunks.getFirst().getKeywordIndexId()).isEqualTo("mock-keyword-1-chunk-1");
         assertThat(fixture.chunks.get(1).getStatus()).isEqualTo(ChunkStatus.SKIP_INDEX);
+        assertThat(result.chunks().getFirst().sectionId()).isEqualTo(11L);
+        assertThat(result.chunks().getFirst().indexContent()).isEqualTo("标题路径 > 测试文本");
+        assertThat(fixture.vectorIndexClient.lastRequest.documents())
+                .extracting(VectorIndexDocument::chunkId)
+                .containsExactly("chunk-1");
+        assertThat(fixture.vectorIndexClient.lastRequest.documents().getFirst().text()).isEqualTo("测试文本");
+        assertThat(fixture.vectorIndexClient.lastRequest.documents().getFirst().indexContent())
+                .isEqualTo("标题路径 > 测试文本");
+        verify(fixture.navigationIndexRepository).upsert(1L);
     }
 
     @Test
@@ -73,6 +83,17 @@ class DocumentIndexServiceImplTest {
         assertThat(fixture.chunks.getFirst().getStatus()).isEqualTo(ChunkStatus.INDEXED);
         assertThat(fixture.chunks.getFirst().getVectorId()).isNull();
         assertThat(fixture.chunks.getFirst().getKeywordIndexId()).isNull();
+    }
+
+    @Test
+    void indexDocumentShouldWriteNavigationWithoutCreatingContentRowForTitleOnlyDocument() {
+        Fixture fixture = new Fixture(DocumentStatus.CHUNKED, null, List.of());
+
+        DocumentIndexResult result = fixture.service.indexDocument(1L);
+
+        assertThat(result.indexedChunkCount()).isZero();
+        assertThat(fixture.vectorIndexClient.lastRequest).isNull();
+        verify(fixture.navigationIndexRepository).upsert(1L);
     }
 
     @Test
@@ -103,7 +124,9 @@ class DocumentIndexServiceImplTest {
                 .chunkId("chunk-1")
                 .documentId(1L)
                 .chunkOrder(0)
+                .sectionId(11L)
                 .text("测试文本")
+                .indexContent("标题路径 > 测试文本")
                 .status(ChunkStatus.PENDING_INDEX)
                 .skipIndex(0)
                 .build());
@@ -124,6 +147,8 @@ class DocumentIndexServiceImplTest {
         private final List<DocumentChunk> chunks;
         private final DocumentService documentService;
         private final DocumentIndexService service;
+        private final StubVectorIndexClient vectorIndexClient;
+        private final SectionNavigationIndexRepository navigationIndexRepository;
 
         private Fixture(DocumentStatus status, String processConfigJson, List<DocumentChunk> chunks) {
             this(status, processConfigJson, chunks, new StubEmbeddingService());
@@ -160,15 +185,18 @@ class DocumentIndexServiceImplTest {
                 return null;
             }).when(documentChunkService).markDocumentSkippedChunks(eq(1L));
             DocumentIndexCleaner cleaner = mock(DocumentIndexCleaner.class);
+            this.navigationIndexRepository = mock(SectionNavigationIndexRepository.class);
             RetrievalProperties retrievalProperties = new RetrievalProperties();
             retrievalProperties.getKeyword().setType("elasticsearch");
+            this.vectorIndexClient = new StubVectorIndexClient();
             this.service = new DocumentIndexServiceImpl(documentService,
                     new ChunkIndexRepositoryImpl(documentChunkService),
                     new IndexConfigResolver(objectMapper, retrievalProperties),
                     embeddingService,
-                    new StubVectorIndexClient(),
+                    vectorIndexClient,
                     new StubKeywordIndexClient(),
-                    cleaner);
+                    cleaner,
+                    navigationIndexRepository);
         }
 
         private void markChunkIndexed(String chunkId, String vectorId, String keywordIndexId) {
@@ -219,8 +247,11 @@ class DocumentIndexServiceImplTest {
      */
     private static class StubVectorIndexClient implements VectorIndexClient {
 
+        private VectorIndexWriteRequest lastRequest;
+
         @Override
         public List<VectorIndexWriteResult> upsert(VectorIndexWriteRequest request) {
+            lastRequest = request;
             return request.documents().stream()
                     .map(document -> new VectorIndexWriteResult(document.chunkId(),
                             "mock-vector-" + request.documentId() + "-" + document.chunkId(), true, null))

@@ -13,6 +13,7 @@ import com.nexarag.document.converter.DocumentConverter;
 import com.nexarag.document.dto.CreateDocumentRequest;
 import com.nexarag.document.dto.ProcessDocumentRequest;
 import com.nexarag.document.entity.Document;
+import com.nexarag.document.event.DocumentDeletedEvent;
 import com.nexarag.document.enums.DocumentStatus;
 import com.nexarag.document.enums.DocumentPipelineMessageStatus;
 import com.nexarag.document.enums.FileType;
@@ -24,6 +25,8 @@ import com.nexarag.infra.config.DocumentPipelineMessagingProperties;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -42,6 +45,7 @@ public class DocumentServiceImpl extends ServiceImpl<DocumentMapper, Document> i
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
     private final DocumentPipelineMessagingProperties messagingProperties;
+    private final ApplicationEventPublisher eventPublisher;
 
     @Override
     public Document createDocument(CreateDocumentRequest request) {
@@ -282,11 +286,16 @@ public class DocumentServiceImpl extends ServiceImpl<DocumentMapper, Document> i
     }
 
     @Override
+    @Transactional(rollbackFor = Exception.class)
     public boolean deleteDocument(Long documentId) {
         getRequiredDocument(documentId);
 
         // 1. 通过统一逻辑删除入口写入删除标记和删除时间
         boolean deleted = logicDeleteDocument(documentId);
+        if (deleted) {
+            // 2. 发布删除事实，事务提交后由下游模块清理其派生索引
+            eventPublisher.publishEvent(new DocumentDeletedEvent(documentId));
+        }
         log.info("删除文档记录完成，documentId={}，deleted={}", documentId, deleted);
         return deleted;
     }
