@@ -4,6 +4,17 @@ server:
 spring:
   application:
     name: nexa-rag
+  mail:
+    host: smtp.qq.com # QQ邮箱SMTP主机。
+    port: 465 # QQ邮箱SSL端口。
+    username: ${NEXA_ALERT_SMTP_USERNAME:} # SMTP认证邮箱，可通过 IDEA 环境变量配置。
+    password: ${NEXA_ALERT_SMTP_PASSWORD:} # SMTP授权码，不使用邮箱登录密码。
+    properties:
+      mail:
+        smtp:
+          auth: true
+          ssl:
+            enable: true # QQ邮箱SMTP使用SSL。
   main:
     banner-mode: console
   servlet:
@@ -14,15 +25,15 @@ spring:
     enabled: false
   data:
     redis:
-      host: 127.0.0.1 # 192.168.0.134
+      host: 192.168.0.134 # 127.0.0.1
       port: 6379
-#      password: 
+      password: 
       timeout: 3s
   datasource:
     driver-class-name: com.mysql.cj.jdbc.Driver
-    url: jdbc:mysql://127.0.0.1:3306/nexa_rag?useUnicode=true&characterEncoding=utf8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true
+    url: jdbc:mysql://192.168.0.134:3306/nexa_rag?useUnicode=true&characterEncoding=utf8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true
     username: root
-    password: root # 
+    password:  # root
 
 # RocketMQ连接配置。name-server为NameServer地址，多个地址使用分号分隔；producer.group为全局生产者组名称。
 rocketmq:
@@ -35,6 +46,17 @@ nexa:
     refresh:
       topic: nexa.prompt.release.changed
       reconcile-interval-ms: 60000
+  alert:
+    enabled: true # 是否启用外部告警投递；开启后同时暴露告警渠道测试接口。
+    topic: nexa-alert # 告警消息主题。
+    consumer-group: nexa-alert-worker # 告警消息消费者组。
+    feishu:
+      enabled: true # 是否启用飞书机器人渠道。
+      webhook-url: ${NEXA_ALERT_FEISHU_WEBHOOK_URL:} # 飞书Webhook，仅通过环境变量配置。
+    email:
+      enabled: true # 是否启用邮件渠道。
+      from: "2901815578@qq.com" # 告警邮件发件人地址，填写发件QQ邮箱。
+      recipients: "2720370245@qq.com" # 告警邮件收件人，多个以逗号分隔。
   # 文档上传和异步处理流水线配置。
   document:
     upload:
@@ -68,9 +90,7 @@ nexa:
     task:
       cleanup-topic: nexa-document-index-cleanup # 删除文档后的外部索引清理主题
       cleanup-consumer-group: nexa-document-index-cleanup-worker # 索引清理消费者组
-      alert-topic: nexa-document-alert # 文档任务最终失败告警主题
-      alert-consumer-group: nexa-document-alert-worker # 文档任务告警消费者组
-      max-reconsume-times: 5 # 清理和告警任务的RocketMQ最大重新消费次数
+      max-reconsume-times: 5 # 索引清理任务的RocketMQ最大重新消费次数
 
   # 文件存储配置，用于控制文档原始文件和解析产物的存取位置。
   storage:
@@ -120,7 +140,7 @@ nexa:
       accepted-rerank-score: 0.0 # 重排序结果最低可接受分数。
     vector:
       type: milvus # 向量索引类型，可选值：milvus。
-      host: 101.132.158.169 # 192.168.0.134 # 向量索引服务地址。
+      host: 192.168.0.134 # 101.132.158.169 # 向量索引服务地址。
       port: 19530 # 向量索引服务端口。
       database-name: nexa_rag # 向量库数据库名称，为空时使用默认数据库。
       collection-name: nexa_document_chunk # 文档片段向量集合名称。
