@@ -9,7 +9,6 @@ import com.nexarag.document.error.DocumentErrorCode;
 import com.nexarag.document.splitter.ChunkDraft;
 import com.nexarag.document.splitter.DocumentChunkIdGenerator;
 import com.nexarag.document.splitter.DocumentSplitContext;
-import com.nexarag.document.splitter.DocumentSplitResult;
 import com.nexarag.document.splitter.DocumentSplitter;
 import cn.idev.excel.FastExcel;
 import cn.idev.excel.context.AnalysisContext;
@@ -45,10 +44,10 @@ public class ExcelDocumentSplitter implements DocumentSplitter {
      * 切分 Excel 或 CSV 文件字节。
      *
      * @param context 文档切分上下文
-     * @return 文档切分结果
+     * @return 片段草稿列表
      */
     @Override
-    public DocumentSplitResult split(DocumentSplitContext context) {
+    public List<ChunkDraft> split(DocumentSplitContext context) {
         validateContext(context);
         SplitConfigRequest config = context.config();
         ExcelSplitOptions options = config.excel();
@@ -59,7 +58,7 @@ public class ExcelDocumentSplitter implements DocumentSplitter {
         for (TableSheet sheet : sheets) {
             drafts.addAll(renderSheet(context, sheet, config, options));
         }
-        return DocumentSplitResult.unstructured(drafts);
+        return drafts;
     }
 
     private void validateContext(DocumentSplitContext context) {

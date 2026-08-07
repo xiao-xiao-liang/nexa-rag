@@ -73,7 +73,7 @@ public class EmbeddingServiceImpl implements EmbeddingService {
                 .bizType(ModelBizType.RETRIEVAL)
                 .bizId(String.valueOf(documentId))
                 .routeKey(resolveRouteKey(config))
-                .texts(batchChunks.stream().map(IndexableChunk::indexContent).toList())
+                .texts(batchChunks.stream().map(IndexableChunk::text).toList())
                 .build();
     }
 

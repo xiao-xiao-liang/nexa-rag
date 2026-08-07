@@ -1,7 +1,6 @@
 package com.nexarag.workflow.dispatcher.chat;
 
 import com.alibaba.cloud.ai.graph.OverAllState;
-import com.nexarag.retrieval.config.RetrievalProperties;
 import com.nexarag.retrieval.enums.RetrievalScope;
 import org.junit.jupiter.api.Test;
 
@@ -9,7 +8,7 @@ import java.util.List;
 import java.util.Map;
 
 import static com.nexarag.workflow.constants.ChatWorkflowNodeConstants.RERANK_NODE;
-import static com.nexarag.workflow.constants.ChatWorkflowNodeConstants.SECTION_EXPANSION_NODE;
+import static com.nexarag.workflow.constants.ChatWorkflowNodeConstants.RETRIEVAL_NODE;
 import static com.nexarag.workflow.constants.ChatWorkflowStateKeys.FUSED_RETRIEVAL_RESULTS;
 import static com.nexarag.workflow.constants.ChatWorkflowStateKeys.MAX_RETRIEVAL_ROUND;
 import static com.nexarag.workflow.constants.ChatWorkflowStateKeys.RETRIEVAL_ROUND;
@@ -25,20 +24,19 @@ class RetrievalFusionDispatcherTest {
     @Test
     void applyShouldExpandRetrievalWhenFirstRoundHasNoResult() {
         OverAllState state = stateWith(1, 2, 10);
-        RetrievalProperties properties = new RetrievalProperties();
-        properties.getCandidate().setExpansionCandidateLimit(8);
-        properties.getCandidate().setCoarseScoreFloor(0.2D);
-        RetrievalFusionDispatcher dispatcher = new RetrievalFusionDispatcher(properties);
+        RetrievalFusionDispatcher dispatcher = new RetrievalFusionDispatcher();
 
-        assertThat(dispatcher.apply(state)).isEqualTo(SECTION_EXPANSION_NODE);
+        assertThat(dispatcher.apply(state)).isEqualTo(RETRIEVAL_NODE);
         assertThat(state.value(RETRIEVAL_ROUND, 0)).isEqualTo(2);
+        assertThat(state.value(RETRIEVAL_TOP_K, 0)).isEqualTo(30);
+        assertThat(state.value(RETRIEVAL_SCOPE, RetrievalScope.INTENT)).isEqualTo(RetrievalScope.INTENT_AND_GLOBAL);
     }
 
     @Test
     void applyShouldContinueToRerankAfterMaximumRound() {
         OverAllState state = stateWith(2, 2, 30);
 
-        assertThat(new RetrievalFusionDispatcher(new RetrievalProperties()).apply(state)).isEqualTo(RERANK_NODE);
+        assertThat(new RetrievalFusionDispatcher().apply(state)).isEqualTo(RERANK_NODE);
     }
 
     private OverAllState stateWith(int round, int maxRound, int topK) {

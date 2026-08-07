@@ -8,7 +8,6 @@ import com.nexarag.document.enums.SplitStrategy;
 import com.nexarag.document.splitter.ChunkDraft;
 import com.nexarag.document.splitter.DocumentChunkIdGenerator;
 import com.nexarag.document.splitter.DocumentSplitContext;
-import com.nexarag.document.splitter.DocumentSplitResult;
 import com.nexarag.document.splitter.support.TextWindowSplitter;
 import org.junit.jupiter.api.Test;
 
@@ -31,17 +30,10 @@ class RegexTextDocumentSplitterTest {
                 new SplitConfigRequest(SplitStrategy.REGEX_TEXT, 8, 2, null,
                         new RegexSplitOptions("\n\n", null, false), null));
 
-        DocumentSplitResult splitResult = splitter.split(context);
-        List<ChunkDraft> drafts = splitResult.chunks();
+        List<ChunkDraft> drafts = splitter.split(context);
 
         assertThat(drafts).hasSize(2);
-        assertThat(splitResult.sections()).isEmpty();
-        assertThat(splitResult.structured()).isFalse();
         assertThat(drafts).allSatisfy(draft -> assertThat(draft.skipIndex()).isFalse());
-        assertThat(drafts).allSatisfy(draft -> {
-            assertThat(draft.sectionId()).isNull();
-            assertThat(draft.indexContent()).isEqualTo(draft.text());
-        });
         assertThat(drafts.getFirst().text()).contains("第一段", "第二段");
     }
 

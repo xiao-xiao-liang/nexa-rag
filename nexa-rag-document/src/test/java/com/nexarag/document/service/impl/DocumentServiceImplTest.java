@@ -8,14 +8,12 @@ import com.nexarag.document.dto.CreateDocumentRequest;
 import com.nexarag.document.dto.ProcessDocumentRequest;
 import com.nexarag.document.dto.SplitConfigRequest;
 import com.nexarag.document.entity.Document;
-import com.nexarag.document.event.DocumentDeletedEvent;
 import com.nexarag.document.enums.DocumentStatus;
 import com.nexarag.document.enums.SplitStrategy;
 import com.nexarag.common.exception.ClientException;
 import com.nexarag.document.vo.DocumentSummaryVO;
 import com.nexarag.infra.config.DocumentPipelineMessagingProperties;
 import org.junit.jupiter.api.Test;
-import org.springframework.context.ApplicationEventPublisher;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -197,7 +195,7 @@ class DocumentServiceImplTest {
     }
 
     @Test
-    void deleteDocumentShouldPublishDeletedEventAfterSuccessfulDelete() {
+    void deleteDocumentShouldUpdateDeleteTime() {
         TestableDocumentServiceImpl documentService = new TestableDocumentServiceImpl();
         documentService.existingDocument = Document.builder()
                 .documentId(1L)
@@ -208,21 +206,6 @@ class DocumentServiceImplTest {
 
         assertThat(deleted).isTrue();
         assertThat(documentService.deleteDocumentId).isEqualTo(1L);
-        verify(documentService.eventPublisher).publishEvent(new DocumentDeletedEvent(1L));
-    }
-
-    @Test
-    void deleteDocumentShouldNotPublishDeletedEventWhenDeleteFails() {
-        TestableDocumentServiceImpl documentService = new TestableDocumentServiceImpl();
-        documentService.existingDocument = Document.builder()
-                .documentId(1L)
-                .status(DocumentStatus.UPLOADED)
-                .build();
-        documentService.deleteResult = false;
-
-        assertThat(documentService.deleteDocument(1L)).isFalse();
-
-        verify(documentService.eventPublisher, never()).publishEvent(any());
     }
 
     @Test
@@ -256,19 +239,12 @@ class DocumentServiceImplTest {
         private Document failureUpdatedDocument;
         private Document retryUpdatedDocument;
         private Long deleteDocumentId;
-        private boolean deleteResult = true;
         private IPage<Document> documentPage;
         private boolean updateResult = true;
         private final LambdaUpdateChainWrapper<Document> updateChain = mock(LambdaUpdateChainWrapper.class);
-        private final ApplicationEventPublisher eventPublisher;
 
         private TestableDocumentServiceImpl() {
-            this(mock(ApplicationEventPublisher.class));
-        }
-
-        private TestableDocumentServiceImpl(ApplicationEventPublisher eventPublisher) {
-            super(messagingProperties(), eventPublisher);
-            this.eventPublisher = eventPublisher;
+            super(messagingProperties());
             when(updateChain.eq(any(), any())).thenReturn(updateChain);
             when(updateChain.notIn(any(), any(Object[].class))).thenReturn(updateChain);
             when(updateChain.set(any(), any())).thenReturn(updateChain);
@@ -325,7 +301,7 @@ class DocumentServiceImplTest {
         @Override
         protected boolean logicDeleteDocument(Long documentId) {
             this.deleteDocumentId = documentId;
-            return deleteResult;
+            return true;
         }
 
         @Override

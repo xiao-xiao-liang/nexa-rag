@@ -6,7 +6,6 @@ import com.nexarag.model.enums.ModelBizType;
 import com.nexarag.model.gateway.ModelGateway;
 import com.nexarag.model.gateway.rerank.RerankCandidate;
 import com.nexarag.model.gateway.rerank.RerankModelRequest;
-import com.nexarag.retrieval.config.RetrievalProperties;
 import com.nexarag.retrieval.model.RetrievalChunk;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -30,8 +29,9 @@ import static com.nexarag.workflow.constants.ChatWorkflowStateKeys.TRACE_ID;
 @RequiredArgsConstructor
 public class RerankNode implements NodeAction {
 
+    private static final int FINAL_TOP_K = 5;
+
     private final ModelGateway modelGateway;
-    private final RetrievalProperties retrievalProperties;
 
     /**
      * 对融合候选执行重排序，空候选直接短路。
@@ -45,7 +45,7 @@ public class RerankNode implements NodeAction {
         String question = state.value(REWRITTEN_QUESTION, "");
         List<RetrievalChunk> chunks = state.value(FUSED_RETRIEVAL_RESULTS, List.of());
         if (chunks.isEmpty()) {
-            log.info("召回结果为空，跳过重排序，traceId={}", state.value(TRACE_ID, ""));
+            log.info("召回结果为空，跳过重排序");
             return Map.of(RERANKED_RETRIEVAL_RESULTS, List.of());
         }
 
@@ -62,11 +62,8 @@ public class RerankNode implements NodeAction {
                 .candidates(candidates)
                 .build());
         if (response == null || response.scores() == null) {
-            List<RetrievalChunk> fallbackChunks = chunks.stream()
-                    .limit(retrievalProperties.getCandidate().getRerankCandidateLimit())
-                    .toList();
-            log.warn("检索重排序未返回分数，使用融合排序结果，traceId={}，候选数={}，保留数={}",
-                    state.value(TRACE_ID, ""), chunks.size(), fallbackChunks.size());
+            List<RetrievalChunk> fallbackChunks = chunks.stream().limit(FINAL_TOP_K).toList();
+            log.warn("检索重排序未返回分数，使用 RRF 融合排序结果");
             return Map.of(RERANKED_RETRIEVAL_RESULTS, fallbackChunks);
         }
 
@@ -78,12 +75,9 @@ public class RerankNode implements NodeAction {
                         Math::max));
         List<RetrievalChunk> rankedChunks = chunks.stream()
                 .sorted(Comparator.comparingDouble(chunk -> -scores.getOrDefault(chunk.chunkId(), chunk.score())))
-                .filter(chunk -> scores.getOrDefault(chunk.chunkId(), chunk.score())
-                        >= retrievalProperties.getCandidate().getAcceptedRerankScore())
-                .limit(retrievalProperties.getCandidate().getRerankCandidateLimit())
+                .limit(FINAL_TOP_K)
                 .toList();
-        log.info("重排序完成，traceId={}，输入候选数={}，通过阈值并保留数={}",
-                state.value(TRACE_ID, ""), chunks.size(), rankedChunks.size());
+        log.debug("重排序结果，query={}，rankedChunks={}", question, rankedChunks);
         return Map.of(RERANKED_RETRIEVAL_RESULTS, rankedChunks);
     }
 }

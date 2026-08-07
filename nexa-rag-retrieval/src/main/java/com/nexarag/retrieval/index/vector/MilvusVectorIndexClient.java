@@ -16,10 +16,8 @@ import io.milvus.v2.client.MilvusClientV2;
 import io.milvus.v2.common.DataType;
 import io.milvus.v2.common.IndexParam;
 import io.milvus.v2.service.collection.request.CreateCollectionReq;
-import io.milvus.v2.service.collection.request.DescribeCollectionReq;
 import io.milvus.v2.service.collection.request.HasCollectionReq;
 import io.milvus.v2.service.collection.request.LoadCollectionReq;
-import io.milvus.v2.service.collection.response.DescribeCollectionResp;
 import io.milvus.v2.service.database.request.CreateDatabaseReq;
 import io.milvus.v2.service.database.response.ListDatabasesResp;
 import io.milvus.v2.service.utility.request.FlushReq;
@@ -104,7 +102,6 @@ public class MilvusVectorIndexClient implements VectorIndexClient, DisposableBea
         if (!hasCollection(collectionName)) {
             return List.of();
         }
-        validateExistingCollectionSchema(collectionName);
 
         // 1. 查询并返回回答所需的片段字段
         SearchResp response = milvusClient.search(SearchReq.builder()
@@ -116,8 +113,7 @@ public class MilvusVectorIndexClient implements VectorIndexClient, DisposableBea
                 .data(List.of(new FloatVec(request.vector())))
                 .outputFields(List.of(DocumentIndexFieldConstants.CHUNK_ID, DocumentIndexFieldConstants.DOCUMENT_ID,
                         DocumentIndexFieldConstants.PARENT_CHUNK_ID, DocumentIndexFieldConstants.CHUNK_ORDER,
-                        DocumentIndexFieldConstants.SECTION_ID, DocumentIndexFieldConstants.TEXT,
-                        DocumentIndexFieldConstants.METADATA_JSON))
+                        DocumentIndexFieldConstants.TEXT, DocumentIndexFieldConstants.METADATA_JSON))
                 .build());
 
         // 2. 标准化首个查询向量的候选结果
@@ -209,7 +205,6 @@ public class MilvusVectorIndexClient implements VectorIndexClient, DisposableBea
 
     private synchronized void ensureCollection(String collectionName, int vectorDimension) {
         if (hasCollection(collectionName)) {
-            validateExistingCollectionSchema(collectionName);
             return;
         }
 
@@ -221,9 +216,7 @@ public class MilvusVectorIndexClient implements VectorIndexClient, DisposableBea
                         field(DocumentIndexFieldConstants.DOCUMENT_ID, DataType.Int64),
                         varcharField(DocumentIndexFieldConstants.PARENT_CHUNK_ID, CHUNK_ID_MAX_LENGTH, true, false),
                         field(DocumentIndexFieldConstants.CHUNK_ORDER, DataType.Int32),
-                        nullableField(DocumentIndexFieldConstants.SECTION_ID, DataType.Int64),
                         varcharField(DocumentIndexFieldConstants.TEXT, TEXT_MAX_LENGTH, false, false),
-                        varcharField(DocumentIndexFieldConstants.INDEX_CONTENT, TEXT_MAX_LENGTH, false, false),
                         varcharField(DocumentIndexFieldConstants.METADATA_JSON, METADATA_MAX_LENGTH, true, false),
                         CreateCollectionReq.FieldSchema.builder()
                                 .name(VECTOR)
@@ -259,43 +252,10 @@ public class MilvusVectorIndexClient implements VectorIndexClient, DisposableBea
                 .build()));
     }
 
-    /**
-     * 校验已存在集合是否具备当前索引模型要求的章节字段。
-     *
-     * @param collectionName 集合名称
-     */
-    private void validateExistingCollectionSchema(String collectionName) {
-        DescribeCollectionResp response = milvusClient.describeCollection(DescribeCollectionReq.builder()
-                .databaseName(databaseNameOrNull())
-                .collectionName(collectionName)
-                .build());
-        List<String> fieldNames = response == null || response.getFieldNames() == null
-                ? List.of()
-                : response.getFieldNames();
-        List<String> missingFields = List.of(DocumentIndexFieldConstants.SECTION_ID,
-                        DocumentIndexFieldConstants.INDEX_CONTENT)
-                .stream()
-                .filter(requiredField -> !fieldNames.contains(requiredField))
-                .toList();
-        if (!missingFields.isEmpty()) {
-            throw new ServiceException("Milvus 集合结构不兼容，collectionName=" + collectionName
-                    + "，缺少必需字段=" + missingFields
-                    + "。请执行已批准的全量重建后再启用向量索引。");
-        }
-    }
-
     private CreateCollectionReq.FieldSchema field(String name, DataType dataType) {
         return CreateCollectionReq.FieldSchema.builder()
                 .name(name)
                 .dataType(dataType)
-                .build();
-    }
-
-    private CreateCollectionReq.FieldSchema nullableField(String name, DataType dataType) {
-        return CreateCollectionReq.FieldSchema.builder()
-                .name(name)
-                .dataType(dataType)
-                .isNullable(true)
                 .build();
     }
 
@@ -342,13 +302,7 @@ public class MilvusVectorIndexClient implements VectorIndexClient, DisposableBea
         row.addProperty(DocumentIndexFieldConstants.DOCUMENT_ID, document.documentId());
         addNullableString(row, DocumentIndexFieldConstants.PARENT_CHUNK_ID, document.parentChunkId(), CHUNK_ID_MAX_LENGTH);
         row.addProperty(DocumentIndexFieldConstants.CHUNK_ORDER, document.chunkOrder());
-        if (document.sectionId() == null) {
-            row.add(DocumentIndexFieldConstants.SECTION_ID, JsonNull.INSTANCE);
-        } else {
-            row.addProperty(DocumentIndexFieldConstants.SECTION_ID, document.sectionId());
-        }
         row.addProperty(DocumentIndexFieldConstants.TEXT, truncate(document.text(), TEXT_MAX_LENGTH));
-        row.addProperty(DocumentIndexFieldConstants.INDEX_CONTENT, truncate(document.indexContent(), TEXT_MAX_LENGTH));
         addNullableString(row, DocumentIndexFieldConstants.METADATA_JSON, document.metadataJson(), METADATA_MAX_LENGTH);
         row.add(VECTOR, toJsonArray(document.vector()));
         return row;
@@ -361,7 +315,6 @@ public class MilvusVectorIndexClient implements VectorIndexClient, DisposableBea
                 longValue(entity, DocumentIndexFieldConstants.DOCUMENT_ID),
                 stringValue(entity, DocumentIndexFieldConstants.PARENT_CHUNK_ID),
                 integerValue(entity, DocumentIndexFieldConstants.CHUNK_ORDER),
-                longValue(entity, DocumentIndexFieldConstants.SECTION_ID),
                 stringValue(entity, DocumentIndexFieldConstants.TEXT),
                 stringValue(entity, DocumentIndexFieldConstants.METADATA_JSON),
                 result.getScore() == null ? 0.0D : result.getScore());

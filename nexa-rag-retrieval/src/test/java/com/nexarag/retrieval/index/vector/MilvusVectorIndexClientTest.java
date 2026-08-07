@@ -1,26 +1,19 @@
 package com.nexarag.retrieval.index.vector;
 
-import com.google.gson.JsonObject;
 import com.nexarag.retrieval.config.RetrievalProperties;
-import com.nexarag.retrieval.dto.req.VectorIndexWriteRequest;
-import com.nexarag.retrieval.model.VectorIndexDocument;
 import io.milvus.v2.client.ConnectConfig;
 import io.milvus.v2.client.MilvusClientV2;
-import io.milvus.v2.service.collection.response.DescribeCollectionResp;
 import io.milvus.v2.service.database.request.CreateDatabaseReq;
 import io.milvus.v2.service.database.response.ListDatabasesResp;
-import io.milvus.v2.service.vector.response.DeleteResp;
 import org.junit.jupiter.api.Test;
 import org.mockito.MockedConstruction;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.lang.reflect.Method;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.argThat;
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mockConstruction;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -88,123 +81,6 @@ class MilvusVectorIndexClientTest {
             // 1. 配置不合法时直接失败，避免继续连接 Milvus 后暴露深层 SDK 异常
             assertThat(construction.constructed()).isEmpty();
         }
-    }
-
-    @Test
-    void milvusRowShouldKeepRawTextAndStoreSectionIndexFields() throws Exception {
-        RetrievalProperties retrievalProperties = retrievalProperties(null);
-        try (MockedConstruction<MilvusClientV2> construction = mockConstruction(MilvusClientV2.class)) {
-            MilvusVectorIndexClient client = new MilvusVectorIndexClient(retrievalProperties);
-            Method method = MilvusVectorIndexClient.class.getDeclaredMethod("toMilvusRow", VectorIndexDocument.class);
-            method.setAccessible(true);
-
-            JsonObject row = (JsonObject) method.invoke(client, new VectorIndexDocument("chunk-1", 1L, null,
-                    0, 11L, "原始正文", "一级标题\n原始正文", null, new float[]{1.0F, 0.0F}));
-
-            assertThat(row.get("section_id").getAsLong()).isEqualTo(11L);
-            assertThat(row.get("text").getAsString()).isEqualTo("原始正文");
-            assertThat(row.get("index_content").getAsString()).isEqualTo("一级标题\n原始正文");
-            client.destroy();
-        }
-    }
-
-    @Test
-    void upsertShouldRejectExistingCollectionMissingSectionFieldsBeforeWriting() {
-        RetrievalProperties retrievalProperties = retrievalProperties(null);
-        try (MockedConstruction<MilvusClientV2> construction = mockConstruction(MilvusClientV2.class,
-                (mock, context) -> {
-                    when(mock.hasCollection(any())).thenReturn(true);
-                    when(mock.describeCollection(any())).thenReturn(DescribeCollectionResp.builder()
-                            .fieldNames(List.of("chunk_id", "document_id", "parent_chunk_id", "chunk_order",
-                                    "text", "metadata_json", "vector"))
-                            .build());
-                })) {
-            MilvusVectorIndexClient client = new MilvusVectorIndexClient(retrievalProperties);
-            MilvusClientV2 milvusClient = construction.constructed().getFirst();
-
-            assertThatThrownBy(() -> client.upsert(writeRequest()))
-                    .hasMessageContaining("Milvus 集合结构不兼容")
-                    .hasMessageContaining("section_id")
-                    .hasMessageContaining("index_content")
-                    .hasMessageContaining("全量重建");
-
-            verify(milvusClient, never()).upsert(any());
-        }
-    }
-
-    @Test
-    void upsertShouldWriteWhenExistingCollectionContainsRequiredSectionFields() {
-        RetrievalProperties retrievalProperties = retrievalProperties(null);
-        try (MockedConstruction<MilvusClientV2> construction = mockConstruction(MilvusClientV2.class,
-                (mock, context) -> {
-                    when(mock.hasCollection(any())).thenReturn(true);
-                    when(mock.describeCollection(any())).thenReturn(DescribeCollectionResp.builder()
-                            .fieldNames(List.of("chunk_id", "document_id", "parent_chunk_id", "chunk_order",
-                                    "section_id", "text", "index_content", "metadata_json", "vector"))
-                            .build());
-                })) {
-            MilvusVectorIndexClient client = new MilvusVectorIndexClient(retrievalProperties);
-            MilvusClientV2 milvusClient = construction.constructed().getFirst();
-
-            assertThat(client.upsert(writeRequest())).hasSize(1);
-
-            verify(milvusClient).upsert(any());
-        }
-    }
-
-    @Test
-    void upsertShouldDescribeExistingCollectionInConfiguredDatabase() {
-        RetrievalProperties retrievalProperties = retrievalProperties("nexa_rag");
-        try (MockedConstruction<MilvusClientV2> construction = mockConstruction(MilvusClientV2.class,
-                (mock, context) -> {
-                    when(mock.listDatabases()).thenReturn(ListDatabasesResp.builder()
-                            .databaseNames(List.of("default", "nexa_rag"))
-                            .build());
-                    when(mock.hasCollection(any())).thenReturn(true);
-                    when(mock.describeCollection(any())).thenReturn(currentSchema());
-                })) {
-            MilvusVectorIndexClient client = new MilvusVectorIndexClient(retrievalProperties);
-            MilvusClientV2 targetDatabaseClient = construction.constructed().get(1);
-
-            client.upsert(writeRequest());
-
-            verify(targetDatabaseClient).describeCollection(argThat(request ->
-                    "nexa_rag".equals(request.getDatabaseName())));
-        }
-    }
-
-    @Test
-    void deleteByDocumentIdShouldDeleteLegacyCollectionWithoutSectionSchemaValidation() {
-        RetrievalProperties retrievalProperties = retrievalProperties(null);
-        try (MockedConstruction<MilvusClientV2> construction = mockConstruction(MilvusClientV2.class,
-                (mock, context) -> {
-                    when(mock.hasCollection(any())).thenReturn(true);
-                    when(mock.describeCollection(any())).thenReturn(DescribeCollectionResp.builder()
-                            .fieldNames(List.of("chunk_id", "document_id", "text", "vector"))
-                            .build());
-                    when(mock.delete(any())).thenReturn(DeleteResp.builder().deleteCnt(2L).build());
-                })) {
-            MilvusVectorIndexClient client = new MilvusVectorIndexClient(retrievalProperties);
-            MilvusClientV2 milvusClient = construction.constructed().getFirst();
-
-            assertThat(client.deleteByDocumentId(1L)).isEqualTo(2);
-
-            verify(milvusClient).delete(argThat(request -> "document_id == 1".equals(request.getFilter())));
-            verify(milvusClient, never()).describeCollection(any());
-        }
-    }
-
-    private DescribeCollectionResp currentSchema() {
-        return DescribeCollectionResp.builder()
-                .fieldNames(List.of("chunk_id", "document_id", "parent_chunk_id", "chunk_order",
-                        "section_id", "text", "index_content", "metadata_json", "vector"))
-                .build();
-    }
-
-    private VectorIndexWriteRequest writeRequest() {
-        return new VectorIndexWriteRequest("nexa_document_chunk", 1L,
-                List.of(new VectorIndexDocument("chunk-1", 1L, null, 0, 11L,
-                        "原始正文", "一级标题\n原始正文", null, new float[]{1.0F, 0.0F})));
     }
 
     private RetrievalProperties retrievalProperties(String databaseName) {

@@ -8,7 +8,6 @@ import com.nexarag.document.enums.SplitStrategy;
 import com.nexarag.document.splitter.ChunkDraft;
 import com.nexarag.document.splitter.DocumentChunkIdGenerator;
 import com.nexarag.document.splitter.DocumentSplitContext;
-import com.nexarag.document.splitter.DocumentSplitResult;
 import org.junit.jupiter.api.Test;
 
 import java.nio.charset.StandardCharsets;
@@ -30,16 +29,9 @@ class ExcelDocumentSplitterTest {
                 new SplitConfigRequest(SplitStrategy.EXCEL, 100, 0, null, null,
                         new ExcelSplitOptions(ExcelSplitMode.KEY_VALUE, true, null, null)));
 
-        DocumentSplitResult splitResult = splitter.split(context);
-        List<ChunkDraft> drafts = splitResult.chunks();
+        List<ChunkDraft> drafts = splitter.split(context);
 
         assertThat(drafts).hasSize(1);
-        assertThat(splitResult.sections()).isEmpty();
-        assertThat(splitResult.structured()).isFalse();
-        assertThat(drafts).allSatisfy(draft -> {
-            assertThat(draft.sectionId()).isNull();
-            assertThat(draft.indexContent()).isEqualTo(draft.text());
-        });
         assertThat(drafts.getFirst().text()).contains("姓名：张三", "部门：研发", "姓名：李四");
         assertThat(drafts.getFirst().metadata()).containsEntry("sheetName", "Sheet1");
     }

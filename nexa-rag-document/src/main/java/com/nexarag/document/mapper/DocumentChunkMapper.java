@@ -5,7 +5,7 @@ import com.nexarag.document.entity.DocumentChunk;
 import org.apache.ibatis.annotations.Mapper;
 
 /**
- * 文档片段数据访问接口，映射正文片段及其所属章节。
+ * 文档片段 Mapper。
  */
 @Mapper
 public interface DocumentChunkMapper extends BaseMapper<DocumentChunk> {

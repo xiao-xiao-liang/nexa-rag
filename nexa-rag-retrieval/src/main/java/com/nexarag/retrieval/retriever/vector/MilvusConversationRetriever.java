@@ -46,9 +46,9 @@ public class MilvusConversationRetriever implements ConversationRetriever {
 
         // 2. 查询 Milvus 并标准化通道内排名
         List<VectorIndexSearchResult> results = vectorIndexClient.search(new VectorIndexSearchRequest(
-                null, response.embeddings().getFirst(), retrievalProperties.getCandidate().getVectorCandidateLimit()));
+                null, response.embeddings().getFirst(), request.topK()));
         return java.util.stream.IntStream.range(0, results.size())
-                .filter(index -> results.get(index).score() >= retrievalProperties.getCandidate().getCoarseScoreFloor())
+                .filter(index -> results.get(index).score() >= request.vectorThreshold())
                 .mapToObj(index -> toRetrievalChunk(results.get(index), index + 1))
                 .toList();
     }

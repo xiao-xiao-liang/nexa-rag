@@ -37,15 +37,4 @@ public interface KeywordIndexClient {
      * @return 删除数量
      */
     int deleteByDocumentId(Long documentId);
-
-    /**
-     * 按文档ID删除指定关键词索引中的记录。
-     *
-     * @param documentId 文档ID
-     * @param indexName  索引名称，为空时使用默认正文索引
-     * @return 删除数量
-     */
-    default int deleteByDocumentId(Long documentId, String indexName) {
-        return deleteByDocumentId(documentId);
-    }
 }

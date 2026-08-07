@@ -6,7 +6,6 @@ import com.nexarag.document.service.DocumentChunkService;
 import com.nexarag.retrieval.model.IndexableChunk;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
-import org.springframework.util.StringUtils;
 
 import java.util.List;
 
@@ -102,9 +101,7 @@ public class ChunkIndexRepositoryImpl implements ChunkIndexRepository {
                 .documentId(chunk.getDocumentId())
                 .chunkOrder(chunk.getChunkOrder())
                 .parentChunkId(chunk.getParentChunkId())
-                .sectionId(chunk.getSectionId())
                 .text(chunk.getText())
-                .indexContent(StringUtils.hasText(chunk.getIndexContent()) ? chunk.getIndexContent() : chunk.getText())
                 .metadataJson(chunk.getMetadataJson())
                 .tokenCount(chunk.getTokenCount())
                 .build();

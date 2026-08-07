@@ -9,9 +9,7 @@ public final class DocumentIndexFieldConstants {
     public static final String DOCUMENT_ID = "document_id";
     public static final String PARENT_CHUNK_ID = "parent_chunk_id";
     public static final String CHUNK_ORDER = "chunk_order";
-    public static final String SECTION_ID = "section_id";
     public static final String TEXT = "text";
-    public static final String INDEX_CONTENT = "index_content";
     public static final String METADATA_JSON = "metadata_json";
 
     private DocumentIndexFieldConstants() {

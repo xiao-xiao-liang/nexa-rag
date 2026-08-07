@@ -11,9 +11,6 @@ public final class ChatWorkflowStateKeys {
     public static final String INTENT_RESULT = "intentResult";
     public static final String FUSED_RETRIEVAL_RESULTS = "fusedRetrievalResults";
     public static final String RERANKED_RETRIEVAL_RESULTS = "rerankedRetrievalResults";
-    public static final String ACCEPTED_EVIDENCE_RESULTS = "acceptedEvidenceResults";
-    public static final String EVIDENCE_QUALITY = "evidenceQuality";
-    public static final String EVIDENCE_EXPANSION_REASON = "evidenceExpansionReason";
     public static final String ASSISTANT_CONTENT = "assistantContent";
     public static final String STREAM_STATUS = "streamStatus";
     public static final String FINISH_REASON = "finishReason";

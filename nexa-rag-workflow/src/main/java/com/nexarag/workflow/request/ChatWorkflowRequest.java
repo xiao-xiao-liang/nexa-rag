@@ -5,6 +5,8 @@ import com.nexarag.retrieval.enums.RetrievalScope;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
+import static com.nexarag.workflow.constants.ChatWorkflowGraphConstants.DEFAULT_RETRIEVAL_TOP_K;
+import static com.nexarag.workflow.constants.ChatWorkflowGraphConstants.DEFAULT_VECTOR_THRESHOLD;
 import static com.nexarag.workflow.constants.ChatWorkflowGraphConstants.MAX_RETRIEVAL_ROUND_VALUE;
 import static com.nexarag.workflow.constants.ChatWorkflowStateKeys.CONVERSATION_ID;
 import static com.nexarag.workflow.constants.ChatWorkflowStateKeys.GENERATION_ID;
@@ -45,6 +47,8 @@ public record ChatWorkflowRequest(String userId, String conversationId, String q
         state.put(RETRIEVAL_SCOPE, RetrievalScope.INTENT);
         state.put(RETRIEVAL_ROUND, 1);
         state.put(MAX_RETRIEVAL_ROUND, MAX_RETRIEVAL_ROUND_VALUE);
+        state.put(RETRIEVAL_TOP_K, DEFAULT_RETRIEVAL_TOP_K);
+        state.put(RETRIEVAL_VECTOR_THRESHOLD, DEFAULT_VECTOR_THRESHOLD);
         if (conversationId != null && !conversationId.isBlank()) {
             state.put(CONVERSATION_ID, conversationId);
         }

@@ -48,19 +48,9 @@ public class DocumentChunk {
     private String parentChunkId;
 
     /**
-     * 所属章节ID。
-     */
-    private Long sectionId;
-
-    /**
      * 片段文本。
      */
     private String text;
-
-    /**
-     * 用于索引的片段内容。
-     */
-    private String indexContent;
 
     /**
      * 元数据JSON。

@@ -8,7 +8,6 @@ import com.nexarag.document.error.DocumentErrorCode;
 import com.nexarag.document.splitter.ChunkDraft;
 import com.nexarag.document.splitter.DocumentChunkIdGenerator;
 import com.nexarag.document.splitter.DocumentSplitContext;
-import com.nexarag.document.splitter.DocumentSplitResult;
 import com.nexarag.document.splitter.DocumentSplitter;
 import com.nexarag.document.splitter.support.TextWindowSplitter;
 import lombok.RequiredArgsConstructor;
@@ -41,10 +40,10 @@ public class RegexTextDocumentSplitter implements DocumentSplitter {
      * 按正则、分隔符或长度切分文本。
      *
      * @param context 文档切分上下文
-     * @return 文档切分结果
+     * @return 片段草稿列表
      */
     @Override
-    public DocumentSplitResult split(DocumentSplitContext context) {
+    public List<ChunkDraft> split(DocumentSplitContext context) {
         if (context == null || !StringUtils.hasText(context.content()) || context.config() == null) {
             throw new ServiceException("文本切分上下文不完整", DocumentErrorCode.DOCUMENT_PROCESS_CONFIG_INVALID);
         }
@@ -59,7 +58,7 @@ public class RegexTextDocumentSplitter implements DocumentSplitter {
             drafts.add(new ChunkDraft(chunkIdGenerator.nextChunkId(context.documentId()), null, chunks.get(i), null,
                     metadata(context, options, i), false));
         }
-        return DocumentSplitResult.unstructured(drafts);
+        return drafts;
     }
 
     private List<String> splitRawParts(String content, RegexSplitOptions options) {

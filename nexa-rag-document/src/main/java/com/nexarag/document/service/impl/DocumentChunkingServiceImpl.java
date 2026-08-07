@@ -9,13 +9,15 @@ import com.nexarag.document.service.DocumentChunkService;
 import com.nexarag.document.service.DocumentChunkingService;
 import com.nexarag.document.service.DocumentService;
 import com.nexarag.document.service.DocumentSplitContextBuilder;
+import com.nexarag.document.splitter.ChunkDraft;
 import com.nexarag.document.splitter.DocumentSplitContext;
-import com.nexarag.document.splitter.DocumentSplitResult;
 import com.nexarag.document.splitter.DocumentSplitter;
 import com.nexarag.document.splitter.DocumentSplitterFactory;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+
+import java.util.List;
 
 /**
  * 文档切分阶段服务实现，负责推进状态、选择切分器并保存 chunk。
@@ -52,16 +54,16 @@ public class DocumentChunkingServiceImpl implements DocumentChunkingService {
         // 1. 构造上下文并选择切分器，异常交给RocketMQ触发重试
         DocumentSplitContext context = contextBuilder.build(document);
         DocumentSplitter splitter = splitterFactory.getRequired(context.config().splitStrategy());
-        DocumentSplitResult splitResult = splitter.split(context);
-        if (splitResult.chunks().isEmpty()) {
+        List<ChunkDraft> drafts = splitter.split(context);
+        if (drafts.isEmpty()) {
             throw new ServiceException("文档切分结果为空，documentId=" + documentId,
                     DocumentErrorCode.DOCUMENT_PROCESS_CONFIG_INVALID);
         }
 
         // 2. 在短事务内保存片段并推进到CHUNKED
-        chunkPersistenceService.replaceDocumentStructure(documentId, splitResult);
-        log.info("文档切分阶段执行完成，documentId={}，chunkCount={}", documentId, splitResult.chunks().size());
-        return splitResult.chunks().size();
+        chunkPersistenceService.replaceChunksAndMarkChunked(documentId, drafts);
+        log.info("文档切分阶段执行完成，documentId={}，chunkCount={}", documentId, drafts.size());
+        return drafts.size();
     }
 
     private void markChunking(Document document) {

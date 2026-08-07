@@ -2,9 +2,7 @@ package com.nexarag.workflow.node.chat;
 
 import com.alibaba.cloud.ai.graph.OverAllState;
 import com.alibaba.cloud.ai.graph.action.NodeAction;
-import com.nexarag.retrieval.config.RetrievalProperties;
 import com.nexarag.retrieval.model.RetrievalChunk;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
@@ -22,10 +20,7 @@ import static com.nexarag.workflow.constants.ChatWorkflowStateKeys.TRACE_ID;
  */
 @Component
 @Slf4j
-@RequiredArgsConstructor
 public class RetrievalFusionNode implements NodeAction {
-
-    private final RetrievalProperties retrievalProperties;
 
     @Override
     public Map<String, Object> apply(OverAllState state) {
@@ -40,10 +35,8 @@ public class RetrievalFusionNode implements NodeAction {
         List<RetrievalChunk> fused = unique.entrySet().stream()
                 .sorted(Comparator.comparingDouble(entry -> -scores.get(entry.getKey())))
                 .map(Map.Entry::getValue)
-                .limit(retrievalProperties.getCandidate().getRrfCandidateLimit())
                 .toList();
-        log.info("检索融合完成，traceId={}，原始候选数={}，去重候选数={}，融合候选数={}",
-                state.value(TRACE_ID, ""), chunks.size(), unique.size(), fused.size());
+        log.debug("检索融合完成，融合后的结果：{}", fused);
         return Map.of(FUSED_RETRIEVAL_RESULTS, fused);
     }
 }
