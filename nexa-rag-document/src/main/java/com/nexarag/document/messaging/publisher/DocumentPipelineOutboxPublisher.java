@@ -3,9 +3,11 @@ package com.nexarag.document.messaging.publisher;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nexarag.document.config.DocumentPipelineOutboxProperties;
 import com.nexarag.document.model.entity.DocumentTaskOutboxDO;
+import com.nexarag.document.enums.DocumentTaskType;
 import com.nexarag.document.service.DocumentPipelineOutboxService;
-import com.nexarag.infra.messaging.document.DocumentPipelineMessagePublisher;
 import com.nexarag.infra.messaging.document.model.DocumentPipelineMessage;
+import com.nexarag.infra.messaging.document.task.DocumentTaskMessage;
+import com.nexarag.infra.messaging.document.task.DocumentTaskMessagePublisher;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -27,7 +29,7 @@ import java.util.UUID;
 public class DocumentPipelineOutboxPublisher {
 
     private final DocumentPipelineOutboxService outboxService;
-    private final DocumentPipelineMessagePublisher messagePublisher;
+    private final DocumentTaskMessagePublisher messagePublisher;
     private final ObjectMapper objectMapper;
     private final DocumentPipelineOutboxProperties properties;
     private final String lockOwner = UUID.randomUUID().toString();
@@ -48,9 +50,8 @@ public class DocumentPipelineOutboxPublisher {
 
     private void publishSingle(DocumentTaskOutboxDO outbox) {
         try {
-            DocumentPipelineMessage message = objectMapper.readValue(
-                    outbox.getMessageBody(), DocumentPipelineMessage.class);
-            var result = messagePublisher.publish(message);
+            Object message = deserializeMessage(outbox);
+            var result = messagePublisher.publish(outbox.getTopic(), outbox.getMessageKey(), message);
             outboxService.markPublished(outbox.getOutboxId());
             log.info("文档流水线Outbox发布成功，outboxId={}，documentId={}，processId={}，messageId={}",
                     outbox.getOutboxId(), outbox.getDocumentId(), outbox.getProcessId(), result.messageId());
@@ -65,5 +66,16 @@ public class DocumentPipelineOutboxPublisher {
                         outbox.getOutboxId(), outbox.getDocumentId(), outbox.getProcessId(), statusException);
             }
         }
+    }
+
+    /**
+     * 按任务类型还原原始消息对象，避免处理流水线消费者收到字符串消息。
+     */
+    private Object deserializeMessage(DocumentTaskOutboxDO outbox) throws Exception {
+        DocumentTaskType taskType = outbox.getTaskType();
+        if (taskType == null || taskType == DocumentTaskType.PROCESS_DOCUMENT) {
+            return objectMapper.readValue(outbox.getMessageBody(), DocumentPipelineMessage.class);
+        }
+        return objectMapper.readValue(outbox.getMessageBody(), DocumentTaskMessage.class);
     }
 }

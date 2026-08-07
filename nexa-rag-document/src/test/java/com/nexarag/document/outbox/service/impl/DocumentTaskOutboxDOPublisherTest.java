@@ -1,12 +1,13 @@
-package com.nexarag.document.service.impl;
+package com.nexarag.document.outbox.service.impl;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nexarag.document.config.DocumentPipelineOutboxProperties;
 import com.nexarag.document.model.entity.DocumentTaskOutboxDO;
+import com.nexarag.document.messaging.publisher.DocumentPipelineOutboxPublisher;
 import com.nexarag.document.service.DocumentPipelineOutboxService;
-import com.nexarag.infra.messaging.document.DocumentPipelineMessagePublisher;
+import com.nexarag.infra.messaging.document.task.DocumentTaskMessagePublisher;
 import com.nexarag.infra.messaging.document.model.DocumentPipelineMessage;
-import com.nexarag.infra.messaging.document.model.DocumentPipelinePublishResult;
+import com.nexarag.infra.messaging.document.task.DocumentMessagePublishResult;
 import org.junit.jupiter.api.Test;
 
 import java.time.LocalDateTime;
@@ -21,12 +22,12 @@ import static org.mockito.Mockito.when;
 /**
  * 文档流水线Outbox发布器测试。
  */
-class DocumentPipelineOutboxPublisherTest {
+class DocumentTaskOutboxDOPublisherTest {
 
     @Test
     void publishPendingMessagesShouldMarkPublished() throws Exception {
         DocumentPipelineOutboxService outboxService = mock(DocumentPipelineOutboxService.class);
-        DocumentPipelineMessagePublisher messagePublisher = mock(DocumentPipelineMessagePublisher.class);
+        DocumentTaskMessagePublisher messagePublisher = mock(DocumentTaskMessagePublisher.class);
         ObjectMapper objectMapper = new ObjectMapper().findAndRegisterModules();
         DocumentPipelineMessage message = new DocumentPipelineMessage(1L, "process-1", 1, LocalDateTime.now());
         DocumentTaskOutboxDO outbox = DocumentTaskOutboxDO.builder()
@@ -36,7 +37,7 @@ class DocumentPipelineOutboxPublisherTest {
                 .messageBody(objectMapper.writeValueAsString(message))
                 .build();
         when(outboxService.claimPublishableMessages(any(), any())).thenReturn(List.of(outbox));
-        when(messagePublisher.publish(any())).thenReturn(DocumentPipelinePublishResult.success("message-1"));
+        when(messagePublisher.publish(any(), any(), any())).thenReturn(new DocumentMessagePublishResult("message-1"));
         DocumentPipelineOutboxPublisher publisher = new DocumentPipelineOutboxPublisher(
                 outboxService, messagePublisher, objectMapper, properties());
 
@@ -48,7 +49,7 @@ class DocumentPipelineOutboxPublisherTest {
     @Test
     void publishPendingMessagesShouldRecordFailureWithoutInterruptingBatch() throws Exception {
         DocumentPipelineOutboxService outboxService = mock(DocumentPipelineOutboxService.class);
-        DocumentPipelineMessagePublisher messagePublisher = mock(DocumentPipelineMessagePublisher.class);
+        DocumentTaskMessagePublisher messagePublisher = mock(DocumentTaskMessagePublisher.class);
         ObjectMapper objectMapper = new ObjectMapper().findAndRegisterModules();
         DocumentPipelineMessage message = new DocumentPipelineMessage(1L, "process-1", 1, LocalDateTime.now());
         DocumentTaskOutboxDO failed = DocumentTaskOutboxDO.builder()
@@ -58,9 +59,9 @@ class DocumentPipelineOutboxPublisherTest {
                 .outboxId(11L).documentId(1L).processId("process-1")
                 .messageBody(objectMapper.writeValueAsString(message)).build();
         when(outboxService.claimPublishableMessages(any(), any())).thenReturn(List.of(failed, succeeded));
-        when(messagePublisher.publish(any()))
+        when(messagePublisher.publish(any(), any(), any()))
                 .thenThrow(new IllegalStateException("测试发送失败"))
-                .thenReturn(DocumentPipelinePublishResult.success("message-2"));
+                .thenReturn(new DocumentMessagePublishResult("message-2"));
         doThrow(new IllegalStateException("测试状态更新失败"))
                 .when(outboxService).markPublishFailed(10L, "测试发送失败");
         DocumentPipelineOutboxPublisher publisher = new DocumentPipelineOutboxPublisher(

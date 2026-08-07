@@ -10,6 +10,8 @@ import com.nexarag.document.model.dto.CreateDocumentRequest;
 import com.nexarag.document.model.dto.ProcessDocumentRequest;
 import com.nexarag.document.model.entity.Document;
 import com.nexarag.document.model.entity.DocumentTaskOutboxDO;
+import com.nexarag.document.enums.DocumentTaskStatus;
+import com.nexarag.document.enums.DocumentTaskType;
 import com.nexarag.document.enums.OutboxPublishStatus;
 import com.nexarag.document.service.DocumentPipelineOutboxService;
 import com.nexarag.document.service.DocumentPipelineSubmitService;
@@ -70,17 +72,21 @@ public class DocumentPipelineSubmitServiceImpl implements DocumentPipelineSubmit
                 : documentService.submitProcess(documentId, request, processId);
 
         // 2. 在同一事务内写入待发布Outbox消息
+        Long outboxId = IdWorker.getId();
         DocumentPipelineMessage message = new DocumentPipelineMessage(
-                documentId, processId, MESSAGE_SCHEMA_VERSION, createdTime);
+                documentId, processId, outboxId, MESSAGE_SCHEMA_VERSION, createdTime);
         boolean saved = outboxService.save(DocumentTaskOutboxDO.builder()
-                .outboxId(IdWorker.getId())
+                .outboxId(outboxId)
                 .documentId(documentId)
                 .processId(processId)
-                .messageKey(documentId + ":" + processId)
+                .taskType(DocumentTaskType.PROCESS_DOCUMENT)
+                .messageKey(documentId + ":" + DocumentTaskType.PROCESS_DOCUMENT + ":" + processId)
                 .topic(messagingProperties.getTopic())
                 .messageBody(serializeMessage(message))
                 .publishStatus(OutboxPublishStatus.PENDING)
+                .taskStatus(DocumentTaskStatus.PENDING)
                 .publishRetryCount(0)
+                .consumeRetryCount(0)
                 .nextRetryTime(createdTime)
                 .build());
         if (!saved) {

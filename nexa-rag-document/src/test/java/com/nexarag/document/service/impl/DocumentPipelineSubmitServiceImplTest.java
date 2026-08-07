@@ -7,6 +7,8 @@ import com.nexarag.document.model.entity.Document;
 import com.nexarag.document.enums.DocumentPipelineMessageStatus;
 import com.nexarag.document.enums.DocumentStatus;
 import com.nexarag.document.model.entity.DocumentTaskOutboxDO;
+import com.nexarag.document.enums.DocumentTaskStatus;
+import com.nexarag.document.enums.DocumentTaskType;
 import com.nexarag.document.enums.OutboxPublishStatus;
 import com.nexarag.document.service.DocumentPipelineOutboxService;
 import com.nexarag.document.service.DocumentService;
@@ -47,8 +49,10 @@ class DocumentPipelineSubmitServiceImplTest {
         assertThat(result.status()).isEqualTo(DocumentStatus.QUEUED);
         assertThat(outbox.getDocumentId()).isEqualTo(1L);
         assertThat(outbox.getProcessId()).isNotBlank();
-        assertThat(outbox.getMessageKey()).isEqualTo("1:" + outbox.getProcessId());
+        assertThat(outbox.getMessageKey()).isEqualTo("1:" + DocumentTaskType.PROCESS_DOCUMENT + ":" + outbox.getProcessId());
         assertThat(outbox.getPublishStatus()).isEqualTo(OutboxPublishStatus.PENDING);
+        assertThat(outbox.getTaskType()).isEqualTo(DocumentTaskType.PROCESS_DOCUMENT);
+        assertThat(outbox.getTaskStatus()).isEqualTo(DocumentTaskStatus.PENDING);
         assertThat(outbox.getTopic()).isEqualTo(properties.getTopic());
         assertThat(outbox.getMessageBody()).contains(outbox.getProcessId());
     }

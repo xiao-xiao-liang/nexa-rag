@@ -7,12 +7,14 @@ import java.time.LocalDateTime;
  *
  * @param documentId 文档ID
  * @param processId 处理批次ID
+ * @param outboxId 对应Outbox ID；历史消息允许为空
  * @param schemaVersion 消息结构版本
  * @param createdTime 消息创建时间
  */
 public record DocumentPipelineMessage(
         Long documentId,
         String processId,
+        Long outboxId,
         Integer schemaVersion,
         LocalDateTime createdTime) {
 
@@ -36,5 +38,13 @@ public record DocumentPipelineMessage(
         if (createdTime == null) {
             throw new IllegalArgumentException("消息创建时间不能为空");
         }
+    }
+
+    /**
+     * 兼容未携带Outbox ID的历史处理消息。
+     */
+    public DocumentPipelineMessage(Long documentId, String processId, Integer schemaVersion,
+                                   LocalDateTime createdTime) {
+        this(documentId, processId, null, schemaVersion, createdTime);
     }
 }
