@@ -2,8 +2,6 @@ package com.nexarag.document.splitter;
 
 import com.nexarag.document.enums.SplitStrategy;
 
-import java.util.List;
-
 /**
  * 文档切分器接口。
  */
@@ -20,7 +18,7 @@ public interface DocumentSplitter {
      * 按上下文切分文档内容。
      *
      * @param context 文档切分上下文
-     * @return 片段草稿列表
+     * @return 文档切分结果
      */
-    List<ChunkDraft> split(DocumentSplitContext context);
+    DocumentSplitResult split(DocumentSplitContext context);
 }
