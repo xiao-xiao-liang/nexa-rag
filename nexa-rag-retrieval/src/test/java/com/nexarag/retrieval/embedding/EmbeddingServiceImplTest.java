@@ -41,8 +41,8 @@ class EmbeddingServiceImplTest {
 
         // 1. 构造超过百炼单次批量限制的片段数量
         List<IndexableChunk> chunks = IntStream.range(0, 49)
-                .mapToObj(index -> new IndexableChunk("chunk-" + index, 1L, index, null,
-                        "测试文本" + index, null, 1))
+                .mapToObj(index -> new IndexableChunk("chunk-" + index, 1L, index, null, null,
+                        "测试文本" + index, "标题路径 > 测试文本" + index, null, 1))
                 .toList();
 
         // 2. 执行向量化并捕获模型网关请求
@@ -54,6 +54,7 @@ class EmbeddingServiceImplTest {
         assertThat(captor.getAllValues())
                 .extracting(request -> request.texts().size())
                 .containsExactly(10, 10, 10, 10, 9);
+        assertThat(captor.getAllValues().getFirst().texts().getFirst()).isEqualTo("标题路径 > 测试文本0");
         assertThat(embeddings).hasSize(49);
         assertThat(embeddings.getFirst().chunkId()).isEqualTo("chunk-0");
         assertThat(embeddings.getLast().chunkId()).isEqualTo("chunk-48");
