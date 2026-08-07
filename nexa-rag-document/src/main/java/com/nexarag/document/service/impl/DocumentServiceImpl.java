@@ -19,11 +19,15 @@ import com.nexarag.document.enums.FileType;
 import com.nexarag.document.enums.DocumentErrorCode;
 import com.nexarag.document.mapper.DocumentMapper;
 import com.nexarag.document.service.DocumentService;
+import com.nexarag.document.service.DocumentDeleteTaskService;
+import com.nexarag.document.enums.DocumentTaskStatus;
+import com.nexarag.document.model.vo.DocumentDeleteVO;
 import com.nexarag.document.model.vo.DocumentSummaryVO;
 import com.nexarag.infra.config.DocumentPipelineMessagingProperties;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -42,6 +46,7 @@ public class DocumentServiceImpl extends ServiceImpl<DocumentMapper, Document> i
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
     private final DocumentPipelineMessagingProperties messagingProperties;
+    private final DocumentDeleteTaskService deleteTaskService;
 
     @Override
     public Document createDocument(CreateDocumentRequest request) {
@@ -282,13 +287,21 @@ public class DocumentServiceImpl extends ServiceImpl<DocumentMapper, Document> i
     }
 
     @Override
-    public boolean deleteDocument(Long documentId) {
+    @Transactional(rollbackFor = Exception.class)
+    public DocumentDeleteVO deleteDocument(Long documentId) {
         getRequiredDocument(documentId);
 
         // 1. 通过统一逻辑删除入口写入删除标记和删除时间
         boolean deleted = logicDeleteDocument(documentId);
-        log.info("删除文档记录完成，documentId={}，deleted={}", documentId, deleted);
-        return deleted;
+        if (!deleted) {
+            return new DocumentDeleteVO(documentId, false, null, null);
+        }
+
+        // 2. 在同一事务内写入索引清理任务，失败时逻辑删除一并回滚
+        Long cleanupOutboxId = deleteTaskService.createIndexCleanupTask(documentId);
+        log.info("删除文档记录并创建索引清理任务完成，documentId={}，cleanupOutboxId={}",
+                documentId, cleanupOutboxId);
+        return new DocumentDeleteVO(documentId, true, cleanupOutboxId, DocumentTaskStatus.PENDING);
     }
 
     @Override

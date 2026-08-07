@@ -65,6 +65,12 @@ nexa:
       # 对象存储上传瞬时失败退避配置；列表长度即最大尝试次数。
       upload-retry:
         backoff-millis: [200, 500, 1000] # 每次失败后的退避时间，单位：毫秒，元素不能小于0。
+    task:
+      cleanup-topic: nexa-document-index-cleanup # 删除文档后的外部索引清理主题
+      cleanup-consumer-group: nexa-document-index-cleanup-worker # 索引清理消费者组
+      alert-topic: nexa-document-alert # 文档任务最终失败告警主题
+      alert-consumer-group: nexa-document-alert-worker # 文档任务告警消费者组
+      max-reconsume-times: 5 # 清理和告警任务的RocketMQ最大重新消费次数
 
   # 文件存储配置，用于控制文档原始文件和解析产物的存取位置。
   storage:

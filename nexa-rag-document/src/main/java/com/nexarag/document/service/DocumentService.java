@@ -6,6 +6,7 @@ import com.nexarag.document.model.dto.CreateDocumentRequest;
 import com.nexarag.document.model.dto.ProcessDocumentRequest;
 import com.nexarag.document.model.entity.Document;
 import com.nexarag.document.model.vo.DocumentSummaryVO;
+import com.nexarag.document.model.vo.DocumentDeleteVO;
 
 /**
  * 文档服务接口，负责文档记录、处理状态和删除状态的业务操作。
@@ -100,9 +101,9 @@ public interface DocumentService extends IService<Document> {
      * 删除文档。
      *
      * @param documentId 文档ID
-     * @return true 表示删除成功，false 表示未删除
+     * @return 删除与异步清理任务响应
      */
-    boolean deleteDocument(Long documentId);
+    DocumentDeleteVO deleteDocument(Long documentId);
 
     /**
      * 根据文档ID获取文档，不存在时抛出异常。

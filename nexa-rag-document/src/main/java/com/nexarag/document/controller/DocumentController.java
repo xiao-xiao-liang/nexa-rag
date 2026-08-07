@@ -13,6 +13,7 @@ import com.nexarag.document.service.DocumentService;
 import com.nexarag.document.service.DocumentUploadService;
 import com.nexarag.document.model.vo.DocumentChunkVO;
 import com.nexarag.document.model.vo.DocumentDetailVO;
+import com.nexarag.document.model.vo.DocumentDeleteVO;
 import com.nexarag.document.model.vo.DocumentProcessStatusVO;
 import com.nexarag.document.model.vo.DocumentSummaryVO;
 import com.nexarag.document.model.vo.UploadDocumentResponse;
@@ -100,7 +101,7 @@ public class DocumentController {
      * @return 删除结果
      */
     @DeleteMapping("/{documentId}")
-    public Result<Boolean> deleteDocument(@PathVariable Long documentId) {
+    public Result<DocumentDeleteVO> deleteDocument(@PathVariable Long documentId) {
         return Results.success(documentService.deleteDocument(documentId));
     }
 

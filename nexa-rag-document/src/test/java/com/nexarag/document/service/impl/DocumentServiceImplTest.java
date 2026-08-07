@@ -12,6 +12,7 @@ import com.nexarag.document.enums.DocumentStatus;
 import com.nexarag.document.enums.SplitStrategy;
 import com.nexarag.common.exception.ClientException;
 import com.nexarag.document.model.vo.DocumentSummaryVO;
+import com.nexarag.document.service.DocumentDeleteTaskService;
 import com.nexarag.infra.config.DocumentPipelineMessagingProperties;
 import org.junit.jupiter.api.Test;
 
@@ -195,17 +196,34 @@ class DocumentServiceImplTest {
     }
 
     @Test
-    void deleteDocumentShouldUpdateDeleteTime() {
+    void deleteDocumentShouldCreateCleanupTaskAfterSuccessfulDelete() {
         TestableDocumentServiceImpl documentService = new TestableDocumentServiceImpl();
         documentService.existingDocument = Document.builder()
                 .documentId(1L)
                 .status(DocumentStatus.UPLOADED)
                 .build();
 
-        boolean deleted = documentService.deleteDocument(1L);
+        when(documentService.deleteTaskService.createIndexCleanupTask(1L)).thenReturn(99L);
+        var deleted = documentService.deleteDocument(1L);
 
-        assertThat(deleted).isTrue();
+        assertThat(deleted.deleted()).isTrue();
+        assertThat(deleted.cleanupOutboxId()).isEqualTo(99L);
         assertThat(documentService.deleteDocumentId).isEqualTo(1L);
+        verify(documentService.deleteTaskService).createIndexCleanupTask(1L);
+    }
+
+    @Test
+    void deleteDocumentShouldNotCreateCleanupTaskWhenDeleteFails() {
+        TestableDocumentServiceImpl documentService = new TestableDocumentServiceImpl();
+        documentService.existingDocument = Document.builder()
+                .documentId(1L)
+                .status(DocumentStatus.UPLOADED)
+                .build();
+        documentService.deleteResult = false;
+
+        assertThat(documentService.deleteDocument(1L).deleted()).isFalse();
+
+        verify(documentService.deleteTaskService, never()).createIndexCleanupTask(any());
     }
 
     @Test
@@ -239,12 +257,19 @@ class DocumentServiceImplTest {
         private Document failureUpdatedDocument;
         private Document retryUpdatedDocument;
         private Long deleteDocumentId;
+        private boolean deleteResult = true;
         private IPage<Document> documentPage;
         private boolean updateResult = true;
         private final LambdaUpdateChainWrapper<Document> updateChain = mock(LambdaUpdateChainWrapper.class);
+        private final DocumentDeleteTaskService deleteTaskService;
 
         private TestableDocumentServiceImpl() {
-            super(messagingProperties());
+            this(mock(DocumentDeleteTaskService.class));
+        }
+
+        private TestableDocumentServiceImpl(DocumentDeleteTaskService deleteTaskService) {
+            super(messagingProperties(), deleteTaskService);
+            this.deleteTaskService = deleteTaskService;
             when(updateChain.eq(any(), any())).thenReturn(updateChain);
             when(updateChain.notIn(any(), any(Object[].class))).thenReturn(updateChain);
             when(updateChain.set(any(), any())).thenReturn(updateChain);
@@ -301,7 +326,7 @@ class DocumentServiceImplTest {
         @Override
         protected boolean logicDeleteDocument(Long documentId) {
             this.deleteDocumentId = documentId;
-            return true;
+            return deleteResult;
         }
 
         @Override
