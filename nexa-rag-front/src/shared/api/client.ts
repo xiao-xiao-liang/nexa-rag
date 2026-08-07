@@ -61,7 +61,11 @@ export async function request<T>(path: string, init?: RequestInit): Promise<T> {
 
 async function readResult<T>(response: Response): Promise<Result<T>> {
   try {
-    return await response.json() as Result<T>
+    const text = await response.text()
+    // 全局响应拦截：匹配 JSON 中所有 16 位以上的未加引号超长数字（支持对象属性值及数组元素）
+    // 在 JSON.parse 之前统一转为字符串，从底层全局杜绝全站 JavaScript 64 位 Long/Snowflake ID 精度截断
+    const safeText = text.replace(/(:\s*|\[\s*|,\s*)([0-9]{16,})/g, '$1"$2"')
+    return JSON.parse(safeText) as Result<T>
   } catch (error) {
     // 1. JSON 读取过程的取消请求继续交由调用方处理。
     if (isAbortError(error)) {
