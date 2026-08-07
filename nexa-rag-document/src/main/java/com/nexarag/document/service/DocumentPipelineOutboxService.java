@@ -58,5 +58,5 @@ public interface DocumentPipelineOutboxService extends IService<DocumentTaskOutb
      * @param consumeRetryCount 消费者执行次数
      * @param failureReason     脱敏失败原因
      */
-    void markTaskFailed(Long outboxId, int consumeRetryCount, String failureReason);
+    boolean markTaskFailed(Long outboxId, int consumeRetryCount, String failureReason);
 }

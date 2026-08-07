@@ -82,7 +82,7 @@ public class RocketMqDocumentPipelineConsumer implements RocketMQListener<Messag
                                 int consumedTimes, RuntimeException exception) {
         String failureDetail = truncate(exception.toString());
         DocumentPipelineFailureMessage failureMessage = new DocumentPipelineFailureMessage(
-                message.documentId(), message.processId(), exception.getClass().getSimpleName(),
+                message.outboxId(), message.documentId(), message.processId(), exception.getClass().getSimpleName(),
                 exception.getMessage(), failureDetail, consumedTimes, messageExt.getMsgId(), LocalDateTime.now());
         org.springframework.messaging.Message<DocumentPipelineFailureMessage> rocketMqMessage =
                 MessageBuilder.withPayload(failureMessage)

@@ -5,6 +5,7 @@ import com.nexarag.document.config.DocumentPipelineOutboxProperties;
 import com.nexarag.document.model.entity.DocumentTaskOutboxDO;
 import com.nexarag.document.enums.DocumentTaskType;
 import com.nexarag.document.service.DocumentPipelineOutboxService;
+import com.nexarag.infra.alert.model.AlertMessage;
 import com.nexarag.infra.messaging.document.model.DocumentPipelineMessage;
 import com.nexarag.infra.messaging.document.task.DocumentTaskMessage;
 import com.nexarag.infra.messaging.document.task.DocumentTaskMessagePublisher;
@@ -75,6 +76,9 @@ public class DocumentPipelineOutboxPublisher {
         DocumentTaskType taskType = outbox.getTaskType();
         if (taskType == null || taskType == DocumentTaskType.PROCESS_DOCUMENT) {
             return objectMapper.readValue(outbox.getMessageBody(), DocumentPipelineMessage.class);
+        }
+        if (taskType.isAlertTask()) {
+            return objectMapper.readValue(outbox.getMessageBody(), AlertMessage.class);
         }
         return objectMapper.readValue(outbox.getMessageBody(), DocumentTaskMessage.class);
     }

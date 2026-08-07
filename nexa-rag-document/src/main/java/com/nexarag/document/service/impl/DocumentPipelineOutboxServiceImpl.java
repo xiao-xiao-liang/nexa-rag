@@ -95,9 +95,9 @@ public class DocumentPipelineOutboxServiceImpl
     }
 
     @Override
-    public void markTaskFailed(Long outboxId, int consumeRetryCount, String failureReason) {
-        outboxMapper.markTaskFailed(outboxId, Math.max(consumeRetryCount, 1),
-                truncateFailureReason(failureReason), LocalDateTime.now());
+    public boolean markTaskFailed(Long outboxId, int consumeRetryCount, String failureReason) {
+        return outboxMapper.markTaskFailed(outboxId, Math.max(consumeRetryCount, 1),
+                truncateFailureReason(failureReason), LocalDateTime.now()) > 0;
     }
 
     private long retryDelay(int retryCount) {

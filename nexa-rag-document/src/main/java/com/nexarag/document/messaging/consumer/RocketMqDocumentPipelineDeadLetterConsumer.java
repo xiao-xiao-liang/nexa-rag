@@ -37,7 +37,7 @@ public class RocketMqDocumentPipelineDeadLetterConsumer implements RocketMQListe
             DocumentPipelineMessage message = objectMapper.readValue(messageExt.getBody(), DocumentPipelineMessage.class);
             int consumedTimes = Math.max(messageExt.getReconsumeTimes(), 1);
             DocumentPipelineFailureMessage failureMessage = new DocumentPipelineFailureMessage(
-                    message.documentId(), message.processId(), "ROCKETMQ_RETRY_EXHAUSTED",
+                    message.outboxId(), message.documentId(), message.processId(), "ROCKETMQ_RETRY_EXHAUSTED",
                     "RocketMQ自动重试已达上限", "消息进入死信队列",
                     consumedTimes, messageExt.getMsgId(), LocalDateTime.now());
 

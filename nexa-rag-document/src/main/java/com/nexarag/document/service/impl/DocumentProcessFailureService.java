@@ -1,10 +1,9 @@
 package com.nexarag.document.service.impl;
 
-import com.nexarag.document.alert.DocumentPipelineAlertService;
-import com.nexarag.document.alert.DocumentPipelineFailureEvent;
 import com.nexarag.document.model.entity.Document;
 import com.nexarag.infra.messaging.document.model.DocumentPipelineFailureMessage;
 import com.nexarag.document.service.DocumentService;
+import com.nexarag.document.service.DocumentTaskAlertService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
@@ -18,7 +17,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class DocumentProcessFailureService {
 
     private final DocumentService documentService;
-    private final DocumentPipelineAlertService alertService;
+    private final DocumentTaskAlertService taskAlertService;
 
     /**
      * 使用独立事务记录文档处理失败信息。
@@ -36,7 +35,7 @@ public class DocumentProcessFailureService {
     }
 
     /**
-     * 使用独立事务标记当前处理轮次最终失败并发出告警。
+     * 使用独立事务标记当前处理轮次最终失败并创建渠道告警任务。
      *
      * @param message 失败消息
      * @return true表示当前轮次已标记失败，false表示消息属于旧轮次
@@ -51,10 +50,10 @@ public class DocumentProcessFailureService {
             return false;
         }
 
-        // 2. 状态更新成功后发出结构化告警
-        alertService.alert(new DocumentPipelineFailureEvent(
-                message.documentId(), message.processId(), message.failureStage(), message.failureReason(),
-                message.failureDetail(), message.consumedTimes(), message.messageId(), message.failureTime()));
+        // 2. 仅在父任务状态更新成功后创建独立的渠道告警任务
+        if (message.outboxId() != null) {
+            taskAlertService.createFailureAlerts(message.outboxId(), message.consumedTimes(), message.failureReason());
+        }
         return true;
     }
 }
