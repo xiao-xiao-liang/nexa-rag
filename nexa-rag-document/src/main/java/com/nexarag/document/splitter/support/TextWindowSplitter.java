@@ -1,7 +1,7 @@
 package com.nexarag.document.splitter.support;
 
 import com.nexarag.common.exception.ServiceException;
-import com.nexarag.document.error.DocumentErrorCode;
+import com.nexarag.document.enums.DocumentErrorCode;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 

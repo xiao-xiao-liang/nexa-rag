@@ -2,9 +2,9 @@ package com.nexarag.retrieval.service.impl;
 
 import com.nexarag.common.exception.ClientException;
 import com.nexarag.common.exception.ServiceException;
-import com.nexarag.document.entity.Document;
+import com.nexarag.document.model.entity.Document;
 import com.nexarag.document.enums.DocumentStatus;
-import com.nexarag.document.error.DocumentErrorCode;
+import com.nexarag.document.enums.DocumentErrorCode;
 import com.nexarag.document.service.DocumentService;
 import com.nexarag.retrieval.service.DocumentIndexCleaner;
 import com.nexarag.retrieval.config.IndexConfigResolver;

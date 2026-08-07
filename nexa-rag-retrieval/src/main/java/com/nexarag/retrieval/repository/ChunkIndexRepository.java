@@ -1,6 +1,6 @@
 package com.nexarag.retrieval.repository;
 
-import com.nexarag.document.entity.DocumentChunk;
+import com.nexarag.document.model.entity.DocumentChunk;
 import com.nexarag.retrieval.model.IndexableChunk;
 
 import java.util.List;

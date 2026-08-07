@@ -1,4 +1,4 @@
-package com.nexarag.document.dto;
+package com.nexarag.document.model.dto;
 
 import com.nexarag.document.enums.SplitStrategy;
 import jakarta.validation.Validation;

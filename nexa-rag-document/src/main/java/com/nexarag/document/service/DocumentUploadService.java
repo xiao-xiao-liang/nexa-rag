@@ -1,7 +1,7 @@
 package com.nexarag.document.service;
 
-import com.nexarag.document.dto.UploadDocumentRequest;
-import com.nexarag.document.vo.UploadDocumentResponse;
+import com.nexarag.document.model.dto.UploadDocumentRequest;
+import com.nexarag.document.model.vo.UploadDocumentResponse;
 import org.springframework.web.multipart.MultipartFile;
 
 /**

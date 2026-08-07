@@ -1,10 +1,10 @@
 package com.nexarag.document.splitter.text;
 
 import com.nexarag.common.exception.ServiceException;
-import com.nexarag.document.dto.RegexSplitOptions;
-import com.nexarag.document.dto.SplitConfigRequest;
+import com.nexarag.document.model.dto.RegexSplitOptions;
+import com.nexarag.document.model.dto.SplitConfigRequest;
 import com.nexarag.document.enums.SplitStrategy;
-import com.nexarag.document.error.DocumentErrorCode;
+import com.nexarag.document.enums.DocumentErrorCode;
 import com.nexarag.document.splitter.ChunkDraft;
 import com.nexarag.document.splitter.DocumentChunkIdGenerator;
 import com.nexarag.document.splitter.DocumentSplitContext;

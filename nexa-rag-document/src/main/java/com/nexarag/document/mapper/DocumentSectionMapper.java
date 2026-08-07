@@ -1,7 +1,7 @@
 package com.nexarag.document.mapper;
 
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
-import com.nexarag.document.entity.DocumentSectionDO;
+import com.nexarag.document.model.entity.DocumentSectionDO;
 import org.apache.ibatis.annotations.Delete;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;

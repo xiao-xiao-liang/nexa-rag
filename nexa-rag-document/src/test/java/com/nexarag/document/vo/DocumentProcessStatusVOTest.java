@@ -1,4 +1,4 @@
-package com.nexarag.document.vo;
+package com.nexarag.document.model.vo;
 
 import org.junit.jupiter.api.Test;
 

@@ -1,7 +1,7 @@
 package com.nexarag.document;
 
 import com.baomidou.mybatisplus.annotation.TableLogic;
-import com.nexarag.document.entity.DocumentSectionDO;
+import com.nexarag.document.model.entity.DocumentSectionDO;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;

@@ -1,6 +1,6 @@
 package com.nexarag.workflow.handler;
 
-import com.nexarag.document.entity.Document;
+import com.nexarag.document.model.entity.Document;
 import com.nexarag.document.service.DocumentService;
 import com.nexarag.infra.messaging.document.DocumentPipelineMessageHandler;
 import com.nexarag.infra.messaging.document.model.DocumentPipelineMessage;

@@ -1,6 +1,6 @@
 package com.nexarag.document.splitter.markdown;
 
-import com.nexarag.document.dto.MarkdownSplitOptions;
+import com.nexarag.document.model.dto.MarkdownSplitOptions;
 import com.nexarag.document.splitter.DocumentSectionIdGenerator;
 import org.junit.jupiter.api.Test;
 

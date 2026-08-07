@@ -2,12 +2,12 @@ package com.nexarag.document.converter;
 
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.nexarag.common.web.PageVO;
-import com.nexarag.document.entity.Document;
-import com.nexarag.document.entity.DocumentChunk;
-import com.nexarag.document.vo.DocumentChunkVO;
-import com.nexarag.document.vo.DocumentDetailVO;
-import com.nexarag.document.vo.DocumentProcessStatusVO;
-import com.nexarag.document.vo.DocumentSummaryVO;
+import com.nexarag.document.model.entity.Document;
+import com.nexarag.document.model.entity.DocumentChunk;
+import com.nexarag.document.model.vo.DocumentChunkVO;
+import com.nexarag.document.model.vo.DocumentDetailVO;
+import com.nexarag.document.model.vo.DocumentProcessStatusVO;
+import com.nexarag.document.model.vo.DocumentSummaryVO;
 
 /**
  * 文档对象转换器。

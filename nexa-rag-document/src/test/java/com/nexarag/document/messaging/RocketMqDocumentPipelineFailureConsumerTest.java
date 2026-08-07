@@ -1,4 +1,4 @@
-package com.nexarag.document.messaging;
+package com.nexarag.document.messaging.consumer;
 
 import com.nexarag.document.service.impl.DocumentProcessFailureService;
 import com.nexarag.infra.messaging.document.model.DocumentPipelineFailureMessage;

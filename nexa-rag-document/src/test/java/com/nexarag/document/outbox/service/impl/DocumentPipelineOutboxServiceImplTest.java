@@ -1,9 +1,9 @@
-package com.nexarag.document.outbox.service.impl;
+package com.nexarag.document.service.impl;
 
-import com.nexarag.document.outbox.config.DocumentPipelineOutboxProperties;
-import com.nexarag.document.outbox.entity.DocumentPipelineOutbox;
-import com.nexarag.document.outbox.enums.OutboxPublishStatus;
-import com.nexarag.document.outbox.mapper.DocumentPipelineOutboxMapper;
+import com.nexarag.document.config.DocumentPipelineOutboxProperties;
+import com.nexarag.document.model.entity.DocumentTaskOutboxDO;
+import com.nexarag.document.enums.OutboxPublishStatus;
+import com.nexarag.document.mapper.DocumentPipelineOutboxMapper;
 import org.junit.jupiter.api.Test;
 
 import java.time.LocalDateTime;
@@ -24,7 +24,7 @@ class DocumentPipelineOutboxServiceImplTest {
     @Test
     void claimPublishableMessagesShouldReturnOnlyClaimedRecords() {
         DocumentPipelineOutboxMapper mapper = mock(DocumentPipelineOutboxMapper.class);
-        DocumentPipelineOutbox candidate = DocumentPipelineOutbox.builder()
+        DocumentTaskOutboxDO candidate = DocumentTaskOutboxDO.builder()
                 .outboxId(1L)
                 .publishStatus(OutboxPublishStatus.PENDING)
                 .build();
@@ -33,7 +33,7 @@ class DocumentPipelineOutboxServiceImplTest {
                 .thenReturn(1);
         DocumentPipelineOutboxServiceImpl service = new DocumentPipelineOutboxServiceImpl(mapper, properties());
 
-        List<DocumentPipelineOutbox> claimed = service.claimPublishableMessages("worker-1", LocalDateTime.now());
+        List<DocumentTaskOutboxDO> claimed = service.claimPublishableMessages("worker-1", LocalDateTime.now());
 
         assertThat(claimed).containsExactly(candidate);
     }
@@ -41,7 +41,7 @@ class DocumentPipelineOutboxServiceImplTest {
     @Test
     void markPublishFailedShouldReachFailedStatusAtRetryLimit() {
         DocumentPipelineOutboxMapper mapper = mock(DocumentPipelineOutboxMapper.class);
-        DocumentPipelineOutbox outbox = DocumentPipelineOutbox.builder()
+        DocumentTaskOutboxDO outbox = DocumentTaskOutboxDO.builder()
                 .outboxId(1L)
                 .publishRetryCount(2)
                 .build();

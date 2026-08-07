@@ -1,7 +1,7 @@
 package com.nexarag.document.service.impl;
 
-import com.nexarag.document.dto.SplitConfigRequest;
-import com.nexarag.document.entity.Document;
+import com.nexarag.document.model.dto.SplitConfigRequest;
+import com.nexarag.document.model.entity.Document;
 import com.nexarag.document.enums.DocumentStatus;
 import com.nexarag.document.enums.FileType;
 import com.nexarag.document.enums.SplitStrategy;

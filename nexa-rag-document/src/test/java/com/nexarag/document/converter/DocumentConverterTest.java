@@ -2,13 +2,13 @@ package com.nexarag.document.converter;
 
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.nexarag.common.web.PageVO;
-import com.nexarag.document.entity.Document;
-import com.nexarag.document.entity.DocumentChunk;
+import com.nexarag.document.model.entity.Document;
+import com.nexarag.document.model.entity.DocumentChunk;
 import com.nexarag.document.enums.ChunkStatus;
 import com.nexarag.document.enums.DocumentStatus;
 import com.nexarag.document.enums.FileType;
-import com.nexarag.document.vo.DocumentChunkVO;
-import com.nexarag.document.vo.DocumentSummaryVO;
+import com.nexarag.document.model.vo.DocumentChunkVO;
+import com.nexarag.document.model.vo.DocumentSummaryVO;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;

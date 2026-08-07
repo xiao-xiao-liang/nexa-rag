@@ -6,15 +6,15 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nexarag.common.error.BaseErrorCode;
 import com.nexarag.common.exception.ServiceException;
 import com.nexarag.document.converter.DocumentConverter;
-import com.nexarag.document.dto.CreateDocumentRequest;
-import com.nexarag.document.dto.ProcessDocumentRequest;
-import com.nexarag.document.entity.Document;
-import com.nexarag.document.outbox.entity.DocumentPipelineOutbox;
-import com.nexarag.document.outbox.enums.OutboxPublishStatus;
-import com.nexarag.document.outbox.service.DocumentPipelineOutboxService;
+import com.nexarag.document.model.dto.CreateDocumentRequest;
+import com.nexarag.document.model.dto.ProcessDocumentRequest;
+import com.nexarag.document.model.entity.Document;
+import com.nexarag.document.model.entity.DocumentTaskOutboxDO;
+import com.nexarag.document.enums.OutboxPublishStatus;
+import com.nexarag.document.service.DocumentPipelineOutboxService;
 import com.nexarag.document.service.DocumentPipelineSubmitService;
 import com.nexarag.document.service.DocumentService;
-import com.nexarag.document.vo.DocumentProcessStatusVO;
+import com.nexarag.document.model.vo.DocumentProcessStatusVO;
 import com.nexarag.infra.config.DocumentPipelineMessagingProperties;
 import com.nexarag.infra.messaging.document.model.DocumentPipelineMessage;
 import lombok.RequiredArgsConstructor;
@@ -72,7 +72,7 @@ public class DocumentPipelineSubmitServiceImpl implements DocumentPipelineSubmit
         // 2. 在同一事务内写入待发布Outbox消息
         DocumentPipelineMessage message = new DocumentPipelineMessage(
                 documentId, processId, MESSAGE_SCHEMA_VERSION, createdTime);
-        boolean saved = outboxService.save(DocumentPipelineOutbox.builder()
+        boolean saved = outboxService.save(DocumentTaskOutboxDO.builder()
                 .outboxId(IdWorker.getId())
                 .documentId(documentId)
                 .processId(processId)

@@ -1,7 +1,7 @@
 package com.nexarag.retrieval.repository;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import com.nexarag.document.entity.DocumentChunk;
+import com.nexarag.document.model.entity.DocumentChunk;
 import com.nexarag.document.mapper.DocumentChunkMapper;
 import com.nexarag.document.mapper.DocumentSectionMapper;
 import com.nexarag.retrieval.model.SectionContentChunk;

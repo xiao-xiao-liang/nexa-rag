@@ -1,10 +1,10 @@
 package com.nexarag.retrieval.service.impl;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.nexarag.document.dto.IndexConfigRequest;
-import com.nexarag.document.dto.ProcessDocumentRequest;
-import com.nexarag.document.entity.Document;
-import com.nexarag.document.entity.DocumentChunk;
+import com.nexarag.document.model.dto.IndexConfigRequest;
+import com.nexarag.document.model.dto.ProcessDocumentRequest;
+import com.nexarag.document.model.entity.Document;
+import com.nexarag.document.model.entity.DocumentChunk;
 import com.nexarag.document.enums.ChunkStatus;
 import com.nexarag.document.enums.DocumentStatus;
 import com.nexarag.document.service.DocumentChunkService;

@@ -1,7 +1,7 @@
 package com.nexarag.document.splitter.markdown;
 
-import com.nexarag.document.dto.MarkdownSplitOptions;
-import com.nexarag.document.dto.SplitConfigRequest;
+import com.nexarag.document.model.dto.MarkdownSplitOptions;
+import com.nexarag.document.model.dto.SplitConfigRequest;
 import com.nexarag.document.enums.FileType;
 import com.nexarag.document.enums.SplitStrategy;
 import com.nexarag.document.splitter.ChunkDraft;

@@ -1,4 +1,4 @@
-package com.nexarag.document.messaging;
+package com.nexarag.document.messaging.consumer;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nexarag.document.service.impl.DocumentProcessFailureService;

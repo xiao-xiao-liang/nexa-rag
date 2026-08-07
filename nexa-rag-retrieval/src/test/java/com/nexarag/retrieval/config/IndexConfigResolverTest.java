@@ -2,9 +2,9 @@ package com.nexarag.retrieval.config;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nexarag.common.exception.ServiceException;
-import com.nexarag.document.dto.IndexConfigRequest;
-import com.nexarag.document.dto.ProcessDocumentRequest;
-import com.nexarag.document.entity.Document;
+import com.nexarag.document.model.dto.IndexConfigRequest;
+import com.nexarag.document.model.dto.ProcessDocumentRequest;
+import com.nexarag.document.model.entity.Document;
 import com.nexarag.retrieval.model.IndexConfigSnapshot;
 import org.junit.jupiter.api.Test;
 

@@ -1,9 +1,9 @@
 package com.nexarag.document.service;
 
-import com.nexarag.document.dto.CreateDocumentRequest;
-import com.nexarag.document.dto.ProcessDocumentRequest;
-import com.nexarag.document.entity.Document;
-import com.nexarag.document.vo.DocumentProcessStatusVO;
+import com.nexarag.document.model.dto.CreateDocumentRequest;
+import com.nexarag.document.model.dto.ProcessDocumentRequest;
+import com.nexarag.document.model.entity.Document;
+import com.nexarag.document.model.vo.DocumentProcessStatusVO;
 
 /**
  * 文档流水线提交服务，负责在同一事务内推进文档状态并写入Outbox消息。

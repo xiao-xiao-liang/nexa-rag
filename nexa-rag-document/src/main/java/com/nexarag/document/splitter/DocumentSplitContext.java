@@ -1,6 +1,6 @@
 package com.nexarag.document.splitter;
 
-import com.nexarag.document.dto.SplitConfigRequest;
+import com.nexarag.document.model.dto.SplitConfigRequest;
 import com.nexarag.document.enums.FileType;
 
 /**

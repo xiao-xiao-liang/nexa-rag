@@ -2,7 +2,7 @@ package com.nexarag.document.service;
 
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.service.IService;
-import com.nexarag.document.entity.DocumentChunk;
+import com.nexarag.document.model.entity.DocumentChunk;
 import com.nexarag.document.splitter.ChunkDraft;
 
 import java.util.List;

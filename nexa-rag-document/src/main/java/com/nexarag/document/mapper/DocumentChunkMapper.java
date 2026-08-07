@@ -1,7 +1,7 @@
 package com.nexarag.document.mapper;
 
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
-import com.nexarag.document.entity.DocumentChunk;
+import com.nexarag.document.model.entity.DocumentChunk;
 import org.apache.ibatis.annotations.Mapper;
 
 /**

@@ -1,16 +1,16 @@
 package com.nexarag.document.service.impl;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.nexarag.document.dto.CreateDocumentRequest;
-import com.nexarag.document.dto.ProcessDocumentRequest;
-import com.nexarag.document.entity.Document;
+import com.nexarag.document.model.dto.CreateDocumentRequest;
+import com.nexarag.document.model.dto.ProcessDocumentRequest;
+import com.nexarag.document.model.entity.Document;
 import com.nexarag.document.enums.DocumentPipelineMessageStatus;
 import com.nexarag.document.enums.DocumentStatus;
-import com.nexarag.document.outbox.entity.DocumentPipelineOutbox;
-import com.nexarag.document.outbox.enums.OutboxPublishStatus;
-import com.nexarag.document.outbox.service.DocumentPipelineOutboxService;
+import com.nexarag.document.model.entity.DocumentTaskOutboxDO;
+import com.nexarag.document.enums.OutboxPublishStatus;
+import com.nexarag.document.service.DocumentPipelineOutboxService;
 import com.nexarag.document.service.DocumentService;
-import com.nexarag.document.vo.DocumentProcessStatusVO;
+import com.nexarag.document.model.vo.DocumentProcessStatusVO;
 import com.nexarag.infra.config.DocumentPipelineMessagingProperties;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -41,9 +41,9 @@ class DocumentPipelineSubmitServiceImplTest {
 
         DocumentProcessStatusVO result = submitService.submitProcess(1L, request);
 
-        ArgumentCaptor<DocumentPipelineOutbox> captor = ArgumentCaptor.forClass(DocumentPipelineOutbox.class);
+        ArgumentCaptor<DocumentTaskOutboxDO> captor = ArgumentCaptor.forClass(DocumentTaskOutboxDO.class);
         verify(outboxService).save(captor.capture());
-        DocumentPipelineOutbox outbox = captor.getValue();
+        DocumentTaskOutboxDO outbox = captor.getValue();
         assertThat(result.status()).isEqualTo(DocumentStatus.QUEUED);
         assertThat(outbox.getDocumentId()).isEqualTo(1L);
         assertThat(outbox.getProcessId()).isNotBlank();

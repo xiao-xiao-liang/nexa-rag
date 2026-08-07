@@ -2,10 +2,10 @@ package com.nexarag.boot;
 
 import com.nexarag.document.mapper.DocumentChunkMapper;
 import com.nexarag.document.mapper.DocumentMapper;
-import com.nexarag.document.messaging.RocketMqDocumentPipelineConsumer;
-import com.nexarag.document.messaging.RocketMqDocumentPipelineDeadLetterConsumer;
-import com.nexarag.document.messaging.RocketMqDocumentPipelineFailureConsumer;
-import com.nexarag.document.outbox.mapper.DocumentPipelineOutboxMapper;
+import com.nexarag.document.messaging.consumer.RocketMqDocumentPipelineConsumer;
+import com.nexarag.document.messaging.consumer.RocketMqDocumentPipelineDeadLetterConsumer;
+import com.nexarag.document.messaging.consumer.RocketMqDocumentPipelineFailureConsumer;
+import com.nexarag.document.mapper.DocumentPipelineOutboxMapper;
 import com.nexarag.infra.messaging.document.DocumentPipelineMessagePublisher;
 import com.nexarag.model.mapper.ModelCallLogMapper;
 import com.nexarag.model.mapper.ModelConfigMapper;

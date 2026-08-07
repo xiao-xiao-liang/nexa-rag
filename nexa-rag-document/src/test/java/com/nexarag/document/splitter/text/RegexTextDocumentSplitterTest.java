@@ -1,8 +1,8 @@
 package com.nexarag.document.splitter.text;
 
 import com.nexarag.common.exception.ServiceException;
-import com.nexarag.document.dto.RegexSplitOptions;
-import com.nexarag.document.dto.SplitConfigRequest;
+import com.nexarag.document.model.dto.RegexSplitOptions;
+import com.nexarag.document.model.dto.SplitConfigRequest;
 import com.nexarag.document.enums.FileType;
 import com.nexarag.document.enums.SplitStrategy;
 import com.nexarag.document.splitter.ChunkDraft;

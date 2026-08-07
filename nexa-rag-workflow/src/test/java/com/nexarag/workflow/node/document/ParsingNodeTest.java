@@ -2,9 +2,9 @@ package com.nexarag.workflow.node.document;
 
 import com.alibaba.cloud.ai.graph.OverAllState;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.nexarag.document.dto.ParseConfigRequest;
-import com.nexarag.document.dto.ProcessDocumentRequest;
-import com.nexarag.document.entity.Document;
+import com.nexarag.document.model.dto.ParseConfigRequest;
+import com.nexarag.document.model.dto.ProcessDocumentRequest;
+import com.nexarag.document.model.entity.Document;
 import com.nexarag.document.enums.DocumentStatus;
 import com.nexarag.document.enums.FileType;
 import com.nexarag.document.service.DocumentService;

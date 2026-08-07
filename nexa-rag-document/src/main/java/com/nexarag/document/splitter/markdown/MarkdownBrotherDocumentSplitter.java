@@ -60,7 +60,7 @@ public class MarkdownBrotherDocumentSplitter implements DocumentSplitter {
     private void validateContext(DocumentSplitContext context) {
         if (context == null || !org.springframework.util.StringUtils.hasText(context.content()) || context.config() == null) {
             throw new com.nexarag.common.exception.ServiceException("Markdown同级切分上下文不完整",
-                    com.nexarag.document.error.DocumentErrorCode.DOCUMENT_PROCESS_CONFIG_INVALID);
+                    com.nexarag.document.enums.DocumentErrorCode.DOCUMENT_PROCESS_CONFIG_INVALID);
         }
     }
 }

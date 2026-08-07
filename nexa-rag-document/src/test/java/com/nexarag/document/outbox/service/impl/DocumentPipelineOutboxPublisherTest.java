@@ -1,9 +1,9 @@
-package com.nexarag.document.outbox.service.impl;
+package com.nexarag.document.service.impl;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.nexarag.document.outbox.config.DocumentPipelineOutboxProperties;
-import com.nexarag.document.outbox.entity.DocumentPipelineOutbox;
-import com.nexarag.document.outbox.service.DocumentPipelineOutboxService;
+import com.nexarag.document.config.DocumentPipelineOutboxProperties;
+import com.nexarag.document.model.entity.DocumentTaskOutboxDO;
+import com.nexarag.document.service.DocumentPipelineOutboxService;
 import com.nexarag.infra.messaging.document.DocumentPipelineMessagePublisher;
 import com.nexarag.infra.messaging.document.model.DocumentPipelineMessage;
 import com.nexarag.infra.messaging.document.model.DocumentPipelinePublishResult;
@@ -29,7 +29,7 @@ class DocumentPipelineOutboxPublisherTest {
         DocumentPipelineMessagePublisher messagePublisher = mock(DocumentPipelineMessagePublisher.class);
         ObjectMapper objectMapper = new ObjectMapper().findAndRegisterModules();
         DocumentPipelineMessage message = new DocumentPipelineMessage(1L, "process-1", 1, LocalDateTime.now());
-        DocumentPipelineOutbox outbox = DocumentPipelineOutbox.builder()
+        DocumentTaskOutboxDO outbox = DocumentTaskOutboxDO.builder()
                 .outboxId(10L)
                 .documentId(1L)
                 .processId("process-1")
@@ -51,10 +51,10 @@ class DocumentPipelineOutboxPublisherTest {
         DocumentPipelineMessagePublisher messagePublisher = mock(DocumentPipelineMessagePublisher.class);
         ObjectMapper objectMapper = new ObjectMapper().findAndRegisterModules();
         DocumentPipelineMessage message = new DocumentPipelineMessage(1L, "process-1", 1, LocalDateTime.now());
-        DocumentPipelineOutbox failed = DocumentPipelineOutbox.builder()
+        DocumentTaskOutboxDO failed = DocumentTaskOutboxDO.builder()
                 .outboxId(10L).documentId(1L).processId("process-1")
                 .messageBody(objectMapper.writeValueAsString(message)).build();
-        DocumentPipelineOutbox succeeded = DocumentPipelineOutbox.builder()
+        DocumentTaskOutboxDO succeeded = DocumentTaskOutboxDO.builder()
                 .outboxId(11L).documentId(1L).processId("process-1")
                 .messageBody(objectMapper.writeValueAsString(message)).build();
         when(outboxService.claimPublishableMessages(any(), any())).thenReturn(List.of(failed, succeeded));

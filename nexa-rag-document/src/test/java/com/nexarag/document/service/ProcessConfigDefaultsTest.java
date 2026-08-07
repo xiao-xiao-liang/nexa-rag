@@ -1,10 +1,10 @@
 package com.nexarag.document.service;
 
-import com.nexarag.document.dto.IndexConfigRequest;
-import com.nexarag.document.dto.ParseConfigRequest;
-import com.nexarag.document.dto.ProcessDocumentRequest;
-import com.nexarag.document.dto.SplitConfigRequest;
-import com.nexarag.document.dto.UploadDocumentRequest;
+import com.nexarag.document.model.dto.IndexConfigRequest;
+import com.nexarag.document.model.dto.ParseConfigRequest;
+import com.nexarag.document.model.dto.ProcessDocumentRequest;
+import com.nexarag.document.model.dto.SplitConfigRequest;
+import com.nexarag.document.model.dto.UploadDocumentRequest;
 import com.nexarag.document.enums.FileType;
 import com.nexarag.document.enums.SplitStrategy;
 import org.junit.jupiter.api.Test;

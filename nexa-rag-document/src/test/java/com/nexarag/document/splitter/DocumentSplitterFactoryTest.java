@@ -2,7 +2,7 @@ package com.nexarag.document.splitter;
 
 import com.nexarag.common.exception.ServiceException;
 import com.nexarag.document.enums.SplitStrategy;
-import com.nexarag.document.error.DocumentErrorCode;
+import com.nexarag.document.enums.DocumentErrorCode;
 import org.junit.jupiter.api.Test;
 
 import java.util.LinkedHashMap;

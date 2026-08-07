@@ -1,6 +1,6 @@
 package com.nexarag.retrieval.repository;
 
-import com.nexarag.document.entity.DocumentChunk;
+import com.nexarag.document.model.entity.DocumentChunk;
 import com.nexarag.document.enums.ChunkStatus;
 import com.nexarag.document.service.DocumentChunkService;
 import com.nexarag.retrieval.model.IndexableChunk;

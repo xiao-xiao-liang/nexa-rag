@@ -2,7 +2,7 @@ package com.nexarag.document.service.impl;
 
 import com.nexarag.document.alert.DocumentPipelineAlertService;
 import com.nexarag.document.alert.DocumentPipelineFailureEvent;
-import com.nexarag.document.entity.Document;
+import com.nexarag.document.model.entity.Document;
 import com.nexarag.infra.messaging.document.model.DocumentPipelineFailureMessage;
 import com.nexarag.document.service.DocumentService;
 import lombok.RequiredArgsConstructor;

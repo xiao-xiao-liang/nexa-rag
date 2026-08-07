@@ -5,7 +5,7 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nexarag.common.error.BaseErrorCode;
 import com.nexarag.common.exception.ServiceException;
-import com.nexarag.document.entity.DocumentSectionDO;
+import com.nexarag.document.model.entity.DocumentSectionDO;
 import com.nexarag.document.mapper.DocumentSectionMapper;
 import com.nexarag.retrieval.config.RetrievalProperties;
 import com.nexarag.retrieval.dto.req.KeywordIndexSearchRequest;

@@ -1,11 +1,11 @@
 package com.nexarag.document.splitter.excel;
 
 import com.nexarag.common.exception.ServiceException;
-import com.nexarag.document.dto.ExcelSplitMode;
-import com.nexarag.document.dto.ExcelSplitOptions;
-import com.nexarag.document.dto.SplitConfigRequest;
+import com.nexarag.document.model.dto.ExcelSplitMode;
+import com.nexarag.document.model.dto.ExcelSplitOptions;
+import com.nexarag.document.model.dto.SplitConfigRequest;
 import com.nexarag.document.enums.SplitStrategy;
-import com.nexarag.document.error.DocumentErrorCode;
+import com.nexarag.document.enums.DocumentErrorCode;
 import com.nexarag.document.splitter.ChunkDraft;
 import com.nexarag.document.splitter.DocumentChunkIdGenerator;
 import com.nexarag.document.splitter.DocumentSplitContext;

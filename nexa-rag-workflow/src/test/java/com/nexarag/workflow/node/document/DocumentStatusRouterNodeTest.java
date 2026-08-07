@@ -2,7 +2,7 @@ package com.nexarag.workflow.node.document;
 
 import com.alibaba.cloud.ai.graph.OverAllState;
 import com.nexarag.common.exception.ServiceException;
-import com.nexarag.document.entity.Document;
+import com.nexarag.document.model.entity.Document;
 import com.nexarag.document.enums.DocumentStatus;
 import com.nexarag.document.service.DocumentService;
 import org.junit.jupiter.api.Test;

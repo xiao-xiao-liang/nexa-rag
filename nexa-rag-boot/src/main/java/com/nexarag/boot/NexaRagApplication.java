@@ -11,7 +11,7 @@ import org.springframework.scheduling.annotation.EnableAsync;
  */
 @MapperScan({
         "com.nexarag.document.mapper",
-        "com.nexarag.document.outbox.mapper",
+        "com.nexarag.document.mapper",
         "com.nexarag.model.mapper",
         "com.nexarag.chat.mapper"
 })
