@@ -129,36 +129,46 @@ CREATE TABLE IF NOT EXISTS document (
     KEY idx_document_del_flag (del_flag)
 ) COMMENT='文档表';
 
-CREATE TABLE IF NOT EXISTS document_pipeline_outbox (
+CREATE TABLE IF NOT EXISTS document_task_outbox (
     outbox_id BIGINT NOT NULL COMMENT 'Outbox记录ID',
     document_id BIGINT NOT NULL COMMENT '文档ID',
-    process_id VARCHAR(64) NOT NULL COMMENT '文档处理流水号',
+    parent_outbox_id BIGINT NULL COMMENT '父任务Outbox ID',
+    operation_id VARCHAR(64) NULL COMMENT '任务操作版本ID',
+    task_type VARCHAR(64) NOT NULL COMMENT '任务类型',
     message_key VARCHAR(128) NOT NULL COMMENT '消息唯一键',
     topic VARCHAR(128) NOT NULL COMMENT '消息主题',
     message_body TEXT NOT NULL COMMENT '消息内容',
     publish_status VARCHAR(32) NOT NULL COMMENT '发布状态',
+    task_status VARCHAR(32) NOT NULL COMMENT '任务最终状态',
     publish_retry_count INT NOT NULL DEFAULT 0 COMMENT '发布重试次数',
+    consume_retry_count INT NOT NULL DEFAULT 0 COMMENT '消费者执行重试次数',
     next_retry_time DATETIME NULL COMMENT '下次重试时间',
     lock_owner VARCHAR(128) NULL COMMENT '锁持有者',
     lock_time DATETIME NULL COMMENT '加锁时间',
     published_time DATETIME NULL COMMENT '发布时间',
-    failure_reason VARCHAR(1024) NULL COMMENT '失败原因',
+    task_completed_time DATETIME NULL COMMENT '任务最终完成时间',
+    publish_failure_reason VARCHAR(1024) NULL COMMENT '消息发布失败原因',
+    task_failure_reason VARCHAR(1024) NULL COMMENT '任务最终失败原因',
     create_time DATETIME NOT NULL COMMENT '创建时间',
     update_time DATETIME NOT NULL COMMENT '更新时间',
     -- 主键：Outbox记录ID
     PRIMARY KEY (outbox_id),
     -- 唯一索引：保证消息唯一键不重复
-    UNIQUE KEY uk_document_pipeline_outbox_message_key (message_key),
+    UNIQUE KEY uk_document_task_outbox_message_key (message_key),
     -- 任务索引：按发布状态和下次重试时间扫描待发布任务
-    KEY idx_document_pipeline_outbox_publish_task (publish_status, next_retry_time)
-) COMMENT='文档流水线消息Outbox表';
+    KEY idx_document_task_outbox_publish_task (publish_status, next_retry_time),
+    KEY idx_document_task_outbox_parent (parent_outbox_id),
+    KEY idx_document_task_outbox_status (task_type, task_status, update_time)
+) COMMENT='文档任务消息Outbox表';
 
 CREATE TABLE IF NOT EXISTS document_chunk (
     chunk_id VARCHAR(64) NOT NULL COMMENT '片段ID',
     document_id BIGINT NOT NULL COMMENT '文档ID',
     chunk_order INT NOT NULL COMMENT '片段顺序',
     parent_chunk_id VARCHAR(64) NULL COMMENT '父片段ID',
+    section_id BIGINT NULL COMMENT '所属章节ID',
     text MEDIUMTEXT NOT NULL COMMENT '片段文本',
+    index_content MEDIUMTEXT NULL COMMENT '用于索引的片段内容',
     metadata_json TEXT NULL COMMENT '元数据JSON',
     token_count INT NULL COMMENT 'Token数量',
     status VARCHAR(32) NOT NULL COMMENT '片段状态',
@@ -176,8 +186,26 @@ CREATE TABLE IF NOT EXISTS document_chunk (
     PRIMARY KEY (chunk_id),
     KEY idx_document_chunk_document_id (document_id),
     KEY idx_document_chunk_status (status),
-    KEY idx_document_chunk_order (document_id, chunk_order)
+    KEY idx_document_chunk_order (document_id, chunk_order),
+    KEY idx_document_chunk_section (document_id, section_id)
 ) COMMENT='文档片段表';
+
+CREATE TABLE IF NOT EXISTS document_section (
+    section_id BIGINT NOT NULL COMMENT '章节ID',
+    document_id BIGINT NOT NULL COMMENT '文档ID',
+    parent_section_id BIGINT NULL COMMENT '父章节ID',
+    title VARCHAR(512) NOT NULL COMMENT '章节标题',
+    heading_path_json TEXT NOT NULL COMMENT '标题层级路径JSON',
+    heading_level INT NOT NULL COMMENT '标题层级',
+    start_line INT NOT NULL COMMENT '章节起始行号',
+    end_line INT NOT NULL COMMENT '章节结束行号',
+    create_time DATETIME NOT NULL COMMENT '创建时间',
+    update_time DATETIME NOT NULL COMMENT '更新时间',
+    del_flag TINYINT NOT NULL DEFAULT 0 COMMENT '删除标记：0未删除，1已删除',
+    PRIMARY KEY (section_id),
+    KEY idx_document_section_document (document_id),
+    KEY idx_document_section_parent (document_id, parent_section_id)
+) COMMENT='文档章节结构表';
 
 CREATE TABLE IF NOT EXISTS model_config (
     config_id BIGINT NOT NULL COMMENT '模型配置ID',
