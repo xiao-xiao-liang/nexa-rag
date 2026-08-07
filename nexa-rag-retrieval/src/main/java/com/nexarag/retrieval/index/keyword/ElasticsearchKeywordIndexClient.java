@@ -79,11 +79,15 @@ public class ElasticsearchKeywordIndexClient implements KeywordIndexClient {
             return List.of();
         }
 
-        // 1. 组装全文匹配请求，并限制单通道候选数量
+        // 1. 同时检索新索引字段和历史正文，兼容未完成重建的旧文档
         String indexName = resolveIndexName(request.indexName());
         Map<String, Object> body = Map.of(
                 "size", request.topK(),
-                "query", Map.of("match", Map.of(TEXT, request.query())));
+                "query", Map.of("bool", Map.of(
+                        "should", List.of(
+                                Map.of("match", Map.of(INDEX_CONTENT, request.query())),
+                                Map.of("match", Map.of(TEXT, request.query()))),
+                        "minimum_should_match", 1)));
         HttpResponse<String> response = send(jsonRequest("POST", "/" + encodePath(indexName) + "/_search", toJson(body)));
         validateSuccess(response, "Elasticsearch 关键词检索失败");
 
@@ -99,21 +103,33 @@ public class ElasticsearchKeywordIndexClient implements KeywordIndexClient {
      */
     @Override
     public int deleteByDocumentId(Long documentId) {
+        return deleteByDocumentId(documentId, null);
+    }
+
+    /**
+     * 按文档ID删除指定 Elasticsearch 索引中的记录。
+     *
+     * @param documentId 文档ID
+     * @param indexName  索引名称，为空时使用默认正文索引
+     * @return 删除数量
+     */
+    @Override
+    public int deleteByDocumentId(Long documentId, String indexName) {
         if (documentId == null) {
             return 0;
         }
 
         // 1. 使用 delete_by_query 按稳定文档ID清理片段索引
-        String indexName = resolveIndexName(null);
+        String resolvedIndexName = resolveIndexName(indexName);
         Map<String, Object> termValue = Map.of("value", documentId);
         Map<String, Object> body = Map.of("query",
                 Map.of("term", Map.of(DOCUMENT_ID, termValue)));
-        HttpResponse<String> response = send(jsonRequest("POST", "/" + encodePath(indexName) + "/_delete_by_query",
+        HttpResponse<String> response = send(jsonRequest("POST", "/" + encodePath(resolvedIndexName) + "/_delete_by_query",
                 toJson(body)));
         validateSuccess(response, "Elasticsearch 关键词索引清理失败");
         int deletedCount = parseDeletedCount(response.body());
         log.info("Elasticsearch 关键词索引清理完成，documentId={}，indexName={}，deletedCount={}",
-                documentId, indexName, deletedCount);
+                documentId, resolvedIndexName, deletedCount);
         return deletedCount;
     }
 
@@ -129,6 +145,7 @@ public class ElasticsearchKeywordIndexClient implements KeywordIndexClient {
     private void ensureIndex(String indexName) {
         HttpResponse<String> headResponse = send(request("HEAD", "/" + encodePath(indexName), null));
         if (isSuccess(headResponse.statusCode())) {
+            ensureSectionFieldMapping(indexName);
             return;
         }
         if (headResponse.statusCode() != 404) {
@@ -142,13 +159,30 @@ public class ElasticsearchKeywordIndexClient implements KeywordIndexClient {
         log.info("Elasticsearch 关键词索引创建完成，indexName={}", indexName);
     }
 
+    /**
+     * 为既有关键词索引补充章节检索字段映射，不改变历史正文数据。
+     *
+     * @param indexName 索引名称
+     */
+    private void ensureSectionFieldMapping(String indexName) {
+        Map<String, Object> properties = new LinkedHashMap<>();
+        properties.put(SECTION_ID, Map.of("type", "long"));
+        properties.put(INDEX_CONTENT, Map.of("type", "text"));
+        HttpResponse<String> response = send(jsonRequest("PUT", "/" + encodePath(indexName) + "/_mapping",
+                toJson(Map.of("properties", properties))));
+        validateSuccess(response, "Elasticsearch 关键词索引映射更新失败");
+        log.info("Elasticsearch 关键词索引章节字段映射已确认，indexName={}", indexName);
+    }
+
     private Map<String, Object> toElasticsearchDocument(KeywordIndexDocument document) {
         Map<String, Object> body = new LinkedHashMap<>();
         body.put(CHUNK_ID, document.chunkId());
         body.put(DOCUMENT_ID, document.documentId());
         body.put(PARENT_CHUNK_ID, document.parentChunkId());
         body.put(CHUNK_ORDER, document.chunkOrder());
+        body.put(SECTION_ID, document.sectionId());
         body.put(TEXT, document.text());
+        body.put(INDEX_CONTENT, document.indexContent());
         body.put(METADATA_JSON, document.metadataJson());
         return body;
     }
@@ -159,7 +193,9 @@ public class ElasticsearchKeywordIndexClient implements KeywordIndexClient {
         properties.put(DOCUMENT_ID, Map.of("type", "long"));
         properties.put(PARENT_CHUNK_ID, Map.of("type", "keyword"));
         properties.put(CHUNK_ORDER, Map.of("type", "integer"));
+        properties.put(SECTION_ID, Map.of("type", "long"));
         properties.put(TEXT, Map.of("type", "text"));
+        properties.put(INDEX_CONTENT, Map.of("type", "text"));
         properties.put(METADATA_JSON, Map.of("type", "keyword", "index", false));
         return toJson(Map.of("mappings", Map.of("properties", properties)));
     }
@@ -230,6 +266,7 @@ public class ElasticsearchKeywordIndexClient implements KeywordIndexClient {
                         source.path(DOCUMENT_ID).isNumber() ? source.path(DOCUMENT_ID).asLong() : null,
                         source.path(PARENT_CHUNK_ID).asText(null),
                         source.path(CHUNK_ORDER).isInt() ? source.path(CHUNK_ORDER).asInt() : null,
+                        source.path(SECTION_ID).isNumber() ? source.path(SECTION_ID).asLong() : null,
                         source.path(TEXT).asText(""),
                         source.path(METADATA_JSON).asText(null),
                         hit.path("_score").asDouble(0.0D)));
