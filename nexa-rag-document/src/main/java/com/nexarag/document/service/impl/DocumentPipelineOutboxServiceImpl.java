@@ -84,6 +84,22 @@ public class DocumentPipelineOutboxServiceImpl
         }
     }
 
+    @Override
+    public boolean markTaskProcessing(Long outboxId, int consumeRetryCount) {
+        return outboxMapper.markTaskProcessing(outboxId, Math.max(consumeRetryCount, 1)) > 0;
+    }
+
+    @Override
+    public void markTaskSucceeded(Long outboxId) {
+        outboxMapper.markTaskSucceeded(outboxId, LocalDateTime.now());
+    }
+
+    @Override
+    public void markTaskFailed(Long outboxId, int consumeRetryCount, String failureReason) {
+        outboxMapper.markTaskFailed(outboxId, Math.max(consumeRetryCount, 1),
+                truncateFailureReason(failureReason), LocalDateTime.now());
+    }
+
     private long retryDelay(int retryCount) {
         int exponent = Math.min(Math.max(retryCount - 1, 0), 20);
         long multiplier = 1L << exponent;

@@ -5,6 +5,8 @@ import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
 import com.nexarag.document.enums.OutboxPublishStatus;
+import com.nexarag.document.enums.DocumentTaskStatus;
+import com.nexarag.document.enums.DocumentTaskType;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
@@ -21,7 +23,7 @@ import java.time.LocalDateTime;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-@TableName("document_pipeline_outbox")
+@TableName("document_task_outbox")
 public class DocumentTaskOutboxDO {
 
     /**
@@ -36,9 +38,20 @@ public class DocumentTaskOutboxDO {
     private Long documentId;
 
     /**
-     * 文档处理流水号。
+     * 父任务Outbox ID，仅告警任务使用。
      */
+    private Long parentOutboxId;
+
+    /**
+     * 任务操作版本ID；处理任务使用处理流水号。
+     */
+    @TableField("operation_id")
     private String processId;
+
+    /**
+     * 任务类型。
+     */
+    private DocumentTaskType taskType;
 
     /**
      * 消息唯一键。
@@ -61,9 +74,19 @@ public class DocumentTaskOutboxDO {
     private OutboxPublishStatus publishStatus;
 
     /**
+     * 消费者最终执行状态。
+     */
+    private DocumentTaskStatus taskStatus;
+
+    /**
      * 发布重试次数。
      */
     private Integer publishRetryCount;
+
+    /**
+     * 消费者执行重试次数。
+     */
+    private Integer consumeRetryCount;
 
     /**
      * 下次重试时间。
@@ -86,9 +109,20 @@ public class DocumentTaskOutboxDO {
     private LocalDateTime publishedTime;
 
     /**
-     * 失败原因。
+     * 任务最终完成时间。
      */
+    private LocalDateTime taskCompletedTime;
+
+    /**
+     * 消息发布失败原因。
+     */
+    @TableField("publish_failure_reason")
     private String failureReason;
+
+    /**
+     * 消费者最终失败原因。
+     */
+    private String taskFailureReason;
 
     /**
      * 创建时间。

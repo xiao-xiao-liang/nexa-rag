@@ -12,7 +12,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 /**
- * 文档流水线Outbox数据访问接口。
+ * 文档任务Outbox数据访问接口。
  */
 @Mapper
 public interface DocumentPipelineOutboxMapper extends BaseMapper<DocumentTaskOutboxDO> {
@@ -22,24 +22,25 @@ public interface DocumentPipelineOutboxMapper extends BaseMapper<DocumentTaskOut
      */
     @Select("""
             SELECT
-                outbox_id, document_id, process_id, message_key, topic, message_body,
-                publish_status, publish_retry_count, next_retry_time, lock_owner, lock_time,
-                published_time, failure_reason, create_time, update_time
-            FROM document_pipeline_outbox
+                outbox_id, document_id, parent_outbox_id, operation_id, task_type, message_key, topic, message_body,
+                publish_status, task_status, publish_retry_count, consume_retry_count, next_retry_time, lock_owner,
+                lock_time, published_time, task_completed_time, publish_failure_reason, task_failure_reason,
+                create_time, update_time
+            FROM document_task_outbox
             WHERE (publish_status = 'PENDING' AND (next_retry_time IS NULL OR next_retry_time <= #{now}))
                OR (publish_status = 'PUBLISHING' AND lock_time <= #{expiredLockTime})
             ORDER BY create_time ASC
             LIMIT #{limit}
             """)
     List<DocumentTaskOutboxDO> selectPublishable(@Param("now") LocalDateTime now,
-                                                   @Param("expiredLockTime") LocalDateTime expiredLockTime,
-                                                   @Param("limit") int limit);
+                                                 @Param("expiredLockTime") LocalDateTime expiredLockTime,
+                                                 @Param("limit") int limit);
 
     /**
      * 使用候选记录原状态和锁时间抢占发布权。
      */
     @Update("""
-            UPDATE document_pipeline_outbox
+            UPDATE document_task_outbox
             SET publish_status = 'PUBLISHING', lock_owner = #{lockOwner}, lock_time = #{lockTime}
             WHERE outbox_id = #{outboxId}
               AND publish_status = #{expectedStatus}
@@ -55,9 +56,9 @@ public interface DocumentPipelineOutboxMapper extends BaseMapper<DocumentTaskOut
      * 更新消息发布成功状态。
      */
     @Update("""
-            UPDATE document_pipeline_outbox
+            UPDATE document_task_outbox
             SET publish_status = 'PUBLISHED', published_time = #{publishedTime},
-                lock_owner = NULL, lock_time = NULL, failure_reason = NULL
+                lock_owner = NULL, lock_time = NULL, publish_failure_reason = NULL
             WHERE outbox_id = #{outboxId} AND publish_status = 'PUBLISHING'
             """)
     int updatePublished(@Param("outboxId") Long outboxId,
@@ -67,9 +68,9 @@ public interface DocumentPipelineOutboxMapper extends BaseMapper<DocumentTaskOut
      * 更新消息发布失败后的状态和重试信息。
      */
     @Update("""
-            UPDATE document_pipeline_outbox
+            UPDATE document_task_outbox
             SET publish_status = #{status}, publish_retry_count = #{retryCount},
-                next_retry_time = #{nextRetryTime}, failure_reason = #{failureReason},
+                next_retry_time = #{nextRetryTime}, publish_failure_reason = #{failureReason},
                 lock_owner = NULL, lock_time = NULL
             WHERE outbox_id = #{outboxId} AND publish_status = 'PUBLISHING'
             """)
@@ -78,4 +79,35 @@ public interface DocumentPipelineOutboxMapper extends BaseMapper<DocumentTaskOut
                              @Param("retryCount") int retryCount,
                              @Param("nextRetryTime") LocalDateTime nextRetryTime,
                              @Param("failureReason") String failureReason);
+
+    /** 标记非终态任务正在消费。 */
+    @Update("""
+            UPDATE document_task_outbox
+            SET task_status = 'PROCESSING', consume_retry_count = #{consumeRetryCount}
+            WHERE outbox_id = #{outboxId} AND task_status IN ('PENDING', 'PROCESSING')
+            """)
+    int markTaskProcessing(@Param("outboxId") Long outboxId,
+                           @Param("consumeRetryCount") int consumeRetryCount);
+
+    /** 标记任务成功。 */
+    @Update("""
+            UPDATE document_task_outbox
+            SET task_status = 'SUCCEEDED', task_completed_time = #{completedTime},
+                task_failure_reason = NULL
+            WHERE outbox_id = #{outboxId} AND task_status IN ('PENDING', 'PROCESSING')
+            """)
+    int markTaskSucceeded(@Param("outboxId") Long outboxId,
+                          @Param("completedTime") LocalDateTime completedTime);
+
+    /** 标记任务最终失败。 */
+    @Update("""
+            UPDATE document_task_outbox
+            SET task_status = 'FAILED', consume_retry_count = #{consumeRetryCount},
+                task_completed_time = #{completedTime}, task_failure_reason = #{failureReason}
+            WHERE outbox_id = #{outboxId} AND task_status IN ('PENDING', 'PROCESSING')
+            """)
+    int markTaskFailed(@Param("outboxId") Long outboxId,
+                       @Param("consumeRetryCount") int consumeRetryCount,
+                       @Param("failureReason") String failureReason,
+                       @Param("completedTime") LocalDateTime completedTime);
 }

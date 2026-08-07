@@ -1,9 +1,10 @@
-package com.nexarag.document.service.impl;
+package com.nexarag.document.outbox.service.impl;
 
 import com.nexarag.document.config.DocumentPipelineOutboxProperties;
 import com.nexarag.document.model.entity.DocumentTaskOutboxDO;
 import com.nexarag.document.enums.OutboxPublishStatus;
 import com.nexarag.document.mapper.DocumentPipelineOutboxMapper;
+import com.nexarag.document.service.impl.DocumentPipelineOutboxServiceImpl;
 import org.junit.jupiter.api.Test;
 
 import java.time.LocalDateTime;
@@ -19,7 +20,7 @@ import static org.mockito.Mockito.when;
 /**
  * 文档流水线Outbox服务测试。
  */
-class DocumentPipelineOutboxServiceImplTest {
+class DocumentTaskOutboxDOServiceImplTest {
 
     @Test
     void claimPublishableMessagesShouldReturnOnlyClaimedRecords() {
