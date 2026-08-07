@@ -18,7 +18,7 @@
 8. Outbox 表和发布器统一复用，但 Topic 与消费者隔离：既有处理任务继续使用 `nexa-document-pipeline`，索引清理任务使用独立 Topic `nexa-document-index-cleanup`。两类任务不得复用同一个消费者或失败状态机。
 9. 索引清理使用独立消费组 `nexa-document-index-cleanup-worker`。RocketMQ 自动重试耗尽后，由该消费组专属的 DLQ 消费者将 Outbox 任务标记为 `FAILED`、写入 `task_failure_reason` 并触发告警；不得交给现有文档处理流水线的 DLQ 消费者。
 10. 管理端按 `outbox_id` 重试 `FAILED` 任务：创建新的执行版本与 `message_key`，清空最终失败信息并重新投递。该动作不得重新删除文档、解析文档或重新走索引构建。
-11. 将现有仅适配处理流水线的 `DocumentPipelineAlertService` 演进为通用文档任务告警能力。告警事件至少包含 `outboxId`、`documentId`、`taskType`、`operationId`、`topic`、最终失败原因、消费重试次数、RocketMQ 消息 ID 和失败时间。仅在 DLQ 消费者将任务持久化为 `FAILED` 后触发一次最终失败告警；普通重试不告警。
+11. 将告警能力下沉到 `infra`：由 `infra` 定义领域无关的告警模型、严重级别、渠道适配、RocketMQ 告警消费者、DLQ 消费者及结构化日志；`infra` 不访问文档任务表或依赖 `document` 模块。告警事件至少包含 `outboxId`、`documentId`、`taskType`、`operationId`、`topic`、最终失败原因、消费重试次数、RocketMQ 消息 ID 和失败时间。仅在 DLQ 消费者将任务持久化为 `FAILED` 后触发一次最终失败告警；普通重试不告警。
 12. 首期告警渠道为飞书机器人 Webhook 与邮件。两者使用同一份脱敏的任务最终失败事件；Webhook URL、SMTP 凭据、收件人等均通过环境变量或受保护配置注入，禁止写入版本库。
 13. 任务进入 `FAILED` 后，创建独立、可重试的告警 Outbox 任务；告警任务以 `parent_outbox_id` 关联原失败任务。告警投递失败不影响原任务的最终失败状态，且告警任务自身失败不得再次创建告警任务，避免无限递归。
 14. 飞书和邮件分别创建一条告警任务，例如 `SEND_FEISHU_FAILURE_ALERT` 与 `SEND_EMAIL_FAILURE_ALERT`。每条任务独立记录最终状态与重试次数，单个渠道失败不得导致另一个已成功渠道重复通知。
@@ -26,8 +26,8 @@
 16. `PROCESS_DOCUMENT` 与 `CLEAN_DOCUMENT_INDEX` 两类任务在最终进入 `FAILED` 时都触发告警。每个失败任务分别创建飞书和邮件两条独立、可重试的告警任务。
 17. 首期告警分级按任务类型确定：`PROCESS_DOCUMENT` 最终失败为 `WARNING`；`CLEAN_DOCUMENT_INDEX` 最终失败为 `ERROR`。两类告警均投递飞书和邮件，级别用于通知标题、日志检索和后续升级策略。
 18. 首期飞书 Webhook 与邮件收件人使用统一全局配置，不按任务类型或严重级别分流。按严重级别配置通知目标作为后续能力，避免首期引入重复配置和复杂路由。
-19. 飞书和邮件告警统一包含严重级别、任务类型、文档 ID、Outbox ID、操作 ID、Topic、消费重试次数、最终失败时间、脱敏后的失败原因以及管理端重试定位信息。不得包含文档正文、文件路径、用户问题、提示词、Webhook URL、SMTP 凭据或其他敏感配置。
-20. 飞书和邮件告警任务复用 RocketMQ 的 `max-reconsume-times=5`。重试耗尽后将告警任务标记为 `FAILED` 并输出结构化错误日志；不得创建新的告警任务。管理员可按 `outbox_id` 手动重试失败的告警任务。
+19. 飞书和邮件告警统一包含严重级别、任务类型、文档 ID、Outbox ID、操作 ID、Topic、消费重试次数、最终失败时间、脱敏后的失败原因以及管理端重试定位信息。`document` 创建 Outbox 时即写入该脱敏载荷，`infra` 消费者不得回查文档任务表。不得包含文档正文、文件路径、用户问题、提示词、Webhook URL、SMTP 凭据或其他敏感配置。
+20. 飞书和邮件告警任务复用 RocketMQ 的 `max-reconsume-times=5`。`infra` 消费者通过 `AlertDeliveryLifecycle` SPI 回调 `document` 实现以更新告警任务状态；重试耗尽后将告警任务标记为 `FAILED` 并输出结构化错误日志；不得创建新的告警任务。管理员可按 `outbox_id` 手动重试失败的告警任务。
 21. 删除接口采用异步清理返回契约，至少返回 `documentId`、`deleted=true`、`cleanupOutboxId` 与初始 `cleanupStatus=PENDING`。这只表示文档数据库状态已删除且清理任务已可靠入队，不表示外部索引已经清理完成。
 22. 暂定仅管理员可查询和人工重试文档任务：`GET /api/document-tasks/{outboxId}` 返回发布与任务状态、失败原因和重试次数；`POST /api/document-tasks/{outboxId}/retry` 仅对 `FAILED` 任务创建新执行版本。普通知识库用户只见“清理中/清理失败”摘要。待接入 Sa-Token 和前端管理页时复核该权限边界。
 23. `CLEAN_DOCUMENT_INDEX` 最终失败时，文档仍保持逻辑删除并对用户不可见；不得因外部索引清理失败自动恢复文档。告警、任务查询和管理员人工重试是唯一补偿路径，用户删除意图优先于外部索引的最终一致性。

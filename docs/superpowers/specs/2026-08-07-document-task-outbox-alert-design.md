@@ -4,6 +4,8 @@
 
 将现有仅用于文档处理流水线发布的 `document_pipeline_outbox` 演进为通用的 `document_task_outbox`。它既可靠发布 RocketMQ 消息，也持久化追踪每个文档异步任务的最终处理结果；首批覆盖文档处理、文档外部索引清理，以及其最终失败后的飞书/邮件告警。
 
+告警模型、渠道配置、飞书/邮件适配、RocketMQ 告警消费者和告警 DLQ 消费者统一归属 `infra`。`document` 只负责识别文档任务终态失败、在自身 Outbox 中创建独立告警任务，并实现告警投递的任务状态回调；`infra` 不得访问 `document_task_outbox` 或依赖 `document` 模块。
+
 本设计替代“删除文档后发布 Spring 事件、提交后监听器清理外部索引”的实现。删除后的外部资源清理必须通过事务 Outbox + RocketMQ 最终一致性完成。
 
 ## 范围与非目标
@@ -14,7 +16,7 @@
 - Outbox 发布状态与任务最终执行状态分离。
 - 文档删除的异步返回契约、任务查询与管理员人工重试。
 - 索引清理最终失败后的告警、幂等、DLQ 与人工补偿。
-- 飞书/邮件后端配置、脱敏告警内容及告警可靠投递。
+- `infra` 中的飞书/邮件后端配置、脱敏告警内容及告警可靠投递。
 
 ### 非目标
 
@@ -35,6 +37,7 @@
 | 任务状态 | `taskStatus` | 消费者实际执行任务的最终生命周期。 | 只能由任务消费者或 DLQ 终态处理更新。 |
 | 索引清理任务 | `CLEAN_DOCUMENT_INDEX` | 按文档 ID 删除 Milvus 正文向量、ES 正文索引和 ES 章节导航索引。 | 删除操作幂等；不恢复逻辑删除文档。 |
 | 告警任务 | `SEND_FEISHU_FAILURE_ALERT` / `SEND_EMAIL_FAILURE_ALERT` | 向一个渠道投递一条最终失败通知。 | 一个渠道一条任务；失败不再生成告警任务。 |
+| 告警投递回调 | `AlertDeliveryLifecycle` | 由业务模块实现的通用任务状态回调。 | `infra` 仅调用接口，不访问业务任务表。 |
 
 ### 任务类型
 
@@ -95,10 +98,28 @@ ALTER TABLE document_task_outbox
 | --- | --- | --- | --- |
 | `PROCESS_DOCUMENT` | `nexa-document-pipeline` | 既有 `nexa-document-pipeline-worker` | 既有文档处理消息。 |
 | `CLEAN_DOCUMENT_INDEX` | `nexa-document-index-cleanup` | `nexa-document-index-cleanup-worker` | `outboxId`、`documentId`、`operationId`、`schemaVersion`。 |
-| `SEND_FEISHU_FAILURE_ALERT` | `nexa-document-alert` | `nexa-document-alert-worker` | 脱敏的最终失败告警事件。 |
-| `SEND_EMAIL_FAILURE_ALERT` | `nexa-document-alert` | `nexa-document-alert-worker` | 脱敏的最终失败告警事件。 |
+| `SEND_FEISHU_FAILURE_ALERT` | `nexa-alert` | `nexa-alert-worker` | 脱敏的最终失败告警事件。 |
+| `SEND_EMAIL_FAILURE_ALERT` | `nexa-alert` | `nexa-alert-worker` | 脱敏的最终失败告警事件。 |
 
-所有消息使用 `documentId:taskType:operationId` 作为 RocketMQ key。告警任务额外包含 `parentOutboxId`，消费者加载父任务失败信息后再渲染渠道消息，避免把敏感正文写入消息体。
+所有消息使用 `documentId:taskType:operationId` 作为 RocketMQ key。告警任务额外包含 `parentOutboxId`，其消息体为 `infra` 定义的脱敏 `AlertMessage`：严重级别、渠道、任务标识、脱敏失败原因和时间等元数据均由 `document` 在创建告警任务时写入。`infra` 消费者不得回查 `document_task_outbox`，也不得接收正文、路径、提示词或凭据。
+
+## 模块边界与投递链路
+
+```text
+document 终态失败 / 专属 DLQ
+  ↓ 创建两条文档 Outbox 告警任务
+document Outbox 发布器
+  ↓ 发送 infra.AlertMessage 到 nexa-alert
+infra.RocketMqAlertConsumer
+  ├─ AlertDeliveryLifecycle.markProcessing（document 实现）
+  ├─ AlertDispatcher → FeishuAlertChannel / EmailAlertChannel
+  └─ AlertDeliveryLifecycle.markSucceeded（document 实现）
+       ↓ 重试耗尽
+infra.RocketMqAlertDeadLetterConsumer
+  └─ AlertDeliveryLifecycle.markFailed（document 实现）+ 结构化错误日志
+```
+
+`infra` 定义 `AlertDeliveryLifecycle` SPI 和条件化的 RocketMQ 消费者；`document` 提供唯一实现，将告警 Outbox 状态更新为 `PROCESSING`、`SUCCEEDED` 或 `FAILED`。因此告警消费者可复用，但任务持久化边界仍归业务模块。
 
 ## 文档删除与索引清理
 
@@ -154,7 +175,7 @@ SEND_EMAIL_FAILURE_ALERT
 
 ### 告警重试与 DLQ
 
-- 告警消费者复用 RocketMQ `max-reconsume-times=5`。
+- `infra` 告警消费者复用 RocketMQ `max-reconsume-times=5`，通过 `AlertDeliveryLifecycle` 更新告警任务状态。
 - 告警任务成功后标记 `SUCCEEDED`。
 - 重试耗尽后标记告警任务 `FAILED` 并输出结构化错误日志。
 - 告警任务失败不得再创建告警任务。
@@ -162,7 +183,7 @@ SEND_EMAIL_FAILURE_ALERT
 
 ## 配置
 
-首期只由后端读取配置。敏感值使用环境变量，示例：
+首期只由后端读取 `infra` 配置。敏感值使用环境变量，示例：
 
 ```yaml
 nexa:
@@ -170,9 +191,10 @@ nexa:
     task:
       cleanup-topic: nexa-document-index-cleanup
       cleanup-consumer-group: nexa-document-index-cleanup-worker
-      alert-topic: nexa-document-alert
-      alert-consumer-group: nexa-document-alert-worker
   alert:
+    enabled: true
+    topic: nexa-alert
+    consumer-group: nexa-alert-worker
     feishu:
       enabled: true
       webhook-url: ${NEXA_ALERT_FEISHU_WEBHOOK_URL:}
@@ -183,7 +205,7 @@ nexa:
 spring:
   mail:
     host: ${NEXA_ALERT_SMTP_HOST:}
-    port: ${NEXA_ALERT_SMTP_PORT:587}
+    port: ${NEXA_ALERT_SMTP_PORT:465}
     username: ${NEXA_ALERT_SMTP_USERNAME:}
     password: ${NEXA_ALERT_SMTP_PASSWORD:}
 ```
@@ -209,7 +231,7 @@ POST /api/document-tasks/{outboxId}/retry
 - `DocumentDeletedEvent` 与 `DocumentDeletedEventListener`：删除。
 - `DocumentServiceImpl.deleteDocument`：改为同一事务内逻辑删除 + 写 `CLEAN_DOCUMENT_INDEX` Outbox，返回异步清理响应。
 - `DocumentPipelineOutbox*`：重命名为 `DocumentTaskOutbox*`，发布器按 `taskType` 反序列化和发送，不再假定所有消息都是处理流水线消息。
-- 现有 `DocumentPipelineAlertService`：演进为通用文档任务告警接口；保留结构化日志实现作为所有外部渠道的最终降级观测。
+- `document.alert` 下的 `DocumentPipelineAlertService`、`DocumentPipelineFailureEvent` 与日志实现：迁移为 `infra.alert` 的领域无关模型与结构化日志能力。文档处理的非终态失败只记录结构化日志；飞书和邮件仅由任务终态失败创建的告警 Outbox 触发。
 
 ## 验收与可观测性
 
