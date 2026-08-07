@@ -1,5 +1,6 @@
-package com.nexarag.document.model.vo;
+package com.nexarag.document.vo;
 
+import com.nexarag.document.model.vo.DocumentProcessStatusVO;
 import org.junit.jupiter.api.Test;
 
 import java.util.Arrays;

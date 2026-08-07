@@ -1,6 +1,6 @@
 package com.nexarag.document.splitter.markdown;
 
-import com.nexarag.common.exception.ServiceException;
+import com.nexarag.document.enums.DocumentErrorCode;
 import com.nexarag.document.enums.SplitStrategy;
 import com.nexarag.document.splitter.DocumentChunkIdGenerator;
 import com.nexarag.document.splitter.DocumentSplitContext;
@@ -60,7 +60,7 @@ public class MarkdownBrotherDocumentSplitter implements DocumentSplitter {
     private void validateContext(DocumentSplitContext context) {
         if (context == null || !org.springframework.util.StringUtils.hasText(context.content()) || context.config() == null) {
             throw new com.nexarag.common.exception.ServiceException("Markdown同级切分上下文不完整",
-                    com.nexarag.document.enums.DocumentErrorCode.DOCUMENT_PROCESS_CONFIG_INVALID);
+                    DocumentErrorCode.DOCUMENT_PROCESS_CONFIG_INVALID);
         }
     }
 }

@@ -1,5 +1,6 @@
-package com.nexarag.document.messaging.consumer;
+package com.nexarag.document.messaging;
 
+import com.nexarag.document.messaging.consumer.RocketMqDocumentPipelineFailureConsumer;
 import com.nexarag.document.service.impl.DocumentProcessFailureService;
 import com.nexarag.infra.messaging.document.model.DocumentPipelineFailureMessage;
 import org.junit.jupiter.api.Test;

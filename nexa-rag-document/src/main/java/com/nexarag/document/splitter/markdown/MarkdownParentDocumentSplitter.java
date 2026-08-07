@@ -1,16 +1,12 @@
 package com.nexarag.document.splitter.markdown;
 
 import com.nexarag.common.exception.ServiceException;
-import com.nexarag.document.model.dto.SplitConfigRequest;
 import com.nexarag.document.enums.SplitStrategy;
 import com.nexarag.document.enums.DocumentErrorCode;
-import com.nexarag.document.splitter.DocumentChunkIdGenerator;
 import com.nexarag.document.splitter.DocumentSplitContext;
 import com.nexarag.document.splitter.DocumentSplitResult;
 import com.nexarag.document.splitter.DocumentSplitter;
-import com.nexarag.document.splitter.support.TextWindowSplitter;
 import lombok.RequiredArgsConstructor;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 

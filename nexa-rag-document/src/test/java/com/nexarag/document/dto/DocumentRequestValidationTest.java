@@ -1,6 +1,7 @@
-package com.nexarag.document.model.dto;
+package com.nexarag.document.dto;
 
 import com.nexarag.document.enums.SplitStrategy;
+import com.nexarag.document.model.dto.*;
 import jakarta.validation.Validation;
 import jakarta.validation.Validator;
 import org.junit.jupiter.api.Test;

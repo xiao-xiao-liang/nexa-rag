@@ -1,7 +1,8 @@
-package com.nexarag.document.messaging.consumer;
+package com.nexarag.document.messaging;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nexarag.common.exception.ClientException;
+import com.nexarag.document.messaging.consumer.RocketMqDocumentPipelineConsumer;
 import com.nexarag.document.service.DocumentService;
 import com.nexarag.infra.messaging.document.DocumentPipelineMessageHandler;
 import com.nexarag.infra.config.DocumentPipelineMessagingProperties;
