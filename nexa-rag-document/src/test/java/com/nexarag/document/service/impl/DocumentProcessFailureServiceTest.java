@@ -1,6 +1,6 @@
 package com.nexarag.document.service.impl;
 
-import com.nexarag.document.alert.DocumentPipelineAlertService;
+import com.nexarag.document.service.DocumentTaskAlertService;
 import com.nexarag.document.service.DocumentService;
 import com.nexarag.infra.messaging.document.model.DocumentPipelineFailureMessage;
 import org.junit.jupiter.api.Test;
@@ -8,7 +8,6 @@ import org.junit.jupiter.api.Test;
 import java.time.LocalDateTime;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -20,9 +19,9 @@ import static org.mockito.Mockito.when;
 class DocumentProcessFailureServiceTest {
 
     @Test
-    void shouldAlertAfterCurrentProcessMarkedFailed() {
+    void shouldCreateAlertTasksAfterCurrentProcessMarkedFailed() {
         DocumentService documentService = mock(DocumentService.class);
-        DocumentPipelineAlertService alertService = mock(DocumentPipelineAlertService.class);
+        DocumentTaskAlertService alertService = mock(DocumentTaskAlertService.class);
         DocumentProcessFailureService service = new DocumentProcessFailureService(documentService, alertService);
         DocumentPipelineFailureMessage message = failureMessage();
         when(documentService.markProcessFailed(1L, "process-1", "INDEXING", "索引失败", "detail",
@@ -31,22 +30,23 @@ class DocumentProcessFailureServiceTest {
 
         assertThat(service.markFinalFailure(message)).isTrue();
 
-        verify(alertService).alert(any());
+        verify(alertService).createFailureAlerts(101L, 6, "索引失败");
     }
 
     @Test
-    void shouldIgnoreOldProcessWithoutAlerting() {
+    void shouldIgnoreOldProcessWithoutCreatingAlertTasks() {
         DocumentService documentService = mock(DocumentService.class);
-        DocumentPipelineAlertService alertService = mock(DocumentPipelineAlertService.class);
+        DocumentTaskAlertService alertService = mock(DocumentTaskAlertService.class);
         DocumentProcessFailureService service = new DocumentProcessFailureService(documentService, alertService);
 
         assertThat(service.markFinalFailure(failureMessage())).isFalse();
 
-        verify(alertService, never()).alert(any());
+        verify(alertService, never()).createFailureAlerts(org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.anyInt(), org.mockito.ArgumentMatchers.any());
     }
 
     private DocumentPipelineFailureMessage failureMessage() {
         return new DocumentPipelineFailureMessage(
-                1L, "process-1", "INDEXING", "索引失败", "detail", 6, "message-1", LocalDateTime.now());
+                101L, 1L, "process-1", "INDEXING", "索引失败", "detail", 6, "message-1", LocalDateTime.now());
     }
 }

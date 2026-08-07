@@ -21,7 +21,7 @@ class RocketMqDocumentPipelineFailureConsumerTest {
         RocketMqDocumentPipelineFailureConsumer consumer =
                 new RocketMqDocumentPipelineFailureConsumer(failureService);
         DocumentPipelineFailureMessage message = new DocumentPipelineFailureMessage(
-                1L, "process-1", "INDEXING", "索引失败", "detail", 6, "message-1", LocalDateTime.now());
+                101L, 1L, "process-1", "INDEXING", "索引失败", "detail", 6, "message-1", LocalDateTime.now());
 
         consumer.onMessage(message);
 
