@@ -24,6 +24,7 @@ import com.nexarag.retrieval.dto.req.VectorIndexWriteRequest;
 import com.nexarag.retrieval.model.VectorIndexWriteResult;
 import com.nexarag.retrieval.model.IndexableChunk;
 import com.nexarag.retrieval.repository.ChunkIndexRepository;
+import com.nexarag.retrieval.repository.SectionNavigationIndexRepository;
 import com.nexarag.retrieval.service.DocumentIndexService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -51,6 +52,7 @@ public class DocumentIndexServiceImpl implements DocumentIndexService {
     private final VectorIndexClient vectorIndexClient;
     private final KeywordIndexClient keywordIndexClient;
     private final DocumentIndexCleaner documentIndexCleaner;
+    private final SectionNavigationIndexRepository sectionNavigationIndexRepository;
 
     /**
      * 执行指定文档的索引写入。
@@ -84,6 +86,7 @@ public class DocumentIndexServiceImpl implements DocumentIndexService {
         List<IndexableChunk> chunks = chunkIndexRepository.listIndexableChunks(documentId);
         int skippedChunkCount = chunkIndexRepository.listSkippedChunks(documentId).size();
         if (chunks.isEmpty()) {
+            indexNavigation(documentId, config);
             markIndexed(document);
             return new DocumentIndexResult(documentId, true, skippedChunkCount, 0, skippedChunkCount, 0,
                     vectorEnabled, keywordEnabled, null, List.of());
@@ -99,6 +102,7 @@ public class DocumentIndexServiceImpl implements DocumentIndexService {
         }
 
         // 5. 全部成功后推进文档到索引完成状态
+        indexNavigation(documentId, config);
         markIndexed(document);
         log.info("文档索引阶段执行完成，documentId={}，indexedChunkCount={}，skippedChunkCount={}",
                 documentId, indexedChunkCount, skippedChunkCount);
@@ -137,13 +141,15 @@ public class DocumentIndexServiceImpl implements DocumentIndexService {
                     vectorState, keywordState);
             if (failureReason != null) {
                 chunkIndexRepository.markFailed(chunk.chunkId(), failureReason);
-                results.add(new DocumentChunkIndexResult(chunk.chunkId(), false, false, vectorId, keywordIndexId, failureReason));
+                results.add(new DocumentChunkIndexResult(chunk.chunkId(), chunk.sectionId(), chunk.indexContent(),
+                        false, false, vectorId, keywordIndexId, failureReason));
                 continue;
             }
 
             // 2. 已开启的索引阶段全部成功后，回写索引ID
             chunkIndexRepository.markIndexed(chunk.chunkId(), vectorId, keywordIndexId);
-            results.add(new DocumentChunkIndexResult(chunk.chunkId(), true, false, vectorId, keywordIndexId, null));
+            results.add(new DocumentChunkIndexResult(chunk.chunkId(), chunk.sectionId(), chunk.indexContent(),
+                    true, false, vectorId, keywordIndexId, null));
         }
         return results;
     }
@@ -153,7 +159,8 @@ public class DocumentIndexServiceImpl implements DocumentIndexService {
         for (IndexableChunk chunk : chunks) {
             // 1. 索引禁用时仍推进片段状态，表示入库流水线已完成
             chunkIndexRepository.markIndexed(chunk.chunkId(), null, null);
-            results.add(new DocumentChunkIndexResult(chunk.chunkId(), true, false, null, null, null));
+            results.add(new DocumentChunkIndexResult(chunk.chunkId(), chunk.sectionId(), chunk.indexContent(),
+                    true, false, null, null, null));
         }
         return results;
     }
@@ -193,12 +200,13 @@ public class DocumentIndexServiceImpl implements DocumentIndexService {
 
     private VectorIndexDocument toVectorIndexDocument(IndexableChunk chunk, ChunkEmbedding embedding) {
         return new VectorIndexDocument(chunk.chunkId(), chunk.documentId(), chunk.parentChunkId(), chunk.chunkOrder(),
-                chunk.text(), chunk.metadataJson(), embedding == null ? new float[0] : embedding.vector());
+                chunk.sectionId(), chunk.text(), chunk.indexContent(), chunk.metadataJson(),
+                embedding == null ? new float[0] : embedding.vector());
     }
 
     private KeywordIndexDocument toKeywordIndexDocument(IndexableChunk chunk) {
         return new KeywordIndexDocument(chunk.chunkId(), chunk.documentId(), chunk.parentChunkId(), chunk.chunkOrder(),
-                chunk.text(), chunk.metadataJson());
+                chunk.sectionId(), chunk.text(), chunk.indexContent(), chunk.metadataJson());
     }
 
     private void validateDocumentStatus(Document document) {
@@ -214,6 +222,13 @@ public class DocumentIndexServiceImpl implements DocumentIndexService {
                     DocumentErrorCode.DOCUMENT_STATUS_INVALID);
         }
         document.setStatus(DocumentStatus.INDEXED);
+    }
+
+    private void indexNavigation(Long documentId, IndexConfigSnapshot config) {
+        if (config.enabled()) {
+            // 1. 正文片段全部成功后再写入章节导航，异常由既有索引重试链路处理
+            sectionNavigationIndexRepository.upsert(documentId);
+        }
     }
 
     private String resolveFailureReason(String chunkId, boolean vectorEnabled, boolean keywordEnabled,
