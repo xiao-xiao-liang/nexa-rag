@@ -1,14 +1,11 @@
 package com.nexarag.retrieval.retriever;
 
-import com.nexarag.model.gateway.ModelGateway;
-import com.nexarag.model.gateway.embedding.EmbeddingModelResponse;
 import com.nexarag.retrieval.config.RetrievalProperties;
 import com.nexarag.retrieval.dto.req.ConversationRetrievalRequest;
 import com.nexarag.retrieval.dto.req.KeywordIndexSearchRequest;
-import com.nexarag.retrieval.dto.req.VectorIndexSearchRequest;
 import com.nexarag.retrieval.enums.RetrievalScope;
 import com.nexarag.retrieval.index.keyword.KeywordIndexClient;
-import com.nexarag.retrieval.index.vector.VectorIndexClient;
+import com.nexarag.retrieval.index.vector.DocumentVectorStore;
 import com.nexarag.retrieval.model.KeywordIndexSearchResult;
 import com.nexarag.retrieval.model.VectorIndexSearchResult;
 import com.nexarag.retrieval.retriever.keyword.Bm25ConversationRetriever;
@@ -31,20 +28,16 @@ class ConversationRetrieverCandidateConfigTest {
 
     @Test
     void vectorRetrieverShouldUseConfiguredCandidateLimitAndKeepScoreAboveConfiguredFloor() {
-        ModelGateway modelGateway = mock(ModelGateway.class);
-        VectorIndexClient vectorIndexClient = mock(VectorIndexClient.class);
+        DocumentVectorStore documentVectorStore = mock(DocumentVectorStore.class);
         RetrievalProperties properties = candidateProperties(7, 4, 0D);
-        when(modelGateway.embedding(any())).thenReturn(new EmbeddingModelResponse(List.of(new float[]{0.1F}), "embedding", 1));
-        when(vectorIndexClient.search(any())).thenReturn(List.of(
+        when(documentVectorStore.search(any(), any(Integer.class))).thenReturn(List.of(
                 new VectorIndexSearchResult("candidate", 1L, null, 1, "内容", "{}", 0.48699233D)));
 
-        List<?> result = new MilvusConversationRetriever(modelGateway, vectorIndexClient, properties)
+        List<?> result = new MilvusConversationRetriever(documentVectorStore, properties)
                 .retrieve(request());
 
         assertThat(result).hasSize(1);
-        ArgumentCaptor<VectorIndexSearchRequest> captor = ArgumentCaptor.forClass(VectorIndexSearchRequest.class);
-        verify(vectorIndexClient).search(captor.capture());
-        assertThat(captor.getValue().topK()).isEqualTo(7);
+        verify(documentVectorStore).search("退款规则", 7);
     }
 
     @Test

@@ -2,7 +2,8 @@ package com.nexarag.retrieval.service.impl;
 
 import com.nexarag.retrieval.dto.res.DocumentIndexCleanupResult;
 import com.nexarag.retrieval.index.keyword.KeywordIndexClient;
-import com.nexarag.retrieval.index.vector.VectorIndexClient;
+import com.nexarag.retrieval.index.vector.DocumentVectorStore;
+import com.nexarag.retrieval.repository.ChunkIndexRepository;
 import com.nexarag.retrieval.repository.SectionNavigationIndexRepository;
 import com.nexarag.retrieval.service.DocumentIndexCleaner;
 import lombok.RequiredArgsConstructor;
@@ -15,7 +16,8 @@ import org.springframework.stereotype.Component;
 @RequiredArgsConstructor
 public class DocumentIndexCleanerImpl implements DocumentIndexCleaner {
 
-    private final VectorIndexClient vectorIndexClient;
+    private final DocumentVectorStore documentVectorStore;
+    private final ChunkIndexRepository chunkIndexRepository;
     private final KeywordIndexClient keywordIndexClient;
     private final SectionNavigationIndexRepository sectionNavigationIndexRepository;
 
@@ -35,7 +37,8 @@ public class DocumentIndexCleanerImpl implements DocumentIndexCleaner {
 
         // 1. 独立清理向量索引，失败后仍继续执行关键词索引清理
         try {
-            vectorDeletedCount = vectorIndexClient.deleteByDocumentId(documentId);
+            vectorDeletedCount = chunkIndexRepository.listIndexedChunks(documentId).size();
+            documentVectorStore.deleteByDocumentId(documentId);
         } catch (RuntimeException exception) {
             vectorFailure = "向量索引清理失败：" + exception.getMessage();
         }

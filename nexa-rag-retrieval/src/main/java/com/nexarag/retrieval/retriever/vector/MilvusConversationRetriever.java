@@ -3,20 +3,14 @@ package com.nexarag.retrieval.retriever.vector;
 import com.nexarag.retrieval.dto.req.ConversationRetrievalRequest;
 import com.nexarag.retrieval.model.RetrievalChunk;
 import com.nexarag.retrieval.config.RetrievalProperties;
-import com.nexarag.retrieval.dto.req.VectorIndexSearchRequest;
-import com.nexarag.retrieval.index.vector.VectorIndexClient;
+import com.nexarag.retrieval.index.vector.DocumentVectorStore;
 import com.nexarag.retrieval.model.VectorIndexSearchResult;
 import com.nexarag.retrieval.retriever.ConversationRetriever;
-import com.nexarag.model.enums.ModelBizType;
-import com.nexarag.model.gateway.ModelGateway;
-import com.nexarag.model.gateway.embedding.EmbeddingModelRequest;
-import com.nexarag.model.gateway.embedding.EmbeddingModelResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
-import java.util.UUID;
 
 /**
  * 基于 Milvus 的对话向量检索通道。
@@ -26,27 +20,16 @@ import java.util.UUID;
 @ConditionalOnProperty(prefix = "nexa.retrieval.vector", name = "type", havingValue = "milvus")
 public class MilvusConversationRetriever implements ConversationRetriever {
 
-    private final ModelGateway modelGateway;
-    private final VectorIndexClient vectorIndexClient;
+    private final DocumentVectorStore documentVectorStore;
     private final RetrievalProperties retrievalProperties;
 
     @Override
     public List<RetrievalChunk> retrieve(ConversationRetrievalRequest request) {
-        // 1. 调用统一模型网关生成查询向量
-        EmbeddingModelResponse response = modelGateway.embedding(EmbeddingModelRequest.builder()
-                .traceId("chat-retrieval-" + UUID.randomUUID().toString().replace("-", ""))
-                .bizType(ModelBizType.RETRIEVAL)
-                .bizId("chat")
-                .routeKey(retrievalProperties.getEmbedding().getRouteKey())
-                .texts(List.of(request.question()))
-                .build());
-        if (response == null || response.embeddings() == null || response.embeddings().isEmpty()) {
-            return List.of();
-        }
+        // 1. 委托文档向量存储执行模型网关向量化与相似度查询
+        List<VectorIndexSearchResult> results = documentVectorStore.search(request.question(),
+                retrievalProperties.getCandidate().getVectorCandidateLimit());
 
-        // 2. 查询 Milvus 并标准化通道内排名
-        List<VectorIndexSearchResult> results = vectorIndexClient.search(new VectorIndexSearchRequest(
-                null, response.embeddings().getFirst(), retrievalProperties.getCandidate().getVectorCandidateLimit()));
+        // 2. 标准化通道内排名
         return java.util.stream.IntStream.range(0, results.size())
                 .filter(index -> results.get(index).score() >= retrievalProperties.getCandidate().getCoarseScoreFloor())
                 .mapToObj(index -> toRetrievalChunk(results.get(index), index + 1))
