@@ -8,6 +8,7 @@ import com.nexarag.document.service.DocumentPipelineOutboxService;
 import com.nexarag.infra.alert.model.AlertMessage;
 import com.nexarag.infra.messaging.document.model.DocumentPipelineMessage;
 import com.nexarag.infra.messaging.document.task.DocumentTaskMessage;
+import com.nexarag.infra.messaging.document.task.DocumentStorageCleanupMessage;
 import com.nexarag.infra.messaging.document.task.DocumentTaskMessagePublisher;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -79,6 +80,9 @@ public class DocumentPipelineOutboxPublisher {
         }
         if (taskType.isAlertTask()) {
             return objectMapper.readValue(outbox.getMessageBody(), AlertMessage.class);
+        }
+        if (taskType == DocumentTaskType.CLEAN_DOCUMENT_STORAGE) {
+            return objectMapper.readValue(outbox.getMessageBody(), DocumentStorageCleanupMessage.class);
         }
         return objectMapper.readValue(outbox.getMessageBody(), DocumentTaskMessage.class);
     }

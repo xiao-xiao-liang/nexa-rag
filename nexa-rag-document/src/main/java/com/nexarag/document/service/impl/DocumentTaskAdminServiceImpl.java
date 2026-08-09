@@ -14,6 +14,7 @@ import com.nexarag.document.service.DocumentTaskAdminService;
 import com.nexarag.infra.alert.model.AlertMessage;
 import com.nexarag.infra.messaging.document.model.DocumentPipelineMessage;
 import com.nexarag.infra.messaging.document.task.DocumentTaskMessage;
+import com.nexarag.infra.messaging.document.task.DocumentStorageCleanupMessage;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -94,6 +95,13 @@ public class DocumentTaskAdminServiceImpl implements DocumentTaskAdminService {
                     yield new DocumentTaskMessage(retryOutboxId, failedTask.getDocumentId(),
                             failedTask.getParentOutboxId(), operationId, failedTask.getTaskType().name(),
                             previous.schemaVersion(), createdTime);
+                }
+                case CLEAN_DOCUMENT_STORAGE -> {
+                    DocumentStorageCleanupMessage previous = objectMapper.readValue(failedTask.getMessageBody(),
+                            DocumentStorageCleanupMessage.class);
+                    yield new DocumentStorageCleanupMessage(retryOutboxId, failedTask.getDocumentId(), operationId,
+                            failedTask.getTaskType().name(), previous.schemaVersion(), previous.originalObjectName(),
+                            previous.parsedObjectName(), createdTime);
                 }
                 case SEND_FEISHU_FAILURE_ALERT, SEND_EMAIL_FAILURE_ALERT -> {
                     AlertMessage previous = objectMapper.readValue(failedTask.getMessageBody(), AlertMessage.class);

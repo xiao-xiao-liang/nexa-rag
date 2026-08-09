@@ -26,6 +26,14 @@ public class DocumentTaskMessagingProperties {
     @NotBlank(message = "索引清理消费者组不能为空")
     private String cleanupConsumerGroup = "nexa-document-index-cleanup-worker";
 
+    /** 对象存储清理任务 Topic。 */
+    @NotBlank(message = "对象存储清理任务Topic不能为空")
+    private String storageCleanupTopic = "nexa-document-storage-cleanup";
+
+    /** 对象存储清理消费者组。 */
+    @NotBlank(message = "对象存储清理消费者组不能为空")
+    private String storageCleanupConsumerGroup = "nexa-document-storage-cleanup-worker";
+
     /** RocketMQ 最大重新消费次数。 */
     @Min(value = 0, message = "文档任务最大重新消费次数不能小于0")
     private int maxReconsumeTimes = 5;

@@ -6,6 +6,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nexarag.common.error.BaseErrorCode;
 import com.nexarag.common.exception.ServiceException;
 import com.nexarag.document.model.entity.DocumentTaskOutboxDO;
+import com.nexarag.document.model.entity.Document;
 import com.nexarag.document.enums.DocumentTaskStatus;
 import com.nexarag.document.enums.DocumentTaskType;
 import com.nexarag.document.enums.OutboxPublishStatus;
@@ -13,6 +14,7 @@ import com.nexarag.document.service.DocumentPipelineOutboxService;
 import com.nexarag.document.service.DocumentDeleteTaskService;
 import com.nexarag.infra.config.DocumentTaskMessagingProperties;
 import com.nexarag.infra.messaging.document.task.DocumentTaskMessage;
+import com.nexarag.infra.messaging.document.task.DocumentStorageCleanupMessage;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -66,7 +68,47 @@ public class DocumentDeleteTaskServiceImpl implements DocumentDeleteTaskService 
         return outboxId;
     }
 
-    private String serialize(DocumentTaskMessage message) {
+    /**
+     * 创建一条可可靠发布的对象存储清理任务。
+     *
+     * @param document 待删除文档
+     */
+    @Override
+    public void createStorageCleanupTask(Document document) {
+        if (document == null || document.getDocumentId() == null) {
+            throw new ServiceException("创建对象存储清理任务时文档不能为空");
+        }
+
+        // 1. 生成独立执行版本和任务ID，并固化逻辑删除前的对象名
+        Long outboxId = IdWorker.getId();
+        String operationId = UUID.randomUUID().toString().replace("-", "");
+        LocalDateTime now = LocalDateTime.now();
+        String messageKey = document.getDocumentId() + ":" + DocumentTaskType.CLEAN_DOCUMENT_STORAGE + ":" + operationId;
+        DocumentStorageCleanupMessage message = new DocumentStorageCleanupMessage(outboxId, document.getDocumentId(),
+                operationId, DocumentTaskType.CLEAN_DOCUMENT_STORAGE.name(), MESSAGE_SCHEMA_VERSION,
+                document.getOriginalObjectName(), document.getParsedObjectName(), now);
+
+        // 2. 在当前事务中保存待发布任务，失败时与文档删除整体回滚
+        boolean saved = outboxService.save(DocumentTaskOutboxDO.builder()
+                .outboxId(outboxId)
+                .documentId(document.getDocumentId())
+                .processId(operationId)
+                .taskType(DocumentTaskType.CLEAN_DOCUMENT_STORAGE)
+                .messageKey(messageKey)
+                .topic(taskProperties.getStorageCleanupTopic())
+                .messageBody(serialize(message))
+                .publishStatus(OutboxPublishStatus.PENDING)
+                .taskStatus(DocumentTaskStatus.PENDING)
+                .publishRetryCount(0)
+                .consumeRetryCount(0)
+                .nextRetryTime(now)
+                .build());
+        if (!saved) {
+            throw new ServiceException("保存文档对象存储清理任务失败，documentId=" + document.getDocumentId());
+        }
+    }
+
+    private String serialize(Object message) {
         try {
             return objectMapper.writeValueAsString(message);
         } catch (JsonProcessingException exception) {

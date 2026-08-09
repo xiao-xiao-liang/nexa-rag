@@ -9,6 +9,8 @@ public enum DocumentTaskType {
     PROCESS_DOCUMENT,
     /** 文档外部索引清理任务。 */
     CLEAN_DOCUMENT_INDEX,
+    /** 文档对象存储清理任务。 */
+    CLEAN_DOCUMENT_STORAGE,
     /** 飞书最终失败告警任务。 */
     SEND_FEISHU_FAILURE_ALERT,
     /** 邮件最终失败告警任务。 */
