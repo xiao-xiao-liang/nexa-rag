@@ -19,6 +19,7 @@ import com.nexarag.document.enums.FileType;
 import com.nexarag.document.enums.DocumentErrorCode;
 import com.nexarag.document.mapper.DocumentMapper;
 import com.nexarag.document.service.DocumentService;
+import com.nexarag.document.service.DocumentChunkService;
 import com.nexarag.document.service.DocumentDeleteTaskService;
 import com.nexarag.document.enums.DocumentTaskStatus;
 import com.nexarag.document.model.vo.DocumentDeleteVO;
@@ -46,6 +47,7 @@ public class DocumentServiceImpl extends ServiceImpl<DocumentMapper, Document> i
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
     private final DocumentPipelineMessagingProperties messagingProperties;
+    private final DocumentChunkService documentChunkService;
     private final DocumentDeleteTaskService deleteTaskService;
 
     @Override
@@ -297,9 +299,12 @@ public class DocumentServiceImpl extends ServiceImpl<DocumentMapper, Document> i
             return new DocumentDeleteVO(documentId, false, null, null);
         }
 
-        // 2. 在同一事务内写入索引清理任务，失败时逻辑删除一并回滚
+        // 2. 在同一事务内逻辑删除片段，失败时文档删除会一并回滚
+        documentChunkService.deleteByDocumentId(documentId);
+
+        // 3. 写入索引清理任务；事务提交后才会被发布到外部索引清理链路
         Long cleanupOutboxId = deleteTaskService.createIndexCleanupTask(documentId);
-        log.info("删除文档记录并创建索引清理任务完成，documentId={}，cleanupOutboxId={}",
+        log.info("删除文档及片段并创建索引清理任务完成，documentId={}，cleanupOutboxId={}",
                 documentId, cleanupOutboxId);
         return new DocumentDeleteVO(documentId, true, cleanupOutboxId, DocumentTaskStatus.PENDING);
     }

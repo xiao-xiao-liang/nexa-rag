@@ -11,7 +11,9 @@ import com.nexarag.document.model.entity.Document;
 import com.nexarag.document.enums.DocumentStatus;
 import com.nexarag.document.enums.SplitStrategy;
 import com.nexarag.common.exception.ClientException;
+import com.nexarag.common.exception.ServiceException;
 import com.nexarag.document.model.vo.DocumentSummaryVO;
+import com.nexarag.document.service.DocumentChunkService;
 import com.nexarag.document.service.DocumentDeleteTaskService;
 import com.nexarag.infra.config.DocumentPipelineMessagingProperties;
 import org.junit.jupiter.api.Test;
@@ -27,6 +29,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -209,7 +212,25 @@ class DocumentServiceImplTest {
         assertThat(deleted.deleted()).isTrue();
         assertThat(deleted.cleanupOutboxId()).isEqualTo(99L);
         assertThat(documentService.deleteDocumentId).isEqualTo(1L);
+        verify(documentService.documentChunkService).deleteByDocumentId(1L);
         verify(documentService.deleteTaskService).createIndexCleanupTask(1L);
+    }
+
+    @Test
+    void deleteDocumentShouldNotCreateCleanupTaskWhenChunkDeletionFails() {
+        TestableDocumentServiceImpl documentService = new TestableDocumentServiceImpl();
+        documentService.existingDocument = Document.builder()
+                .documentId(1L)
+                .status(DocumentStatus.UPLOADED)
+                .build();
+        ServiceException exception = new ServiceException("删除文档片段失败");
+        doThrow(exception).when(documentService.documentChunkService).deleteByDocumentId(1L);
+
+        assertThatThrownBy(() -> documentService.deleteDocument(1L))
+                .isSameAs(exception);
+
+        assertThat(documentService.deleteDocumentId).isEqualTo(1L);
+        verify(documentService.deleteTaskService, never()).createIndexCleanupTask(1L);
     }
 
     @Test
@@ -261,14 +282,17 @@ class DocumentServiceImplTest {
         private IPage<Document> documentPage;
         private boolean updateResult = true;
         private final LambdaUpdateChainWrapper<Document> updateChain = mock(LambdaUpdateChainWrapper.class);
+        private final DocumentChunkService documentChunkService;
         private final DocumentDeleteTaskService deleteTaskService;
 
         private TestableDocumentServiceImpl() {
-            this(mock(DocumentDeleteTaskService.class));
+            this(mock(DocumentChunkService.class), mock(DocumentDeleteTaskService.class));
         }
 
-        private TestableDocumentServiceImpl(DocumentDeleteTaskService deleteTaskService) {
-            super(messagingProperties(), deleteTaskService);
+        private TestableDocumentServiceImpl(DocumentChunkService documentChunkService,
+                                            DocumentDeleteTaskService deleteTaskService) {
+            super(messagingProperties(), documentChunkService, deleteTaskService);
+            this.documentChunkService = documentChunkService;
             this.deleteTaskService = deleteTaskService;
             when(updateChain.eq(any(), any())).thenReturn(updateChain);
             when(updateChain.notIn(any(), any(Object[].class))).thenReturn(updateChain);
