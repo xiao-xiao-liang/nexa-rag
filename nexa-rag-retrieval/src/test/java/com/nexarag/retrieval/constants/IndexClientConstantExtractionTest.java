@@ -1,7 +1,7 @@
 package com.nexarag.retrieval.constants;
 
 import com.nexarag.retrieval.index.keyword.ElasticsearchKeywordIndexClient;
-import com.nexarag.retrieval.index.vector.MilvusVectorIndexClient;
+import com.nexarag.retrieval.index.vector.SpringAiDocumentVectorStore;
 import org.junit.jupiter.api.Test;
 
 import java.lang.reflect.Modifier;
@@ -17,7 +17,7 @@ class IndexClientConstantExtractionTest {
     @Test
     void indexClientsShouldNotDeclarePrivateStaticFinalConstants() {
         assertThat(privateStaticFinalFieldNames(ElasticsearchKeywordIndexClient.class)).isEmpty();
-        assertThat(privateStaticFinalFieldNames(MilvusVectorIndexClient.class)).isEmpty();
+        assertThat(privateStaticFinalFieldNames(SpringAiDocumentVectorStore.class)).isEmpty();
     }
 
     private String[] privateStaticFinalFieldNames(Class<?> targetClass) {

@@ -12,15 +12,11 @@ import com.nexarag.retrieval.model.IndexConfigSnapshot;
 import com.nexarag.retrieval.dto.res.DocumentChunkIndexResult;
 import com.nexarag.retrieval.dto.res.DocumentIndexCleanupResult;
 import com.nexarag.retrieval.dto.res.DocumentIndexResult;
-import com.nexarag.retrieval.model.ChunkEmbedding;
-import com.nexarag.retrieval.service.EmbeddingService;
 import com.nexarag.retrieval.index.keyword.KeywordIndexClient;
 import com.nexarag.retrieval.model.KeywordIndexDocument;
 import com.nexarag.retrieval.dto.req.KeywordIndexWriteRequest;
 import com.nexarag.retrieval.model.KeywordIndexWriteResult;
-import com.nexarag.retrieval.index.vector.VectorIndexClient;
-import com.nexarag.retrieval.model.VectorIndexDocument;
-import com.nexarag.retrieval.dto.req.VectorIndexWriteRequest;
+import com.nexarag.retrieval.index.vector.DocumentVectorStore;
 import com.nexarag.retrieval.model.VectorIndexWriteResult;
 import com.nexarag.retrieval.model.IndexableChunk;
 import com.nexarag.retrieval.repository.ChunkIndexRepository;
@@ -48,8 +44,7 @@ public class DocumentIndexServiceImpl implements DocumentIndexService {
     private final DocumentService documentService;
     private final ChunkIndexRepository chunkIndexRepository;
     private final IndexConfigResolver indexConfigResolver;
-    private final EmbeddingService embeddingService;
-    private final VectorIndexClient vectorIndexClient;
+    private final DocumentVectorStore documentVectorStore;
     private final KeywordIndexClient keywordIndexClient;
     private final DocumentIndexCleaner documentIndexCleaner;
     private final SectionNavigationIndexRepository sectionNavigationIndexRepository;
@@ -86,6 +81,10 @@ public class DocumentIndexServiceImpl implements DocumentIndexService {
         List<IndexableChunk> chunks = chunkIndexRepository.listIndexableChunks(documentId);
         int skippedChunkCount = chunkIndexRepository.listSkippedChunks(documentId).size();
         if (chunks.isEmpty()) {
+            if (vectorEnabled) {
+                // 正文全部变为不可索引时也要清除旧向量，避免重处理后召回已失效内容
+                documentVectorStore.replaceDocument(documentId, List.of());
+            }
             indexNavigation(documentId, config);
             markIndexed(document);
             return new DocumentIndexResult(documentId, true, skippedChunkCount, 0, skippedChunkCount, 0,
@@ -166,14 +165,7 @@ public class DocumentIndexServiceImpl implements DocumentIndexService {
     }
 
     private IndexWriteState writeVectorIndex(Long documentId, List<IndexableChunk> chunks, IndexConfigSnapshot config) {
-        List<ChunkEmbedding> embeddings = embeddingService.embed(chunks, config);
-        Map<String, ChunkEmbedding> embeddingMap = embeddings.stream()
-                .collect(Collectors.toMap(ChunkEmbedding::chunkId, Function.identity()));
-        List<VectorIndexDocument> documents = chunks.stream()
-                .map(chunk -> toVectorIndexDocument(chunk, embeddingMap.get(chunk.chunkId())))
-                .toList();
-        List<VectorIndexWriteResult> results = vectorIndexClient.upsert(
-                new VectorIndexWriteRequest(config.vectorCollection(), documentId, documents));
+        List<VectorIndexWriteResult> results = documentVectorStore.replaceDocument(documentId, chunks);
         Map<String, String> ids = results.stream()
                 .filter(VectorIndexWriteResult::success)
                 .collect(Collectors.toMap(VectorIndexWriteResult::chunkId, VectorIndexWriteResult::vectorId));
@@ -196,12 +188,6 @@ public class DocumentIndexServiceImpl implements DocumentIndexService {
                 .filter(result -> !result.success())
                 .collect(Collectors.toMap(KeywordIndexWriteResult::chunkId, KeywordIndexWriteResult::failureReason));
         return new IndexWriteState(ids, failures);
-    }
-
-    private VectorIndexDocument toVectorIndexDocument(IndexableChunk chunk, ChunkEmbedding embedding) {
-        return new VectorIndexDocument(chunk.chunkId(), chunk.documentId(), chunk.parentChunkId(), chunk.chunkOrder(),
-                chunk.sectionId(), chunk.text(), chunk.indexContent(), chunk.metadataJson(),
-                embedding == null ? new float[0] : embedding.vector());
     }
 
     private KeywordIndexDocument toKeywordIndexDocument(IndexableChunk chunk) {

@@ -15,12 +15,10 @@ import com.nexarag.retrieval.config.IndexConfigResolver;
 import com.nexarag.retrieval.config.RetrievalProperties;
 import com.nexarag.retrieval.dto.res.DocumentIndexResult;
 import com.nexarag.retrieval.dto.req.KeywordIndexWriteRequest;
-import com.nexarag.retrieval.dto.req.VectorIndexWriteRequest;
 import com.nexarag.retrieval.index.keyword.KeywordIndexClient;
-import com.nexarag.retrieval.index.vector.VectorIndexClient;
+import com.nexarag.retrieval.index.vector.DocumentVectorStore;
 import com.nexarag.retrieval.repository.ChunkIndexRepositoryImpl;
 import com.nexarag.retrieval.repository.SectionNavigationIndexRepository;
-import com.nexarag.retrieval.service.EmbeddingService;
 import com.nexarag.retrieval.service.DocumentIndexService;
 import org.junit.jupiter.api.Test;
 
@@ -55,16 +53,16 @@ class DocumentIndexServiceImplTest {
         assertThat(result.skippedChunkCount()).isEqualTo(1);
         assertThat(fixture.document.getStatus()).isEqualTo(DocumentStatus.INDEXED);
         assertThat(fixture.chunks.getFirst().getStatus()).isEqualTo(ChunkStatus.INDEXED);
-        assertThat(fixture.chunks.getFirst().getVectorId()).isEqualTo("mock-vector-1-chunk-1");
+        assertThat(fixture.chunks.getFirst().getVectorId()).isEqualTo("chunk-1");
         assertThat(fixture.chunks.getFirst().getKeywordIndexId()).isEqualTo("mock-keyword-1-chunk-1");
         assertThat(fixture.chunks.get(1).getStatus()).isEqualTo(ChunkStatus.SKIP_INDEX);
         assertThat(result.chunks().getFirst().sectionId()).isEqualTo(11L);
         assertThat(result.chunks().getFirst().indexContent()).isEqualTo("标题路径 > 测试文本");
-        assertThat(fixture.vectorIndexClient.lastRequest.documents())
-                .extracting(VectorIndexDocument::chunkId)
+        assertThat(fixture.documentVectorStore.lastChunks)
+                .extracting(IndexableChunk::chunkId)
                 .containsExactly("chunk-1");
-        assertThat(fixture.vectorIndexClient.lastRequest.documents().getFirst().text()).isEqualTo("测试文本");
-        assertThat(fixture.vectorIndexClient.lastRequest.documents().getFirst().indexContent())
+        assertThat(fixture.documentVectorStore.lastChunks.getFirst().text()).isEqualTo("测试文本");
+        assertThat(fixture.documentVectorStore.lastChunks.getFirst().indexContent())
                 .isEqualTo("标题路径 > 测试文本");
         verify(fixture.navigationIndexRepository).upsert(1L);
     }
@@ -86,13 +84,13 @@ class DocumentIndexServiceImplTest {
     }
 
     @Test
-    void indexDocumentShouldWriteNavigationWithoutCreatingContentRowForTitleOnlyDocument() {
+    void indexDocumentShouldClearVectorsAndWriteNavigationForTitleOnlyDocument() {
         Fixture fixture = new Fixture(DocumentStatus.CHUNKED, null, List.of());
 
         DocumentIndexResult result = fixture.service.indexDocument(1L);
 
         assertThat(result.indexedChunkCount()).isZero();
-        assertThat(fixture.vectorIndexClient.lastRequest).isNull();
+        assertThat(fixture.documentVectorStore.lastChunks).isEmpty();
         verify(fixture.navigationIndexRepository).upsert(1L);
     }
 
@@ -108,9 +106,8 @@ class DocumentIndexServiceImplTest {
     }
 
     @Test
-    void indexDocumentShouldPropagateEmbeddingExceptionWithoutRequeueing() {
-        Fixture fixture = new Fixture(DocumentStatus.CHUNKED, null, chunks(),
-                (chunks, config) -> { throw new IllegalStateException("模型服务暂时不可用"); });
+    void indexDocumentShouldPropagateVectorStoreExceptionWithoutRequeueing() {
+        Fixture fixture = new Fixture(DocumentStatus.CHUNKED, null, chunks(), new FailingDocumentVectorStore());
 
         assertThatThrownBy(() -> fixture.service.indexDocument(1L))
                 .isInstanceOf(IllegalStateException.class)
@@ -147,15 +144,15 @@ class DocumentIndexServiceImplTest {
         private final List<DocumentChunk> chunks;
         private final DocumentService documentService;
         private final DocumentIndexService service;
-        private final StubVectorIndexClient vectorIndexClient;
+        private final StubDocumentVectorStore documentVectorStore;
         private final SectionNavigationIndexRepository navigationIndexRepository;
 
         private Fixture(DocumentStatus status, String processConfigJson, List<DocumentChunk> chunks) {
-            this(status, processConfigJson, chunks, new StubEmbeddingService());
+            this(status, processConfigJson, chunks, new StubDocumentVectorStore());
         }
 
         private Fixture(DocumentStatus status, String processConfigJson, List<DocumentChunk> chunks,
-                        EmbeddingService embeddingService) {
+                        DocumentVectorStore documentVectorStore) {
             this.document = Document.builder()
                     .documentId(1L)
                     .processId("process-1")
@@ -188,12 +185,11 @@ class DocumentIndexServiceImplTest {
             this.navigationIndexRepository = mock(SectionNavigationIndexRepository.class);
             RetrievalProperties retrievalProperties = new RetrievalProperties();
             retrievalProperties.getKeyword().setType("elasticsearch");
-            this.vectorIndexClient = new StubVectorIndexClient();
+            this.documentVectorStore = documentVectorStore instanceof StubDocumentVectorStore stub ? stub : null;
             this.service = new DocumentIndexServiceImpl(documentService,
                     new ChunkIndexRepositoryImpl(documentChunkService),
                     new IndexConfigResolver(objectMapper, retrievalProperties),
-                    embeddingService,
-                    vectorIndexClient,
+                    documentVectorStore,
                     new StubKeywordIndexClient(),
                     cleaner,
                     navigationIndexRepository);
@@ -229,38 +225,47 @@ class DocumentIndexServiceImplTest {
     }
 
     /**
-     * 测试用 Embedding 服务，生成确定性向量，避免依赖真实模型服务。
+     * 测试用文档向量存储，返回稳定向量索引ID。
      */
-    private static class StubEmbeddingService implements EmbeddingService {
+    private static class StubDocumentVectorStore implements DocumentVectorStore {
+
+        private List<IndexableChunk> lastChunks;
 
         @Override
-        public List<ChunkEmbedding> embed(List<IndexableChunk> chunks,
-                                          IndexConfigSnapshot config) {
+        public List<VectorIndexWriteResult> replaceDocument(Long documentId, List<IndexableChunk> chunks) {
+            lastChunks = chunks;
             return chunks.stream()
-                    .map(chunk -> new ChunkEmbedding(chunk.chunkId(), new float[]{1.0F, 0.0F}, "test", null))
+                    .map(chunk -> new VectorIndexWriteResult(chunk.chunkId(), chunk.chunkId(), true, null))
                     .toList();
+        }
+
+        @Override
+        public List<VectorIndexSearchResult> search(String query, int topK) {
+            return List.of();
+        }
+
+        @Override
+        public void deleteByDocumentId(Long documentId) {
         }
     }
 
     /**
-     * 测试用向量索引客户端，返回稳定向量索引ID。
+     * 模拟向量存储异常，验证索引任务不会吞掉失败。
      */
-    private static class StubVectorIndexClient implements VectorIndexClient {
-
-        private VectorIndexWriteRequest lastRequest;
+    private static class FailingDocumentVectorStore implements DocumentVectorStore {
 
         @Override
-        public List<VectorIndexWriteResult> upsert(VectorIndexWriteRequest request) {
-            lastRequest = request;
-            return request.documents().stream()
-                    .map(document -> new VectorIndexWriteResult(document.chunkId(),
-                            "mock-vector-" + request.documentId() + "-" + document.chunkId(), true, null))
-                    .toList();
+        public List<VectorIndexWriteResult> replaceDocument(Long documentId, List<IndexableChunk> chunks) {
+            throw new IllegalStateException("模型服务暂时不可用");
         }
 
         @Override
-        public int deleteByDocumentId(Long documentId) {
-            return 0;
+        public List<VectorIndexSearchResult> search(String query, int topK) {
+            return List.of();
+        }
+
+        @Override
+        public void deleteByDocumentId(Long documentId) {
         }
     }
 
