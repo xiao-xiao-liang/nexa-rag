@@ -31,8 +31,8 @@ export interface DocumentProcessStatus {
   failureReason: string | null
 }
 
-/** 文本切分策略类型。 */
-export type SplitStrategy = 'CHARACTER' | 'MARKDOWN' | 'REGEX' | 'EXCEL'
+/** 与文档服务切分策略枚举保持一致。 */
+export type SplitStrategy = 'PARENT_MARKDOWN' | 'BROTHER_MARKDOWN' | 'REGEX_TEXT' | 'EXCEL'
 
 /** 文本切分配置输入。 */
 export interface SplitConfigInput {

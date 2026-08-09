@@ -64,9 +64,32 @@ describe('UploadDocumentDialog', () => {
 
     await waitFor(() =>
       expect(uploadDocument).toHaveBeenCalledWith(
-        expect.objectContaining({ file, title: '员工手册', description: '' })
+        expect.objectContaining({
+          file,
+          title: '员工手册',
+          description: '',
+          splitConfig: expect.objectContaining({ splitStrategy: 'REGEX_TEXT' }),
+        })
       )
     )
     expect(onUploaded).toHaveBeenCalledWith(18)
+  })
+
+  it('选择 Markdown 标题时应提交父子 Markdown 策略', async () => {
+    vi.mocked(uploadDocument).mockResolvedValue({ documentId: 18, processId: 'p-18', status: 'QUEUED' })
+    const user = userEvent.setup()
+    render(<UploadDocumentDialog open onOpenChange={vi.fn()} onUploaded={vi.fn()} />)
+
+    await user.upload(screen.getByLabelText('选择本地文件'), new File(['# 标题'], '员工手册.md'))
+    await user.click(screen.getByRole('button', { name: /Markdown 标题/ }))
+    await user.click(screen.getByRole('button', { name: '开始上传' }))
+
+    await waitFor(() =>
+      expect(uploadDocument).toHaveBeenCalledWith(
+        expect.objectContaining({
+          splitConfig: expect.objectContaining({ splitStrategy: 'PARENT_MARKDOWN' }),
+        })
+      )
+    )
   })
 })

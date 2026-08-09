@@ -20,7 +20,7 @@ export function UploadDocumentDialog({ open, onOpenChange, onUploaded }: UploadD
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
   const [descriptionExpanded, setDescriptionExpanded] = useState(false)
-  const [splitStrategy, setSplitStrategy] = useState<SplitStrategy>('CHARACTER')
+  const [splitStrategy, setSplitStrategy] = useState<SplitStrategy>('REGEX_TEXT')
   const [chunkSize, setChunkSize] = useState<number>(500)
   const [chunkOverlap, setChunkOverlap] = useState<number>(50)
   const [submitting, setSubmitting] = useState(false)
@@ -31,7 +31,7 @@ export function UploadDocumentDialog({ open, onOpenChange, onUploaded }: UploadD
     setTitle('')
     setDescription('')
     setDescriptionExpanded(false)
-    setSplitStrategy('CHARACTER')
+    setSplitStrategy('REGEX_TEXT')
     setChunkSize(500)
     setChunkOverlap(50)
     setError(null)
@@ -56,9 +56,9 @@ export function UploadDocumentDialog({ open, onOpenChange, onUploaded }: UploadD
     setTitle(deriveDocumentTitle(nextFile.name))
 
     if (nextFile.name.endsWith('.md') || nextFile.name.endsWith('.markdown')) {
-      setSplitStrategy('MARKDOWN')
+      setSplitStrategy('PARENT_MARKDOWN')
     } else {
-      setSplitStrategy('CHARACTER')
+      setSplitStrategy('REGEX_TEXT')
     }
     setError(null)
   }
@@ -188,16 +188,16 @@ export function UploadDocumentDialog({ open, onOpenChange, onUploaded }: UploadD
                 <button
                   type="button"
                   disabled={submitting}
-                  onClick={() => setSplitStrategy('CHARACTER')}
+                  onClick={() => setSplitStrategy('REGEX_TEXT')}
                   className={`flex flex-col justify-center rounded-xl border px-3 py-2 text-left transition-all ${
-                    splitStrategy === 'CHARACTER'
+                    splitStrategy === 'REGEX_TEXT'
                       ? 'border-indigo-500 bg-white ring-2 ring-indigo-500/20 shadow-sm'
                       : 'border-slate-200 bg-white/70 hover:border-slate-300'
                   }`}
                 >
                   <span className="flex items-center gap-1.5">
-                    <AlignLeft className={`size-3.5 ${splitStrategy === 'CHARACTER' ? 'text-indigo-600' : 'text-slate-400'}`} />
-                    <b className={`text-xs ${splitStrategy === 'CHARACTER' ? 'text-indigo-900 font-bold' : 'text-slate-700'}`}>
+                    <AlignLeft className={`size-3.5 ${splitStrategy === 'REGEX_TEXT' ? 'text-indigo-600' : 'text-slate-400'}`} />
+                    <b className={`text-xs ${splitStrategy === 'REGEX_TEXT' ? 'text-indigo-900 font-bold' : 'text-slate-700'}`}>
                       智能段落
                     </b>
                   </span>
@@ -207,16 +207,16 @@ export function UploadDocumentDialog({ open, onOpenChange, onUploaded }: UploadD
                 <button
                   type="button"
                   disabled={submitting}
-                  onClick={() => setSplitStrategy('MARKDOWN')}
+                  onClick={() => setSplitStrategy('PARENT_MARKDOWN')}
                   className={`flex flex-col justify-center rounded-xl border px-3 py-2 text-left transition-all ${
-                    splitStrategy === 'MARKDOWN'
+                    splitStrategy === 'PARENT_MARKDOWN'
                       ? 'border-indigo-500 bg-white ring-2 ring-indigo-500/20 shadow-sm'
                       : 'border-slate-200 bg-white/70 hover:border-slate-300'
                   }`}
                 >
                   <span className="flex items-center gap-1.5">
-                    <FileCode className={`size-3.5 ${splitStrategy === 'MARKDOWN' ? 'text-indigo-600' : 'text-slate-400'}`} />
-                    <b className={`text-xs ${splitStrategy === 'MARKDOWN' ? 'text-indigo-900 font-bold' : 'text-slate-700'}`}>
+                    <FileCode className={`size-3.5 ${splitStrategy === 'PARENT_MARKDOWN' ? 'text-indigo-600' : 'text-slate-400'}`} />
+                    <b className={`text-xs ${splitStrategy === 'PARENT_MARKDOWN' ? 'text-indigo-900 font-bold' : 'text-slate-700'}`}>
                       Markdown 标题
                     </b>
                   </span>
