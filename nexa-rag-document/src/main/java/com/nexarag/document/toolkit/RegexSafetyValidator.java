@@ -1,4 +1,4 @@
-package com.nexarag.document.splitter.text;
+package com.nexarag.document.toolkit;
 
 import com.nexarag.common.exception.ServiceException;
 import com.nexarag.document.enums.DocumentErrorCode;

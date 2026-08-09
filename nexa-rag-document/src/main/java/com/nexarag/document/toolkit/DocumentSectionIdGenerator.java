@@ -1,4 +1,4 @@
-package com.nexarag.document.splitter;
+package com.nexarag.document.toolkit;
 
 import com.baomidou.mybatisplus.core.toolkit.IdWorker;
 import org.springframework.stereotype.Component;

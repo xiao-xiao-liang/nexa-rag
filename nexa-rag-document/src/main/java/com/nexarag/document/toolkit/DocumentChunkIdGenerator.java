@@ -1,4 +1,4 @@
-package com.nexarag.document.splitter;
+package com.nexarag.document.toolkit;
 
 import org.springframework.stereotype.Component;
 
