@@ -1,8 +1,7 @@
 package com.nexarag.retrieval.messaging;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.nexarag.document.service.DocumentPipelineOutboxService;
-import com.nexarag.document.service.DocumentTaskAlertService;
+import com.nexarag.document.service.DocumentTaskFinalFailureService;
 import com.nexarag.infra.messaging.document.task.DocumentTaskMessage;
 import org.apache.rocketmq.common.message.MessageExt;
 import org.junit.jupiter.api.Test;
@@ -24,20 +23,18 @@ class DocumentIndexCleanupDeadLetterConsumerTest {
     @Test
     void shouldCreateAlertTasksAfterMarkingCleanupTaskFailed() throws Exception {
         ObjectMapper objectMapper = mock(ObjectMapper.class);
-        DocumentPipelineOutboxService outboxService = mock(DocumentPipelineOutboxService.class);
-        DocumentTaskAlertService alertService = mock(DocumentTaskAlertService.class);
+        DocumentTaskFinalFailureService finalFailureService = mock(DocumentTaskFinalFailureService.class);
         DocumentTaskMessage taskMessage = new DocumentTaskMessage(101L, 1L, null, "operation-1",
                 "CLEAN_DOCUMENT_INDEX", 1, LocalDateTime.of(2026, 8, 7, 18, 0));
         when(objectMapper.readValue(any(byte[].class), eq(DocumentTaskMessage.class))).thenReturn(taskMessage);
-        when(outboxService.markTaskFailed(eq(101L), eq(6), any())).thenReturn(true);
         DocumentIndexCleanupDeadLetterConsumer consumer = new DocumentIndexCleanupDeadLetterConsumer(objectMapper,
-                outboxService, alertService);
+                finalFailureService);
         MessageExt messageExt = new MessageExt();
         messageExt.setBody("{}".getBytes(StandardCharsets.UTF_8));
         messageExt.setReconsumeTimes(5);
 
         consumer.onMessage(messageExt);
 
-        verify(alertService).createFailureAlerts(101L, 6, "文档索引清理任务进入RocketMQ死信队列");
+        verify(finalFailureService).markFailedAndCreateAlerts(101L, 6, "文档索引清理任务进入RocketMQ死信队列");
     }
 }

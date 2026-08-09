@@ -3,8 +3,7 @@ package com.nexarag.retrieval.messaging;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nexarag.common.error.BaseErrorCode;
 import com.nexarag.common.exception.ServiceException;
-import com.nexarag.document.service.DocumentPipelineOutboxService;
-import com.nexarag.document.service.DocumentTaskAlertService;
+import com.nexarag.document.service.DocumentTaskFinalFailureService;
 import com.nexarag.infra.messaging.document.task.DocumentTaskMessage;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -26,20 +25,15 @@ public class DocumentIndexCleanupDeadLetterConsumer implements RocketMQListener<
     private static final String FAILURE_REASON = "文档索引清理任务进入RocketMQ死信队列";
 
     private final ObjectMapper objectMapper;
-    private final DocumentPipelineOutboxService outboxService;
-    private final DocumentTaskAlertService taskAlertService;
+    private final DocumentTaskFinalFailureService finalFailureService;
 
     @Override
     public void onMessage(MessageExt messageExt) {
         DocumentTaskMessage message = deserialize(messageExt);
         int consumeRetryCount = Math.max(messageExt.getReconsumeTimes() + 1, 1);
 
-        // 1. 仅在父清理任务首次进入FAILED时创建渠道告警，避免死信重复投递产生重复任务
-        boolean markedFailed = outboxService.markTaskFailed(message.outboxId(), consumeRetryCount, FAILURE_REASON);
-        if (!markedFailed) {
-            return;
-        }
-        taskAlertService.createFailureAlerts(message.outboxId(), consumeRetryCount, FAILURE_REASON);
+        // 1. 在同一事务中标记最终失败并创建告警，失败时由死信消息重投
+        finalFailureService.markFailedAndCreateAlerts(message.outboxId(), consumeRetryCount, FAILURE_REASON);
         log.error("文档索引清理任务进入死信队列，outboxId={}，documentId={}，operationId={}",
                 message.outboxId(), message.documentId(), message.operationId());
     }
