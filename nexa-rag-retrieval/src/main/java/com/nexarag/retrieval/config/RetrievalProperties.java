@@ -101,9 +101,10 @@ public class RetrievalProperties {
         private String navigationCollectionName = "nexa_document_section_navigation";
 
         /**
-         * 向量维度，0 表示按首次写入向量维度创建集合。
+         * 向量维度，必须与当前生效 Embedding 模型返回的向量长度一致。
          */
-        private int dimension = 0;
+        @Min(1)
+        private int dimension = 1024;
 
         /**
          * 向量索引服务用户名，未启用鉴权时为空。
