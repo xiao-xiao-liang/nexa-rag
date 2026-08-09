@@ -4,7 +4,7 @@ import com.nexarag.document.model.dto.MarkdownSplitOptions;
 import com.nexarag.document.model.dto.SplitConfigRequest;
 import com.nexarag.document.enums.SplitStrategy;
 import com.nexarag.document.splitter.ChunkDraft;
-import com.nexarag.document.splitter.DocumentChunkIdGenerator;
+import com.nexarag.document.toolkit.DocumentChunkIdGenerator;
 import com.nexarag.document.splitter.DocumentSectionDraft;
 import com.nexarag.document.splitter.DocumentSplitContext;
 import com.nexarag.document.splitter.DocumentSplitResult;

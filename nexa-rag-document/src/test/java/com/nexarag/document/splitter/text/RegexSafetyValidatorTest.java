@@ -1,6 +1,7 @@
 package com.nexarag.document.splitter.text;
 
 import com.nexarag.common.exception.ServiceException;
+import com.nexarag.document.toolkit.RegexSafetyValidator;
 import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThatCode;

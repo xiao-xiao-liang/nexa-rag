@@ -1,7 +1,7 @@
 package com.nexarag.document.splitter.markdown;
 
-import com.nexarag.document.splitter.DocumentChunkIdGenerator;
-import com.nexarag.document.splitter.DocumentSectionIdGenerator;
+import com.nexarag.document.toolkit.DocumentChunkIdGenerator;
+import com.nexarag.document.toolkit.DocumentSectionIdGenerator;
 import com.nexarag.document.splitter.support.TextWindowSplitter;
 import org.junit.jupiter.api.Test;
 import org.springframework.context.annotation.AnnotationConfigApplicationContext;

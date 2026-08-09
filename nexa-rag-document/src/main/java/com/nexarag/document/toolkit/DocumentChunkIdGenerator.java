@@ -17,6 +17,6 @@ public class DocumentChunkIdGenerator {
      * @return 片段ID
      */
     public String nextChunkId(Long documentId) {
-        return "chunk_" + documentId + "_" + UUID.randomUUID().toString().replace("-", "");
+        return UUID.randomUUID().toString();
     }
 }

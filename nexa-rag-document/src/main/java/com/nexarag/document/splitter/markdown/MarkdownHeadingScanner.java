@@ -1,7 +1,7 @@
 package com.nexarag.document.splitter.markdown;
 
 import com.nexarag.document.model.dto.MarkdownSplitOptions;
-import com.nexarag.document.splitter.DocumentSectionIdGenerator;
+import com.nexarag.document.toolkit.DocumentSectionIdGenerator;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
