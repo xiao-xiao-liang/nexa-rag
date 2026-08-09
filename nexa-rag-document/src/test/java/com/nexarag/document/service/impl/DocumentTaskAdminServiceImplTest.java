@@ -7,6 +7,7 @@ import com.nexarag.document.enums.OutboxPublishStatus;
 import com.nexarag.document.model.entity.DocumentTaskOutboxDO;
 import com.nexarag.document.model.vo.DocumentTaskVO;
 import com.nexarag.document.service.DocumentPipelineOutboxService;
+import com.nexarag.infra.messaging.document.task.DocumentStorageCleanupMessage;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 
@@ -56,5 +57,39 @@ class DocumentTaskAdminServiceImplTest {
         assertThat(captor.getValue().getTaskStatus()).isEqualTo(DocumentTaskStatus.PENDING);
         assertThat(captor.getValue().getMessageBody()).contains("outboxId");
         assertThat(retried.taskStatus()).isEqualTo(DocumentTaskStatus.PENDING);
+    }
+
+    @Test
+    void shouldKeepObjectNamesWhenRetryingStorageCleanupTask() throws Exception {
+        DocumentPipelineOutboxService outboxService = mock(DocumentPipelineOutboxService.class);
+        ObjectMapper objectMapper = mock(ObjectMapper.class);
+        DocumentTaskOutboxDO failedTask = DocumentTaskOutboxDO.builder()
+                .outboxId(11L)
+                .documentId(1L)
+                .processId("operation-old")
+                .taskType(DocumentTaskType.CLEAN_DOCUMENT_STORAGE)
+                .messageKey("message-old")
+                .topic("nexa-document-storage-cleanup")
+                .messageBody("{}")
+                .publishStatus(OutboxPublishStatus.PUBLISHED)
+                .taskStatus(DocumentTaskStatus.FAILED)
+                .build();
+        when(outboxService.getById(11L)).thenReturn(failedTask);
+        when(outboxService.save(org.mockito.ArgumentMatchers.any(DocumentTaskOutboxDO.class))).thenReturn(true);
+        when(objectMapper.readValue("{}", DocumentStorageCleanupMessage.class))
+                .thenReturn(new DocumentStorageCleanupMessage(11L, 1L, "operation-old", "CLEAN_DOCUMENT_STORAGE", 1,
+                        "original/demo.pdf", "parsed/demo.md", java.time.LocalDateTime.now()));
+        when(objectMapper.writeValueAsString(org.mockito.ArgumentMatchers.any())).thenReturn("{}");
+        DocumentTaskAdminServiceImpl service = new DocumentTaskAdminServiceImpl(outboxService, objectMapper);
+
+        service.retryFailedTask(11L);
+
+        ArgumentCaptor<Object> messageCaptor = ArgumentCaptor.forClass(Object.class);
+        verify(objectMapper).writeValueAsString(messageCaptor.capture());
+        assertThat(messageCaptor.getValue()).isInstanceOf(DocumentStorageCleanupMessage.class);
+        DocumentStorageCleanupMessage message = (DocumentStorageCleanupMessage) messageCaptor.getValue();
+        assertThat(message.outboxId()).isNotEqualTo(11L);
+        assertThat(message.originalObjectName()).isEqualTo("original/demo.pdf");
+        assertThat(message.parsedObjectName()).isEqualTo("parsed/demo.md");
     }
 }

@@ -30,6 +30,7 @@ import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.mockingDetails;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -213,7 +214,9 @@ class DocumentServiceImplTest {
         assertThat(deleted.cleanupOutboxId()).isEqualTo(99L);
         assertThat(documentService.deleteDocumentId).isEqualTo(1L);
         verify(documentService.documentChunkService).deleteByDocumentId(1L);
+        verify(documentService.deleteTaskService).createStorageCleanupTask(documentService.existingDocument);
         verify(documentService.deleteTaskService).createIndexCleanupTask(1L);
+        assertThat(mockingDetails(documentService.deleteTaskService).getInvocations()).hasSize(2);
     }
 
     @Test
