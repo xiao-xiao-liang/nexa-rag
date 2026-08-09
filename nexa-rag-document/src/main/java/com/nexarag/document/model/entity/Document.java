@@ -22,7 +22,7 @@ import java.time.LocalDateTime;
  */
 @Getter
 @Setter
-@Builder
+@Builder(toBuilder = true)
 @NoArgsConstructor
 @AllArgsConstructor
 @TableName("document")

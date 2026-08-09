@@ -121,28 +121,28 @@ public class DocumentServiceImpl extends ServiceImpl<DocumentMapper, Document> i
         }
 
         // 1. 更新处理配置快照和排队状态
-        document.setProcessConfigJson(serializeProcessConfig(request));
-        document.setStatus(DocumentStatus.QUEUED);
-        document.setQueueStage(QUEUE_STAGE_PIPELINE);
-        document.setQueueTime(LocalDateTime.now());
-        document.setProcessId(processId);
-        document.setMessageStatus(DocumentPipelineMessageStatus.PENDING_PUBLISH);
-        document.setConsumedTimes(0);
-        document.setLastMessageId(null);
-        document.setRetryCount(0);
-        document.setMaxRetryCount(messagingProperties.getMaxReconsumeTimes());
-        document.setLastRetryTime(null);
-        document.setFailureStage(null);
-        document.setFailureReason(null);
-        document.setFailureDetail(null);
+        Document updatedDocument = document.toBuilder()
+                .processConfigJson(serializeProcessConfig(request))
+                .status(DocumentStatus.QUEUED)
+                .queueStage(QUEUE_STAGE_PIPELINE)
+                .queueTime(LocalDateTime.now())
+                .processId(processId)
+                .messageStatus(DocumentPipelineMessageStatus.PENDING_PUBLISH)
+                .consumedTimes(0)
+                .lastMessageId(null)
+                .retryCount(0)
+                .maxRetryCount(messagingProperties.getMaxReconsumeTimes())
+                .lastRetryTime(null)
+                .failureStage(null)
+                .failureReason(null)
+                .failureDetail(null)
+                .build();
 
         // 2. 使用原状态作为条件，避免并发重复提交
-        if (documentStatusUpdateFailed(document, oldStatus)) {
-            throw new ClientException("文档状态已变化，请刷新后重试，documentId=" + documentId,
-                    DocumentErrorCode.DOCUMENT_STATUS_INVALID);
+        if (documentStatusUpdateFailed(updatedDocument, oldStatus)) {
+            throw new ClientException("文档状态已变化，请刷新后重试，文档ID" + documentId, DocumentErrorCode.DOCUMENT_STATUS_INVALID);
         }
-        log.info("文档提交处理成功，documentId={}，oldStatus={}，newStatus={}",
-                documentId, oldStatus, document.getStatus());
+        log.info("文档提交处理成功，文档ID：{}，原状态：{} -> 当前状态：{}", documentId, oldStatus, updatedDocument.getStatus());
         return document;
     }
 
@@ -291,7 +291,7 @@ public class DocumentServiceImpl extends ServiceImpl<DocumentMapper, Document> i
     @Override
     @Transactional(rollbackFor = Exception.class)
     public DocumentDeleteVO deleteDocument(Long documentId) {
-        getRequiredDocument(documentId);
+        Document document = getRequiredDocument(documentId);
 
         // 1. 通过统一逻辑删除入口写入删除标记和删除时间
         boolean deleted = logicDeleteDocument(documentId);
@@ -302,9 +302,10 @@ public class DocumentServiceImpl extends ServiceImpl<DocumentMapper, Document> i
         // 2. 在同一事务内逻辑删除片段，失败时文档删除会一并回滚
         documentChunkService.deleteByDocumentId(documentId);
 
-        // 3. 写入索引清理任务；事务提交后才会被发布到外部索引清理链路
+        // 3. 写入对象存储和索引清理任务；事务提交后才会执行外部副作用
+        deleteTaskService.createStorageCleanupTask(document);
         Long cleanupOutboxId = deleteTaskService.createIndexCleanupTask(documentId);
-        log.info("删除文档及片段并创建索引清理任务完成，documentId={}，cleanupOutboxId={}",
+        log.info("删除文档及片段并创建对象存储和索引清理任务完成，documentId={}，cleanupOutboxId={}",
                 documentId, cleanupOutboxId);
         return new DocumentDeleteVO(documentId, true, cleanupOutboxId, DocumentTaskStatus.PENDING);
     }
