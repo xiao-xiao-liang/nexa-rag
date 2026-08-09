@@ -24,16 +24,19 @@ export class ApiError extends Error {
  */
 export async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const headers = new Headers(init?.headers)
-  if (init?.body && !headers.has('Content-Type')) {
+  const isFormDataRequest = init?.body instanceof FormData
+  if (isFormDataRequest) {
+    headers.delete('Content-Type')
+  }
+
+  const shouldAddDefaultContentType = init?.body != null && !isFormDataRequest && !headers.has('Content-Type')
+  if (shouldAddDefaultContentType) {
     headers.set('Content-Type', 'application/json')
   }
 
   let response: Response
   try {
-    response = await fetch(path, {
-      ...init,
-      headers,
-    })
+    response = await fetch(path, (init?.headers || shouldAddDefaultContentType) ? { ...init, headers } : init)
   } catch (error) {
     // 1. 取消请求属于调用方控制流，必须保留原始 AbortError。
     if (isAbortError(error)) {

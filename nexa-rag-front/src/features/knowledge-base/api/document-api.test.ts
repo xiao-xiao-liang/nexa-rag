@@ -26,6 +26,7 @@ describe('文档接口客户端', () => {
     const init = fetchMock.mock.calls[0][1] as RequestInit
     const formData = init.body as FormData
     expect(init.method).toBe('POST')
+    expect(new Headers(init.headers).has('Content-Type')).toBe(false)
     expect(formData.get('file')).toBe(file)
     expect(formData.get('request')).toBeInstanceOf(Blob)
     expect(await readBlob(formData.get('request') as Blob)).toBe(JSON.stringify({ title: '员工手册', description: '内部制度' }))
