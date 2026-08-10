@@ -79,7 +79,7 @@ public class DocumentIngestionWorkflowConfiguration {
 
         // 4. 输出图结构，便于开发阶段排查节点编排
         GraphRepresentation representation = graph.getGraph(GraphRepresentation.Type.PLANTUML, "document ingestion workflow");
-        log.info("文档入库 Workflow Graph 已装配，PlantUML:\n{}", representation.content());
+        log.debug("文档入库 Workflow Graph 已装配，PlantUML:\n{}", representation.content());
         return graph;
     }
 
