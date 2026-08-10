@@ -85,6 +85,10 @@ public class DocumentIndexServiceImpl implements DocumentIndexService {
                 // 正文全部变为不可索引时也要清除旧向量，避免重处理后召回已失效内容
                 documentVectorStore.replaceDocument(documentId, List.of());
             }
+            if (keywordEnabled) {
+                // 正文全部变为不可索引时同步清除旧关键词记录，保持双索引替换语义一致
+                keywordIndexClient.deleteByDocumentId(documentId, config.keywordIndexName());
+            }
             indexNavigation(documentId, config);
             markIndexed(document);
             return new DocumentIndexResult(documentId, true, skippedChunkCount, 0, skippedChunkCount, 0,
@@ -179,7 +183,7 @@ public class DocumentIndexServiceImpl implements DocumentIndexService {
         List<KeywordIndexDocument> documents = chunks.stream()
                 .map(this::toKeywordIndexDocument)
                 .toList();
-        List<KeywordIndexWriteResult> results = keywordIndexClient.upsert(
+        List<KeywordIndexWriteResult> results = keywordIndexClient.replaceDocument(
                 new KeywordIndexWriteRequest(config.keywordIndexName(), documentId, documents));
         Map<String, String> ids = results.stream()
                 .filter(KeywordIndexWriteResult::success)
@@ -211,7 +215,7 @@ public class DocumentIndexServiceImpl implements DocumentIndexService {
     }
 
     private void indexNavigation(Long documentId, IndexConfigSnapshot config) {
-        if (config.enabled()) {
+        if (config.enabled() && config.keywordEnabled()) {
             // 1. 正文片段全部成功后再写入章节导航，异常由既有索引重试链路处理
             sectionNavigationIndexRepository.upsert(documentId);
         }

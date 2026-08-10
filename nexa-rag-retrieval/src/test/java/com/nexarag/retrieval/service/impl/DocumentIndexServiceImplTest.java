@@ -91,7 +91,30 @@ class DocumentIndexServiceImplTest {
 
         assertThat(result.indexedChunkCount()).isZero();
         assertThat(fixture.documentVectorStore.lastChunks).isEmpty();
+        assertThat(fixture.keywordIndexClient.operations())
+                .containsExactly("delete:1:nexa_document_chunk");
         verify(fixture.navigationIndexRepository).upsert(1L);
+    }
+
+    @Test
+    void indexDocumentShouldReplaceKeywordIndexBeforeWritingNewChunks() {
+        Fixture fixture = new Fixture(DocumentStatus.CHUNKED, null, chunks());
+
+        fixture.service.indexDocument(1L);
+
+        assertThat(fixture.keywordIndexClient.operations())
+                .containsExactly("delete:1:nexa_document_chunk", "upsert:1");
+    }
+
+    @Test
+    void indexDocumentShouldNotWriteNavigationWhenKeywordIndexDisabled() throws Exception {
+        ProcessDocumentRequest request = new ProcessDocumentRequest(null, null,
+                new IndexConfigRequest(true, true, false));
+        Fixture fixture = new Fixture(DocumentStatus.CHUNKED, objectMapper.writeValueAsString(request), chunks());
+
+        fixture.service.indexDocument(1L);
+
+        verify(fixture.navigationIndexRepository, never()).upsert(1L);
     }
 
     @Test
@@ -145,6 +168,7 @@ class DocumentIndexServiceImplTest {
         private final DocumentService documentService;
         private final DocumentIndexService service;
         private final StubDocumentVectorStore documentVectorStore;
+        private final StubKeywordIndexClient keywordIndexClient;
         private final SectionNavigationIndexRepository navigationIndexRepository;
 
         private Fixture(DocumentStatus status, String processConfigJson, List<DocumentChunk> chunks) {
@@ -183,6 +207,7 @@ class DocumentIndexServiceImplTest {
             }).when(documentChunkService).markDocumentSkippedChunks(eq(1L));
             DocumentIndexCleaner cleaner = mock(DocumentIndexCleaner.class);
             this.navigationIndexRepository = mock(SectionNavigationIndexRepository.class);
+            this.keywordIndexClient = new StubKeywordIndexClient();
             RetrievalProperties retrievalProperties = new RetrievalProperties();
             retrievalProperties.getKeyword().setType("elasticsearch");
             this.documentVectorStore = documentVectorStore instanceof StubDocumentVectorStore stub ? stub : null;
@@ -190,7 +215,7 @@ class DocumentIndexServiceImplTest {
                     new ChunkIndexRepositoryImpl(documentChunkService),
                     new IndexConfigResolver(objectMapper, retrievalProperties),
                     documentVectorStore,
-                    new StubKeywordIndexClient(),
+                    keywordIndexClient,
                     cleaner,
                     navigationIndexRepository);
         }
@@ -274,8 +299,11 @@ class DocumentIndexServiceImplTest {
      */
     private static class StubKeywordIndexClient implements KeywordIndexClient {
 
+        private final List<String> operations = new ArrayList<>();
+
         @Override
         public List<KeywordIndexWriteResult> upsert(KeywordIndexWriteRequest request) {
+            operations.add("upsert:" + request.documentId());
             return request.documents().stream()
                     .map(document -> new KeywordIndexWriteResult(document.chunkId(),
                             "mock-keyword-" + request.documentId() + "-" + document.chunkId(), true, null))
@@ -284,7 +312,18 @@ class DocumentIndexServiceImplTest {
 
         @Override
         public int deleteByDocumentId(Long documentId) {
+            operations.add("delete:" + documentId + ":default");
             return 0;
+        }
+
+        @Override
+        public int deleteByDocumentId(Long documentId, String indexName) {
+            operations.add("delete:" + documentId + ":" + indexName);
+            return 0;
+        }
+
+        private List<String> operations() {
+            return operations;
         }
     }
 }
