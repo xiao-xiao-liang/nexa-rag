@@ -48,12 +48,10 @@ import static org.assertj.core.api.Assertions.assertThat;
         "nexa.retrieval.vector.database-name=",
         "nexa.retrieval.vector.collection-name=nexa_document_chunk",
         "nexa.retrieval.keyword.type=elasticsearch",
-        "nexa.retrieval.keyword.scheme=http",
-        "nexa.retrieval.keyword.host=192.168.0.134",
-        "nexa.retrieval.keyword.port=9200",
         "nexa.retrieval.keyword.index-name=nexa_document_chunk",
-        "nexa.retrieval.keyword.username=elastic",
-        "nexa.retrieval.keyword.password="
+        "spring.elasticsearch.uris=http://192.168.0.134:9200",
+        "spring.elasticsearch.username=elastic",
+        "spring.elasticsearch.password="
 })
 class DocumentMilvusIndexIntegrationTest {
 

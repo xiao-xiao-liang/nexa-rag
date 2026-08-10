@@ -135,21 +135,6 @@ public class RetrievalProperties {
         private String type = "none";
 
         /**
-         * 关键词索引服务协议。
-         */
-        private String scheme = "http";
-
-        /**
-         * 关键词索引服务地址。
-         */
-        private String host = "192.168.0.134";
-
-        /**
-         * 关键词索引服务端口。
-         */
-        private int port = 9200;
-
-        /**
          * 关键词索引名称。
          */
         private String indexName = "nexa_document_chunk";
@@ -159,20 +144,6 @@ public class RetrievalProperties {
          */
         private String navigationIndexName = "nexa_document_section_navigation";
 
-        /**
-         * 关键词索引服务用户名。
-         */
-        private String username = "elastic";
-
-        /**
-         * 关键词索引服务密码。
-         */
-        private String password = "";
-
-        /**
-         * 请求超时时间，单位毫秒。
-         */
-        private long requestTimeoutMs = 30000;
     }
 
     /**

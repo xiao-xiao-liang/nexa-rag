@@ -34,6 +34,11 @@ spring:
     url: jdbc:mysql://192.168.0.134:3306/nexa_rag?useUnicode=true&characterEncoding=utf8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true
     username: root
     password:  # root
+  elasticsearch:
+    uris: http://192.168.0.134:9200 # Spring Data Elasticsearch 连接地址。
+    username: elastic # Elasticsearch 用户名。
+    password:  # Elasticsearch 密码。
+    socket-timeout: 30s # Elasticsearch 请求超时时间。
 
 # RocketMQ连接配置。name-server为NameServer地址，多个地址使用分号分隔；producer.group为全局生产者组名称。
 rocketmq:
@@ -149,14 +154,8 @@ nexa:
       password: # 向量索引服务密码，未启用鉴权时为空。
       rpc-deadline-ms: 60000 # 向量索引 RPC 超时时间，单位：毫秒。
     keyword:
-      type: none # elasticsearch # 关键词索引类型，可选值：none/elasticsearch。
-      scheme: http # 关键词索引服务协议。
-      host: 192.168.0.134 # Elasticsearch 服务地址。
-      port: 9200 # Elasticsearch HTTP 端口。
+      type: elasticsearch # elasticsearch # 关键词索引类型，可选值：none/elasticsearch。
       index-name: nexa_document_chunk # 文档片段关键词索引名称。
-      username: elastic # Elasticsearch 用户名。
-      password:  # Elasticsearch 密码。
-      request-timeout-ms: 30000 # Elasticsearch 请求超时时间，单位：毫秒。
 
   # 模型治理配置，用于控制模型路由、Profile、密钥加密和注册表刷新。
   model:

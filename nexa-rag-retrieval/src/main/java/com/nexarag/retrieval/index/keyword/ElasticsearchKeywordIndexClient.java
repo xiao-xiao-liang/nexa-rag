@@ -1,39 +1,37 @@
 package com.nexarag.retrieval.index.keyword;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.nexarag.common.error.BaseErrorCode;
 import com.nexarag.common.exception.ServiceException;
 import com.nexarag.retrieval.config.RetrievalProperties;
-import com.nexarag.retrieval.dto.req.KeywordIndexWriteRequest;
 import com.nexarag.retrieval.dto.req.KeywordIndexSearchRequest;
+import com.nexarag.retrieval.dto.req.KeywordIndexWriteRequest;
 import com.nexarag.retrieval.model.KeywordIndexDocument;
 import com.nexarag.retrieval.model.KeywordIndexSearchResult;
 import com.nexarag.retrieval.model.KeywordIndexWriteResult;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.elasticsearch.client.elc.NativeQuery;
+import org.springframework.data.elasticsearch.core.ElasticsearchOperations;
+import org.springframework.data.elasticsearch.core.IndexOperations;
+import org.springframework.data.elasticsearch.core.SearchHit;
+import org.springframework.data.elasticsearch.core.document.Document;
+import org.springframework.data.elasticsearch.core.mapping.IndexCoordinates;
+import org.springframework.data.elasticsearch.core.query.ByQueryResponse;
+import org.springframework.data.elasticsearch.core.query.DeleteQuery;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 
-import java.io.IOException;
-import java.net.URI;
-import java.net.URLEncoder;
-import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
-import java.nio.charset.StandardCharsets;
-import java.time.Duration;
-import java.util.Base64;
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
 
-import static com.nexarag.retrieval.constants.DocumentIndexFieldConstants.*;
-import static com.nexarag.retrieval.constants.ElasticsearchIndexConstants.MAX_RESPONSE_BODY_LENGTH;
+import static com.nexarag.retrieval.constants.DocumentIndexFieldConstants.DOCUMENT_ID;
+import static com.nexarag.retrieval.constants.DocumentIndexFieldConstants.INDEX_CONTENT;
+import static com.nexarag.retrieval.constants.DocumentIndexFieldConstants.TEXT;
 
 /**
- * Elasticsearch 关键词索引客户端，负责创建片段关键词索引、写入片段文本并按文档清理索引数据。
+ * 基于 Spring Data Elasticsearch 的关键词索引客户端。
+ *
+ * <p>该客户端只承担 BM25 索引读写；召回通道排序与 RRF 融合仍由既有检索节点负责。</p>
  */
 @Slf4j
 @Component
@@ -42,8 +40,7 @@ import static com.nexarag.retrieval.constants.ElasticsearchIndexConstants.MAX_RE
 public class ElasticsearchKeywordIndexClient implements KeywordIndexClient {
 
     private final RetrievalProperties retrievalProperties;
-    private final ObjectMapper objectMapper;
-    private final HttpClient httpClient = HttpClient.newHttpClient();
+    private final ElasticsearchOperations elasticsearchOperations;
 
     /**
      * 批量写入或更新 Elasticsearch 关键词索引。
@@ -57,13 +54,21 @@ public class ElasticsearchKeywordIndexClient implements KeywordIndexClient {
             return List.of();
         }
 
-        // 1. 写入前确认索引存在，不存在时按片段检索字段创建
+        // 1. 按运行时索引名创建或补齐映射，支持正文和章节导航物理隔离。
         String indexName = resolveIndexName(request.indexName());
-        ensureIndex(indexName);
+        IndexCoordinates indexCoordinates = IndexCoordinates.of(indexName);
+        ensureIndex(indexCoordinates);
 
-        // 2. 逐片段写入关键词索引，返回稳定索引ID供数据库回写
+        // 2. 由 Spring Data 统一完成批量 upsert 和对象字段转换。
+        List<KeywordIndexDocumentDO> documents = request.documents().stream()
+                .map(KeywordIndexDocumentDO::from)
+                .toList();
+        elasticsearchOperations.save(documents, indexCoordinates);
+
+        // 3. 保持数据库回写使用的稳定关键词索引ID不变。
         return request.documents().stream()
-                .map(document -> upsertDocument(indexName, document))
+                .map(document -> new KeywordIndexWriteResult(document.chunkId(),
+                        keywordIndexId(indexName, document.chunkId()), true, null))
                 .toList();
     }
 
@@ -79,24 +84,21 @@ public class ElasticsearchKeywordIndexClient implements KeywordIndexClient {
             return List.of();
         }
 
-        // 1. 同时检索新索引字段和历史正文，兼容未完成重建的旧文档
+        // 1. 同时检索新索引字段和历史正文，兼容未完成重建的旧文档。
+        NativeQuery query = buildSearchQuery(request.query(), request.topK());
         String indexName = resolveIndexName(request.indexName());
-        Map<String, Object> body = Map.of(
-                "size", request.topK(),
-                "query", Map.of("bool", Map.of(
-                        "should", List.of(
-                                Map.of("match", Map.of(INDEX_CONTENT, request.query())),
-                                Map.of("match", Map.of(TEXT, request.query()))),
-                        "minimum_should_match", 1)));
-        HttpResponse<String> response = send(jsonRequest("POST", "/" + encodePath(indexName) + "/_search", toJson(body)));
-        validateSuccess(response, "Elasticsearch 关键词检索失败");
+        List<SearchHit<KeywordIndexDocumentDO>> searchHits = elasticsearchOperations
+                .search(query, KeywordIndexDocumentDO.class, IndexCoordinates.of(indexName))
+                .getSearchHits();
 
-        // 2. 将 Elasticsearch 文档和分数转换为模块内标准结果
-        return parseSearchResults(response.body());
+        // 2. 保留 Elasticsearch 原始 BM25 分数，交由既有 RRF 节点融合。
+        return searchHits.stream()
+                .map(this::toSearchResult)
+                .toList();
     }
 
     /**
-     * 按文档ID删除 Elasticsearch 关键词索引。
+     * 按文档ID删除默认 Elasticsearch 关键词索引中的记录。
      *
      * @param documentId 文档ID
      * @return 删除数量
@@ -119,202 +121,69 @@ public class ElasticsearchKeywordIndexClient implements KeywordIndexClient {
             return 0;
         }
 
-        // 1. 使用 delete_by_query 按稳定文档ID清理片段索引
+        // 1. 通过 Spring Data delete_by_query 清理指定文档的全部片段。
         String resolvedIndexName = resolveIndexName(indexName);
-        Map<String, Object> termValue = Map.of("value", documentId);
-        Map<String, Object> body = Map.of("query",
-                Map.of("term", Map.of(DOCUMENT_ID, termValue)));
-        HttpResponse<String> response = send(jsonRequest("POST", "/" + encodePath(resolvedIndexName) + "/_delete_by_query",
-                toJson(body)));
-        validateSuccess(response, "Elasticsearch 关键词索引清理失败");
-        int deletedCount = parseDeletedCount(response.body());
-        log.info("Elasticsearch 关键词索引清理完成，documentId={}，indexName={}，deletedCount={}",
-                documentId, resolvedIndexName, deletedCount);
+        NativeQuery query = NativeQuery.builder()
+                .withQuery(queryBuilder -> queryBuilder.term(term -> term
+                        .field(DOCUMENT_ID)
+                        .value(documentId)))
+                .build();
+        ByQueryResponse response = elasticsearchOperations.delete(DeleteQuery.builder(query).build(),
+                KeywordIndexDocumentDO.class, IndexCoordinates.of(resolvedIndexName));
+        int deletedCount = Math.toIntExact(response.getDeleted());
+
+        // 2. 记录真实删除数量，供异步索引清理任务排查。
+        log.info("Elasticsearch 关键词索引清理完成，文档ID：{}，indexName={}，删除数量：{}", documentId, resolvedIndexName, deletedCount);
         return deletedCount;
     }
 
-    private KeywordIndexWriteResult upsertDocument(String indexName, KeywordIndexDocument document) {
-        HttpResponse<String> response = send(jsonRequest("PUT",
-                "/" + encodePath(indexName) + "/_doc/" + encodePath(document.chunkId()),
-                toJson(toElasticsearchDocument(document))));
-        validateSuccess(response, "Elasticsearch 关键词索引写入失败");
-        return new KeywordIndexWriteResult(document.chunkId(), keywordIndexId(indexName, document.chunkId()),
-                true, null);
-    }
-
-    private void ensureIndex(String indexName) {
-        HttpResponse<String> headResponse = send(request("HEAD", "/" + encodePath(indexName), null));
-        if (isSuccess(headResponse.statusCode())) {
-            ensureSectionFieldMapping(indexName);
+    private void ensureIndex(IndexCoordinates indexCoordinates) {
+        IndexOperations targetIndexOperations = elasticsearchOperations.indexOps(indexCoordinates);
+        Document mapping = elasticsearchOperations.indexOps(KeywordIndexDocumentDO.class).createMapping();
+        if (!targetIndexOperations.exists()) {
+            createIndex(indexCoordinates, targetIndexOperations, mapping);
             return;
         }
-        if (headResponse.statusCode() != 404) {
-            throw new ServiceException("Elasticsearch 关键词索引检查失败，indexName=" + indexName
-                    + "，statusCode=" + headResponse.statusCode());
+
+        // 1. 为已存在索引补齐字段映射，不改变历史文档数据。
+        if (!targetIndexOperations.putMapping(mapping)) {
+            throw new ServiceException("Elasticsearch 关键词索引映射更新失败，indexName="
+                    + indexCoordinates.getIndexName());
         }
-
-        // 1. 索引不存在时创建基础映射，保证精确字段和全文字段类型稳定
-        HttpResponse<String> createResponse = send(jsonRequest("PUT", "/" + encodePath(indexName), mappingJson()));
-        validateSuccess(createResponse, "Elasticsearch 关键词索引创建失败");
-        log.info("Elasticsearch 关键词索引创建完成，indexName={}", indexName);
+        log.info("Elasticsearch 关键词索引映射已确认，indexName={}", indexCoordinates.getIndexName());
     }
 
-    /**
-     * 为既有关键词索引补充章节检索字段映射，不改变历史正文数据。
-     *
-     * @param indexName 索引名称
-     */
-    private void ensureSectionFieldMapping(String indexName) {
-        Map<String, Object> properties = new LinkedHashMap<>();
-        properties.put(SECTION_ID, Map.of("type", "long"));
-        properties.put(INDEX_CONTENT, Map.of("type", "text"));
-        HttpResponse<String> response = send(jsonRequest("PUT", "/" + encodePath(indexName) + "/_mapping",
-                toJson(Map.of("properties", properties))));
-        validateSuccess(response, "Elasticsearch 关键词索引映射更新失败");
-        log.info("Elasticsearch 关键词索引章节字段映射已确认，indexName={}", indexName);
-    }
-
-    private Map<String, Object> toElasticsearchDocument(KeywordIndexDocument document) {
-        Map<String, Object> body = new LinkedHashMap<>();
-        body.put(CHUNK_ID, document.chunkId());
-        body.put(DOCUMENT_ID, document.documentId());
-        body.put(PARENT_CHUNK_ID, document.parentChunkId());
-        body.put(CHUNK_ORDER, document.chunkOrder());
-        body.put(SECTION_ID, document.sectionId());
-        body.put(TEXT, document.text());
-        body.put(INDEX_CONTENT, document.indexContent());
-        body.put(METADATA_JSON, document.metadataJson());
-        return body;
-    }
-
-    private String mappingJson() {
-        Map<String, Object> properties = new LinkedHashMap<>();
-        properties.put(CHUNK_ID, Map.of("type", "keyword"));
-        properties.put(DOCUMENT_ID, Map.of("type", "long"));
-        properties.put(PARENT_CHUNK_ID, Map.of("type", "keyword"));
-        properties.put(CHUNK_ORDER, Map.of("type", "integer"));
-        properties.put(SECTION_ID, Map.of("type", "long"));
-        properties.put(TEXT, Map.of("type", "text"));
-        properties.put(INDEX_CONTENT, Map.of("type", "text"));
-        properties.put(METADATA_JSON, Map.of("type", "keyword", "index", false));
-        return toJson(Map.of("mappings", Map.of("properties", properties)));
-    }
-
-    private HttpRequest.Builder jsonRequest(String method, String path, String body) {
-        return request(method, path, body).header("Content-Type", "application/json");
-    }
-
-    private HttpRequest.Builder request(String method, String path, String body) {
-        RetrievalProperties.Keyword keywordProperties = retrievalProperties.getKeyword();
-        HttpRequest.BodyPublisher publisher = body == null
-                ? HttpRequest.BodyPublishers.noBody()
-                : HttpRequest.BodyPublishers.ofString(body, StandardCharsets.UTF_8);
-        HttpRequest.Builder builder = HttpRequest.newBuilder()
-                .uri(URI.create(baseUrl() + path))
-                .timeout(Duration.ofMillis(keywordProperties.getRequestTimeoutMs()))
-                .method(method, publisher);
-        if (StringUtils.hasText(keywordProperties.getUsername())) {
-            builder.header("Authorization", basicAuthorization(keywordProperties));
+    private void createIndex(IndexCoordinates indexCoordinates, IndexOperations targetIndexOperations, Document mapping) {
+        // 1. 索引不存在时使用实体映射创建，保证精确字段和全文字段类型稳定。
+        if (!targetIndexOperations.create(java.util.Map.of(), mapping) && !targetIndexOperations.exists()) {
+            throw new ServiceException("Elasticsearch 关键词索引创建失败，indexName="
+                    + indexCoordinates.getIndexName());
         }
-        return builder;
+        log.info("Elasticsearch 关键词索引创建完成，indexName={}", indexCoordinates.getIndexName());
     }
 
-    private HttpResponse<String> send(HttpRequest.Builder requestBuilder) {
-        try {
-            return httpClient.send(requestBuilder.build(), HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
-        } catch (IOException exception) {
-            throw new ServiceException("Elasticsearch 关键词索引请求失败", exception, BaseErrorCode.SERVICE_ERROR);
-        } catch (InterruptedException exception) {
-            Thread.currentThread().interrupt();
-            throw new ServiceException("Elasticsearch 关键词索引请求被中断", exception,
-                    BaseErrorCode.SERVICE_ERROR);
-        }
+    private NativeQuery buildSearchQuery(String queryText, int topK) {
+        return NativeQuery.builder()
+                .withQuery(queryBuilder -> queryBuilder.bool(bool -> bool
+                        .should(should -> should.match(match -> match.field(INDEX_CONTENT).query(queryText)))
+                        .should(should -> should.match(match -> match.field(TEXT).query(queryText)))
+                        .minimumShouldMatch("1")))
+                .withPageable(PageRequest.of(0, topK))
+                .build();
     }
 
-    private void validateSuccess(HttpResponse<String> response, String message) {
-        if (!isSuccess(response.statusCode())) {
-            throw new ServiceException(message + "，statusCode=" + response.statusCode()
-                    + "，responseBody=" + truncateResponseBody(response.body()));
-        }
-    }
-
-    private boolean isSuccess(int statusCode) {
-        return statusCode >= 200 && statusCode < 300;
-    }
-
-    private int parseDeletedCount(String body) {
-        try {
-            JsonNode root = objectMapper.readTree(body);
-            return root.path("deleted").asInt(0);
-        } catch (IOException exception) {
-            throw new ServiceException("解析 Elasticsearch 删除结果失败", exception,
-                    BaseErrorCode.SERVICE_ERROR);
-        }
-    }
-
-    private List<KeywordIndexSearchResult> parseSearchResults(String body) {
-        try {
-            JsonNode hits = objectMapper.readTree(body).path("hits").path("hits");
-            if (!hits.isArray()) {
-                return List.of();
-            }
-            List<KeywordIndexSearchResult> results = new java.util.ArrayList<>();
-            for (JsonNode hit : hits) {
-                JsonNode source = hit.path("_source");
-                results.add(new KeywordIndexSearchResult(
-                        source.path(CHUNK_ID).asText(null),
-                        source.path(DOCUMENT_ID).isNumber() ? source.path(DOCUMENT_ID).asLong() : null,
-                        source.path(PARENT_CHUNK_ID).asText(null),
-                        source.path(CHUNK_ORDER).isInt() ? source.path(CHUNK_ORDER).asInt() : null,
-                        source.path(SECTION_ID).isNumber() ? source.path(SECTION_ID).asLong() : null,
-                        source.path(TEXT).asText(""),
-                        source.path(METADATA_JSON).asText(null),
-                        hit.path("_score").asDouble(0.0D)));
-            }
-            return results;
-        } catch (IOException exception) {
-            throw new ServiceException("解析 Elasticsearch 关键词检索结果失败", exception, BaseErrorCode.SERVICE_ERROR);
-        }
-    }
-
-    private String toJson(Object value) {
-        try {
-            return objectMapper.writeValueAsString(value);
-        } catch (IOException exception) {
-            throw new ServiceException("序列化 Elasticsearch 请求失败", exception,
-                    BaseErrorCode.SERVICE_ERROR);
-        }
-    }
-
-    private String truncateResponseBody(String body) {
-        if (body == null || body.length() <= MAX_RESPONSE_BODY_LENGTH) {
-            return body;
-        }
-        return body.substring(0, MAX_RESPONSE_BODY_LENGTH);
+    private KeywordIndexSearchResult toSearchResult(SearchHit<KeywordIndexDocumentDO> searchHit) {
+        KeywordIndexDocumentDO document = searchHit.getContent();
+        return new KeywordIndexSearchResult(document.chunkId(), document.documentId(), document.parentChunkId(),
+                document.chunkOrder(), document.sectionId(), document.text(), document.metadataJson(),
+                searchHit.getScore());
     }
 
     private String resolveIndexName(String indexName) {
-        if (StringUtils.hasText(indexName)) {
-            return indexName;
-        }
-        return retrievalProperties.getKeyword().getIndexName();
-    }
-
-    private String baseUrl() {
-        RetrievalProperties.Keyword keywordProperties = retrievalProperties.getKeyword();
-        return keywordProperties.getScheme() + "://" + keywordProperties.getHost() + ":" + keywordProperties.getPort();
-    }
-
-    private String basicAuthorization(RetrievalProperties.Keyword keywordProperties) {
-        String credential = keywordProperties.getUsername() + ":" + keywordProperties.getPassword();
-        return "Basic " + Base64.getEncoder().encodeToString(credential.getBytes(StandardCharsets.UTF_8));
+        return StringUtils.hasText(indexName) ? indexName : retrievalProperties.getKeyword().getIndexName();
     }
 
     private String keywordIndexId(String indexName, String chunkId) {
         return "elasticsearch:" + indexName + ":" + chunkId;
-    }
-
-    private String encodePath(String path) {
-        return URLEncoder.encode(path, StandardCharsets.UTF_8).replace("+", "%20");
     }
 }
