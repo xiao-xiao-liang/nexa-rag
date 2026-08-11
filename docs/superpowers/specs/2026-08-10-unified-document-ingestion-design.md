@@ -17,11 +17,11 @@
 | 向量索引（已落地） | Spring AI `VectorStore` 已操作 Milvus；项目 `chunkId` 与 Spring AI `Document.id` 对齐。 |
 | 关键词索引（已落地） | Spring Data Elasticsearch 已替换手写 HTTP 客户端；RRF 仍由现有检索节点执行。 |
 | 双索引替换（已实现，短期） | Milvus 与正文 ES 均按文档先删除旧记录再写入新 chunk；章节导航仅在关键词索引启用时写入。 |
-| 索引构建一致性（待演进） | 普通文档重处理在当前 active `indexVersion` 内以构建批次替换该文档；索引版本切流仅保留为未来完整迁移能力。 |
+| 索引构建一致性（延后） | 当前系统整体视为唯一默认知识库；索引版本、构建批次和切流在迁移多知识库时再实现。 |
 | Embedding 变更策略（已确认） | 已有知识库禁止切换 Embedding 模型；若未来开放，必须整库新版本重建并切流。 |
-| 索引配置真实性（待修正） | 不再暴露未生效的文档级模型/collection 选择；长期改为真正按索引版本解析运行时 VectorStore。 |
-| 解析产物（待收敛） | `DocumentParseResult` 明确为整份文档的规范化解析产物，并向 `ParsedArtifact` 契约收敛。 |
-| 文件解析 | 在项目解析器适配层接入 Spring AI Alibaba `DocumentParser`，不让框架直接写向量库。 |
+| 索引配置真实性（延后） | 当前保持全局唯一模型与 collection；不暴露未生效的文档级选择，迁移多知识库时再按索引配置解析运行时 VectorStore。 |
+| 解析产物（已实现） | `ParsedArtifact` 是整份文档的规范化解析产物，仅传递对象键、内容类型和元数据。 |
+| 文件解析（已实现） | 在项目解析器适配层接入 Spring AI Alibaba `DocumentParser`，不让框架直接写向量库。 |
 | 外部来源 | 上传、飞书、语雀是并列 Source；MinIO 是统一的制品存储与可重试检查点。 |
 | 飞书 | 自建防腐 Reader，读取 Docx Block 树与 revision 后生成快照和 Markdown。 |
 | 语雀 | 包装 Spring AI Alibaba `YuQueDocumentReader`，接入项目统一来源契约。 |
@@ -58,7 +58,8 @@ flowchart LR
 | 索引构建批次（build batch） | 指定文档在指定 `indexVersion` 下的一次可重试构建尝试，记录双索引阶段状态。 | retrieval workflow | 可供查询切流的全局索引版本。 |
 | Chunk 可见性 | Chunk 在查询时间点能否参与向量或关键词召回的索引元数据。 | retrieval workflow | 前端传入的任意时间戳。 |
 | 文档版本（`documentRevisionId`） | 同一 `documentId` 的一份不可变源文件、解析产物和切分结果快照，供历史查看与按版本清理。 | document 模块 | 单次索引重试或知识库级 `indexVersion`。 |
-| `DocumentParseResult` | 项目解析阶段的领域结果，含制品定位、内容类型和元数据。 | infra 到 workflow 的契约 | Spring AI `Document` 的替代品。 |
+| `ParsedArtifact` | 项目解析阶段的领域结果，仅含对象键、内容类型和元数据。 | infra 到 workflow 的契约 | Spring AI `Document` 的替代品。 |
+| `DocumentArtifactParser` | 项目级解析产物生成策略，负责路由、持久化制品与元数据。 | infra 解析层 | Spring AI Alibaba `DocumentParser`。 |
 | Spring AI `Document` | Reader、Parser、VectorStore 之间的框架交换对象。 | 框架适配层 | 项目文档任务的持久化实体。 |
 
 `Document` 实体的对象字段应保持以下语义：
@@ -133,7 +134,7 @@ replaceDocument(documentId, chunks, indexName)
 
 构建批次用于记录双写阶段、失败原因与重试进度，避免 ES 失败后无状态地反复删除、Embedding、重写 Milvus。它不是检索切流单位。
 
-当前产品不开放已有知识库的 Embedding 模型切换。未来若开放 Embedding 模型、维度、距离度量、切分策略或知识库范围变更，才需要创建新的知识库级 `indexVersion` 并进行整体切流。届时重建流程应为：
+当前系统整体视为唯一默认知识库；不在本轮实现知识库实体、多知识库路由、`indexVersion`、构建批次或配置 resolver。当前产品不开放 Embedding 模型切换，运行时保持全局唯一模型与 collection。未来开放 Embedding 模型、维度、距离度量、切分策略或知识库范围变更时，才需要创建新的知识库级 `indexVersion` 并进行整体切流。届时重建流程应为：
 
 ```mermaid
 flowchart LR
@@ -161,7 +162,7 @@ Embedding 模型、维度、距离度量、切分策略或知识库范围改变�
 
 ## 6. 解析产物设计
 
-`DocumentParseResult` 表示整份文档已经被读取、解析和规范化后的结果，而不是切分结果。PPT 的实际链路是“原始 PPT → Tika 全文文本 → `parsed/{documentId}/content.txt` → `DocumentParseResult` → ChunkingNode 从对象存储读取并切分”。PDF/Word 的 MinerU Markdown 路径同理。
+`ParsedArtifact` 表示整份文档已经被读取、解析和规范化后的结果，而不是切分结果。PPT 的实际链路是“原始 PPT → Tika 全文文本 → `parsed/{documentId}/content.txt` → `ParsedArtifact` → ChunkingNode 从对象存储读取并切分”。PDF/Word 的 MinerU Markdown 路径同理。
 
 因此文档处理概念分为三层：
 
@@ -179,9 +180,9 @@ Spring AI Document（id = chunkId，VectorStore 写入载体）
 
 PDF/Word 等由 MinerU 产出 Markdown 的路径保持不变：原始文件从 MinIO 读取，解析 Markdown 保存到 MinIO，再由现有父子 Markdown 切分器消费。
 
-PPT、TXT、HTML 和其他适合 Tika 的输入，在现有 Tika 解析器边界替换为 Spring AI Alibaba `DocumentParser`。框架只处理 InputStream 到 `List<Document>` 的格式解析；任务状态、对象存储、切分和索引仍由项目负责。
+PPT、TXT、HTML 和其他适合 Tika 的输入，在 `DocumentArtifactParser` 的 Tika 实现内使用 Spring AI Alibaba `DocumentParser`。框架只处理 InputStream 到 `List<Document>` 的格式解析；任务状态、对象存储、切分和索引仍由项目负责。Tika 是必选解析能力，不再提供 `nexa.parser.tika.enabled` 开关。
 
-`DocumentParseResult` 的内存 `content` 与 `parsedObjectName` 双存不应成为跨阶段契约。后续应收敛为逻辑上的 `ParsedArtifact`：
+已移除原 `DocumentParseResult` 的内存 `content` 与对象 URL 双存。解析阶段的正式契约为 `ParsedArtifact`：
 
 ```java
 ParsedArtifact(
@@ -191,9 +192,20 @@ ParsedArtifact(
 )
 ```
 
-`objectKey` 是切分阶段唯一正式输入，`content` 只允许作为解析器内部临时变量。若框架返回多个页面或 Block 的 `List<Document>`，先持久化为一份 Markdown 或 JSONL 快照，再交给现有切分器；它们不是最终 Chunk。
+`objectKey` 是切分阶段唯一正式输入，`content` 只允许作为解析器内部临时变量。展示用 URL 由工作流按 `objectKey` 经 `FileStorageService` 解析。若框架返回多个页面或 Block 的 `List<Document>`，先持久化为一份 Markdown 或 JSONL 快照，再交给现有切分器；它们不是最终 Chunk。
 
 ## 7. 统一来源读取契约
+
+### 7.1 统一受理入口与来源路由
+
+前端使用同一个“创建并提交文档”入口，并在请求中传递 `sourceType`：
+
+- `LOCAL`：同时携带上传文件；
+- `FEISHU_DOCX`、`YUQUE`：携带 `sourceUrl`，不携带文件。
+
+入口层只做来源类型、请求形态和 URL 格式校验，再统一创建 `Document`、写入 Outbox 并返回排队状态。不得为飞书或语雀暴露独立的前端导入概念或在 HTTP 请求中读取远端内容。
+
+`SourceType` 决定 ParsingNode 所委托的来源处理器：本地来源复用现有文件解析服务；外部来源先读取并落来源快照，再形成 `ParsedArtifact`。远端鉴权、分页、下载、内容解析和失败分类均在异步处理阶段执行，以复用既有 RocketMQ 重试与文档状态机。
 
 建议由 infra 定义项目级 `SourceReadResult`，其逻辑字段为：
 
@@ -202,7 +214,7 @@ ParsedArtifact(
 - `sourceUrl`、`externalDocumentId`、`externalRevisionId`；
 - 标题、来源路径及平台专有可追溯元数据。
 
-所有 Source Reader 以该契约汇合；统一适配器负责落来源快照和规范化产物，并形成 `DocumentParseResult`。此接口不要求各来源提供同一种原始物理文件。
+所有 Source Reader 以该契约汇合；统一适配器负责落来源快照和规范化产物，并形成 `ParsedArtifact`。此接口不要求各来源提供同一种原始物理文件。
 
 ## 8. 来源实现
 
@@ -215,12 +227,12 @@ ParsedArtifact(
 飞书 Docx 是结构化远程内容，不应伪装成语雀或 MinIO 文件 Reader。流程如下：
 
 ```text
-导入 /docx/{token} URL
+统一创建并提交入口（sourceType=FEISHU_DOCX，sourceUrl=/docx/{token} URL）
 → 创建 FEISHU_DOCX Document + Outbox
 → ParsingNode 异步调用飞书来源 Reader
 → 使用应用身份读取文档信息、固定 revision 分页读取 Block 树
 → 保存 Block JSON 快照与 Markdown
-→ 返回 DocumentParseResult
+→ 返回 ParsedArtifact
 → 现有 ChunkingNode、IndexingNode
 ```
 
@@ -235,7 +247,7 @@ YuqueSourceReader
 → YuQueDocumentReader.get()
 → List<Spring AI Document>
 → SourceReadResult
-→ 快照、DocumentParseResult、既有切分与索引
+→ 快照、ParsedArtifact、既有切分与索引
 ```
 
 优先使用 Markdown 解析器以保留标题、列表等结构；只有语雀返回 HTML、附件或其他文件流时再选择 Tika。框架 Reader 的 Token、资源路径和 `source` metadata 是读取实现细节，项目仍须持久化外部文档 ID、版本信息和对象存储快照。
@@ -521,12 +533,12 @@ UPLOADED → QUEUED → PARSING → PARSED → CHUNKING → INDEXING → INDEXED
 
 实施应按以下顺序拆分计划：
 
-1. 修正文 ES `replaceDocument` 与章节导航 `keywordEnabled` 门禁，并为重处理回归加测试；
-2. 固化 `ParsedArtifact`、来源字段和 `SourceReadResult` 的语义；
-3. 完成框架 Tika Parser 适配；
+1. 已完成：修正文 ES `replaceDocument` 与章节导航 `keywordEnabled` 门禁，并为重处理回归加测试；
+2. 已完成：固化三字段 `ParsedArtifact` 的语义；`SourceReadResult` 留待外部来源接入时实现；
+3. 已完成：完成框架 Tika Parser 适配；
 4. 封装语雀 Reader 并完成单文档入库闭环；
 5. 实现飞书 Docx Reader 并复用相同契约；
-6. 设计并实施索引版本、构建批次、active version 切流与旧版本清理；
+6. 后续：系统从唯一默认知识库迁移到多知识库时，再设计并实施索引版本、构建批次、active version 切流与旧版本清理；
 7. 执行已有文档的初始 revision 回填，完成数据库、Milvus、正文 ES、导航 ES 的计数核验后启用 revision 过滤；
 8. 为每种来源和每个构建阶段覆盖快照、重试、Milvus、Elasticsearch、RRF、版本切换和兼容迁移的端到端验证。
 
