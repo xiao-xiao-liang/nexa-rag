@@ -1,7 +1,7 @@
 package com.nexarag.infra.parser.tika;
 
 import com.nexarag.infra.parser.model.DocumentParseRequest;
-import com.nexarag.infra.parser.model.DocumentParseResult;
+import com.nexarag.infra.parser.model.ParsedArtifact;
 import com.nexarag.infra.constants.ParsedContentTypes;
 import com.nexarag.infra.constants.ParserFileTypes;
 import com.nexarag.infra.storage.ObjectNameResolver;
@@ -12,17 +12,18 @@ import org.junit.jupiter.api.Test;
 import java.io.ByteArrayInputStream;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * Tika 文档解析器测试。
  */
-class TikaDocumentParserTest {
+class TikaArtifactParserTest {
 
     @Test
     void supportsShouldAcceptPptAndTextOnly() {
-        TikaDocumentParser parser = newParser("你好".getBytes(StandardCharsets.UTF_8));
+        TikaArtifactParser parser = newParser("你好".getBytes(StandardCharsets.UTF_8));
 
         assertThat(parser.supports(request(ParserFileTypes.PPT))).isTrue();
         assertThat(parser.supports(request(ParserFileTypes.TEXT))).isTrue();
@@ -30,20 +31,29 @@ class TikaDocumentParserTest {
     }
 
     @Test
-    void parseShouldExtractTextAndSaveParsedFile() {
+    void parseShouldUseDefaultFrameworkParserAndSaveParsedFile() {
         RecordingFileStorageService storageService = new RecordingFileStorageService("你好，NexaRAG".getBytes(StandardCharsets.UTF_8));
-        TikaDocumentParser parser = new TikaDocumentParser(storageService, new ObjectNameResolver());
+        TikaArtifactParser parser = new TikaArtifactParser(storageService, new ObjectNameResolver());
 
-        DocumentParseResult result = parser.parse(request(ParserFileTypes.TEXT));
+        ParsedArtifact artifact = parser.parse(request(ParserFileTypes.TEXT));
 
-        assertThat(result.contentType()).isEqualTo(ParsedContentTypes.TEXT_PLAIN);
-        assertThat(result.content()).contains("你好");
-        assertThat(result.parsedObjectName()).isEqualTo("parsed/1/content.txt");
-        assertThat(storageService.savedContent).contains("你好");
+        assertThat(artifact.contentType()).isEqualTo(ParsedContentTypes.TEXT_PLAIN);
+        assertThat(artifact.objectKey()).isEqualTo("parsed/1/content.txt");
+        assertThat(artifact.metadata()).containsEntry("parser", "tika");
+        assertThat(storageService.savedContent).contains("你好，NexaRAG");
     }
 
-    private TikaDocumentParser newParser(byte[] content) {
-        return new TikaDocumentParser(new RecordingFileStorageService(content), new ObjectNameResolver());
+    @Test
+    void mergeDocumentTextsShouldKeepDocumentOrderWithBlankLineSeparator() {
+        String content = TikaArtifactParser.mergeDocumentTexts(List.of(
+                new org.springframework.ai.document.Document("第一页"),
+                new org.springframework.ai.document.Document("第二页")));
+
+        assertThat(content).isEqualTo("第一页\n\n第二页");
+    }
+
+    private TikaArtifactParser newParser(byte[] content) {
+        return new TikaArtifactParser(new RecordingFileStorageService(content), new ObjectNameResolver());
     }
 
     private DocumentParseRequest request(String fileType) {
@@ -82,6 +92,11 @@ class TikaDocumentParserTest {
         @Override
         public InputStream load(String objectName) {
             return new ByteArrayInputStream(content);
+        }
+
+        @Override
+        public String resolveUrl(String objectName) {
+            return "http://127.0.0.1:9000/nexa-rag/" + objectName;
         }
 
         @Override

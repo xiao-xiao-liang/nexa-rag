@@ -94,6 +94,8 @@ CREATE TABLE IF NOT EXISTS document (
     file_size BIGINT NULL COMMENT '文件大小',
     original_file_url VARCHAR(1024) NULL COMMENT '原始文件地址',
     original_object_name VARCHAR(1024) NULL COMMENT '原始文件对象名',
+    source_type VARCHAR(32) NOT NULL DEFAULT 'LOCAL' COMMENT '文档来源类型',
+    source_url VARCHAR(1024) NULL COMMENT '外部来源URL',
     parsed_file_url VARCHAR(1024) NULL COMMENT '解析后文件地址',
     parsed_object_name VARCHAR(1024) NULL COMMENT '解析后文件对象名',
     parsed_content_type VARCHAR(128) NULL COMMENT '解析后内容类型',
@@ -126,7 +128,8 @@ CREATE TABLE IF NOT EXISTS document (
     PRIMARY KEY (document_id),
     KEY idx_document_status (status),
     KEY idx_document_create_time (create_time),
-    KEY idx_document_del_flag (del_flag)
+    KEY idx_document_del_flag (del_flag),
+    KEY idx_document_source_type (source_type)
 ) COMMENT='文档表';
 
 CREATE TABLE IF NOT EXISTS document_task_outbox (

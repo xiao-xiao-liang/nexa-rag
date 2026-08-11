@@ -34,6 +34,9 @@ export interface DocumentProcessStatus {
 /** 与文档服务切分策略枚举保持一致。 */
 export type SplitStrategy = 'PARENT_MARKDOWN' | 'BROTHER_MARKDOWN' | 'REGEX_TEXT' | 'EXCEL'
 
+/** 外部文档来源类型。 */
+export type ExternalDocumentSourceType = 'LOCAL' | 'FEISHU' | 'YUQUE'
+
 /** 文本切分配置输入。 */
 export interface SplitConfigInput {
   splitStrategy: SplitStrategy
@@ -65,6 +68,15 @@ export interface UploadDocumentInput {
   splitConfig?: SplitConfigInput | null
 }
 
+/** 外部文档提交请求。 */
+export interface ExternalDocumentSubmitInput {
+  sourceType: 'FEISHU' | 'YUQUE'
+  sourceUrl: string
+  title?: string | null
+  description?: string | null
+  splitConfig?: SplitConfigInput | null
+}
+
 /** 查询文档服务端分页列表。 */
 export function listDocuments(pageNum = 1, pageSize = 20, signal?: AbortSignal): Promise<PageVO<DocumentSummary>> {
   return request<PageVO<DocumentSummary>>(`/api/documents?pageNum=${pageNum}&pageSize=${pageSize}`, signal ? { signal } : undefined)
@@ -86,6 +98,15 @@ export function uploadDocument(input: UploadDocumentInput, signal?: AbortSignal)
 
   body.append('request', new Blob([JSON.stringify(requestPayload)], { type: 'application/json' }))
   return request<UploadDocumentResponse>('/api/documents/upload', { method: 'POST', body, signal })
+}
+
+/** 提交外部文档（飞书/语雀）。 */
+export function submitExternalDocument(input: ExternalDocumentSubmitInput, signal?: AbortSignal): Promise<UploadDocumentResponse> {
+  return request<UploadDocumentResponse>('/api/documents/external', {
+    method: 'POST',
+    body: JSON.stringify(input),
+    signal,
+  })
 }
 
 /** 查询文档详情。 */

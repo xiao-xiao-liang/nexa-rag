@@ -6,6 +6,7 @@ import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableLogic;
 import com.baomidou.mybatisplus.annotation.TableName;
 import com.baomidou.mybatisplus.annotation.Version;
+import com.nexarag.infra.enums.ExternalDocumentSourceType;
 import com.nexarag.document.enums.DocumentPipelineMessageStatus;
 import com.nexarag.document.enums.DocumentStatus;
 import com.nexarag.document.enums.FileType;
@@ -68,6 +69,12 @@ public class Document {
      * 原始文件对象名。
      */
     private String originalObjectName;
+
+    /** 文档来源类型。 */
+    private ExternalDocumentSourceType sourceType;
+
+    /** 外部来源URL。 */
+    private String sourceUrl;
 
     /**
      * 解析后文件地址。

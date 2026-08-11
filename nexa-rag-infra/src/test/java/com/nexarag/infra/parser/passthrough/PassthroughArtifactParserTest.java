@@ -1,7 +1,7 @@
 package com.nexarag.infra.parser.passthrough;
 
 import com.nexarag.infra.parser.model.DocumentParseRequest;
-import com.nexarag.infra.parser.model.DocumentParseResult;
+import com.nexarag.infra.parser.model.ParsedArtifact;
 import com.nexarag.infra.constants.ParsedContentTypes;
 import com.nexarag.infra.constants.ParserFileTypes;
 import org.junit.jupiter.api.Test;
@@ -11,11 +11,11 @@ import static org.assertj.core.api.Assertions.assertThat;
 /**
  * 透传文档解析器测试。
  */
-class PassthroughDocumentParserTest {
+class PassthroughArtifactParserTest {
 
     @Test
     void supportsShouldAcceptMarkdownAndExcel() {
-        PassthroughDocumentParser parser = new PassthroughDocumentParser();
+        PassthroughArtifactParser parser = new PassthroughArtifactParser();
 
         assertThat(parser.supports(request(ParserFileTypes.MARKDOWN))).isTrue();
         assertThat(parser.supports(request(ParserFileTypes.EXCEL))).isTrue();
@@ -24,12 +24,11 @@ class PassthroughDocumentParserTest {
 
     @Test
     void parseShouldReturnOriginalFileAsParsedFile() {
-        PassthroughDocumentParser parser = new PassthroughDocumentParser();
+        PassthroughArtifactParser parser = new PassthroughArtifactParser();
 
-        DocumentParseResult result = parser.parse(request(ParserFileTypes.MARKDOWN));
+        ParsedArtifact result = parser.parse(request(ParserFileTypes.MARKDOWN));
 
-        assertThat(result.parsedObjectName()).isEqualTo("original/demo.md");
-        assertThat(result.parsedFileUrl()).isEqualTo("http://127.0.0.1:9000/nexa-rag/original/demo.md");
+        assertThat(result.objectKey()).isEqualTo("original/demo.md");
         assertThat(result.contentType()).isEqualTo(ParsedContentTypes.TEXT_MARKDOWN);
         assertThat(result.metadata()).containsEntry("passthrough", true);
     }

@@ -1,7 +1,7 @@
 package com.nexarag.infra.parser.mineru;
 
 import com.nexarag.infra.parser.model.DocumentParseRequest;
-import com.nexarag.infra.parser.model.DocumentParseResult;
+import com.nexarag.infra.parser.model.ParsedArtifact;
 import com.nexarag.infra.constants.ParsedContentTypes;
 import com.nexarag.infra.constants.ParserFileTypes;
 import com.nexarag.infra.parser.mineru.client.MinerUClient;
@@ -30,11 +30,11 @@ import static org.assertj.core.api.Assertions.assertThat;
 /**
  * MinerU 文档解析器测试。
  */
-class MinerUDocumentParserTest {
+class MinerUArtifactParserTest {
 
     @Test
     void supportsShouldAcceptPdfAndWordOnly() {
-        MinerUDocumentParser parser = newParser(zip(Map.of("content.md", "# title")));
+        MinerUArtifactParser parser = newParser(zip(Map.of("content.md", "# title")));
 
         assertThat(parser.supports(request(ParserFileTypes.PDF))).isTrue();
         assertThat(parser.supports(request(ParserFileTypes.WORD))).isTrue();
@@ -45,7 +45,7 @@ class MinerUDocumentParserTest {
     void parseShouldSaveAssetsRewriteMarkdownAndSaveParsedMarkdown() throws Exception {
         RecordingFileStorageService storageService = new RecordingFileStorageService("original".getBytes(StandardCharsets.UTF_8));
         RecordingMinerUParseLimiter parseLimiter = new RecordingMinerUParseLimiter();
-        MinerUDocumentParser parser = new MinerUDocumentParser(
+        MinerUArtifactParser parser = new MinerUArtifactParser(
                 storageService,
                 new ObjectNameResolver(),
                 new StubMinerUClient(zip(Map.of(
@@ -57,12 +57,12 @@ class MinerUDocumentParserTest {
                 parseLimiter
         );
 
-        DocumentParseResult result = parser.parse(request(ParserFileTypes.PDF));
+        ParsedArtifact result = parser.parse(request(ParserFileTypes.PDF));
 
         assertThat(parseLimiter.acquiredDocumentId).isEqualTo(1L);
         assertThat(parseLimiter.released).isTrue();
         assertThat(result.contentType()).isEqualTo(ParsedContentTypes.TEXT_MARKDOWN);
-        assertThat(result.parsedObjectName()).isEqualTo("parsed/1/content.md");
+        assertThat(result.objectKey()).isEqualTo("parsed/1/content.md");
         assertThat(storageService.savedObjects).containsKey("parsed/1/content.md");
         assertThat(storageService.savedObjects).anySatisfy((objectName, content) -> {
             assertThat(objectName).startsWith("parsed/1/assets/");
@@ -71,11 +71,10 @@ class MinerUDocumentParserTest {
         assertThat(storageService.savedObjects.get("parsed/1/content.md"))
                 .contains("# title")
                 .contains("http://127.0.0.1:9000/nexa-rag/parsed/1/assets/");
-        assertThat(result.content()).contains("http://127.0.0.1:9000/nexa-rag/parsed/1/assets/");
     }
 
-    private MinerUDocumentParser newParser(byte[] zipBytes) {
-        return new MinerUDocumentParser(
+    private MinerUArtifactParser newParser(byte[] zipBytes) {
+        return new MinerUArtifactParser(
                 new RecordingFileStorageService("original".getBytes(StandardCharsets.UTF_8)),
                 new ObjectNameResolver(),
                 new StubMinerUClient(zipBytes),
@@ -174,6 +173,11 @@ class MinerUDocumentParserTest {
         @Override
         public InputStream load(String objectName) {
             return new ByteArrayInputStream(originalContent);
+        }
+
+        @Override
+        public String resolveUrl(String objectName) {
+            return "http://127.0.0.1:9000/nexa-rag/" + objectName;
         }
 
         @Override

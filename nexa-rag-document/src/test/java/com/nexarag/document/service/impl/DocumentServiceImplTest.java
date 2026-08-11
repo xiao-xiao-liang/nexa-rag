@@ -12,6 +12,7 @@ import com.nexarag.document.enums.DocumentStatus;
 import com.nexarag.document.enums.SplitStrategy;
 import com.nexarag.common.exception.ClientException;
 import com.nexarag.common.exception.ServiceException;
+import com.nexarag.infra.enums.ExternalDocumentSourceType;
 import com.nexarag.document.model.vo.DocumentSummaryVO;
 import com.nexarag.document.service.DocumentChunkService;
 import com.nexarag.document.service.DocumentDeleteTaskService;
@@ -217,6 +218,20 @@ class DocumentServiceImplTest {
         verify(documentService.deleteTaskService).createStorageCleanupTask(documentService.existingDocument);
         verify(documentService.deleteTaskService).createIndexCleanupTask(1L);
         assertThat(mockingDetails(documentService.deleteTaskService).getInvocations()).hasSize(2);
+    }
+
+    @Test
+    void createDocumentShouldAllowExternalSourceWithoutOriginalObject() {
+        TestableDocumentServiceImpl documentService = new TestableDocumentServiceImpl();
+
+        Document document = documentService.createDocument(CreateDocumentRequest.external(
+                "飞书测试文档", "描述", "feishu-docx-abc.md", ExternalDocumentSourceType.FEISHU,
+                "https://tenant.feishu.cn/docx/abc"));
+
+        assertThat(document.getOriginalObjectName()).isNull();
+        assertThat(document.getSourceType()).isEqualTo(ExternalDocumentSourceType.FEISHU);
+        assertThat(document.getSourceUrl()).isEqualTo("https://tenant.feishu.cn/docx/abc");
+        assertThat(document.getFileType()).isEqualTo(com.nexarag.document.enums.FileType.MARKDOWN);
     }
 
     @Test

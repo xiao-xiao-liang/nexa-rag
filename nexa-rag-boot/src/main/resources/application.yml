@@ -47,6 +47,13 @@ rocketmq:
     group: nexa-document-pipeline-producer # 文档流水线生产者组，同一应用集群应保持一致。
 
 nexa:
+  source:
+    yuque:
+      token: ${NEXA_SOURCE_YUQUE_TOKEN:}
+    feishu:
+      app-id: ${NEXA_SOURCE_FEISHU_APP_ID:}
+      app-secret: ${NEXA_SOURCE_FEISHU_APP_SECRET:}
+      base-url: https://open.feishu.cn
   prompt:
     refresh:
       topic: nexa.prompt.release.changed

@@ -4,7 +4,7 @@ import com.nexarag.common.exception.ServiceException;
 import com.nexarag.infra.constants.ParsedContentTypes;
 import com.nexarag.infra.constants.ParserFileTypes;
 import com.nexarag.infra.parser.model.DocumentParseRequest;
-import com.nexarag.infra.parser.model.DocumentParseResult;
+import com.nexarag.infra.parser.model.ParsedArtifact;
 import com.nexarag.infra.parser.service.impl.DocumentParseServiceImpl;
 import org.junit.jupiter.api.Test;
 
@@ -24,10 +24,10 @@ class DocumentParseServiceImplTest {
         RecordingParser parser = new RecordingParser(ParserFileTypes.PDF);
         DocumentParseServiceImpl service = new DocumentParseServiceImpl(List.of(parser));
 
-        DocumentParseResult result = service.parse(request(ParserFileTypes.PDF));
+        ParsedArtifact result = service.parse(request(ParserFileTypes.PDF));
 
         assertThat(parser.parsed).isTrue();
-        assertThat(result.parsedFileUrl()).isEqualTo("http://127.0.0.1:9000/nexa-rag/parsed/1/content.md");
+        assertThat(result.objectKey()).isEqualTo("parsed/1/content.md");
     }
 
     @Test
@@ -51,7 +51,7 @@ class DocumentParseServiceImplTest {
                 .build();
     }
 
-    private static class RecordingParser implements DocumentParser {
+    private static class RecordingParser implements DocumentArtifactParser {
 
         private final String supportedFileType;
         private boolean parsed;
@@ -66,12 +66,11 @@ class DocumentParseServiceImplTest {
         }
 
         @Override
-        public DocumentParseResult parse(DocumentParseRequest request) {
+        public ParsedArtifact parse(DocumentParseRequest request) {
             parsed = true;
-            return DocumentParseResult.builder()
+            return ParsedArtifact.builder()
                     .contentType(ParsedContentTypes.TEXT_MARKDOWN)
-                    .parsedObjectName("parsed/1/content.md")
-                    .parsedFileUrl("http://127.0.0.1:9000/nexa-rag/parsed/1/content.md")
+                    .objectKey("parsed/1/content.md")
                     .metadata(Map.of("parser", supportedFileType))
                     .build();
         }

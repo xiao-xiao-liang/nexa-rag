@@ -110,6 +110,20 @@ public class MinioFileStorageStrategy implements FileStorageStrategy {
     }
 
     /**
+     * 解析 MinIO 对象的可访问地址。
+     *
+     * @param objectName 对象名
+     * @return 对象访问地址
+     */
+    @Override
+    public String resolveUrl(String objectName) {
+        if (!StringUtils.hasText(objectName)) {
+            throw new ServiceException("MinIO 对象名不能为空");
+        }
+        return buildObjectUrl(objectName);
+    }
+
+    /**
      * 删除 MinIO 文件。
      *
      * @param objectName 对象名

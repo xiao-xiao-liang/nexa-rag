@@ -9,8 +9,12 @@ import com.nexarag.document.enums.DocumentStatus;
 import com.nexarag.document.enums.FileType;
 import com.nexarag.document.service.DocumentService;
 import com.nexarag.infra.parser.model.DocumentParseRequest;
-import com.nexarag.infra.parser.model.DocumentParseResult;
+import com.nexarag.infra.parser.model.ParsedArtifact;
 import com.nexarag.infra.parser.service.DocumentParseService;
+import com.nexarag.infra.storage.service.FileStorageService;
+import com.nexarag.infra.enums.ExternalDocumentSourceType;
+import com.nexarag.infra.source.ExternalDocumentSourceService;
+import com.nexarag.infra.source.model.SourceArtifactBO;
 import org.junit.jupiter.api.Test;
 
 import java.util.Map;
@@ -38,16 +42,18 @@ class ParsingNodeTest {
     void applyShouldParseQueuedDocumentAndRouteToChunking() throws Exception {
         DocumentService documentService = mock(DocumentService.class);
         DocumentParseService parseService = mock(DocumentParseService.class);
+        FileStorageService fileStorageService = mock(FileStorageService.class);
         Document document = buildQueuedDocument();
         when(documentService.getRequiredDocument(1001L)).thenReturn(document);
         when(documentService.updateById(any(Document.class))).thenReturn(true);
-        when(parseService.parse(any(DocumentParseRequest.class))).thenReturn(DocumentParseResult.builder()
+        when(parseService.parse(any(DocumentParseRequest.class))).thenReturn(ParsedArtifact.builder()
                 .contentType("text/markdown")
-                .parsedObjectName("parsed/1001/demo.md")
-                .parsedFileUrl("http://127.0.0.1/parsed/1001/demo.md")
+                .objectKey("parsed/1001/demo.md")
                 .build());
+        when(fileStorageService.resolveUrl("parsed/1001/demo.md"))
+                .thenReturn("http://127.0.0.1/parsed/1001/demo.md");
 
-        ParsingNode node = new ParsingNode(documentService, parseService, objectMapper);
+        ParsingNode node = new ParsingNode(documentService, parseService, fileStorageService, objectMapper);
         Map<String, Object> result = node.apply(new OverAllState(Map.of(DOCUMENT_ID, 1001L)));
 
         assertThat(document.getStatus()).isEqualTo(DocumentStatus.PARSED);
@@ -62,13 +68,14 @@ class ParsingNodeTest {
     void applyShouldPropagateParseFailureToMessageConsumer() throws Exception {
         DocumentService documentService = mock(DocumentService.class);
         DocumentParseService parseService = mock(DocumentParseService.class);
+        FileStorageService fileStorageService = mock(FileStorageService.class);
         Document document = buildQueuedDocument();
         when(documentService.getRequiredDocument(1001L)).thenReturn(document);
         when(documentService.updateById(any(Document.class))).thenReturn(true);
         IllegalStateException failure = new IllegalStateException("解析失败");
         when(parseService.parse(any(DocumentParseRequest.class))).thenThrow(failure);
 
-        ParsingNode node = new ParsingNode(documentService, parseService, objectMapper);
+        ParsingNode node = new ParsingNode(documentService, parseService, fileStorageService, objectMapper);
 
         assertThatThrownBy(() -> node.apply(new OverAllState(Map.of(DOCUMENT_ID, 1001L))))
                 .isSameAs(failure);
@@ -79,17 +86,42 @@ class ParsingNodeTest {
     void applyShouldSkipParseWhenDocumentAlreadyParsed() throws Exception {
         DocumentService documentService = mock(DocumentService.class);
         DocumentParseService parseService = mock(DocumentParseService.class);
+        FileStorageService fileStorageService = mock(FileStorageService.class);
         Document document = Document.builder()
                 .documentId(1001L)
                 .status(DocumentStatus.PARSED)
                 .build();
         when(documentService.getRequiredDocument(1001L)).thenReturn(document);
 
-        ParsingNode node = new ParsingNode(documentService, parseService, objectMapper);
+        ParsingNode node = new ParsingNode(documentService, parseService, fileStorageService, objectMapper);
         Map<String, Object> result = node.apply(new OverAllState(Map.of(DOCUMENT_ID, 1001L)));
 
         assertThat(result).containsEntry(ROUTE_TARGET, CHUNKING_NODE);
         verify(parseService, never()).parse(any(DocumentParseRequest.class));
+    }
+
+    @Test
+    void applyShouldReadExternalSourceInsteadOfFileParser() throws Exception {
+        DocumentService documentService = mock(DocumentService.class);
+        DocumentParseService parseService = mock(DocumentParseService.class);
+        ExternalDocumentSourceService sourceService = mock(ExternalDocumentSourceService.class);
+        FileStorageService fileStorageService = mock(FileStorageService.class);
+        Document document = buildQueuedDocument();
+        document.setSourceType(ExternalDocumentSourceType.YUQUE);
+        document.setSourceUrl("https://www.yuque.com/a/b");
+        when(documentService.getRequiredDocument(1001L)).thenReturn(document);
+        when(documentService.updateById(any(Document.class))).thenReturn(true);
+        ParsedArtifact artifact = ParsedArtifact.builder().contentType("text/markdown")
+                .objectKey("parsed/1001/content.md").build();
+        when(sourceService.readAndPersist(any())).thenReturn(new SourceArtifactBO(artifact, "语雀标题", null, Map.of()));
+        when(fileStorageService.resolveUrl(artifact.objectKey())).thenReturn("http://127.0.0.1/parsed/1001/content.md");
+
+        ParsingNode node = new ParsingNode(documentService, parseService, sourceService, fileStorageService, objectMapper);
+        node.apply(new OverAllState(Map.of(DOCUMENT_ID, 1001L)));
+
+        verify(sourceService).readAndPersist(any());
+        verify(parseService, never()).parse(any());
+        assertThat(document.getStatus()).isEqualTo(DocumentStatus.PARSED);
     }
 
     private Document buildQueuedDocument() throws Exception {

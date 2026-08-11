@@ -1,8 +1,8 @@
 package com.nexarag.infra.parser.passthrough;
 
 import com.nexarag.infra.parser.model.DocumentParseRequest;
-import com.nexarag.infra.parser.model.DocumentParseResult;
-import com.nexarag.infra.parser.DocumentParser;
+import com.nexarag.infra.parser.model.ParsedArtifact;
+import com.nexarag.infra.parser.DocumentArtifactParser;
 import com.nexarag.infra.constants.ParsedContentTypes;
 import com.nexarag.infra.constants.ParserFileTypes;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -15,7 +15,7 @@ import java.util.Map;
  */
 @Component
 @ConditionalOnProperty(prefix = "nexa.parser.passthrough", name = "enabled", havingValue = "true", matchIfMissing = true)
-public class PassthroughDocumentParser implements DocumentParser {
+public class PassthroughArtifactParser implements DocumentArtifactParser {
 
     /**
      * 判断是否支持透传解析。
@@ -37,17 +37,16 @@ public class PassthroughDocumentParser implements DocumentParser {
      * @return 文档解析结果
      */
     @Override
-    public DocumentParseResult parse(DocumentParseRequest request) {
+    public ParsedArtifact parse(DocumentParseRequest request) {
         // 1. 根据文件类型确定透传产物内容类型
         String contentType = ParserFileTypes.MARKDOWN.equals(request.fileType())
                 ? ParsedContentTypes.TEXT_MARKDOWN
                 : ParsedContentTypes.EXCEL;
 
         // 2. 复用原始文件地址作为解析产物地址
-        return DocumentParseResult.builder()
+        return ParsedArtifact.builder()
                 .contentType(contentType)
-                .parsedObjectName(request.originalObjectName())
-                .parsedFileUrl(request.originalFileUrl())
+                .objectKey(request.originalObjectName())
                 .metadata(Map.of(
                         "parser", "passthrough",
                         "passthrough", true,

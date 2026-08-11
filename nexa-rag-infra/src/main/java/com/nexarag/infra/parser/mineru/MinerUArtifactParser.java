@@ -3,7 +3,7 @@ package com.nexarag.infra.parser.mineru;
 import com.nexarag.common.error.BaseErrorCode;
 import com.nexarag.common.exception.ServiceException;
 import com.nexarag.infra.parser.model.*;
-import com.nexarag.infra.parser.DocumentParser;
+import com.nexarag.infra.parser.DocumentArtifactParser;
 import com.nexarag.infra.constants.ParsedContentTypes;
 import com.nexarag.infra.constants.ParserFileTypes;
 import com.nexarag.infra.parser.mineru.client.MinerUClient;
@@ -30,7 +30,7 @@ import java.util.Map;
 @Component
 @RequiredArgsConstructor
 @ConditionalOnProperty(prefix = "nexa.parser.mineru", name = "enabled", havingValue = "true", matchIfMissing = true)
-public class MinerUDocumentParser implements DocumentParser {
+public class MinerUArtifactParser implements DocumentArtifactParser {
 
     private final FileStorageService fileStorageService;
     private final ObjectNameResolver objectNameResolver;
@@ -58,11 +58,11 @@ public class MinerUDocumentParser implements DocumentParser {
      * @return 文档解析结果
      */
     @Override
-    public DocumentParseResult parse(DocumentParseRequest request) {
+    public ParsedArtifact parse(DocumentParseRequest request) {
         return minerUParseLimiter.execute(request.documentId(), () -> doParse(request));
     }
 
-    private DocumentParseResult doParse(DocumentParseRequest request) {
+    private ParsedArtifact doParse(DocumentParseRequest request) {
         try (InputStream originalInputStream = fileStorageService.load(request.originalObjectName())) {
             // 1. 调用 MinerU 获取 ZIP 格式解析产物
             MinerUParseResponse response = minerUClient.parse(MinerUParseCommand.builder()
@@ -87,11 +87,9 @@ public class MinerUDocumentParser implements DocumentParser {
                     new ByteArrayInputStream(markdownBytes), markdownBytes.length, ParsedContentTypes.TEXT_MARKDOWN);
 
             // 5. 合并解析元数据并返回解析结果
-            return DocumentParseResult.builder()
+            return ParsedArtifact.builder()
                     .contentType(ParsedContentTypes.TEXT_MARKDOWN)
-                    .content(rewrittenMarkdown)
-                    .parsedObjectName(storedFile.objectName())
-                    .parsedFileUrl(storedFile.url())
+                    .objectKey(storedFile.objectName())
                     .metadata(buildMetadata(response, extractedResult, assetUrls))
                     .build();
         } catch (ServiceException exception) {

@@ -5,12 +5,14 @@ import com.nexarag.common.web.Results;
 import com.nexarag.common.web.PageVO;
 import com.nexarag.document.converter.DocumentConverter;
 import com.nexarag.document.model.dto.CreateDocumentRequest;
+import com.nexarag.document.model.dto.ExternalDocumentSubmitDTO;
 import com.nexarag.document.model.dto.ProcessDocumentRequest;
 import com.nexarag.document.model.dto.UploadDocumentRequest;
 import com.nexarag.document.service.DocumentChunkService;
 import com.nexarag.document.service.DocumentPipelineSubmitService;
 import com.nexarag.document.service.DocumentService;
 import com.nexarag.document.service.DocumentUploadService;
+import com.nexarag.document.service.impl.ExternalDocumentSubmitServiceImpl;
 import com.nexarag.document.model.vo.DocumentChunkVO;
 import com.nexarag.document.model.vo.DocumentDetailVO;
 import com.nexarag.document.model.vo.DocumentDeleteVO;
@@ -43,6 +45,7 @@ public class DocumentController {
     private final DocumentChunkService documentChunkService;
     private final DocumentUploadService documentUploadService;
     private final DocumentPipelineSubmitService documentPipelineSubmitService;
+    private final ExternalDocumentSubmitServiceImpl externalDocumentSubmitService;
 
     /**
      * 创建文档记录。
@@ -67,6 +70,12 @@ public class DocumentController {
                                                          @Valid @RequestPart(value = "request", required = false)
                                                          UploadDocumentRequest request) {
         return Results.success(documentUploadService.upload(file, request));
+    }
+
+    /** 受理飞书或语雀单篇文档，并异步提交处理。 */
+    @PostMapping("/external")
+    public Result<UploadDocumentResponse> submitExternalDocument(@Valid @RequestBody ExternalDocumentSubmitDTO request) {
+        return Results.success(externalDocumentSubmitService.submit(request));
     }
 
     /**

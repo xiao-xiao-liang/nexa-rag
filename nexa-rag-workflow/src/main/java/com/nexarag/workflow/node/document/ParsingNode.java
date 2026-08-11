@@ -12,8 +12,13 @@ import com.nexarag.document.enums.DocumentStatus;
 import com.nexarag.document.enums.DocumentErrorCode;
 import com.nexarag.document.service.DocumentService;
 import com.nexarag.infra.parser.model.DocumentParseRequest;
-import com.nexarag.infra.parser.model.DocumentParseResult;
+import com.nexarag.infra.parser.model.ParsedArtifact;
 import com.nexarag.infra.parser.service.DocumentParseService;
+import com.nexarag.infra.enums.ExternalDocumentSourceType;
+import com.nexarag.infra.source.ExternalDocumentSourceService;
+import com.nexarag.infra.source.model.SourceArtifactBO;
+import com.nexarag.infra.source.model.SourceReadRequestDTO;
+import com.nexarag.infra.storage.service.FileStorageService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
@@ -39,6 +44,8 @@ public class ParsingNode implements NodeAction {
 
     private final DocumentService documentService;
     private final DocumentParseService documentParseService;
+    private final ExternalDocumentSourceService externalDocumentSourceService;
+    private final FileStorageService fileStorageService;
     private final ObjectMapper objectMapper;
 
     /**
@@ -62,10 +69,10 @@ public class ParsingNode implements NodeAction {
         markParsing(document);
 
         // 3. 调用infra解析能力生成标准解析产物，异常交给RocketMQ触发重试
-        DocumentParseResult parseResult = documentParseService.parse(buildParseRequest(document));
+        ParsedArtifact parsedArtifact = parseDocument(document);
 
         // 4. 回写解析产物并路由到切分节点
-        markParsed(document, parseResult);
+        markParsed(document, parsedArtifact);
         return Map.of(
                 CURRENT_STAGE, DocumentStatus.PARSING.name(),
                 CURRENT_STATUS, DocumentStatus.PARSED.name(),
@@ -118,6 +125,18 @@ public class ParsingNode implements NodeAction {
                 .build();
     }
 
+    /**
+     * 根据来源选择文件解析器或外部平台 Reader。
+     */
+    private ParsedArtifact parseDocument(Document document) {
+        if (document.getSourceType() == null || document.getSourceType() == ExternalDocumentSourceType.LOCAL) {
+            return documentParseService.parse(buildParseRequest(document));
+        }
+        SourceArtifactBO artifact = externalDocumentSourceService.readAndPersist(new SourceReadRequestDTO(
+                document.getDocumentId(), document.getSourceType(), document.getSourceUrl()));
+        return artifact.parsedArtifact();
+    }
+
     private ParseConfigRequest readParseConfig(String processConfigJson) {
         if (!StringUtils.hasText(processConfigJson)) {
             return null;
@@ -131,10 +150,10 @@ public class ParsingNode implements NodeAction {
         }
     }
 
-    private void markParsed(Document document, DocumentParseResult parseResult) {
-        document.setParsedFileUrl(parseResult.parsedFileUrl());
-        document.setParsedObjectName(parseResult.parsedObjectName());
-        document.setParsedContentType(parseResult.contentType());
+    private void markParsed(Document document, ParsedArtifact parsedArtifact) {
+        document.setParsedFileUrl(fileStorageService.resolveUrl(parsedArtifact.objectKey()));
+        document.setParsedObjectName(parsedArtifact.objectKey());
+        document.setParsedContentType(parsedArtifact.contentType());
         document.setFailureStage(null);
         document.setFailureReason(null);
         document.setFailureDetail(null);

@@ -72,6 +72,21 @@ public class FileStorageServiceImpl implements FileStorageService {
     }
 
     /**
+     * 解析对象的可访问地址。
+     *
+     * @param objectName 对象名
+     * @return 对象访问地址
+     */
+    @Override
+    public String resolveUrl(String objectName) {
+        // 1. 根据配置选择具体存储策略
+        FileStorageStrategy storageStrategy = getRequiredStrategy();
+
+        // 2. 委派给具体策略解析对象访问地址
+        return storageStrategy.resolveUrl(objectName);
+    }
+
+    /**
      * 删除文件。
      *
      * @param objectName 对象名

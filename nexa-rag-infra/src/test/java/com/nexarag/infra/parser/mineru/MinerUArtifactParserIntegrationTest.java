@@ -3,7 +3,7 @@ package com.nexarag.infra.parser.mineru;
 import com.nexarag.infra.config.MinerUProperties;
 import com.nexarag.infra.config.StorageProperties;
 import com.nexarag.infra.parser.model.DocumentParseRequest;
-import com.nexarag.infra.parser.model.DocumentParseResult;
+import com.nexarag.infra.parser.model.ParsedArtifact;
 import com.nexarag.infra.constants.ParsedContentTypes;
 import com.nexarag.infra.constants.ParserFileTypes;
 import com.nexarag.infra.parser.mineru.client.LocalMinerUClient;
@@ -30,7 +30,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 /**
  * MinerU 真实解析集成测试，显式开启后连接本地 MinIO 和 MinerU。
  */
-class MinerUDocumentParserIntegrationTest {
+class MinerUArtifactParserIntegrationTest {
 
     /**
      * 使用真实 PDF 验证 MinIO 原文入库、MinerU 解析、Markdown 产物入库。
@@ -54,7 +54,7 @@ class MinerUDocumentParserIntegrationTest {
         }
 
         // 3. 调用真实 MinerU 完成 PDF 到 Markdown 的解析
-        MinerUDocumentParser parser = new MinerUDocumentParser(
+        MinerUArtifactParser parser = new MinerUArtifactParser(
                 fileStorageService,
                 new ObjectNameResolver(),
                 new LocalMinerUClient(buildMinerUProperties()),
@@ -62,7 +62,7 @@ class MinerUDocumentParserIntegrationTest {
                 new MarkdownImageUrlRewriter(),
                 new NoopMinerUParseLimiter()
         );
-        DocumentParseResult result = parser.parse(DocumentParseRequest.builder()
+        ParsedArtifact result = parser.parse(DocumentParseRequest.builder()
                 .documentId(documentId)
                 .originalFileName(pdfPath.getFileName().toString())
                 .fileType(ParserFileTypes.PDF)
@@ -74,12 +74,11 @@ class MinerUDocumentParserIntegrationTest {
 
         // 4. 从 MinIO 读回 Markdown 产物并校验核心内容
         String savedMarkdown;
-        try (InputStream inputStream = fileStorageService.load(result.parsedObjectName())) {
+        try (InputStream inputStream = fileStorageService.load(result.objectKey())) {
             savedMarkdown = new String(inputStream.readAllBytes(), StandardCharsets.UTF_8);
         }
         assertThat(result.contentType()).isEqualTo(ParsedContentTypes.TEXT_MARKDOWN);
-        assertThat(result.parsedObjectName()).isEqualTo("parsed/" + documentId + "/content.md");
-        assertThat(result.content()).isEqualTo(savedMarkdown);
+        assertThat(result.objectKey()).isEqualTo("parsed/" + documentId + "/content.md");
         assertThat(savedMarkdown).containsIgnoringCase("Reactive");
         assertThat(savedMarkdown).containsIgnoringCase("Stream");
         assertThat(savedMarkdown.length()).isGreaterThan(1000);

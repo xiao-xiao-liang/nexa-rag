@@ -1,10 +1,13 @@
 import { cleanup, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { uploadDocument } from '../api/document-api'
+import { submitExternalDocument, uploadDocument } from '../api/document-api'
 import { UploadDocumentDialog } from './UploadDocumentDialog'
 
-vi.mock('../api/document-api', () => ({ uploadDocument: vi.fn() }))
+vi.mock('../api/document-api', () => ({
+  uploadDocument: vi.fn(),
+  submitExternalDocument: vi.fn(),
+}))
 
 /** 上传文档弹窗测试。 */
 describe('UploadDocumentDialog', () => {
@@ -52,7 +55,7 @@ describe('UploadDocumentDialog', () => {
     expect(screen.getByLabelText('文档描述')).toHaveValue('新员工入职参考')
   })
 
-  it('上传成功后应提交自动生成的标题并通知调用方', async () => {
+  it('上传成功后应默认以 Markdown 层级切分策略提交并通知调用方', async () => {
     vi.mocked(uploadDocument).mockResolvedValue({ documentId: 18, processId: 'p-18', status: 'QUEUED' })
     const onUploaded = vi.fn()
     const user = userEvent.setup()
@@ -68,28 +71,66 @@ describe('UploadDocumentDialog', () => {
           file,
           title: '员工手册',
           description: '',
-          splitConfig: expect.objectContaining({ splitStrategy: 'REGEX_TEXT' }),
+          splitConfig: expect.objectContaining({ splitStrategy: 'PARENT_MARKDOWN' }),
         })
       )
     )
     expect(onUploaded).toHaveBeenCalledWith(18)
   })
 
-  it('选择 Markdown 标题时应提交父子 Markdown 策略', async () => {
-    vi.mocked(uploadDocument).mockResolvedValue({ documentId: 18, processId: 'p-18', status: 'QUEUED' })
+  it('选择飞书文档来源并输入 URL 时应成功提交外部文档接口', async () => {
+    vi.mocked(submitExternalDocument).mockResolvedValue({ documentId: 20, processId: 'p-20', status: 'QUEUED' })
+    const onUploaded = vi.fn()
     const user = userEvent.setup()
-    render(<UploadDocumentDialog open onOpenChange={vi.fn()} onUploaded={vi.fn()} />)
+    render(<UploadDocumentDialog open onOpenChange={vi.fn()} onUploaded={onUploaded} />)
 
-    await user.upload(screen.getByLabelText('选择本地文件'), new File(['# 标题'], '员工手册.md'))
-    await user.click(screen.getByRole('button', { name: /Markdown 标题/ }))
+    await user.click(screen.getByRole('button', { name: '飞书文档' }))
+    expect(screen.getByLabelText('飞书文档 URL')).toBeInTheDocument()
+
+    await user.type(screen.getByLabelText('飞书文档 URL'), 'https://test.feishu.cn/docx/doxc12345')
     await user.click(screen.getByRole('button', { name: '开始上传' }))
 
     await waitFor(() =>
-      expect(uploadDocument).toHaveBeenCalledWith(
-        expect.objectContaining({
-          splitConfig: expect.objectContaining({ splitStrategy: 'PARENT_MARKDOWN' }),
-        })
-      )
+      expect(submitExternalDocument).toHaveBeenCalledWith({
+        sourceType: 'FEISHU',
+        sourceUrl: 'https://test.feishu.cn/docx/doxc12345',
+        title: undefined,
+        description: undefined,
+        splitConfig: {
+          splitStrategy: 'PARENT_MARKDOWN',
+          chunkSize: 500,
+          chunkOverlap: 50,
+        },
+      })
     )
+    expect(onUploaded).toHaveBeenCalledWith(20)
+  })
+
+  it('选择语雀文档来源并输入 URL 时应成功提交外部文档接口', async () => {
+    vi.mocked(submitExternalDocument).mockResolvedValue({ documentId: 22, processId: 'p-22', status: 'QUEUED' })
+    const onUploaded = vi.fn()
+    const user = userEvent.setup()
+    render(<UploadDocumentDialog open onOpenChange={vi.fn()} onUploaded={onUploaded} />)
+
+    await user.click(screen.getByRole('button', { name: '语雀文档' }))
+    expect(screen.getByLabelText('语雀文档 URL')).toBeInTheDocument()
+
+    await user.type(screen.getByLabelText('语雀文档 URL'), 'https://www.yuque.com/org/repo/doc-slug')
+    await user.click(screen.getByRole('button', { name: '开始上传' }))
+
+    await waitFor(() =>
+      expect(submitExternalDocument).toHaveBeenCalledWith({
+        sourceType: 'YUQUE',
+        sourceUrl: 'https://www.yuque.com/org/repo/doc-slug',
+        title: undefined,
+        description: undefined,
+        splitConfig: {
+          splitStrategy: 'PARENT_MARKDOWN',
+          chunkSize: 500,
+          chunkOverlap: 50,
+        },
+      })
+    )
+    expect(onUploaded).toHaveBeenCalledWith(22)
   })
 })

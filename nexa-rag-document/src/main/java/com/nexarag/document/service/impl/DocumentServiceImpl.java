@@ -8,6 +8,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nexarag.common.exception.ClientException;
 import com.nexarag.common.exception.ServiceException;
+import com.nexarag.infra.enums.ExternalDocumentSourceType;
 import com.nexarag.common.web.PageVO;
 import com.nexarag.document.converter.DocumentConverter;
 import com.nexarag.document.model.dto.CreateDocumentRequest;
@@ -67,6 +68,8 @@ public class DocumentServiceImpl extends ServiceImpl<DocumentMapper, Document> i
                 .originalObjectName(request.originalObjectName())
                 .originalFileUrl(request.originalFileUrl())
                 .fileSize(request.fileSize())
+                .sourceType(request.sourceType() == null ? ExternalDocumentSourceType.LOCAL : request.sourceType())
+                .sourceUrl(request.sourceUrl())
                 .fileType(fileType)
                 .status(DocumentStatus.UPLOADED)
                 .retryCount(0)

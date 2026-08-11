@@ -2,8 +2,8 @@ package com.nexarag.infra.parser.service.impl;
 
 import com.nexarag.common.exception.ServiceException;
 import com.nexarag.infra.parser.model.DocumentParseRequest;
-import com.nexarag.infra.parser.model.DocumentParseResult;
-import com.nexarag.infra.parser.DocumentParser;
+import com.nexarag.infra.parser.model.ParsedArtifact;
+import com.nexarag.infra.parser.DocumentArtifactParser;
 import com.nexarag.infra.parser.service.DocumentParseService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -20,7 +20,7 @@ import java.util.List;
 @RequiredArgsConstructor
 public class DocumentParseServiceImpl implements DocumentParseService {
 
-    private final List<DocumentParser> documentParsers;
+    private final List<DocumentArtifactParser> documentArtifactParsers;
 
     /**
      * 解析文档并返回解析产物。
@@ -29,13 +29,13 @@ public class DocumentParseServiceImpl implements DocumentParseService {
      * @return 文档解析结果
      */
     @Override
-    public DocumentParseResult parse(DocumentParseRequest request) {
+    public ParsedArtifact parse(DocumentParseRequest request) {
         // 1. 校验解析请求
         validateRequest(request);
 
         // 2. 根据文件类型选择解析器
-        DocumentParser parser = documentParsers.stream()
-                .filter(documentParser -> documentParser.supports(request))
+        DocumentArtifactParser parser = documentArtifactParsers.stream()
+                .filter(documentArtifactParser -> documentArtifactParser.supports(request))
                 .findFirst()
                 .orElseThrow(() -> new ServiceException("未找到可用文档解析器，documentId="
                         + request.documentId() + "，fileType=" + request.fileType()));

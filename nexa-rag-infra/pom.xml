@@ -48,14 +48,19 @@
             <artifactId>minio</artifactId>
         </dependency>
         <dependency>
-            <groupId>org.apache.tika</groupId>
-            <artifactId>tika-core</artifactId>
-            <version>${tika.version}</version>
+            <groupId>com.alibaba.cloud.ai</groupId>
+            <artifactId>spring-ai-alibaba-starter-document-parser-tika</artifactId>
+            <version>${spring-ai-alibaba.version}</version>
         </dependency>
         <dependency>
-            <groupId>org.apache.tika</groupId>
-            <artifactId>tika-parsers-standard-package</artifactId>
-            <version>${tika.version}</version>
+            <groupId>com.alibaba.cloud.ai</groupId>
+            <artifactId>spring-ai-alibaba-starter-document-reader-yuque</artifactId>
+            <version>${spring-ai-alibaba.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>com.alibaba.cloud.ai</groupId>
+            <artifactId>spring-ai-alibaba-dashscope</artifactId>
+            <version>${spring-ai-alibaba.version}</version>
         </dependency>
         <dependency>
             <groupId>commons-io</groupId>

@@ -39,6 +39,14 @@ public interface FileStorageService {
     InputStream load(String objectName);
 
     /**
+     * 解析对象的可访问地址。
+     *
+     * @param objectName 对象名
+     * @return 对象访问地址
+     */
+    String resolveUrl(String objectName);
+
+    /**
      * 删除文件。
      *
      * @param objectName 对象名

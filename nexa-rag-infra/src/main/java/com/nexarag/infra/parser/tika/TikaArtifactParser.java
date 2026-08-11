@@ -1,37 +1,49 @@
 package com.nexarag.infra.parser.tika;
 
+import com.alibaba.cloud.ai.parser.tika.TikaDocumentParser;
 import com.nexarag.common.error.BaseErrorCode;
 import com.nexarag.common.exception.ServiceException;
-import com.nexarag.infra.parser.model.DocumentParseRequest;
-import com.nexarag.infra.parser.model.DocumentParseResult;
-import com.nexarag.infra.parser.DocumentParser;
 import com.nexarag.infra.constants.ParsedContentTypes;
 import com.nexarag.infra.constants.ParserFileTypes;
+import com.nexarag.infra.parser.DocumentArtifactParser;
+import com.nexarag.infra.parser.model.DocumentParseRequest;
+import com.nexarag.infra.parser.model.ParsedArtifact;
 import com.nexarag.infra.storage.ObjectNameResolver;
 import com.nexarag.infra.storage.StoredFile;
 import com.nexarag.infra.storage.service.FileStorageService;
-import lombok.RequiredArgsConstructor;
-import org.apache.tika.Tika;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.ai.document.Document;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 
 import java.io.ByteArrayInputStream;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
+import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.stream.Collectors;
 
 /**
  * Tika 文档解析器，负责将 PPT 和纯文本文件抽取为标准文本产物。
  */
 @Component
-@RequiredArgsConstructor
-@ConditionalOnProperty(prefix = "nexa.parser.tika", name = "enabled", havingValue = "true", matchIfMissing = true)
-public class TikaDocumentParser implements DocumentParser {
+public class TikaArtifactParser implements DocumentArtifactParser {
 
     private final FileStorageService fileStorageService;
     private final ObjectNameResolver objectNameResolver;
-    private final Tika tika = new Tika();
+    private final TikaDocumentParser parser;
+
+    /**
+     * 创建 Tika 文档解析适配器。
+     *
+     * @param fileStorageService 文件存储服务
+     * @param objectNameResolver 对象名解析器
+     */
+    public TikaArtifactParser(FileStorageService fileStorageService, ObjectNameResolver objectNameResolver) {
+        this.fileStorageService = fileStorageService;
+        this.objectNameResolver = objectNameResolver;
+        this.parser = new TikaDocumentParser();
+    }
 
     /**
      * 判断是否支持 Tika 解析。
@@ -52,10 +64,11 @@ public class TikaDocumentParser implements DocumentParser {
      * @return 文档解析结果
      */
     @Override
-    public DocumentParseResult parse(DocumentParseRequest request) {
+    public ParsedArtifact parse(DocumentParseRequest request) {
         try (InputStream inputStream = fileStorageService.load(request.originalObjectName())) {
-            // 1. 使用 Tika 抽取文本内容
-            String content = tika.parseToString(inputStream).trim();
+            // 1. 使用框架解析器抽取文本内容
+            List<Document> documents = parser.parse(inputStream);
+            String content = mergeDocumentTexts(documents);
             if (!StringUtils.hasText(content)) {
                 throw new ServiceException("Tika解析结果为空，documentId=" + request.documentId());
             }
@@ -68,14 +81,13 @@ public class TikaDocumentParser implements DocumentParser {
                     new ByteArrayInputStream(contentBytes), contentBytes.length, ParsedContentTypes.TEXT_PLAIN);
 
             // 3. 组装解析结果
-            return DocumentParseResult.builder()
+            return ParsedArtifact.builder()
                     .contentType(ParsedContentTypes.TEXT_PLAIN)
-                    .content(content)
-                    .parsedObjectName(storedFile.objectName())
-                    .parsedFileUrl(storedFile.url())
+                    .objectKey(storedFile.objectName())
                     .metadata(Map.of(
                             "parser", "tika",
                             "originalFileName", request.originalFileName(),
+                            "parsedDocumentCount", documents == null ? 0 : documents.size(),
                             "textLength", content.length()
                     ))
                     .build();
@@ -85,5 +97,17 @@ public class TikaDocumentParser implements DocumentParser {
             throw new ServiceException("Tika解析文档失败，documentId=" + request.documentId(),
                     exception, BaseErrorCode.SERVICE_ERROR);
         }
+    }
+
+    static String mergeDocumentTexts(List<Document> documents) {
+        if (documents == null) {
+            return "";
+        }
+        return documents.stream()
+                .filter(Objects::nonNull)
+                .map(Document::getText)
+                .filter(StringUtils::hasText)
+                .map(String::trim)
+                .collect(Collectors.joining("\n\n"));
     }
 }

@@ -1,5 +1,6 @@
 package com.nexarag.document.model.dto;
 
+import com.nexarag.infra.enums.ExternalDocumentSourceType;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.PositiveOrZero;
 import jakarta.validation.constraints.Size;
@@ -23,12 +24,31 @@ public record CreateDocumentRequest(
         @NotBlank(message = "原始文件名不能为空")
         @Size(max = 512, message = "原始文件名不能超过512个字符")
         String originalFileName,
-        @NotBlank(message = "原始文件对象名不能为空")
         @Size(max = 1024, message = "原始文件对象名不能超过1024个字符")
         String originalObjectName,
-        @NotBlank(message = "原始文件地址不能为空")
         @Size(max = 1024, message = "原始文件地址不能超过1024个字符")
         String originalFileUrl,
         @PositiveOrZero(message = "文件大小不能小于0")
-        Long fileSize) {
+        Long fileSize,
+        ExternalDocumentSourceType sourceType,
+        @Size(max = 1024, message = "来源URL不能超过1024个字符")
+        String sourceUrl) {
+
+    /**
+     * 兼容本地上传创建请求。
+     */
+    public CreateDocumentRequest(String title, String description, String originalFileName,
+                                 String originalObjectName, String originalFileUrl, Long fileSize) {
+        this(title, description, originalFileName, originalObjectName, originalFileUrl, fileSize,
+                ExternalDocumentSourceType.LOCAL, null);
+    }
+
+    /**
+     * 创建外部文档请求，远端内容会在异步解析阶段读取。
+     */
+    public static CreateDocumentRequest external(String title, String description, String virtualFileName,
+                                                 ExternalDocumentSourceType sourceType, String sourceUrl) {
+        return new CreateDocumentRequest(title, description, virtualFileName, null, null, null,
+                sourceType, sourceUrl);
+    }
 }

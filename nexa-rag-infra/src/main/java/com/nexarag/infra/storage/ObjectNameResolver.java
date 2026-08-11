@@ -75,6 +75,14 @@ public class ObjectNameResolver {
         return "parsed/" + documentId + "/assets/" + UUID.randomUUID() + extension;
     }
 
+    /**
+     * 生成外部来源响应快照对象名。
+     */
+    public String resolveSourceSnapshotObjectName(Long documentId, String extension) {
+        validateDocumentId(documentId);
+        return "source-snapshots/" + documentId + "/source" + normalizeExtension(extension);
+    }
+
     private void validateDocumentId(Long documentId) {
         if (documentId == null) {
             throw new ServiceException("文档ID不能为空");
