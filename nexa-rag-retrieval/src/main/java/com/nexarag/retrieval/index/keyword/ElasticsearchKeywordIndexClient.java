@@ -123,13 +123,18 @@ public class ElasticsearchKeywordIndexClient implements KeywordIndexClient {
 
         // 1. 通过 Spring Data delete_by_query 清理指定文档的全部片段。
         String resolvedIndexName = resolveIndexName(indexName);
+        IndexCoordinates indexCoordinates = IndexCoordinates.of(resolvedIndexName);
+        if (!elasticsearchOperations.indexOps(indexCoordinates).exists()) {
+            log.info("Elasticsearch 关键词索引不存在，跳过清理，文档ID：{}，indexName={}", documentId, resolvedIndexName);
+            return 0;
+        }
         NativeQuery query = NativeQuery.builder()
                 .withQuery(queryBuilder -> queryBuilder.term(term -> term
                         .field(DOCUMENT_ID)
                         .value(documentId)))
                 .build();
         ByQueryResponse response = elasticsearchOperations.delete(DeleteQuery.builder(query).build(),
-                KeywordIndexDocumentDO.class, IndexCoordinates.of(resolvedIndexName));
+                KeywordIndexDocumentDO.class, indexCoordinates);
         int deletedCount = Math.toIntExact(response.getDeleted());
 
         // 2. 记录真实删除数量，供异步索引清理任务排查。
