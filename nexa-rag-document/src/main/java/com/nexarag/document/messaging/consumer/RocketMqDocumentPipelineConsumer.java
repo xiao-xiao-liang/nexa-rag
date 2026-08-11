@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nexarag.common.exception.ClientException;
 import com.nexarag.common.exception.ServiceException;
 import com.nexarag.document.service.DocumentService;
+import com.nexarag.document.service.impl.DocumentProcessFailureService;
 import com.nexarag.infra.messaging.document.DocumentPipelineMessageHandler;
 import com.nexarag.infra.messaging.document.DocumentPipelineNonRetryableException;
 import com.nexarag.infra.config.DocumentPipelineMessagingProperties;
@@ -44,6 +45,7 @@ public class RocketMqDocumentPipelineConsumer implements RocketMQListener<Messag
     private final DocumentPipelineMessageHandler messageHandler;
     private final RocketMQTemplate rocketMQTemplate;
     private final DocumentPipelineMessagingProperties properties;
+    private final DocumentProcessFailureService failureService;
 
     @Override
     public void onMessage(MessageExt messageExt) {
@@ -65,7 +67,12 @@ public class RocketMqDocumentPipelineConsumer implements RocketMQListener<Messag
             documentService.markMessageCompleted(message.documentId(), message.processId());
         } catch (ClientException | DocumentPipelineNonRetryableException exception) {
             // 3. 永久性业务异常直接发布失败主题，避免无效重试
-            publishFailure(message, messageExt, consumedTimes, exception);
+            publishFailure(message, messageExt, consumedTimes, currentFailureStage(message.documentId()), exception);
+        } catch (RuntimeException exception) {
+            // 4. 可重试异常先独立回写失败上下文，再交由 RocketMQ 重投
+            failureService.recordFailure(message.documentId(), currentFailureStage(message.documentId()), exception.getMessage(),
+                    truncate(exception.toString()));
+            throw exception;
         }
     }
 
@@ -79,10 +86,10 @@ public class RocketMqDocumentPipelineConsumer implements RocketMQListener<Messag
     }
 
     private void publishFailure(DocumentPipelineMessage message, MessageExt messageExt,
-                                int consumedTimes, RuntimeException exception) {
+                                int consumedTimes, String failureStage, RuntimeException exception) {
         String failureDetail = truncate(exception.toString());
         DocumentPipelineFailureMessage failureMessage = new DocumentPipelineFailureMessage(
-                message.outboxId(), message.documentId(), message.processId(), exception.getClass().getSimpleName(),
+                message.outboxId(), message.documentId(), message.processId(), failureStage,
                 exception.getMessage(), failureDetail, consumedTimes, messageExt.getMsgId(), LocalDateTime.now());
         org.springframework.messaging.Message<DocumentPipelineFailureMessage> rocketMqMessage =
                 MessageBuilder.withPayload(failureMessage)
@@ -100,6 +107,13 @@ public class RocketMqDocumentPipelineConsumer implements RocketMQListener<Messag
                     message.documentId(), message.processId(), publishException);
             throw publishException;
         }
+    }
+
+    /**
+     * 获取异常发生时文档已推进到的处理状态，用作失败阶段。
+     */
+    private String currentFailureStage(Long documentId) {
+        return documentService.getRequiredDocument(documentId).getStatus().name();
     }
 
     private String truncate(String detail) {

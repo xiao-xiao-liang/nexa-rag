@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nexarag.common.exception.ClientException;
 import com.nexarag.document.messaging.consumer.RocketMqDocumentPipelineConsumer;
 import com.nexarag.document.service.DocumentService;
+import com.nexarag.document.service.impl.DocumentProcessFailureService;
 import com.nexarag.infra.messaging.document.DocumentPipelineMessageHandler;
 import com.nexarag.infra.config.DocumentPipelineMessagingProperties;
 import com.nexarag.infra.messaging.document.model.DocumentPipelineMessage;
@@ -63,6 +64,7 @@ class RocketMqDocumentPipelineConsumerTest {
 
         assertThatThrownBy(() -> fixture.consumer.onMessage(messageExt(fixture.objectMapper, 0)))
                 .isSameAs(failure);
+        verify(fixture.failureService).recordFailure(1L, "PIPELINE", "临时网络异常", failure.toString());
     }
 
     @Test
@@ -87,10 +89,11 @@ class RocketMqDocumentPipelineConsumerTest {
         DocumentService documentService = mock(DocumentService.class);
         DocumentPipelineMessageHandler messageHandler = mock(DocumentPipelineMessageHandler.class);
         RocketMQTemplate rocketMQTemplate = mock(RocketMQTemplate.class);
+        DocumentProcessFailureService failureService = mock(DocumentProcessFailureService.class);
         DocumentPipelineMessagingProperties properties = new DocumentPipelineMessagingProperties();
         RocketMqDocumentPipelineConsumer consumer = new RocketMqDocumentPipelineConsumer(
-                objectMapper, documentService, messageHandler, rocketMQTemplate, properties);
-        return new Fixture(objectMapper, documentService, messageHandler, rocketMQTemplate, properties, consumer);
+                objectMapper, documentService, messageHandler, rocketMQTemplate, properties, failureService);
+        return new Fixture(objectMapper, documentService, messageHandler, rocketMQTemplate, properties, failureService, consumer);
     }
 
     private MessageExt messageExt(ObjectMapper objectMapper, int reconsumeTimes) throws Exception {
@@ -107,6 +110,7 @@ class RocketMqDocumentPipelineConsumerTest {
                            DocumentPipelineMessageHandler messageHandler,
                            RocketMQTemplate rocketMQTemplate,
                            DocumentPipelineMessagingProperties properties,
+                           DocumentProcessFailureService failureService,
                            RocketMqDocumentPipelineConsumer consumer) {
     }
 }
