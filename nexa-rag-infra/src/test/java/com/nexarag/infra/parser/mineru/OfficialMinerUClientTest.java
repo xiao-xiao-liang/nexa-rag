@@ -2,6 +2,7 @@ package com.nexarag.infra.parser.mineru;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nexarag.common.exception.ServiceException;
+import com.nexarag.infra.config.ArtifactProcessingProperties;
 import com.nexarag.infra.config.MinerUProperties;
 import com.nexarag.infra.enums.MinerUClientMode;
 import com.nexarag.infra.parser.mineru.client.OfficialMinerUClient;
@@ -106,7 +107,8 @@ class OfficialMinerUClientTest {
             respondBytes(exchange, 200, ZIP_BYTES, "application/zip");
         });
 
-        MinerUParseResponse response = createClient(properties()).parse(command());
+        MinerUParseResponse response = createClient(properties()).parse(command(
+                new ReadAllBytesFailingInputStream(FILE_BYTES)));
 
         assertThat(response.zipInputStream().readAllBytes()).isEqualTo(ZIP_BYTES);
         assertThat(response.metadata())
@@ -189,16 +191,37 @@ class OfficialMinerUClientTest {
     }
 
     private OfficialMinerUClient createClient(MinerUProperties properties) {
-        return new OfficialMinerUClient(properties, new ObjectMapper());
+        ArtifactProcessingProperties artifactProperties = new ArtifactProcessingProperties();
+        artifactProperties.setMaxWorkspaceBytes(1024L);
+        return new OfficialMinerUClient(properties, new ObjectMapper(), artifactProperties);
     }
 
     private MinerUParseCommand command() {
+        return command(new ByteArrayInputStream(FILE_BYTES));
+    }
+
+    private MinerUParseCommand command(ByteArrayInputStream inputStream) {
         return MinerUParseCommand.builder()
                 .documentId(1L)
                 .fileName("demo.pdf")
-                .inputStream(new ByteArrayInputStream(FILE_BYTES))
+                .inputStream(inputStream)
                 .enableOcr(true)
                 .build();
+    }
+
+    /**
+     * 仅允许分段读取，用于防止客户端重新引入全量字节聚合。
+     */
+    private static final class ReadAllBytesFailingInputStream extends ByteArrayInputStream {
+
+        private ReadAllBytesFailingInputStream(byte[] bytes) {
+            super(bytes);
+        }
+
+        @Override
+        public byte[] readAllBytes() {
+            throw new AssertionError("不应调用readAllBytes");
+        }
     }
 
     private String baseUrl() {

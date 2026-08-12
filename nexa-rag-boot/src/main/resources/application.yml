@@ -47,13 +47,16 @@ rocketmq:
     group: nexa-document-pipeline-producer # 文档流水线生产者组，同一应用集群应保持一致。
 
 nexa:
-  source:
+  cloud-document:
     yuque:
       token: ${NEXA_SOURCE_YUQUE_TOKEN:}
     feishu:
       app-id: ${NEXA_SOURCE_FEISHU_APP_ID:}
       app-secret: ${NEXA_SOURCE_FEISHU_APP_SECRET:}
-      base-url: https://open.feishu.cn
+      export:
+        timeout: 120s
+        poll-interval: 2s
+        max-poll-count: 60
   prompt:
     refresh:
       topic: nexa.prompt.release.changed
@@ -115,6 +118,15 @@ nexa:
 
   # 文档解析器配置，用于控制 MinerU、Tika 和直通解析器的启停及连接参数。
   parser:
+    artifact:
+      temp-root: ${NEXA_ARTIFACT_TEMP_ROOT:${java.io.tmpdir}/nexa-rag-artifacts}
+      max-workspace-bytes: 524288000
+      max-concurrent: 2
+    pandoc:
+      enabled: true
+      executable: ${NEXA_PANDOC_EXECUTABLE:D:\Software\笔记&协助\pandoc-3.1.13\pandoc.exe}
+      timeout: 120s
+      max-stderr-bytes: 8192
     mineru:
       enabled: true # 是否启用 MinerU 解析器，可选值：true、false。
       mode: official # MinerU 调用模式，可选值：LOCAL、OFFICIAL；配置时大小写均可绑定。

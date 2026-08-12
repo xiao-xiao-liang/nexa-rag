@@ -9,6 +9,7 @@ import com.nexarag.document.model.entity.DocumentTaskOutboxDO;
 import com.nexarag.document.service.DocumentPipelineOutboxService;
 import com.nexarag.infra.config.DocumentTaskMessagingProperties;
 import com.nexarag.infra.messaging.document.task.DocumentStorageCleanupMessage;
+import com.nexarag.infra.storage.ObjectNameResolver;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 
@@ -27,7 +28,8 @@ class DocumentDeleteTaskServiceImplTest {
         DocumentPipelineOutboxService outboxService = mock(DocumentPipelineOutboxService.class);
         when(outboxService.save(org.mockito.ArgumentMatchers.any(DocumentTaskOutboxDO.class))).thenReturn(true);
         DocumentDeleteTaskServiceImpl service = new DocumentDeleteTaskServiceImpl(outboxService,
-                new DocumentTaskMessagingProperties(), new ObjectMapper().findAndRegisterModules());
+                new DocumentTaskMessagingProperties(), new ObjectMapper().findAndRegisterModules(),
+                new ObjectNameResolver());
         Document document = Document.builder()
                 .documentId(1L)
                 .originalObjectName("original/demo.pdf")
@@ -49,5 +51,8 @@ class DocumentDeleteTaskServiceImplTest {
         assertThat(message.outboxId()).isEqualTo(outbox.getOutboxId());
         assertThat(message.originalObjectName()).isEqualTo("original/demo.pdf");
         assertThat(message.parsedObjectName()).isEqualTo("parsed/demo.md");
+        assertThat(message.schemaVersion()).isEqualTo(2);
+        assertThat(message.parsedObjectPrefix()).isEqualTo("parsed/1/");
+        assertThat(message.sourceSnapshotPrefix()).isEqualTo("source-snapshots/1/");
     }
 }

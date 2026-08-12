@@ -101,7 +101,8 @@ public class DocumentTaskAdminServiceImpl implements DocumentTaskAdminService {
                             DocumentStorageCleanupMessage.class);
                     yield new DocumentStorageCleanupMessage(retryOutboxId, failedTask.getDocumentId(), operationId,
                             failedTask.getTaskType().name(), previous.schemaVersion(), previous.originalObjectName(),
-                            previous.parsedObjectName(), createdTime);
+                            previous.parsedObjectName(), previous.parsedObjectPrefix(),
+                            previous.sourceSnapshotPrefix(), createdTime);
                 }
                 case SEND_FEISHU_FAILURE_ALERT, SEND_EMAIL_FAILURE_ALERT -> {
                     AlertMessage previous = objectMapper.readValue(failedTask.getMessageBody(), AlertMessage.class);

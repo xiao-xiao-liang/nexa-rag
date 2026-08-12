@@ -4,10 +4,13 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nexarag.common.error.BaseErrorCode;
 import com.nexarag.common.exception.ServiceException;
+import com.nexarag.infra.config.ArtifactProcessingProperties;
 import com.nexarag.infra.config.MinerUProperties;
+import com.nexarag.infra.parser.workspace.BoundedFileTransfer;
 import com.nexarag.infra.parser.model.MinerUParseCommand;
 import com.nexarag.infra.parser.model.MinerUParseResponse;
 import com.nexarag.infra.parser.model.OfficialMinerUResponse;
+import lombok.extern.slf4j.Slf4j;
 import lombok.RequiredArgsConstructor;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.http.*;
@@ -18,10 +21,11 @@ import org.springframework.util.StringUtils;
 import org.springframework.web.client.HttpStatusCodeException;
 import org.springframework.web.client.RestTemplate;
 
-import java.io.ByteArrayInputStream;
 import java.io.InputStream;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.time.Duration;
 import java.util.List;
 import java.util.Map;
@@ -30,12 +34,16 @@ import java.util.Map;
  * 官方 MinerU 客户端，负责通过官方异步接口上传文件、轮询任务并下载 ZIP 产物。
  */
 @Component
+@Slf4j
 @RequiredArgsConstructor
 @ConditionalOnProperty(prefix = "nexa.parser.mineru", name = "mode", havingValue = "official")
 public class OfficialMinerUClient implements MinerUClient {
 
+    private static final BoundedFileTransfer FILE_TRANSFER = new BoundedFileTransfer();
+
     private final MinerUProperties properties;
     private final ObjectMapper objectMapper;
+    private final ArtifactProcessingProperties artifactProcessingProperties;
 
     /**
      * 调用官方 MinerU 服务解析文件。
@@ -46,32 +54,32 @@ public class OfficialMinerUClient implements MinerUClient {
     @Override
     public MinerUParseResponse parse(MinerUParseCommand command) {
         validateApiKey(command);
+        Path zipFile = null;
         try {
-            // 1. 一次性读取原始文件，避免异步调用阶段重复消费输入流
-            byte[] fileBytes;
+            // 1. 申请签名地址后，直接将原始文件流上传至对象存储。
+            ApplyResult applyResult = applyUploadUrl(command);
             try (InputStream inputStream = command.inputStream()) {
-                fileBytes = inputStream.readAllBytes();
+                uploadFile(command, applyResult.fileUrl(), inputStream);
             }
 
-            // 2. 申请签名地址并上传原始文件
-            ApplyResult applyResult = applyUploadUrl(command);
-            uploadFile(command, applyResult.fileUrl(), fileBytes);
-
-            // 3. 轮询官方任务，完成后下载 ZIP 解析产物
+            // 2. 轮询官方任务，完成后将 ZIP 解析产物写入临时文件。
             PollResult pollResult = waitForResult(command, applyResult.batchId());
-            byte[] zipBytes = downloadZip(command, pollResult.fullZipUrl());
+            DownloadedZip downloadedZip = downloadZip(command, pollResult.fullZipUrl());
+            zipFile = downloadedZip.path();
             return MinerUParseResponse.builder()
-                    .zipInputStream(new ByteArrayInputStream(zipBytes))
+                    .zipInputStream(new DeleteOnCloseFileInputStream(zipFile))
                     .metadata(Map.of(
                             "clientMode", "official",
                             "batchId", applyResult.batchId(),
                             "pollCount", pollResult.pollCount(),
-                            "zipSize", zipBytes.length
+                            "zipSize", Math.toIntExact(downloadedZip.size())
                     ))
                     .build();
         } catch (ServiceException exception) {
+            deleteTemporaryFile(zipFile);
             throw exception;
         } catch (Exception exception) {
+            deleteTemporaryFile(zipFile);
             throw new ServiceException("调用官方MinerU异常，documentId=" + command.documentId(),
                     exception, BaseErrorCode.REMOTE_ERROR);
         }
@@ -125,13 +133,13 @@ public class OfficialMinerUClient implements MinerUClient {
         }
     }
 
-    private void uploadFile(MinerUParseCommand command, String fileUrl, byte[] fileBytes) {
+    private void uploadFile(MinerUParseCommand command, String fileUrl, InputStream inputStream) {
         try {
             // 1. 签名上传地址已包含鉴权信息，不额外设置Content-Type，避免改变OSS签名串
             HttpStatusCode statusCode = buildRestTemplate().execute(
                     URI.create(fileUrl),
                     HttpMethod.PUT,
-                    request -> request.getBody().write(fileBytes),
+                    request -> inputStream.transferTo(request.getBody()),
                     ClientHttpResponse::getStatusCode
             );
             if (statusCode == null || !statusCode.is2xxSuccessful()) {
@@ -188,17 +196,30 @@ public class OfficialMinerUClient implements MinerUClient {
         }
     }
 
-    private byte[] downloadZip(MinerUParseCommand command, String fullZipUrl) {
+    private DownloadedZip downloadZip(MinerUParseCommand command, String fullZipUrl) {
+        Path zipFile = null;
         try {
-            ResponseEntity<byte[]> response = buildRestTemplate().getForEntity(URI.create(fullZipUrl), byte[].class);
-            if (!response.getStatusCode().is2xxSuccessful() || response.getBody() == null
-                    || response.getBody().length == 0) {
+            zipFile = Files.createTempFile("nexa-rag-mineru-", ".zip");
+            Files.deleteIfExists(zipFile);
+            Path targetZipFile = zipFile;
+            Long zipSize = buildRestTemplate().execute(
+                    URI.create(fullZipUrl),
+                    HttpMethod.GET,
+                    null,
+                    response -> FILE_TRANSFER.copy(response.getBody(), targetZipFile, requiredMaxFileBytes())
+            );
+            if (zipSize == null || zipSize <= 0) {
                 throw remoteError("下载ZIP解析产物失败", command.documentId());
             }
-            return response.getBody();
+            return new DownloadedZip(zipFile, zipSize);
         } catch (HttpStatusCodeException exception) {
+            deleteTemporaryFile(zipFile);
             throw new ServiceException("下载ZIP解析产物失败，httpStatus=" + exception.getStatusCode().value()
                     + "，documentId=" + command.documentId(), exception, BaseErrorCode.REMOTE_ERROR);
+        } catch (java.io.IOException exception) {
+            deleteTemporaryFile(zipFile);
+            throw new ServiceException("下载ZIP解析产物失败，documentId=" + command.documentId(),
+                    exception, BaseErrorCode.REMOTE_ERROR);
         }
     }
 
@@ -274,6 +295,24 @@ public class OfficialMinerUClient implements MinerUClient {
         return millis > Integer.MAX_VALUE ? Integer.MAX_VALUE : (int) millis;
     }
 
+    private long requiredMaxFileBytes() {
+        if (artifactProcessingProperties.getMaxWorkspaceBytes() <= 0) {
+            throw new ServiceException("文档解析工作区大小限制必须大于零");
+        }
+        return artifactProcessingProperties.getMaxWorkspaceBytes();
+    }
+
+    private void deleteTemporaryFile(Path temporaryFile) {
+        if (temporaryFile == null) {
+            return;
+        }
+        try {
+            Files.deleteIfExists(temporaryFile);
+        } catch (java.io.IOException exception) {
+            log.warn("删除MinerU ZIP临时文件失败，path={}", temporaryFile, exception);
+        }
+    }
+
     private ServiceException remoteError(String message, Long documentId) {
         return new ServiceException(message + "，documentId=" + documentId, BaseErrorCode.REMOTE_ERROR);
     }
@@ -282,5 +321,8 @@ public class OfficialMinerUClient implements MinerUClient {
     }
 
     private record PollResult(String fullZipUrl, int pollCount) {
+    }
+
+    private record DownloadedZip(Path path, long size) {
     }
 }

@@ -18,7 +18,7 @@ import java.util.LinkedHashSet;
 import java.util.Set;
 
 /**
- * 文档对象存储清理消费者，按删除任务中固化的对象名幂等清理原始与解析文件。
+ * 文档对象存储清理消费者，按消息版本幂等清理原始对象与解析制品。
  */
 @Slf4j
 @Component
@@ -44,9 +44,13 @@ public class RocketMqDocumentStorageCleanupConsumer implements RocketMQListener<
             return;
         }
 
-        // 2. 逐个删除去重后的对象；任一失败交由RocketMQ重试
-        for (String objectName : resolveObjectNames(message)) {
+        // 2. 逐个删除对象和受校验前缀；任一失败交由RocketMQ重试
+        CleanupTargets cleanupTargets = resolveCleanupTargets(message);
+        for (String objectName : cleanupTargets.objectNames()) {
             fileStorageService.delete(objectName);
+        }
+        for (String objectPrefix : cleanupTargets.objectPrefixes()) {
+            fileStorageService.deleteByPrefix(objectPrefix);
         }
 
         // 3. 两类对象均清理成功后更新任务状态
@@ -70,14 +74,30 @@ public class RocketMqDocumentStorageCleanupConsumer implements RocketMQListener<
         }
     }
 
-    private Set<String> resolveObjectNames(DocumentStorageCleanupMessage message) {
+    private CleanupTargets resolveCleanupTargets(DocumentStorageCleanupMessage message) {
         Set<String> objectNames = new LinkedHashSet<>();
         if (StringUtils.hasText(message.originalObjectName())) {
             objectNames.add(message.originalObjectName());
         }
-        if (StringUtils.hasText(message.parsedObjectName())) {
-            objectNames.add(message.parsedObjectName());
+        if (message.schemaVersion() == null || message.schemaVersion() < 2) {
+            if (StringUtils.hasText(message.parsedObjectName())) {
+                objectNames.add(message.parsedObjectName());
+            }
+            return new CleanupTargets(objectNames, Set.of());
         }
-        return objectNames;
+
+        String parsedPrefix = "parsed/" + message.documentId() + "/";
+        String sourceSnapshotPrefix = "source-snapshots/" + message.documentId() + "/";
+        if (!parsedPrefix.equals(message.parsedObjectPrefix())
+                || !sourceSnapshotPrefix.equals(message.sourceSnapshotPrefix())) {
+            throw new ServiceException("文档对象存储清理前缀非法，documentId=" + message.documentId());
+        }
+        Set<String> objectPrefixes = new LinkedHashSet<>();
+        objectPrefixes.add(parsedPrefix);
+        objectPrefixes.add(sourceSnapshotPrefix);
+        return new CleanupTargets(objectNames, objectPrefixes);
+    }
+
+    private record CleanupTargets(Set<String> objectNames, Set<String> objectPrefixes) {
     }
 }

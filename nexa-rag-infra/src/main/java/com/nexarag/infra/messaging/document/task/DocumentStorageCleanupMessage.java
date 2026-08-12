@@ -12,9 +12,22 @@ import java.time.LocalDateTime;
  * @param schemaVersion      消息结构版本
  * @param originalObjectName 原始文件对象名
  * @param parsedObjectName   解析文件对象名
+ * @param parsedObjectPrefix 解析制品对象前缀，仅 schema v2 及以上使用
+ * @param sourceSnapshotPrefix 外部来源快照对象前缀，仅 schema v2 及以上使用
  * @param createdTime        创建时间
  */
 public record DocumentStorageCleanupMessage(Long outboxId, Long documentId, String operationId, String taskType,
                                             Integer schemaVersion, String originalObjectName, String parsedObjectName,
+                                            String parsedObjectPrefix, String sourceSnapshotPrefix,
                                             LocalDateTime createdTime) {
+
+    /**
+     * 兼容历史 schema v1 的清理消息。
+     */
+    public DocumentStorageCleanupMessage(Long outboxId, Long documentId, String operationId, String taskType,
+                                         Integer schemaVersion, String originalObjectName, String parsedObjectName,
+                                         LocalDateTime createdTime) {
+        this(outboxId, documentId, operationId, taskType, schemaVersion, originalObjectName, parsedObjectName,
+                null, null, createdTime);
+    }
 }

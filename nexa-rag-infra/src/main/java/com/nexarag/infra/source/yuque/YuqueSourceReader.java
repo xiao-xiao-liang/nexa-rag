@@ -3,11 +3,12 @@ package com.nexarag.infra.source.yuque;
 import com.alibaba.cloud.ai.parser.tika.TikaDocumentParser;
 import com.alibaba.cloud.ai.reader.yuque.YuQueDocumentReader;
 import com.alibaba.cloud.ai.reader.yuque.YuQueResource;
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nexarag.common.exception.ServiceException;
-import com.nexarag.infra.config.YuqueSourceProperties;
+import com.nexarag.common.error.BaseErrorCode;
+import com.nexarag.infra.config.CloudDocumentProperties;
 import com.nexarag.infra.enums.ExternalDocumentSourceType;
+import com.nexarag.infra.parser.model.DocumentFormat;
+import com.nexarag.infra.parser.workspace.ArtifactWorkspace;
 import com.nexarag.infra.source.ExternalDocumentSourceReader;
 import com.nexarag.infra.source.model.SourceReadRequestDTO;
 import com.nexarag.infra.source.model.SourceReadResultBO;
@@ -16,6 +17,8 @@ import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 
 import java.net.URI;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
 
@@ -24,8 +27,7 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class YuqueSourceReader implements ExternalDocumentSourceReader {
 
-    private final YuqueSourceProperties properties;
-    private final ObjectMapper objectMapper;
+    private final CloudDocumentProperties cloudDocumentProperties;
 
     @Override
     public boolean supports(ExternalDocumentSourceType sourceType) {
@@ -48,25 +50,24 @@ public class YuqueSourceReader implements ExternalDocumentSourceReader {
     }
 
     @Override
-    public SourceReadResultBO read(SourceReadRequestDTO request) {
-        if (!StringUtils.hasText(properties.getToken())) {
+    public SourceReadResultBO read(SourceReadRequestDTO request, ArtifactWorkspace workspace) {
+        if (!StringUtils.hasText(cloudDocumentProperties.getYuque().getToken())) {
             throw new ServiceException("未配置语雀访问令牌");
         }
         validateAndExtractDocumentId(request.sourceUrl());
         List<org.springframework.ai.document.Document> documents = new YuQueDocumentReader(YuQueResource.builder()
-                .yuQueToken(properties.getToken()).resourcePath(request.sourceUrl()).build(), new TikaDocumentParser()).get();
+                .yuQueToken(cloudDocumentProperties.getYuque().getToken()).resourcePath(request.sourceUrl()).build(),
+                new TikaDocumentParser()).get();
         String markdown = documents.stream().map(org.springframework.ai.document.Document::getText)
                 .filter(StringUtils::hasText).reduce((left, right) -> left + "\n\n" + right)
                 .orElseThrow(() -> new ServiceException("语雀文档未返回正文"));
-        return new SourceReadResultBO(serialize(documents), "application/json", markdown, null,
-                validateAndExtractDocumentId(request.sourceUrl()), null, Map.of("sourceType", "YUQUE"));
-    }
-
-    private byte[] serialize(List<org.springframework.ai.document.Document> documents) {
         try {
-            return objectMapper.writeValueAsBytes(documents);
-        } catch (JsonProcessingException exception) {
-            throw new ServiceException("序列化语雀来源快照失败");
+            Path sourcePath = workspace.resolve("source.md");
+            Files.writeString(sourcePath, markdown);
+            return new SourceReadResultBO(sourcePath, "text/markdown", DocumentFormat.MARKDOWN, "source.md", null,
+                    validateAndExtractDocumentId(request.sourceUrl()), null, Map.of("sourceType", "YUQUE"));
+        } catch (Exception exception) {
+            throw new ServiceException("写入语雀来源文件失败", exception, BaseErrorCode.SERVICE_ERROR);
         }
     }
 }

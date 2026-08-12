@@ -1,6 +1,7 @@
 package com.nexarag.document.service.impl;
 
 import com.nexarag.common.exception.ClientException;
+import com.nexarag.document.constants.DocumentConstants;
 import com.nexarag.document.enums.DocumentErrorCode;
 import com.nexarag.document.enums.DocumentStatus;
 import com.nexarag.document.enums.FileType;
@@ -13,6 +14,8 @@ import com.nexarag.infra.enums.ExternalDocumentSourceType;
 import com.nexarag.infra.source.ExternalDocumentSourceService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+
+import static com.nexarag.document.constants.DocumentConstants.DEFAULT_EXTERNAL_DOCUMENT_TITLE;
 
 /** 外部文档统一受理服务，仅创建文档任务，不在请求线程读取远端内容。 */
 @Service
@@ -31,7 +34,8 @@ public class ExternalDocumentSubmitServiceImpl {
         externalDocumentSourceService.validateAndExtractDocumentId(request.sourceType(), request.sourceUrl());
 
         // 2. 创建外部来源文档并通过既有事务写入 Outbox
-        String title = request.title() == null || request.title().isBlank() ? "外部文档" : request.title();
+        String title = request.title() == null || request.title().isBlank()
+                ? DEFAULT_EXTERNAL_DOCUMENT_TITLE : request.title();
         var document = documentPipelineSubmitService.createAndSubmit(
                 com.nexarag.document.model.dto.CreateDocumentRequest.external(title, request.description(),
                         "external.md", request.sourceType(), request.sourceUrl()),

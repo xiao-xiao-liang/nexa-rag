@@ -58,12 +58,37 @@ class FileStorageServiceImplTest {
                 .hasMessageContaining("未找到文件存储策略");
     }
 
+    @Test
+    void resolveUrlShouldDelegateToConfiguredStrategy() {
+        StorageProperties properties = new StorageProperties();
+        properties.setType(StorageType.MINIO);
+        RecordingStorageStrategy strategy = new RecordingStorageStrategy(StorageType.MINIO);
+        FileStorageServiceImpl storageService = new FileStorageServiceImpl(properties, List.of(strategy));
+
+        String url = storageService.resolveUrl("parsed/1/content.md");
+
+        assertThat(url).isEqualTo("http://127.0.0.1:9000/nexa-rag/parsed/1/content.md");
+    }
+
+    @Test
+    void deleteByPrefixShouldDelegateToConfiguredStrategy() {
+        StorageProperties properties = new StorageProperties();
+        properties.setType(StorageType.MINIO);
+        RecordingStorageStrategy strategy = new RecordingStorageStrategy(StorageType.MINIO);
+        FileStorageServiceImpl storageService = new FileStorageServiceImpl(properties, List.of(strategy));
+
+        storageService.deleteByPrefix("parsed/1/");
+
+        assertThat(strategy.deletedPrefix).isEqualTo("parsed/1/");
+    }
+
     private static class RecordingStorageStrategy implements FileStorageStrategy {
 
         private final StorageType storageType;
         private String savedFileName;
         private String savedObjectName;
         private String savedContentType;
+        private String deletedPrefix;
         private long savedSize;
 
         private RecordingStorageStrategy(StorageType storageType) {
@@ -96,7 +121,17 @@ class FileStorageServiceImplTest {
         }
 
         @Override
+        public String resolveUrl(String objectName) {
+            return "http://127.0.0.1:9000/nexa-rag/" + objectName;
+        }
+
+        @Override
         public void delete(String objectName) {
+        }
+
+        @Override
+        public void deleteByPrefix(String objectPrefix) {
+            this.deletedPrefix = objectPrefix;
         }
     }
 }

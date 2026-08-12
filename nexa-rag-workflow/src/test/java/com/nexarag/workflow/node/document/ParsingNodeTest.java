@@ -42,6 +42,7 @@ class ParsingNodeTest {
     void applyShouldParseQueuedDocumentAndRouteToChunking() throws Exception {
         DocumentService documentService = mock(DocumentService.class);
         DocumentParseService parseService = mock(DocumentParseService.class);
+        ExternalDocumentSourceService sourceService = mock(ExternalDocumentSourceService.class);
         FileStorageService fileStorageService = mock(FileStorageService.class);
         Document document = buildQueuedDocument();
         when(documentService.getRequiredDocument(1001L)).thenReturn(document);
@@ -53,7 +54,7 @@ class ParsingNodeTest {
         when(fileStorageService.resolveUrl("parsed/1001/demo.md"))
                 .thenReturn("http://127.0.0.1/parsed/1001/demo.md");
 
-        ParsingNode node = new ParsingNode(documentService, parseService, fileStorageService, objectMapper);
+        ParsingNode node = new ParsingNode(documentService, parseService, sourceService, fileStorageService, objectMapper);
         Map<String, Object> result = node.apply(new OverAllState(Map.of(DOCUMENT_ID, 1001L)));
 
         assertThat(document.getStatus()).isEqualTo(DocumentStatus.PARSED);
@@ -68,6 +69,7 @@ class ParsingNodeTest {
     void applyShouldPropagateParseFailureToMessageConsumer() throws Exception {
         DocumentService documentService = mock(DocumentService.class);
         DocumentParseService parseService = mock(DocumentParseService.class);
+        ExternalDocumentSourceService sourceService = mock(ExternalDocumentSourceService.class);
         FileStorageService fileStorageService = mock(FileStorageService.class);
         Document document = buildQueuedDocument();
         when(documentService.getRequiredDocument(1001L)).thenReturn(document);
@@ -75,7 +77,7 @@ class ParsingNodeTest {
         IllegalStateException failure = new IllegalStateException("解析失败");
         when(parseService.parse(any(DocumentParseRequest.class))).thenThrow(failure);
 
-        ParsingNode node = new ParsingNode(documentService, parseService, fileStorageService, objectMapper);
+        ParsingNode node = new ParsingNode(documentService, parseService, sourceService, fileStorageService, objectMapper);
 
         assertThatThrownBy(() -> node.apply(new OverAllState(Map.of(DOCUMENT_ID, 1001L))))
                 .isSameAs(failure);
@@ -86,6 +88,7 @@ class ParsingNodeTest {
     void applyShouldSkipParseWhenDocumentAlreadyParsed() throws Exception {
         DocumentService documentService = mock(DocumentService.class);
         DocumentParseService parseService = mock(DocumentParseService.class);
+        ExternalDocumentSourceService sourceService = mock(ExternalDocumentSourceService.class);
         FileStorageService fileStorageService = mock(FileStorageService.class);
         Document document = Document.builder()
                 .documentId(1001L)
@@ -93,7 +96,7 @@ class ParsingNodeTest {
                 .build();
         when(documentService.getRequiredDocument(1001L)).thenReturn(document);
 
-        ParsingNode node = new ParsingNode(documentService, parseService, fileStorageService, objectMapper);
+        ParsingNode node = new ParsingNode(documentService, parseService, sourceService, fileStorageService, objectMapper);
         Map<String, Object> result = node.apply(new OverAllState(Map.of(DOCUMENT_ID, 1001L)));
 
         assertThat(result).containsEntry(ROUTE_TARGET, CHUNKING_NODE);

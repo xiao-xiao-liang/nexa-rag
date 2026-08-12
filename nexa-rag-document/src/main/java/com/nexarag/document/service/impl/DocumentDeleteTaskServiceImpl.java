@@ -15,6 +15,7 @@ import com.nexarag.document.service.DocumentDeleteTaskService;
 import com.nexarag.infra.config.DocumentTaskMessagingProperties;
 import com.nexarag.infra.messaging.document.task.DocumentTaskMessage;
 import com.nexarag.infra.messaging.document.task.DocumentStorageCleanupMessage;
+import com.nexarag.infra.storage.ObjectNameResolver;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -29,10 +30,12 @@ import java.util.UUID;
 public class DocumentDeleteTaskServiceImpl implements DocumentDeleteTaskService {
 
     private static final int MESSAGE_SCHEMA_VERSION = 1;
+    private static final int STORAGE_CLEANUP_MESSAGE_SCHEMA_VERSION = 2;
 
     private final DocumentPipelineOutboxService outboxService;
     private final DocumentTaskMessagingProperties taskProperties;
     private final ObjectMapper objectMapper;
+    private final ObjectNameResolver objectNameResolver;
 
     /**
      * 创建一条可可靠发布的索引清理任务。
@@ -85,8 +88,11 @@ public class DocumentDeleteTaskServiceImpl implements DocumentDeleteTaskService 
         LocalDateTime now = LocalDateTime.now();
         String messageKey = document.getDocumentId() + ":" + DocumentTaskType.CLEAN_DOCUMENT_STORAGE + ":" + operationId;
         DocumentStorageCleanupMessage message = new DocumentStorageCleanupMessage(outboxId, document.getDocumentId(),
-                operationId, DocumentTaskType.CLEAN_DOCUMENT_STORAGE.name(), MESSAGE_SCHEMA_VERSION,
-                document.getOriginalObjectName(), document.getParsedObjectName(), now);
+                operationId, DocumentTaskType.CLEAN_DOCUMENT_STORAGE.name(), STORAGE_CLEANUP_MESSAGE_SCHEMA_VERSION,
+                document.getOriginalObjectName(), document.getParsedObjectName(),
+                objectNameResolver.resolveParsedPrefix(document.getDocumentId()),
+                objectNameResolver.resolveSourceSnapshotPrefix(document.getDocumentId()),
+                now);
 
         // 2. 在当前事务中保存待发布任务，失败时与文档删除整体回滚
         boolean saved = outboxService.save(DocumentTaskOutboxDO.builder()

@@ -59,4 +59,11 @@ public interface FileStorageStrategy {
      * @param objectName 对象名
      */
     void delete(String objectName);
+
+    /**
+     * 删除指定对象前缀下的全部文件。
+     *
+     * @param objectPrefix 已校验的对象前缀
+     */
+    void deleteByPrefix(String objectPrefix);
 }

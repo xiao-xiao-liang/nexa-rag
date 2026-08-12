@@ -10,6 +10,7 @@ import com.nexarag.infra.storage.StoredFile;
 import io.minio.BucketExistsArgs;
 import io.minio.GetObjectArgs;
 import io.minio.MakeBucketArgs;
+import io.minio.ListObjectsArgs;
 import io.minio.MinioClient;
 import io.minio.PutObjectArgs;
 import io.minio.RemoveObjectArgs;
@@ -142,6 +143,34 @@ public class MinioFileStorageStrategy implements FileStorageStrategy {
             log.info("删除 MinIO 文件成功，bucket={}，objectName={}", properties.getBucket(), objectName);
         } catch (Exception exception) {
             throw new ServiceException("删除 MinIO 文件失败，objectName=" + objectName,
+                    exception, BaseErrorCode.SERVICE_ERROR);
+        }
+    }
+
+    /**
+     * 删除指定对象前缀下的全部 MinIO 文件。
+     *
+     * @param objectPrefix 已校验的对象前缀
+     */
+    @Override
+    public void deleteByPrefix(String objectPrefix) {
+        if (!StringUtils.hasText(objectPrefix)) {
+            throw new ServiceException("MinIO 对象前缀不能为空");
+        }
+        try {
+            // 1. 递归列举前缀下对象，避免执行桶级删除
+            Iterable<io.minio.Result<io.minio.messages.Item>> results = getMinioClient().listObjects(
+                    ListObjectsArgs.builder().bucket(properties.getBucket()).prefix(objectPrefix).recursive(true).build());
+
+            // 2. 逐个删除对象，便于失败时由上层重试
+            for (io.minio.Result<io.minio.messages.Item> result : results) {
+                String objectName = result.get().objectName();
+                getMinioClient().removeObject(RemoveObjectArgs.builder()
+                        .bucket(properties.getBucket()).object(objectName).build());
+            }
+            log.info("删除 MinIO 前缀文件成功，bucket={}，objectPrefix={}", properties.getBucket(), objectPrefix);
+        } catch (Exception exception) {
+            throw new ServiceException("删除 MinIO 前缀文件失败，objectPrefix=" + objectPrefix,
                     exception, BaseErrorCode.SERVICE_ERROR);
         }
     }

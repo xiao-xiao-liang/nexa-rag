@@ -52,4 +52,13 @@ public interface FileStorageService {
      * @param objectName 对象名
      */
     void delete(String objectName);
+
+    /**
+     * 删除指定对象前缀下的全部文件。
+     *
+     * @param objectPrefix 已校验的对象前缀
+     */
+    default void deleteByPrefix(String objectPrefix) {
+        throw new UnsupportedOperationException("当前文件存储服务不支持按前缀删除");
+    }
 }

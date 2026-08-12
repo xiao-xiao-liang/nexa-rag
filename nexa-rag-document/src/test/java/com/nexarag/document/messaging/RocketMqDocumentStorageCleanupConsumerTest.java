@@ -89,6 +89,28 @@ class RocketMqDocumentStorageCleanupConsumerTest {
     }
 
     @Test
+    void shouldDeleteValidatedPrefixesForSchemaVersionTwo() throws Exception {
+        FileStorageService fileStorageService = mock(FileStorageService.class);
+        DocumentPipelineOutboxService outboxService = mock(DocumentPipelineOutboxService.class);
+        ObjectMapper objectMapper = mock(ObjectMapper.class);
+        when(outboxService.markTaskProcessing(101L, 1)).thenReturn(true);
+        DocumentStorageCleanupMessage message = new DocumentStorageCleanupMessage(101L, 1L, "operation-1",
+                "CLEAN_DOCUMENT_STORAGE", 2, "original/demo.docx", "parsed/1/content.md",
+                "parsed/1/", "source-snapshots/1/", LocalDateTime.of(2026, 8, 9, 18, 30));
+        when(objectMapper.readValue(any(byte[].class), eq(DocumentStorageCleanupMessage.class))).thenReturn(message);
+        RocketMqDocumentStorageCleanupConsumer consumer = new RocketMqDocumentStorageCleanupConsumer(
+                objectMapper, fileStorageService, outboxService);
+
+        consumer.onMessage(messageExt(0));
+
+        verify(fileStorageService).delete("original/demo.docx");
+        verify(fileStorageService).deleteByPrefix("parsed/1/");
+        verify(fileStorageService).deleteByPrefix("source-snapshots/1/");
+        verify(fileStorageService, never()).delete("parsed/1/content.md");
+        verify(outboxService).markTaskSucceeded(101L);
+    }
+
+    @Test
     void shouldRecordActualConsumptionTimesWhenMessageIsRedelivered() throws Exception {
         FileStorageService fileStorageService = mock(FileStorageService.class);
         DocumentPipelineOutboxService outboxService = mock(DocumentPipelineOutboxService.class);

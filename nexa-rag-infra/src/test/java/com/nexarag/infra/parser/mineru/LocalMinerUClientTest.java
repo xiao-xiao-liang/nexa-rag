@@ -1,6 +1,7 @@
 package com.nexarag.infra.parser.mineru;
 
 import com.nexarag.infra.config.MinerUProperties;
+import com.nexarag.infra.config.ArtifactProcessingProperties;
 import com.nexarag.infra.parser.mineru.client.LocalMinerUClient;
 import com.nexarag.infra.parser.model.MinerUParseCommand;
 import com.nexarag.infra.parser.model.MinerUParseResponse;
@@ -43,16 +44,18 @@ class LocalMinerUClientTest {
         server.start();
         MinerUProperties properties = new MinerUProperties();
         properties.setLocalEndpoint("http://127.0.0.1:" + server.getAddress().getPort());
-        LocalMinerUClient client = new LocalMinerUClient(properties);
+        LocalMinerUClient client = new LocalMinerUClient(properties, artifactProperties());
 
         MinerUParseResponse response = client.parse(MinerUParseCommand.builder()
                 .documentId(1L)
                 .fileName("demo.pdf")
-                .inputStream(new ByteArrayInputStream("pdf".getBytes(StandardCharsets.UTF_8)))
+                .inputStream(new ReadAllBytesFailingInputStream("pdf".getBytes(StandardCharsets.UTF_8)))
                 .enableOcr(true)
                 .build());
 
-        assertThat(response.zipInputStream().readAllBytes()).isEqualTo(zipBytes);
+        try (var zipInputStream = response.zipInputStream()) {
+            assertThat(zipInputStream.readAllBytes()).isEqualTo(zipBytes);
+        }
         assertThat(response.metadata()).containsEntry("clientMode", "local");
         assertThat(requestBody)
                 .contains("name=\"files\"; filename=\"demo.pdf\"")
@@ -82,5 +85,26 @@ class LocalMinerUClientTest {
             }
         }
         return outputStream.toByteArray();
+    }
+
+    private ArtifactProcessingProperties artifactProperties() {
+        ArtifactProcessingProperties properties = new ArtifactProcessingProperties();
+        properties.setMaxWorkspaceBytes(1024L);
+        return properties;
+    }
+
+    /**
+     * 用于验证客户端未通过 readAllBytes 聚合上传文件的输入流。
+     */
+    private static final class ReadAllBytesFailingInputStream extends ByteArrayInputStream {
+
+        private ReadAllBytesFailingInputStream(byte[] bytes) {
+            super(bytes);
+        }
+
+        @Override
+        public byte[] readAllBytes() {
+            throw new AssertionError("不应聚合读取上传文件");
+        }
     }
 }

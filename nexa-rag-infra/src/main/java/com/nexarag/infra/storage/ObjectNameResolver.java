@@ -76,11 +76,33 @@ public class ObjectNameResolver {
     }
 
     /**
+     * 生成指定文档全部解析制品的对象前缀。
+     *
+     * @param documentId 文档ID
+     * @return 解析制品对象前缀
+     */
+    public String resolveParsedPrefix(Long documentId) {
+        validateDocumentId(documentId);
+        return "parsed/" + documentId + "/";
+    }
+
+    /**
      * 生成外部来源响应快照对象名。
      */
     public String resolveSourceSnapshotObjectName(Long documentId, String extension) {
         validateDocumentId(documentId);
-        return "source-snapshots/" + documentId + "/source" + normalizeExtension(extension);
+        return resolveSourceSnapshotPrefix(documentId) + "source" + normalizeExtension(extension);
+    }
+
+    /**
+     * 生成指定文档全部外部来源快照的对象前缀。
+     *
+     * @param documentId 文档ID
+     * @return 外部来源快照对象前缀
+     */
+    public String resolveSourceSnapshotPrefix(Long documentId) {
+        validateDocumentId(documentId);
+        return "source-snapshots/" + documentId + "/";
     }
 
     private void validateDocumentId(Long documentId) {

@@ -1,8 +1,14 @@
 package com.nexarag.infra.source;
 
 import com.nexarag.infra.enums.ExternalDocumentSourceType;
+import com.nexarag.common.error.BaseErrorCode;
 import com.nexarag.common.exception.ServiceException;
+import com.nexarag.infra.parser.model.DocumentArtifactDTO;
 import com.nexarag.infra.parser.model.ParsedArtifact;
+import com.nexarag.infra.parser.model.StagedDocumentBO;
+import com.nexarag.infra.parser.service.DocumentParseService;
+import com.nexarag.infra.parser.workspace.ArtifactWorkspace;
+import com.nexarag.infra.parser.workspace.ArtifactWorkspaceFactory;
 import com.nexarag.infra.source.model.SourceArtifactBO;
 import com.nexarag.infra.source.model.SourceReadRequestDTO;
 import com.nexarag.infra.source.model.SourceReadResultBO;
@@ -12,22 +18,23 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
-import java.io.ByteArrayInputStream;
-import java.nio.charset.StandardCharsets;
+import java.io.InputStream;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.List;
 
 /**
- * 外部来源读取服务实现，将平台读取结果统一保存为快照和 Markdown 制品。
+ * 外部来源读取服务实现，将平台导出的原始文件流式保存为快照，并复用工作区文件完成解析。
  */
 @Service
 @RequiredArgsConstructor
 public class ExternalDocumentSourceServiceImpl implements ExternalDocumentSourceService {
 
-    private static final String MARKDOWN_CONTENT_TYPE = "text/markdown";
-
     private final List<ExternalDocumentSourceReader> sourceReaders;
     private final FileStorageService fileStorageService;
     private final ObjectNameResolver objectNameResolver;
+    private final ArtifactWorkspaceFactory workspaceFactory;
+    private final DocumentParseService documentParseService;
 
     @Override
     public String validateAndExtractDocumentId(ExternalDocumentSourceType sourceType, String sourceUrl) {
@@ -36,28 +43,38 @@ public class ExternalDocumentSourceServiceImpl implements ExternalDocumentSource
 
     @Override
     public SourceArtifactBO readAndPersist(SourceReadRequestDTO request) {
-        // 1. 按来源路由并读取远端内容
+        // 1. 按来源路由并创建受管工作区。
         if (request == null || request.documentId() == null) {
             throw new ServiceException("外部来源读取请求不能为空");
         }
-        SourceReadResultBO result = requiredReader(request.sourceType()).read(request);
-        if (result == null || !StringUtils.hasText(result.markdownContent())) {
-            throw new ServiceException("外部来源未返回可切分Markdown，documentId=" + request.documentId());
+        try (ArtifactWorkspace workspace = workspaceFactory.create(request.documentId())) {
+            SourceReadResultBO result = requiredReader(request.sourceType()).read(request, workspace);
+            validateSourceResult(result, request.documentId());
+
+            // 2. 将来源文件流式保存为不可变快照。
+            String snapshotName = objectNameResolver.resolveSourceSnapshotObjectName(request.documentId(),
+                    resolveExtension(result.originalFileName()));
+            try (InputStream sourceStream = Files.newInputStream(result.sourcePath())) {
+                fileStorageService.saveAs(snapshotName, sourceStream, Files.size(result.sourcePath()),
+                        result.sourceContentType());
+            }
+
+            // 3. 复用同一工作区文件生成解析制品。
+            DocumentArtifactDTO artifactDTO = DocumentArtifactDTO.builder()
+                    .documentId(request.documentId())
+                    .originalFileName(result.originalFileName())
+                    .format(result.documentFormat())
+                    .originalObjectName(snapshotName)
+                    .build();
+            ParsedArtifact parsedArtifact = documentParseService.parseStaged(artifactDTO,
+                    new StagedDocumentBO(result.sourcePath(), workspace));
+            return new SourceArtifactBO(parsedArtifact, result.title(), snapshotName, result.metadata());
+        } catch (ServiceException exception) {
+            throw exception;
+        } catch (Exception exception) {
+            throw new ServiceException("保存外部来源文件失败，documentId=" + request.documentId(), exception,
+                    BaseErrorCode.SERVICE_ERROR);
         }
-
-        // 2. 保存不可变来源快照和规范化 Markdown
-        byte[] snapshot = result.snapshotContent() == null ? new byte[0] : result.snapshotContent();
-        String snapshotName = objectNameResolver.resolveSourceSnapshotObjectName(request.documentId(), ".json");
-        fileStorageService.saveAs(snapshotName, new ByteArrayInputStream(snapshot), snapshot.length,
-                result.snapshotContentType());
-        byte[] markdown = result.markdownContent().getBytes(StandardCharsets.UTF_8);
-        String parsedName = objectNameResolver.resolveParsedObjectName(request.documentId(), "source.md", ".md");
-        fileStorageService.saveAs(parsedName, new ByteArrayInputStream(markdown), markdown.length, MARKDOWN_CONTENT_TYPE);
-
-        // 3. 返回工作流可回写的标准制品
-        return new SourceArtifactBO(ParsedArtifact.builder().objectKey(parsedName)
-                .contentType(MARKDOWN_CONTENT_TYPE).metadata(result.metadata()).build(), result.title(),
-                snapshotName, result.metadata());
     }
 
     private ExternalDocumentSourceReader requiredReader(ExternalDocumentSourceType sourceType) {
@@ -66,5 +83,24 @@ public class ExternalDocumentSourceServiceImpl implements ExternalDocumentSource
         }
         return sourceReaders.stream().filter(reader -> reader.supports(sourceType)).findFirst()
                 .orElseThrow(() -> new ServiceException("未找到外部来源读取器，sourceType=" + sourceType));
+    }
+
+    /**
+     * 校验 Reader 返回的文件化结果。
+     */
+    private void validateSourceResult(SourceReadResultBO result, Long documentId) {
+        if (result == null || result.sourcePath() == null || !Files.isRegularFile(result.sourcePath())
+                || result.documentFormat() == null || !StringUtils.hasText(result.originalFileName())
+                || !StringUtils.hasText(result.sourceContentType())) {
+            throw new ServiceException("外部来源未返回有效文件，documentId=" + documentId);
+        }
+    }
+
+    /**
+     * 从受控原始文件名取得对象快照扩展名。
+     */
+    private String resolveExtension(String originalFileName) {
+        int extensionIndex = originalFileName.lastIndexOf('.');
+        return extensionIndex >= 0 ? originalFileName.substring(extensionIndex) : ".bin";
     }
 }

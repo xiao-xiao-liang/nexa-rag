@@ -100,6 +100,20 @@ public class FileStorageServiceImpl implements FileStorageService {
         storageStrategy.delete(objectName);
     }
 
+    /**
+     * 删除指定对象前缀下的全部文件。
+     *
+     * @param objectPrefix 已校验的对象前缀
+     */
+    @Override
+    public void deleteByPrefix(String objectPrefix) {
+        // 1. 根据配置选择具体存储策略
+        FileStorageStrategy storageStrategy = getRequiredStrategy();
+
+        // 2. 委派具体策略删除前缀下的对象
+        storageStrategy.deleteByPrefix(objectPrefix);
+    }
+
     private FileStorageStrategy getRequiredStrategy() {
         StorageType storageType = storageProperties.getType();
         return storageStrategies.stream()

@@ -2,142 +2,202 @@ package com.nexarag.infra.parser.mineru.client;
 
 import com.nexarag.common.error.BaseErrorCode;
 import com.nexarag.common.exception.ServiceException;
+import com.nexarag.infra.config.ArtifactProcessingProperties;
+import com.nexarag.infra.config.MinerUProperties;
+import com.nexarag.infra.messaging.document.DocumentPipelineNonRetryableException;
 import com.nexarag.infra.parser.model.MinerUParseCommand;
 import com.nexarag.infra.parser.model.MinerUParseResponse;
-import com.nexarag.infra.config.MinerUProperties;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
-import org.springframework.core.io.ByteArrayResource;
-import org.springframework.http.HttpEntity;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.MediaType;
-import org.springframework.http.ResponseEntity;
-import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
-import org.springframework.util.LinkedMultiValueMap;
-import org.springframework.util.MultiValueMap;
 import org.springframework.util.StringUtils;
-import org.springframework.web.client.HttpStatusCodeException;
-import org.springframework.web.client.RestTemplate;
 
-import java.io.ByteArrayInputStream;
+import java.io.*;
+import java.net.HttpURLConnection;
+import java.net.URI;
+import java.net.URL;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.time.Duration;
-import java.util.LinkedHashMap;
-import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 
 /**
- * 本地部署 MinerU 客户端，负责调用本地 `/file_parse` 接口获取 ZIP 解析产物。
+ * 本地部署 MinerU 客户端，使用分块 multipart 上传和临时 ZIP 文件避免堆内存聚合。
  */
 @Component
+@Slf4j
 @RequiredArgsConstructor
 @ConditionalOnProperty(prefix = "nexa.parser.mineru", name = "mode", havingValue = "local", matchIfMissing = true)
 public class LocalMinerUClient implements MinerUClient {
 
+    private static final int BUFFER_SIZE = 8192;
+    private static final int MAX_ERROR_BODY_BYTES = 4096;
+
     private final MinerUProperties properties;
+    private final ArtifactProcessingProperties artifactProcessingProperties;
 
     /**
      * 调用本地 MinerU 文件解析接口。
      *
      * @param command 解析命令
-     * @return MinerU ZIP 解析响应
+     * @return 指向临时 ZIP 文件的自动清理输入流
      */
     @Override
     public MinerUParseResponse parse(MinerUParseCommand command) {
+        validateCommand(command);
+        Path zipFile = null;
+        HttpURLConnection connection = null;
         try {
-            // 1. 使用 Spring 标准 multipart 编码构造请求，避免手写边界导致 FastAPI 无法识别文件字段
-            HttpEntity<MultiValueMap<String, Object>> requestEntity = buildMultipartRequest(command);
+            // 1. 以分块 multipart 请求流式上传原始文件。
+            String boundary = "----NexaRagMinerU" + UUID.randomUUID();
+            connection = openConnection(boundary);
+            try (OutputStream outputStream = new BufferedOutputStream(connection.getOutputStream())) {
+                writeMultipartRequest(outputStream, boundary, command);
+            }
 
-            // 2. 调用本地 MinerU HTTP 接口
-            ResponseEntity<byte[]> response = buildRestTemplate().postForEntity(
-                    resolveParseUrl(),
-                    requestEntity,
-                    byte[].class
-            );
-
-            // 3. 校验响应并返回 ZIP 流
-            if (!response.getStatusCode().is2xxSuccessful() || response.getBody() == null) {
+            // 2. 将 ZIP 响应流式写入临时文件。
+            int statusCode = connection.getResponseCode();
+            if (statusCode / 100 != 2) {
                 throw new ServiceException("调用本地MinerU失败，documentId=" + command.documentId()
-                        + "，httpStatus=" + response.getStatusCode().value()
-                        + "，responseBody=" + truncateResponseBody(response.getBody()), BaseErrorCode.REMOTE_ERROR);
+                        + "，httpStatus=" + statusCode + "，responseBody=" + readErrorBody(connection),
+                        BaseErrorCode.REMOTE_ERROR);
+            }
+            zipFile = Files.createTempFile("nexa-rag-mineru-", ".zip");
+            long zipSize;
+            try (InputStream inputStream = new BufferedInputStream(connection.getInputStream())) {
+                zipSize = copyToFile(inputStream, zipFile, requiredMaxFileBytes());
             }
             return MinerUParseResponse.builder()
-                    .zipInputStream(new ByteArrayInputStream(response.getBody()))
-                    .metadata(Map.of(
-                            "clientMode", "local",
-                            "httpStatus", response.getStatusCode().value(),
-                            "zipSize", response.getBody().length
-                    ))
+                    .zipInputStream(new DeleteOnCloseFileInputStream(zipFile))
+                    .metadata(Map.of("clientMode", "local", "httpStatus", statusCode, "zipSize", zipSize))
                     .build();
-        } catch (HttpStatusCodeException exception) {
-            throw new ServiceException("调用本地MinerU失败，documentId=" + command.documentId()
-                    + "，httpStatus=" + exception.getStatusCode().value()
-                    + "，responseBody=" + truncateResponseBody(exception.getResponseBodyAsByteArray()),
-                    exception, BaseErrorCode.REMOTE_ERROR);
         } catch (ServiceException exception) {
+            deleteTemporaryFile(zipFile);
             throw exception;
         } catch (Exception exception) {
-            throw new ServiceException("调用本地MinerU异常，documentId=" + command.documentId(),
-                    exception, BaseErrorCode.REMOTE_ERROR);
-        }
-    }
-
-    /**
-     * 构造本地 MinerU 需要的 multipart/form-data 请求。
-     *
-     * @param command 解析命令
-     * @return multipart 请求实体
-     * @throws Exception 读取文件输入流失败时抛出
-     */
-    private HttpEntity<MultiValueMap<String, Object>> buildMultipartRequest(MinerUParseCommand command) throws Exception {
-        MultiValueMap<String, Object> multipartBody = new LinkedMultiValueMap<>();
-        multipartBody.add("files", buildFilePart(command));
-        Map<String, String> fields = new LinkedHashMap<>();
-        fields.put("backend", "pipeline");
-        fields.put("parse_method", command.enableOcr() ? "ocr" : "auto");
-        fields.put("response_format_zip", "true");
-        fields.put("return_images", "true");
-        fields.put("return_model_output", "false");
-        fields.put("return_middle_json", "false");
-        for (Map.Entry<String, String> field : fields.entrySet()) {
-            multipartBody.add(field.getKey(), field.getValue());
-        }
-
-        HttpHeaders headers = new HttpHeaders();
-        headers.setContentType(MediaType.MULTIPART_FORM_DATA);
-        headers.setAccept(List.of(MediaType.APPLICATION_OCTET_STREAM, MediaType.APPLICATION_JSON, MediaType.ALL));
-        return new HttpEntity<>(multipartBody, headers);
-    }
-
-    /**
-     * 构造文件表单项，字段名由外层 multipartBody 固定为 files。
-     *
-     * @param command 解析命令
-     * @return 文件表单项
-     * @throws Exception 读取文件输入流失败时抛出
-     */
-    private HttpEntity<ByteArrayResource> buildFilePart(MinerUParseCommand command) throws Exception {
-        byte[] fileBytes = command.inputStream().readAllBytes();
-        String fileName = sanitizeFileName(command.fileName());
-        ByteArrayResource fileResource = new ByteArrayResource(fileBytes) {
-
-            @Override
-            public String getFilename() {
-                return fileName;
+            deleteTemporaryFile(zipFile);
+            throw new ServiceException("调用本地MinerU异常，documentId=" + command.documentId(), exception,
+                    BaseErrorCode.REMOTE_ERROR);
+        } finally {
+            if (connection != null) {
+                connection.disconnect();
             }
-        };
-
-        HttpHeaders headers = new HttpHeaders();
-        headers.setContentType(MediaType.APPLICATION_OCTET_STREAM);
-        return new HttpEntity<>(fileResource, headers);
+        }
     }
 
-    private RestTemplate buildRestTemplate() {
-        SimpleClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory();
-        requestFactory.setConnectTimeout(toMillis(resolveConnectTimeout()));
-        requestFactory.setReadTimeout(toMillis(resolveReadTimeout()));
-        return new RestTemplate(requestFactory);
+    /**
+     * 配置本地 HTTP 连接并启用分块传输。
+     */
+    private HttpURLConnection openConnection(String boundary) throws IOException {
+        URL url = URI.create(resolveParseUrl()).toURL();
+        HttpURLConnection connection = (HttpURLConnection) url.openConnection();
+        connection.setRequestMethod("POST");
+        connection.setDoOutput(true);
+        connection.setChunkedStreamingMode(BUFFER_SIZE);
+        connection.setConnectTimeout(toMillis(resolveConnectTimeout()));
+        connection.setReadTimeout(toMillis(resolveReadTimeout()));
+        connection.setRequestProperty("Content-Type", "multipart/form-data; boundary=" + boundary);
+        connection.setRequestProperty("Accept", "application/octet-stream, application/json, */*");
+        return connection;
+    }
+
+    /**
+     * 将文件字段和固定表单字段逐段写入请求流。
+     */
+    private void writeMultipartRequest(OutputStream outputStream, String boundary, MinerUParseCommand command)
+            throws IOException {
+        writeTextPart(outputStream, boundary, "backend", "pipeline");
+        writeTextPart(outputStream, boundary, "parse_method", command.enableOcr() ? "ocr" : "auto");
+        writeTextPart(outputStream, boundary, "response_format_zip", "true");
+        writeTextPart(outputStream, boundary, "return_images", "true");
+        writeTextPart(outputStream, boundary, "return_model_output", "false");
+        writeTextPart(outputStream, boundary, "return_middle_json", "false");
+        writeFilePart(outputStream, boundary, command);
+        writeAscii(outputStream, "--" + boundary + "--\r\n");
+    }
+
+    private void writeTextPart(OutputStream outputStream, String boundary, String name, String value) throws IOException {
+        writeAscii(outputStream, "--" + boundary + "\r\n");
+        writeAscii(outputStream, "Content-Disposition: form-data; name=\"" + name + "\"\r\n\r\n");
+        writeAscii(outputStream, value + "\r\n");
+    }
+
+    private void writeFilePart(OutputStream outputStream, String boundary, MinerUParseCommand command) throws IOException {
+        writeAscii(outputStream, "--" + boundary + "\r\n");
+        writeAscii(outputStream, "Content-Disposition: form-data; name=\"files\"; filename=\""
+                + sanitizeFileName(command.fileName()) + "\"\r\n");
+        writeAscii(outputStream, "Content-Type: application/octet-stream\r\n\r\n");
+
+        try (InputStream inputStream = command.inputStream()) {
+            byte[] buffer = new byte[BUFFER_SIZE];
+            int bytesRead;
+            while ((bytesRead = inputStream.read(buffer)) != -1) {
+                outputStream.write(buffer, 0, bytesRead);
+            }
+        }
+        writeAscii(outputStream, "\r\n");
+    }
+
+    /**
+     * 将响应复制到临时文件，并在超过工作区限制时立即清理。
+     */
+    private long copyToFile(InputStream inputStream, Path targetPath, long maxBytes) throws IOException {
+        long copiedBytes = 0L;
+        try (OutputStream outputStream = new BufferedOutputStream(Files.newOutputStream(targetPath))) {
+            byte[] buffer = new byte[BUFFER_SIZE];
+            int bytesRead;
+            while ((bytesRead = inputStream.read(buffer)) != -1) {
+                copiedBytes = Math.addExact(copiedBytes, bytesRead);
+                if (copiedBytes > maxBytes) {
+                    throw new DocumentPipelineNonRetryableException("MinerU ZIP 解析产物超过大小限制，maxBytes=" + maxBytes);
+                }
+                outputStream.write(buffer, 0, bytesRead);
+            }
+            return copiedBytes;
+        } catch (IOException | RuntimeException exception) {
+            Files.deleteIfExists(targetPath);
+            throw exception;
+        }
+    }
+
+    private void validateCommand(MinerUParseCommand command) {
+        if (command == null || command.documentId() == null || command.inputStream() == null) {
+            throw new ServiceException("本地MinerU解析请求不完整");
+        }
+    }
+
+    private long requiredMaxFileBytes() {
+        if (artifactProcessingProperties.getMaxWorkspaceBytes() <= 0) {
+            throw new ServiceException("文档解析工作区大小限制必须大于零");
+        }
+        return artifactProcessingProperties.getMaxWorkspaceBytes();
+    }
+
+    private String readErrorBody(HttpURLConnection connection) throws IOException {
+        try (InputStream errorStream = connection.getErrorStream()) {
+            if (errorStream == null) {
+                return "";
+            }
+            return new String(errorStream.readNBytes(MAX_ERROR_BODY_BYTES), StandardCharsets.UTF_8);
+        }
+    }
+
+    private void writeAscii(OutputStream outputStream, String value) throws IOException {
+        outputStream.write(value.getBytes(StandardCharsets.UTF_8));
+    }
+
+    private void deleteTemporaryFile(Path temporaryFile) {
+        if (temporaryFile == null) {
+            return;
+        }
+        try {
+            Files.deleteIfExists(temporaryFile);
+        } catch (IOException exception) {
+            log.warn("删除MinerU ZIP临时文件失败，path={}", temporaryFile, exception);
+        }
     }
 
     private String resolveParseUrl() {
@@ -146,10 +206,7 @@ public class LocalMinerUClient implements MinerUClient {
         if (!StringUtils.hasText(path)) {
             path = "/file_parse";
         }
-        if (!path.startsWith("/")) {
-            path = "/" + path;
-        }
-        return endpoint + path;
+        return endpoint + (path.startsWith("/") ? path : "/" + path);
     }
 
     private String trimRightSlash(String value) {
@@ -164,14 +221,6 @@ public class LocalMinerUClient implements MinerUClient {
             return "document";
         }
         return fileName.replace("\\", "_").replace("/", "_").replace("\"", "_");
-    }
-
-    private String truncateResponseBody(byte[] responseBody) {
-        if (responseBody == null || responseBody.length == 0) {
-            return "";
-        }
-        String body = new String(responseBody, StandardCharsets.UTF_8);
-        return body.length() <= 500 ? body : body.substring(0, 500);
     }
 
     private Duration resolveConnectTimeout() {

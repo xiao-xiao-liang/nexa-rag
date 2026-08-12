@@ -5,6 +5,7 @@ import com.alibaba.cloud.ai.graph.action.NodeAction;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nexarag.common.exception.ServiceException;
+import com.nexarag.document.constants.DocumentConstants;
 import com.nexarag.document.model.dto.ParseConfigRequest;
 import com.nexarag.document.model.dto.ProcessDocumentRequest;
 import com.nexarag.document.model.entity.Document;
@@ -15,6 +16,7 @@ import com.nexarag.infra.parser.model.DocumentParseRequest;
 import com.nexarag.infra.parser.model.ParsedArtifact;
 import com.nexarag.infra.parser.service.DocumentParseService;
 import com.nexarag.infra.enums.ExternalDocumentSourceType;
+import com.nexarag.infra.messaging.document.DocumentPipelineNonRetryableException;
 import com.nexarag.infra.source.ExternalDocumentSourceService;
 import com.nexarag.infra.source.model.SourceArtifactBO;
 import com.nexarag.infra.source.model.SourceReadRequestDTO;
@@ -25,8 +27,10 @@ import org.springframework.util.StringUtils;
 
 import java.time.LocalDateTime;
 import java.util.Map;
+import java.util.Locale;
 
 import static com.alibaba.cloud.ai.graph.StateGraph.END;
+import static com.nexarag.document.constants.DocumentConstants.*;
 import static com.nexarag.workflow.constants.DocumentIngestionNodeConstants.CHUNKING_NODE;
 import static com.nexarag.workflow.constants.DocumentIngestionNodeConstants.INDEXING_NODE;
 import static com.nexarag.workflow.constants.DocumentIngestionStateKeys.CURRENT_STAGE;
@@ -134,7 +138,48 @@ public class ParsingNode implements NodeAction {
         }
         SourceArtifactBO artifact = externalDocumentSourceService.readAndPersist(new SourceReadRequestDTO(
                 document.getDocumentId(), document.getSourceType(), document.getSourceUrl()));
+        refreshExternalDocumentName(document, artifact.title());
         return artifact.parsedArtifact();
+    }
+
+    /**
+     * 将远端文档标题回写为外部文档的默认展示名和原始文件名。
+     *
+     * @param document    当前处理中的文档实体
+     * @param sourceTitle 外部平台返回的文档标题
+     */
+    private void refreshExternalDocumentName(Document document, String sourceTitle) {
+        if (!StringUtils.hasText(sourceTitle)) {
+            return;
+        }
+        String normalizedTitle = sourceTitle.trim();
+
+        String originalFileName = toMarkdownFileName(normalizedTitle);
+        validateExternalDocumentName(document.getDocumentId(), normalizedTitle, originalFileName);
+
+        // 1. 仅覆盖系统默认标题，保留用户在提交时明确填写的标题
+        if (DEFAULT_EXTERNAL_DOCUMENT_TITLE.equals(document.getTitle())) {
+            document.setTitle(normalizedTitle);
+        }
+
+        // 2. 外部来源统一解析为 Markdown，文件名使用远端文档名便于追溯
+        document.setOriginalFileName(originalFileName);
+    }
+
+    private String toMarkdownFileName(String title) {
+        return title.toLowerCase(Locale.ROOT).endsWith(MARKDOWN_FILE_EXTENSION)
+                ? title : title + MARKDOWN_FILE_EXTENSION;
+    }
+
+    private void validateExternalDocumentName(Long documentId, String title, String originalFileName) {
+        if (title.length() > MAX_TITLE_LENGTH) {
+            throw new DocumentPipelineNonRetryableException("外部文档标题超过最大长度，documentId=" + documentId
+                    + "，maxLength=" + MAX_TITLE_LENGTH);
+        }
+        if (originalFileName.length() > MAX_ORIGINAL_FILE_NAME_LENGTH) {
+            throw new DocumentPipelineNonRetryableException("外部文档原始文件名超过最大长度，documentId=" + documentId
+                    + "，maxLength=" + MAX_ORIGINAL_FILE_NAME_LENGTH);
+        }
     }
 
     private ParseConfigRequest readParseConfig(String processConfigJson) {

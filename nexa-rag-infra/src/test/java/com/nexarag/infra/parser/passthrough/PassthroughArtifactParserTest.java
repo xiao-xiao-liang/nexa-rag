@@ -1,42 +1,42 @@
 package com.nexarag.infra.parser.passthrough;
 
-import com.nexarag.infra.parser.model.DocumentParseRequest;
+import com.nexarag.infra.parser.model.DocumentArtifactDTO;
+import com.nexarag.infra.parser.model.DocumentFormat;
 import com.nexarag.infra.parser.model.ParsedArtifact;
+import com.nexarag.infra.parser.model.StagedDocumentBO;
 import com.nexarag.infra.constants.ParsedContentTypes;
-import com.nexarag.infra.constants.ParserFileTypes;
 import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.mock;
 
 /**
- * 透传文档解析器测试。
+ * 透传文档制品处理器测试。
  */
 class PassthroughArtifactParserTest {
 
     @Test
-    void supportsShouldAcceptMarkdownAndExcel() {
+    void supportedFormatsShouldContainMarkdownAndExcelOnly() {
         PassthroughArtifactParser parser = new PassthroughArtifactParser();
 
-        assertThat(parser.supports(request(ParserFileTypes.MARKDOWN))).isTrue();
-        assertThat(parser.supports(request(ParserFileTypes.EXCEL))).isTrue();
-        assertThat(parser.supports(request(ParserFileTypes.PDF))).isFalse();
+        assertThat(parser.supportedFormats()).containsExactlyInAnyOrder(DocumentFormat.MARKDOWN, DocumentFormat.EXCEL);
     }
 
     @Test
-    void parseShouldReturnOriginalFileAsParsedFile() {
+    void handleShouldReturnOriginalFileAsParsedFile() {
         PassthroughArtifactParser parser = new PassthroughArtifactParser();
 
-        ParsedArtifact result = parser.parse(request(ParserFileTypes.MARKDOWN));
+        ParsedArtifact result = parser.handle(artifact(DocumentFormat.MARKDOWN), mock(StagedDocumentBO.class));
 
         assertThat(result.objectKey()).isEqualTo("original/demo.md");
         assertThat(result.contentType()).isEqualTo(ParsedContentTypes.TEXT_MARKDOWN);
         assertThat(result.metadata()).containsEntry("passthrough", true);
     }
 
-    private DocumentParseRequest request(String fileType) {
-        return DocumentParseRequest.builder()
+    private DocumentArtifactDTO artifact(DocumentFormat format) {
+        return DocumentArtifactDTO.builder()
                 .documentId(1L)
-                .fileType(fileType)
+                .format(format)
                 .originalFileName("demo.md")
                 .originalObjectName("original/demo.md")
                 .originalFileUrl("http://127.0.0.1:9000/nexa-rag/original/demo.md")

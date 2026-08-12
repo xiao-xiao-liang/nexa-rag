@@ -1,41 +1,50 @@
 package com.nexarag.infra.parser.tika;
 
-import com.nexarag.infra.parser.model.DocumentParseRequest;
+import com.nexarag.infra.parser.model.DocumentArtifactDTO;
+import com.nexarag.infra.parser.model.DocumentFormat;
 import com.nexarag.infra.parser.model.ParsedArtifact;
+import com.nexarag.infra.parser.model.StagedDocumentBO;
 import com.nexarag.infra.constants.ParsedContentTypes;
-import com.nexarag.infra.constants.ParserFileTypes;
 import com.nexarag.infra.storage.ObjectNameResolver;
 import com.nexarag.infra.storage.StoredFile;
 import com.nexarag.infra.storage.service.FileStorageService;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 import java.io.ByteArrayInputStream;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.mock;
 
 /**
  * Tika 文档解析器测试。
  */
 class TikaArtifactParserTest {
 
+    @TempDir
+    Path tempDir;
+
     @Test
-    void supportsShouldAcceptPptAndTextOnly() {
+    void supportedFormatsShouldContainPptAndTextOnly() {
         TikaArtifactParser parser = newParser("你好".getBytes(StandardCharsets.UTF_8));
 
-        assertThat(parser.supports(request(ParserFileTypes.PPT))).isTrue();
-        assertThat(parser.supports(request(ParserFileTypes.TEXT))).isTrue();
-        assertThat(parser.supports(request(ParserFileTypes.EXCEL))).isFalse();
+        assertThat(parser.supportedFormats()).containsExactlyInAnyOrder(DocumentFormat.PPT, DocumentFormat.TEXT);
     }
 
     @Test
-    void parseShouldUseDefaultFrameworkParserAndSaveParsedFile() {
+    void handleShouldUseDefaultFrameworkParserAndSaveParsedFile() throws Exception {
         RecordingFileStorageService storageService = new RecordingFileStorageService("你好，NexaRAG".getBytes(StandardCharsets.UTF_8));
         TikaArtifactParser parser = new TikaArtifactParser(storageService, new ObjectNameResolver());
+        Path sourcePath = tempDir.resolve("source.txt");
+        Files.writeString(sourcePath, "你好，NexaRAG");
 
-        ParsedArtifact artifact = parser.parse(request(ParserFileTypes.TEXT));
+        ParsedArtifact artifact = parser.handle(artifact(DocumentFormat.TEXT),
+                new StagedDocumentBO(sourcePath, mock(com.nexarag.infra.parser.workspace.ArtifactWorkspace.class)));
 
         assertThat(artifact.contentType()).isEqualTo(ParsedContentTypes.TEXT_PLAIN);
         assertThat(artifact.objectKey()).isEqualTo("parsed/1/content.txt");
@@ -56,10 +65,10 @@ class TikaArtifactParserTest {
         return new TikaArtifactParser(new RecordingFileStorageService(content), new ObjectNameResolver());
     }
 
-    private DocumentParseRequest request(String fileType) {
-        return DocumentParseRequest.builder()
+    private DocumentArtifactDTO artifact(DocumentFormat format) {
+        return DocumentArtifactDTO.builder()
                 .documentId(1L)
-                .fileType(fileType)
+                .format(format)
                 .originalFileName("demo.txt")
                 .originalObjectName("original/demo.txt")
                 .originalFileUrl("http://127.0.0.1:9000/nexa-rag/original/demo.txt")
