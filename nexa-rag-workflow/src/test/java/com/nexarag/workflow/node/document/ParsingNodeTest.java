@@ -17,6 +17,7 @@ import com.nexarag.infra.source.ExternalDocumentSourceService;
 import com.nexarag.infra.source.model.SourceArtifactBO;
 import org.junit.jupiter.api.Test;
 
+import java.util.List;
 import java.util.Map;
 
 import static com.nexarag.workflow.constants.DocumentIngestionNodeConstants.CHUNKING_NODE;
@@ -50,6 +51,11 @@ class ParsingNodeTest {
         when(parseService.parse(any(DocumentParseRequest.class))).thenReturn(ParsedArtifact.builder()
                 .contentType("text/markdown")
                 .objectKey("parsed/1001/demo.md")
+                .metadata(Map.of("structureArtifacts", List.of(Map.of(
+                        "type", "MINERU_MIDDLE_JSON",
+                        "objectKey", "parsed/1001/structure/mineru-middle.json",
+                        "contentType", "application/json",
+                        "size", 256L))))
                 .build());
         when(fileStorageService.resolveUrl("parsed/1001/demo.md"))
                 .thenReturn("http://127.0.0.1/parsed/1001/demo.md");
@@ -60,6 +66,9 @@ class ParsingNodeTest {
         assertThat(document.getStatus()).isEqualTo(DocumentStatus.PARSED);
         assertThat(document.getParsedObjectName()).isEqualTo("parsed/1001/demo.md");
         assertThat(document.getParsedFileUrl()).isEqualTo("http://127.0.0.1/parsed/1001/demo.md");
+        assertThat(objectMapper.readTree(document.getParsedMetadataJson()))
+                .at("/structureArtifacts/0/objectKey")
+                .hasToString("\"parsed/1001/structure/mineru-middle.json\"");
         assertThat(result).containsEntry(ROUTE_TARGET, CHUNKING_NODE);
         verify(parseService).parse(argThat(request -> Boolean.TRUE.equals(request.enableOcr())
                 && Boolean.FALSE.equals(request.enableImageDescription())));

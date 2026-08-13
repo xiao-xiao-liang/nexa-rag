@@ -196,6 +196,13 @@ public class ParsingNode implements NodeAction {
     }
 
     private void markParsed(Document document, ParsedArtifact parsedArtifact) {
+        try {
+            document.setParsedMetadataJson(objectMapper.writeValueAsString(
+                    parsedArtifact.metadata() == null ? Map.of() : parsedArtifact.metadata()));
+        } catch (JsonProcessingException exception) {
+            throw new ServiceException("保存文档解析元数据失败", exception,
+                    DocumentErrorCode.DOCUMENT_PROCESS_CONFIG_INVALID);
+        }
         document.setParsedFileUrl(fileStorageService.resolveUrl(parsedArtifact.objectKey()));
         document.setParsedObjectName(parsedArtifact.objectKey());
         document.setParsedContentType(parsedArtifact.contentType());

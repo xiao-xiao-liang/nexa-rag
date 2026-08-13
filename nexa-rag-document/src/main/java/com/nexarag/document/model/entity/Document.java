@@ -92,6 +92,11 @@ public class Document {
     private String parsedContentType;
 
     /**
+     * 解析附属制品与结构元数据。
+     */
+    private String parsedMetadataJson;
+
+    /**
      * 文档处理状态。
      */
     private DocumentStatus status;
