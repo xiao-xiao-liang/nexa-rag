@@ -98,4 +98,3 @@ Expected: 命令全部成功。
 - [ ] **Step 2: 重新解析验收 PDF**
 
 重新处理 `Java集合.pdf`，确认 `document_section.parent_section_id` 出现父子关系，且 `heading_path_json` 包含完整路径。
-

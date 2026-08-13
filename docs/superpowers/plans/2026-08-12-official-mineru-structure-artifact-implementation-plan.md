@@ -126,4 +126,3 @@ Expected: 命令全部成功。
 - [ ] **Step 2: 重新处理验收文档**
 
 重新上传或重新处理 `Java集合.pdf`，确认 `parsed_metadata_json.structureArtifacts` 中存在 `MINERU_MIDDLE_JSON`，且 `document_section.parent_section_id` 出现真实父子关系。
-
