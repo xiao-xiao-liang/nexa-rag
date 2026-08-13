@@ -14,7 +14,7 @@ interface FileDropzoneProps {
 
 const ACCEPTED_FILE_TYPES = '.pdf,.doc,.docx,.xls,.xlsx,.csv,.ppt,.pptx,.md,.markdown,.txt'
 
-/** 知识库单文件选择、拖拽与文件卡片组件（清晰大字号型）。 */
+/** 知识库单文件选择、拖拽与文件卡片组件（飞书风格紧凑型）。 */
 export function FileDropzone({ file, disabled, error, onFileChange, onRemove }: FileDropzoneProps) {
   const inputRef = useRef<HTMLInputElement>(null)
   const [dragging, setDragging] = useState(false)
@@ -68,8 +68,8 @@ export function FileDropzone({ file, disabled, error, onFileChange, onRemove }: 
           aria-disabled={disabled}
           data-dragging={dragging || undefined}
           className={cn(
-            'group flex min-h-[96px] cursor-pointer items-center justify-center rounded-2xl border-2 border-dashed border-slate-200 bg-slate-50/60 px-5 py-3.5 text-center outline-none transition-all duration-200 hover:border-indigo-400 hover:bg-indigo-50/30 focus-visible:border-indigo-500 focus-visible:ring-2 focus-visible:ring-indigo-500/20',
-            dragging && 'border-indigo-500 bg-indigo-50/60 shadow-md shadow-indigo-100',
+            'flex min-h-[76px] cursor-pointer items-center justify-center rounded-md border border-dashed border-input bg-muted/40 px-5 py-3 text-center outline-none transition-colors hover:border-primary hover:bg-primary-light/40 focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-ring/30',
+            dragging && 'border-primary bg-primary-light/60',
             disabled && 'cursor-not-allowed opacity-60'
           )}
           onClick={openFilePicker}
@@ -79,37 +79,39 @@ export function FileDropzone({ file, disabled, error, onFileChange, onRemove }: 
           onDragLeave={() => setDragging(false)}
           onDrop={handleDrop}
         >
-          <div className="flex items-center gap-3.5">
-            <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-indigo-100/80 text-indigo-600 shadow-sm transition-transform duration-200 group-hover:scale-105">
-              <UploadCloud className="size-5" />
+          <div className="flex items-center gap-3">
+            <span className="flex size-8 shrink-0 items-center justify-center rounded-md bg-muted text-secondary">
+              <UploadCloud className="size-4" />
             </span>
             <div className="text-left">
-              <p className="text-sm font-bold text-slate-800">
-                拖拽文档文件到这里，或 <span className="text-indigo-600 underline underline-offset-2">点击选择</span>
+              <p className="text-xs font-medium text-secondary">
+                拖拽文件到此处，或 <span className="text-primary">点击选择</span>
               </p>
-              <p className="text-xs text-slate-500 mt-0.5">
-                支持 PDF、Word、Excel/CSV、PPT、Markdown、TXT (最大 100MB)
+              <p className="mt-0.5 text-[11px] text-tertiary">
+                支持 PDF、Word、Excel/CSV、PPT、Markdown、TXT（最大 100MB）
               </p>
             </div>
           </div>
         </div>
       ) : (
-        <div className="flex items-center gap-3.5 rounded-2xl border border-indigo-100 bg-gradient-to-r from-indigo-50/60 to-slate-50 px-4 py-3 shadow-sm">
-          <FileTypeIcon fileName={file.name} />
+        <div className="flex items-center gap-3 rounded-md border border-border bg-card px-3 py-2.5">
+          <span className="flex size-9 shrink-0 items-center justify-center rounded-md bg-muted text-primary">
+            <FileTypeIcon fileName={file.name} />
+          </span>
           <div className="min-w-0 flex-1">
-            <p className="truncate font-bold text-sm text-slate-800">{file.name}</p>
-            <p className="mt-0.5 text-xs font-medium text-slate-500">
+            <p className="truncate text-xs font-medium text-foreground">{file.name}</p>
+            <p className="mt-0.5 text-[11px] text-tertiary">
               {getFileTypeLabel(file.name)} · {formatFileSize(file.size)}
             </p>
           </div>
           <div className="flex shrink-0 items-center gap-1.5">
             <Button
               type="button"
-              variant="ghost"
+              variant="outline"
               size="sm"
               disabled={disabled}
               onClick={openFilePicker}
-              className="h-8 rounded-xl text-xs font-semibold text-indigo-600 hover:bg-indigo-100/60"
+              className="h-7 rounded-md px-2.5 text-xs"
             >
               更换文件
             </Button>
@@ -120,16 +122,16 @@ export function FileDropzone({ file, disabled, error, onFileChange, onRemove }: 
               aria-label={`移除 ${file.name}`}
               disabled={disabled}
               onClick={onRemove}
-              className="size-8 rounded-xl text-slate-400 hover:bg-rose-50 hover:text-rose-600"
+              className="size-7 rounded-md text-tertiary hover:bg-danger-light hover:text-danger"
             >
-              <X className="size-4" />
+              <X className="size-3.5" />
             </Button>
           </div>
         </div>
       )}
 
       {error && (
-        <p role="alert" className="rounded-xl border border-rose-200 bg-rose-50 px-3.5 py-2 text-xs font-medium text-rose-700">
+        <p role="alert" className="rounded-md border border-danger-light bg-danger-light px-3 py-2 text-xs font-medium text-danger">
           {error}
         </p>
       )}
@@ -149,9 +151,5 @@ function FileTypeIcon({ fileName }: { fileName: string }) {
           ? FileType2
           : FileText
 
-  return (
-    <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-white text-indigo-600 shadow-sm border border-slate-100">
-      <Icon className="size-4.5" />
-    </span>
-  )
+  return <Icon className="size-4" />
 }

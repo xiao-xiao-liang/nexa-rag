@@ -9,6 +9,18 @@ vi.mock('../api/document-api', () => ({
   submitExternalDocument: vi.fn(),
 }))
 
+const markdownSplitConfig = expect.objectContaining({
+  splitStrategy: 'PARENT_MARKDOWN',
+  chunkSize: 500,
+  chunkOverlap: 50,
+  markdown: expect.objectContaining({
+    titleLevel: 3,
+    stripHeaders: false,
+    preserveCodeBlock: true,
+    createParentForOversized: true,
+  }),
+})
+
 /** 上传文档弹窗测试。 */
 describe('UploadDocumentDialog', () => {
   afterEach(() => {
@@ -16,15 +28,13 @@ describe('UploadDocumentDialog', () => {
     vi.clearAllMocks()
   })
 
-  it('选择文件后应自动填写标题，并允许补充可选描述', async () => {
+  it('选择文件后应自动填写标题，描述栏常驻可见', async () => {
     const user = userEvent.setup()
     render(<UploadDocumentDialog open onOpenChange={vi.fn()} onUploaded={vi.fn()} />)
 
     await user.upload(screen.getByLabelText('选择本地文件'), new File(['内容'], '员工手册.pdf', { type: 'application/pdf' }))
 
     expect(screen.getByLabelText('文档标题')).toHaveValue('员工手册')
-    expect(screen.queryByLabelText('文档描述')).not.toBeInTheDocument()
-    await user.click(screen.getByRole('button', { name: '添加描述（可选）' }))
     expect(screen.getByLabelText('文档描述')).toBeInTheDocument()
   })
 
@@ -45,7 +55,6 @@ describe('UploadDocumentDialog', () => {
     render(<UploadDocumentDialog open onOpenChange={vi.fn()} onUploaded={vi.fn()} />)
 
     await user.upload(screen.getByLabelText('选择本地文件'), new File(['内容'], '员工手册.pdf'))
-    await user.click(screen.getByRole('button', { name: '添加描述（可选）' }))
     await user.type(screen.getByLabelText('文档描述'), '新员工入职参考')
     await user.click(screen.getByRole('button', { name: '开始上传' }))
 
@@ -71,11 +80,52 @@ describe('UploadDocumentDialog', () => {
           file,
           title: '员工手册',
           description: '',
-          splitConfig: expect.objectContaining({ splitStrategy: 'PARENT_MARKDOWN' }),
+          splitConfig: markdownSplitConfig,
+          parseConfig: { enableOcr: true, enableImageDescription: false },
+          indexConfig: { enabled: true, vectorEnabled: true, keywordEnabled: true },
         })
       )
     )
     expect(onUploaded).toHaveBeenCalledWith(18)
+  })
+
+  it('切换正则策略时应展示专属参数并按正则配置提交', async () => {
+    vi.mocked(uploadDocument).mockResolvedValue({ documentId: 19, processId: 'p-19', status: 'QUEUED' })
+    const user = userEvent.setup()
+    render(<UploadDocumentDialog open onOpenChange={vi.fn()} onUploaded={vi.fn()} />)
+
+    await user.upload(screen.getByLabelText('选择本地文件'), new File(['内容'], '员工手册.txt'))
+    await user.click(screen.getByRole('button', { name: /正则文本/ }))
+    expect(screen.getByLabelText('分隔符')).toBeInTheDocument()
+    expect(screen.getByLabelText('正则表达式')).toBeInTheDocument()
+    await user.type(screen.getByLabelText('分隔符'), '；')
+    await user.click(screen.getByRole('button', { name: '开始上传' }))
+
+    await waitFor(() =>
+      expect(uploadDocument).toHaveBeenCalledWith(
+        expect.objectContaining({
+          splitConfig: expect.objectContaining({
+            splitStrategy: 'REGEX_TEXT',
+            regex: expect.objectContaining({ separator: '；', keepSeparator: false }),
+          }),
+        })
+      )
+    )
+  })
+
+  it('重叠大小不小于片段大小时应阻止提交', async () => {
+    const user = userEvent.setup()
+    render(<UploadDocumentDialog open onOpenChange={vi.fn()} onUploaded={vi.fn()} />)
+
+    await user.upload(screen.getByLabelText('选择本地文件'), new File(['内容'], '员工手册.pdf'))
+    await user.clear(screen.getByLabelText('片段大小'))
+    await user.type(screen.getByLabelText('片段大小'), '100')
+    await user.clear(screen.getByLabelText('重叠大小'))
+    await user.type(screen.getByLabelText('重叠大小'), '200')
+    await user.click(screen.getByRole('button', { name: '开始上传' }))
+
+    expect(screen.getByRole('alert')).toHaveTextContent('片段重叠大小必须小于片段大小')
+    expect(uploadDocument).not.toHaveBeenCalled()
   })
 
   it('选择飞书文档来源并输入 URL 时应成功提交外部文档接口', async () => {
@@ -91,17 +141,15 @@ describe('UploadDocumentDialog', () => {
     await user.click(screen.getByRole('button', { name: '开始上传' }))
 
     await waitFor(() =>
-      expect(submitExternalDocument).toHaveBeenCalledWith({
-        sourceType: 'FEISHU',
-        sourceUrl: 'https://test.feishu.cn/docx/doxc12345',
-        title: undefined,
-        description: undefined,
-        splitConfig: {
-          splitStrategy: 'PARENT_MARKDOWN',
-          chunkSize: 500,
-          chunkOverlap: 50,
-        },
-      })
+      expect(submitExternalDocument).toHaveBeenCalledWith(
+        expect.objectContaining({
+          sourceType: 'FEISHU',
+          sourceUrl: 'https://test.feishu.cn/docx/doxc12345',
+          splitConfig: markdownSplitConfig,
+          parseConfig: { enableOcr: false, enableImageDescription: false },
+          indexConfig: { enabled: true, vectorEnabled: true, keywordEnabled: true },
+        })
+      )
     )
     expect(onUploaded).toHaveBeenCalledWith(20)
   })
@@ -119,17 +167,15 @@ describe('UploadDocumentDialog', () => {
     await user.click(screen.getByRole('button', { name: '开始上传' }))
 
     await waitFor(() =>
-      expect(submitExternalDocument).toHaveBeenCalledWith({
-        sourceType: 'YUQUE',
-        sourceUrl: 'https://www.yuque.com/org/repo/doc-slug',
-        title: undefined,
-        description: undefined,
-        splitConfig: {
-          splitStrategy: 'PARENT_MARKDOWN',
-          chunkSize: 500,
-          chunkOverlap: 50,
-        },
-      })
+      expect(submitExternalDocument).toHaveBeenCalledWith(
+        expect.objectContaining({
+          sourceType: 'YUQUE',
+          sourceUrl: 'https://www.yuque.com/org/repo/doc-slug',
+          splitConfig: markdownSplitConfig,
+          parseConfig: { enableOcr: false, enableImageDescription: false },
+          indexConfig: { enabled: true, vectorEnabled: true, keywordEnabled: true },
+        })
+      )
     )
     expect(onUploaded).toHaveBeenCalledWith(22)
   })

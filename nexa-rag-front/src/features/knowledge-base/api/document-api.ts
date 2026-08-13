@@ -38,11 +38,50 @@ export type SplitStrategy = 'PARENT_MARKDOWN' | 'BROTHER_MARKDOWN' | 'REGEX_TEXT
 /** 外部文档来源类型。 */
 export type ExternalDocumentSourceType = 'LOCAL' | 'FEISHU' | 'YUQUE'
 
+/** Markdown 切分专属参数。 */
+export interface MarkdownSplitOptionsInput {
+  titleLevel?: number
+  stripHeaders?: boolean
+  preserveCodeBlock?: boolean
+  createParentForOversized?: boolean
+}
+
+/** 正则文本切分专属参数。 */
+export interface RegexSplitOptionsInput {
+  separator?: string
+  regex?: string
+  keepSeparator?: boolean
+}
+
+/** Excel/CSV 切分专属参数。 */
+export interface ExcelSplitOptionsInput {
+  mode?: 'KEY_VALUE' | 'HTML_TABLE'
+  firstRowAsHeader?: boolean
+  charset?: string
+  maxRowsPerChunk?: number
+}
+
+/** 文档解析配置输入。 */
+export interface ParseConfigInput {
+  enableOcr?: boolean
+  enableImageDescription?: boolean
+}
+
+/** 文档索引配置输入。 */
+export interface IndexConfigInput {
+  enabled?: boolean
+  vectorEnabled?: boolean
+  keywordEnabled?: boolean
+}
+
 /** 文本切分配置输入。 */
 export interface SplitConfigInput {
   splitStrategy: SplitStrategy
   chunkSize?: number
   chunkOverlap?: number
+  markdown?: MarkdownSplitOptionsInput | null
+  regex?: RegexSplitOptionsInput | null
+  excel?: ExcelSplitOptionsInput | null
 }
 
 /** 文本分块。 */
@@ -67,6 +106,8 @@ export interface UploadDocumentInput {
   title: string
   description: string
   splitConfig?: SplitConfigInput | null
+  parseConfig?: ParseConfigInput | null
+  indexConfig?: IndexConfigInput | null
 }
 
 /** 外部文档提交请求。 */
@@ -76,6 +117,8 @@ export interface ExternalDocumentSubmitInput {
   title?: string | null
   description?: string | null
   splitConfig?: SplitConfigInput | null
+  parseConfig?: ParseConfigInput | null
+  indexConfig?: IndexConfigInput | null
 }
 
 /** 查询文档服务端分页列表。 */
