@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from 'react'
-import { ChevronDown, SlidersHorizontal } from 'lucide-react'
+import { BookOpen, ChevronDown, Globe, SlidersHorizontal, UploadCloud } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { CustomSelect, type SelectOption } from '@/components/ui/select'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
@@ -28,10 +28,10 @@ interface UploadDocumentDialogProps {
   onUploaded: (documentId: number | string) => void
 }
 
-const SOURCE_OPTIONS: { value: ExternalDocumentSourceType; label: string }[] = [
-  { value: 'LOCAL', label: '本地文件' },
-  { value: 'FEISHU', label: '飞书文档' },
-  { value: 'YUQUE', label: '语雀文档' },
+const SOURCE_OPTIONS: { value: ExternalDocumentSourceType; label: string; icon: typeof UploadCloud }[] = [
+  { value: 'LOCAL', label: '本地文件', icon: UploadCloud },
+  { value: 'FEISHU', label: '飞书文档', icon: Globe },
+  { value: 'YUQUE', label: '语雀文档', icon: BookOpen },
 ]
 
 const STRATEGY_OPTIONS: { value: SplitStrategy; label: string; description: string }[] = [
@@ -218,12 +218,13 @@ export function UploadDocumentDialog({ open, onOpenChange, onUploaded }: UploadD
         </DialogHeader>
 
         <form id="upload-document-form" className="min-h-0 flex-1 space-y-3.5 overflow-y-auto px-4 pb-4 pt-3.5" noValidate onSubmit={handleSubmit}>
-          {/* 1. 文档来源（分段控件） */}
+          {/* 1. 文档来源 */}
           <div>
             <span className="mb-1.5 block text-xs font-semibold text-secondary">文档来源</span>
-            <div className="flex w-fit gap-0.5 rounded-md bg-muted p-0.5">
+            <div className="grid grid-cols-3 gap-2">
               {SOURCE_OPTIONS.map((option) => {
                 const isActive = sourceType === option.value
+                const Icon = option.icon
                 return (
                   <button
                     key={option.value}
@@ -235,12 +236,13 @@ export function UploadDocumentDialog({ open, onOpenChange, onUploaded }: UploadD
                       setUrlError(null)
                     }}
                     className={cn(
-                      'flex h-6 items-center rounded-sm px-3 text-xs transition-colors',
+                      'flex h-9 items-center justify-center gap-1.5 rounded-md border text-xs transition-colors',
                       isActive
-                        ? 'border border-border bg-card font-medium text-primary'
-                        : 'text-secondary hover:text-foreground'
+                        ? 'border-primary bg-primary-light font-medium text-primary'
+                        : 'border-border bg-card text-secondary hover:border-primary/60 hover:text-foreground'
                     )}
                   >
+                    <Icon className="size-3.5" />
                     {option.label}
                   </button>
                 )
