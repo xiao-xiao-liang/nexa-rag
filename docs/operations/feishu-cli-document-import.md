@@ -104,7 +104,7 @@ nexa:
 
 | 现象 | 原因与处理 |
 | --- | --- |
-| `lark-cli` 找不到 | 配置 `nexa.source.feishu.cli.executable`，或将 CLI 安装目录加入服务进程的 `PATH`。 |
+| `lark-cli` 找不到 | 配置 `nexa.cloud-document.feishu.cli.executable`，或将 CLI 安装目录加入服务进程的 `PATH`。 |
 | `identity` 不是 `bot` | 执行 `lark-cli --profile nexarag config default-as bot`，并检查严格模式。 |
 | `131006` / `node permission denied` | 应用没有目标文档或 Wiki 节点的资源权限；将应用加入文档/知识库成员。 |
 | 权限已开通仍然失败 | 确认应用版本已发布且租户管理员已生效；重新执行 `whoami --as bot` 与手工 `docs +fetch`。 |

@@ -12,18 +12,18 @@
 - OpenAPI Block API 退回为 Reader 的私有降级路径，继续处理 Wiki 解析、revision 固定、分页和 `FeishuBlockMarkdownConverter`。
 - CLI 成功时，完整 JSON 输出作为来源快照写入 MinIO；规范化 Markdown 继续写入既有 parsed artifact 位置。
 - CLI 显式返回资源权限拒绝时，直接抛出不可重试异常；其他启动、超时、退出码、协议解析和临时 API 失败均可降级 OpenAPI。
-- `FeishuSourceProperties` 重命名为 `FeishuProperties`，`YuqueSourceProperties` 重命名为 `YuqueProperties`。飞书 CLI 子配置作为 `FeishuProperties.CliProperties`。
+- 使用 `CloudDocumentProperties` 统一管理飞书和语雀配置；飞书 CLI 子配置位于 `CloudDocumentProperties.FeishuProperties.CliProperties`。
 
 ## 3. CLI 可执行文件解析
 
-1. `nexa.source.feishu.cli.executable` 非空时，使用其绝对路径并校验可执行性。
+1. `nexa.cloud-document.feishu.cli.executable` 非空时，使用其绝对路径并校验可执行性。
 2. 未配置时，使用命令名 `lark-cli`，由服务进程的 `PATH` 解析。
 3. 两者都不可用时，记录含 documentId 的告警并进入 OpenAPI 降级；不硬编码任何开发机或 Node 全局目录。
 
 ## 4. 配置
 
 ```yaml
-nexa.source.feishu.cli:
+nexa.cloud-document.feishu.cli:
   enabled: true
   executable: ${NEXA_SOURCE_FEISHU_CLI_EXECUTABLE:}
   profile: ${NEXA_SOURCE_FEISHU_CLI_PROFILE:nexarag}
@@ -51,4 +51,3 @@ nexa.source.feishu.cli:
 3. 显式配置的 CLI 路径优先于 `PATH`，并且不依赖开发机特定路径。
 4. 配置类重命名后，配置绑定与注入点保持一致。
 5. 项目文档提供应用权限、资源授权、CLI 安装、Profile 初始化、验证与故障排查的可复现步骤。
-

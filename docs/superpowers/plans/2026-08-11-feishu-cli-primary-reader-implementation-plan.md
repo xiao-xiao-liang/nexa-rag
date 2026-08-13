@@ -14,55 +14,51 @@
 
 ## 文件结构
 
-- 修改 `nexa-rag-infra/src/main/java/com/nexarag/infra/config/FeishuSourceProperties.java`：重命名为 `FeishuProperties`，承载应用凭据、OpenAPI 基础地址与 CLI 子配置。
-- 修改 `nexa-rag-infra/src/main/java/com/nexarag/infra/config/YuqueSourceProperties.java`：重命名为 `YuqueProperties`。
+- 新建 `nexa-rag-infra/src/main/java/com/nexarag/infra/config/CloudDocumentProperties.java`：统一承载飞书、语雀配置；飞书子配置包含应用凭据、OpenAPI 基础地址与 CLI 参数。
 - 新建 `nexa-rag-infra/src/main/java/com/nexarag/infra/source/feishu/FeishuCliDocumentExporter.java`：封装 CLI 命令构造、进程超时、输出采集、JSON 解析和错误分类。
 - 修改 `nexa-rag-infra/src/main/java/com/nexarag/infra/source/feishu/FeishuDocxSourceReader.java`：CLI 主路径与 OpenAPI 降级。
 - 修改 `nexa-rag-infra/src/main/java/com/nexarag/infra/source/yuque/YuqueSourceReader.java`：更新配置类导入和字段类型。
-- 修改 `nexa-rag-boot/src/main/resources/application.yml`：增加 `nexa.source.feishu.cli`。
+- 修改 `nexa-rag-boot/src/main/resources/application.yml`：增加 `nexa.cloud-document.feishu.cli`。
 - 修改 `docs/operations/feishu-cli-document-import.md`：同步最终配置名和手工验收结果。
 
 ### Task 1: 归一化来源配置命名并增加 CLI 子配置
 
 **Files:**
-- Move: `nexa-rag-infra/src/main/java/com/nexarag/infra/config/FeishuSourceProperties.java` → `nexa-rag-infra/src/main/java/com/nexarag/infra/config/FeishuProperties.java`
-- Move: `nexa-rag-infra/src/main/java/com/nexarag/infra/config/YuqueSourceProperties.java` → `nexa-rag-infra/src/main/java/com/nexarag/infra/config/YuqueProperties.java`
+- Create: `nexa-rag-infra/src/main/java/com/nexarag/infra/config/CloudDocumentProperties.java`
 - Modify: `nexa-rag-infra/src/main/java/com/nexarag/infra/source/yuque/YuqueSourceReader.java`
 - Modify: `nexa-rag-boot/src/main/resources/application.yml`
 
-- [ ] **Step 1: 重命名配置类型并保持现有绑定前缀**
+- [ ] **Step 1: 收敛配置类型并保持现有绑定层级**
 
-将飞书类型替换为以下形态，保留 `nexa.source.feishu`，避免部署环境变量失效：
+使用 `nexa.cloud-document` 作为配置绑定前缀，保留 `feishu`、`yuque` 两层配置结构，避免部署环境变量失效：
 
 ```java
-/** 飞书外部来源读取配置。 */
+/** 云文档来源读取配置。 */
 @Getter
 @Setter
 @Component
-@ConfigurationProperties(prefix = "nexa.source.feishu")
-public class FeishuProperties {
-    private String appId;
-    private String appSecret;
-    private String baseUrl = "https://open.feishu.cn";
-    private CliProperties cli = new CliProperties();
+@ConfigurationProperties(prefix = "nexa.cloud-document")
+public class CloudDocumentProperties {
+    private FeishuProperties feishu = new FeishuProperties();
+    private YuqueProperties yuque = new YuqueProperties();
 
-    /** 飞书 CLI 导出配置。 */
+    /** 飞书来源读取配置。 */
     @Getter
     @Setter
-    public static class CliProperties {
-        private boolean enabled = true;
-        private String executable;
-        private String profile = "nexarag";
-        private Duration timeout = Duration.ofSeconds(60);
+    public static class FeishuProperties {
+        private String appId;
+        private String appSecret;
+        private String baseUrl = "https://open.feishu.cn";
+        private CliProperties cli = new CliProperties();
     }
 }
 ```
 
-将语雀类型更名为 `YuqueProperties`，前缀仍为 `nexa.source.yuque`；同步 `YuqueSourceReader` 的 import 和字段类型。
+飞书和语雀 Reader 均构造注入 `CloudDocumentProperties`，分别读取 `getFeishu()`、`getYuque()` 子配置。
 
 - [ ] **Step 2: 配置 CLI 运行参数**
 
-在已有 `nexa.source.feishu` 下追加：
+在已有 `nexa.cloud-document.feishu` 下追加：
 
 ```yaml
 cli:
@@ -81,7 +77,7 @@ cli:
 
 - [ ] **Step 1: 定义导出器边界和返回结果**
 
-新增 Spring `@Component`，构造注入 `FeishuProperties` 与 `ObjectMapper`。仅暴露：
+新增 Spring `@Component`，构造注入 `CloudDocumentProperties` 与 `ObjectMapper`。仅暴露：
 
 ```java
 /** 以飞书 CLI 应用身份导出单篇飞书 Docx 或 Wiki 文档。 */
@@ -124,7 +120,7 @@ Process process = new ProcessBuilder(command).start();
 
 - [ ] **Step 1: 更新依赖和主读取流程**
 
-将配置类型替换为 `FeishuProperties`，注入 `FeishuCliDocumentExporter`。`read` 的前半段改为：
+将配置类型替换为 `CloudDocumentProperties`，注入 `FeishuCliDocumentExporter`。`read` 的前半段改为：
 
 ```java
 if (properties.getCli().isEnabled()) {
@@ -163,7 +159,7 @@ CLI 成功日志记录 `documentId`、CLI Profile、外部 documentId、revision
 
 - [ ] **Step 1: 同步最终配置名称与降级定义**
 
-确认文档示例与 `FeishuProperties.CliProperties` 的键一致，明确 CLI Profile 由运行服务账号配置，CLI 失败的范围及权限拒绝不降级的语义。
+确认文档示例与 `CloudDocumentProperties.FeishuProperties.CliProperties` 的键一致，明确 CLI Profile 由运行服务账号配置，CLI 失败的范围及权限拒绝不降级的语义。
 
 - [ ] **Step 2: 执行人工 CLI 验收，不运行构建或自动化测试**
 
@@ -184,4 +180,3 @@ git status --short
 ```
 
 预期：不存在空白错误；仅出现本功能文件和用户已有未提交改动。
-
