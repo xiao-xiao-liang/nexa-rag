@@ -13,7 +13,7 @@ export const DialogClose = DialogPrimitive.Close
 
 /** Shadcn 风格的对话框遮罩层。 */
 export function DialogOverlay({ className, ...props }: ComponentPropsWithoutRef<typeof DialogPrimitive.Overlay>) {
-  return <DialogPrimitive.Overlay className={cn('fixed inset-0 z-50 bg-slate-950/40', className)} {...props} />
+  return <DialogPrimitive.Overlay className={cn('fixed inset-0 z-50 bg-foreground/40', className)} {...props} />
 }
 
 /** Shadcn 风格的对话框内容组件。 */
@@ -22,7 +22,7 @@ export function DialogContent({ className, children, ...props }: ComponentPropsW
     <DialogPrimitive.Portal>
       <DialogOverlay />
       <DialogPrimitive.Content
-        className={cn('fixed left-1/2 top-1/2 z-50 grid w-[calc(100%-2rem)] max-w-lg -translate-x-1/2 -translate-y-1/2 gap-4 rounded-xl border bg-card p-6 text-card-foreground shadow-xl', className)}
+        className={cn('fixed left-1/2 top-1/2 z-50 grid w-[calc(100%-2rem)] max-w-lg -translate-x-1/2 -translate-y-1/2 gap-4 rounded-lg border bg-card p-5 text-card-foreground shadow-lg', className)}
         {...props}
       >
         {children}

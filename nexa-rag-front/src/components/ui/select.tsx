@@ -51,11 +51,11 @@ export function CustomSelect({
         disabled={disabled}
         onClick={() => setOpen(!open)}
         className={cn(
-          'flex w-full items-center justify-between gap-2 rounded-xl border border-slate-200/90 bg-white px-3 py-1.5 text-xs text-slate-800 shadow-xs transition-all duration-200',
-          'hover:border-[#b9b1f7] hover:bg-slate-50/50',
-          'focus:outline-none focus:ring-2 focus:ring-[#eeecff] focus:border-[#6f62e8]',
-          open && 'border-[#6f62e8] ring-2 ring-[#eeecff]',
-          disabled && 'cursor-not-allowed opacity-50 bg-slate-100',
+          'flex w-full items-center justify-between gap-2 rounded-md border border-input bg-card px-3 py-1.5 text-xs text-foreground shadow-xs transition-all duration-200',
+          'hover:border-primary hover:bg-muted',
+          'focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary',
+          open && 'border-primary ring-2 ring-primary/30',
+          disabled && 'cursor-not-allowed opacity-50 bg-muted',
           triggerClassName,
         )}
       >
@@ -67,16 +67,16 @@ export function CustomSelect({
         </div>
         <ChevronDown
           className={cn(
-            'size-3.5 shrink-0 text-slate-400 transition-transform duration-200',
-            open && 'rotate-180 text-[#6f62e8]',
+            'size-3.5 shrink-0 text-tertiary transition-transform duration-200',
+            open && 'rotate-180 text-primary',
           )}
         />
       </button>
 
       {open && (
-        <div className="absolute left-0 right-0 z-50 mt-1.5 max-h-60 overflow-y-auto rounded-xl border border-slate-100 bg-white p-1 shadow-xl ring-1 ring-slate-900/5 animate-in fade-in-80 zoom-in-95">
+        <div className="absolute left-0 right-0 z-50 mt-1.5 max-h-60 overflow-y-auto rounded-md border border-border bg-card p-1 shadow-lg animate-in fade-in-80 zoom-in-95">
           {options.length === 0 ? (
-            <div className="px-3 py-2 text-center text-xs text-slate-400">无可选数据</div>
+            <div className="px-3 py-2 text-center text-xs text-tertiary">无可选数据</div>
           ) : (
             options.map((opt) => {
               const isSelected = opt.value === value
@@ -88,17 +88,17 @@ export function CustomSelect({
                     setOpen(false)
                   }}
                   className={cn(
-                    'flex cursor-pointer items-center justify-between rounded-lg px-2.5 py-1.5 text-xs transition-colors',
+                    'flex cursor-pointer items-center justify-between rounded px-2.5 py-1.5 text-xs transition-colors',
                     isSelected
-                      ? 'bg-[#eeecff] font-semibold text-[#5649ce]'
-                      : 'text-slate-700 hover:bg-slate-100/80',
+                      ? 'bg-primary-light font-semibold text-primary'
+                      : 'text-secondary hover:bg-muted',
                   )}
                 >
                   <div className="flex items-center gap-2 truncate">
                     {opt.icon}
                     <span className="truncate">{opt.label}</span>
                   </div>
-                  {isSelected && <Check className="size-3.5 text-[#6f62e8]" />}
+                  {isSelected && <Check className="size-3.5 text-primary" />}
                 </div>
               )
             })
