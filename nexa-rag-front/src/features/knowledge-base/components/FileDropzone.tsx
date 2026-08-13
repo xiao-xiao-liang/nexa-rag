@@ -1,8 +1,9 @@
 import { useRef, useState, type ChangeEvent, type DragEvent, type KeyboardEvent } from 'react'
-import { FileSpreadsheet, FileText, FileType2, Presentation, UploadCloud, X } from 'lucide-react'
+import { X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { formatFileSize, getFileExtension, getFileTypeLabel } from '../file-upload'
+import { FileTypeIcon } from './FileTypeIcon'
 
 interface FileDropzoneProps {
   file: File | null
@@ -79,24 +80,19 @@ export function FileDropzone({ file, disabled, error, onFileChange, onRemove }: 
           onDragLeave={() => setDragging(false)}
           onDrop={handleDrop}
         >
-          <div className="flex items-center gap-3">
-            <span className="flex size-8 shrink-0 items-center justify-center rounded-md bg-muted text-secondary">
-              <UploadCloud className="size-4" />
-            </span>
-            <div className="text-left">
-              <p className="text-xs font-medium text-secondary">
-                拖拽文件到此处，或 <span className="text-primary">点击选择</span>
-              </p>
-              <p className="mt-0.5 text-[11px] text-tertiary">
-                支持 PDF、Word、Excel/CSV、PPT、Markdown、TXT（最大 100MB）
-              </p>
-            </div>
+          <div className="text-center">
+            <p className="text-xs font-medium text-secondary">
+              拖拽文件到此处，或 <span className="text-primary">点击选择</span>
+            </p>
+            <p className="mt-1 text-[11px] text-tertiary">
+              支持 PDF、Word、Excel/CSV、PPT、Markdown、TXT（最大 100MB）
+            </p>
           </div>
         </div>
       ) : (
         <div className="flex items-center gap-3 rounded-md border border-border bg-card px-3 py-2.5">
-          <span className="flex size-9 shrink-0 items-center justify-center rounded-md bg-muted text-primary">
-            <FileTypeIcon fileName={file.name} />
+          <span className={cn('flex size-9 shrink-0 items-center justify-center rounded-md', resolveFileBoxClass(file.name))}>
+            <FileTypeIcon fileName={file.name} size="md" />
           </span>
           <div className="min-w-0 flex-1">
             <p className="truncate text-xs font-medium text-foreground">{file.name}</p>
@@ -139,17 +135,12 @@ export function FileDropzone({ file, disabled, error, onFileChange, onRemove }: 
   )
 }
 
-/** 根据文件类型渲染可辨识的卡片图标。 */
-function FileTypeIcon({ fileName }: { fileName: string }) {
+/** 根据文件类型选择与图标颜色匹配的浅色底。 */
+function resolveFileBoxClass(fileName: string): string {
   const extension = getFileExtension(fileName)
-  const Icon =
-    extension === 'xls' || extension === 'xlsx' || extension === 'csv'
-      ? FileSpreadsheet
-      : extension === 'ppt' || extension === 'pptx'
-        ? Presentation
-        : extension === 'doc' || extension === 'docx'
-          ? FileType2
-          : FileText
-
-  return <Icon className="size-4" />
+  if (extension === 'pdf' || extension === 'doc' || extension === 'docx') return 'bg-danger-light'
+  if (extension === 'xls' || extension === 'xlsx' || extension === 'csv') return 'bg-success-light'
+  if (extension === 'ppt' || extension === 'pptx') return 'bg-warning-light'
+  if (extension === 'md' || extension === 'markdown' || extension === 'txt') return 'bg-primary-light'
+  return 'bg-muted'
 }
