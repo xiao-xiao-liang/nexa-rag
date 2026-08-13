@@ -1,5 +1,6 @@
 package com.nexarag.document.dto;
 
+import com.nexarag.document.enums.ExcelSplitMode;
 import com.nexarag.document.enums.SplitStrategy;
 import com.nexarag.document.model.dto.*;
 import jakarta.validation.Validation;

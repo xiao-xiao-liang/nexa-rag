@@ -1,4 +1,4 @@
-package com.nexarag.document.model.dto;
+package com.nexarag.document.enums;
 
 /**
  * Excel/CSV 切分渲染模式。

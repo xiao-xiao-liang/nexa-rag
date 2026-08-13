@@ -1,5 +1,6 @@
 package com.nexarag.document.model.dto;
 
+import com.nexarag.document.enums.ExcelSplitMode;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.Max;
 

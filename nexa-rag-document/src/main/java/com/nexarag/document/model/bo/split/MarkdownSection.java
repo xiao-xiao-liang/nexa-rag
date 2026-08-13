@@ -1,4 +1,4 @@
-package com.nexarag.document.splitter.markdown;
+package com.nexarag.document.model.bo.split;
 
 import java.util.List;
 

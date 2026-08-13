@@ -2,43 +2,20 @@ package com.nexarag.document.splitter.markdown;
 
 import com.nexarag.document.enums.DocumentErrorCode;
 import com.nexarag.document.enums.SplitStrategy;
-import com.nexarag.document.toolkit.DocumentChunkIdGenerator;
-import com.nexarag.document.splitter.DocumentSplitContext;
-import com.nexarag.document.splitter.DocumentSplitResult;
+import com.nexarag.document.model.bo.split.DocumentSplitContext;
+import com.nexarag.document.model.bo.split.DocumentSplitResult;
 import com.nexarag.document.splitter.DocumentSplitter;
-import com.nexarag.document.splitter.support.TextWindowSplitter;
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
+
 /**
  * Markdown 同级切分器，负责按标题区块生成同级可索引片段。
  */
 @Component
+@RequiredArgsConstructor
 public class MarkdownBrotherDocumentSplitter implements DocumentSplitter {
 
     private final MarkdownSectionStructureBuilder structureBuilder;
-
-    /**
-     * 创建 Markdown 同级切分器。
-     *
-     * @param structureBuilder Markdown 章节结构构建器
-     */
-    @Autowired
-    public MarkdownBrotherDocumentSplitter(MarkdownSectionStructureBuilder structureBuilder) {
-        this.structureBuilder = structureBuilder;
-    }
-
-    /**
-     * 兼容直接构造切分器的测试和调用方式。
-     *
-     * @param headingScanner      Markdown 标题扫描器
-     * @param textWindowSplitter  文本窗口切分器
-     * @param chunkIdGenerator    片段ID生成器
-     */
-    public MarkdownBrotherDocumentSplitter(MarkdownHeadingScanner headingScanner,
-                                           TextWindowSplitter textWindowSplitter,
-                                           DocumentChunkIdGenerator chunkIdGenerator) {
-        this(new MarkdownSectionStructureBuilder(headingScanner, textWindowSplitter, chunkIdGenerator));
-    }
 
     @Override
     public SplitStrategy strategy() {

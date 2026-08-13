@@ -37,7 +37,12 @@ public enum DocumentErrorCode implements IErrorCode {
     /**
      * 上传文件不合法。
      */
-    DOCUMENT_UPLOAD_FILE_INVALID("D000006", "上传文件不合法");
+    DOCUMENT_UPLOAD_FILE_INVALID("D000006", "上传文件不合法"),
+
+    /**
+     * Markdown 标题结构无法用于结构化切分。
+     */
+    DOCUMENT_MARKDOWN_STRUCTURE_INVALID("D000007", "Markdown标题结构不可用");
 
     private final String code;
     private final String message;

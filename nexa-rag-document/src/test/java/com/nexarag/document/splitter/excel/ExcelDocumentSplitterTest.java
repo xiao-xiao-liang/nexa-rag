@@ -1,14 +1,14 @@
 package com.nexarag.document.splitter.excel;
 
-import com.nexarag.document.model.dto.ExcelSplitMode;
+import com.nexarag.document.enums.ExcelSplitMode;
 import com.nexarag.document.model.dto.ExcelSplitOptions;
 import com.nexarag.document.model.dto.SplitConfigRequest;
 import com.nexarag.document.enums.FileType;
 import com.nexarag.document.enums.SplitStrategy;
-import com.nexarag.document.splitter.ChunkDraft;
+import com.nexarag.document.model.bo.split.ChunkDraft;
 import com.nexarag.document.toolkit.DocumentChunkIdGenerator;
-import com.nexarag.document.splitter.DocumentSplitContext;
-import com.nexarag.document.splitter.DocumentSplitResult;
+import com.nexarag.document.model.bo.split.DocumentSplitContext;
+import com.nexarag.document.model.bo.split.DocumentSplitResult;
 import org.junit.jupiter.api.Test;
 
 import java.nio.charset.StandardCharsets;

@@ -1,6 +1,8 @@
 package com.nexarag.document.splitter;
 
 import com.nexarag.document.enums.SplitStrategy;
+import com.nexarag.document.model.bo.split.DocumentSplitContext;
+import com.nexarag.document.model.bo.split.DocumentSplitResult;
 
 /**
  * 文档切分器接口。

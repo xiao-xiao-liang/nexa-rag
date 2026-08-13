@@ -3,6 +3,9 @@ package com.nexarag.document.splitter;
 import com.nexarag.common.exception.ServiceException;
 import com.nexarag.document.enums.SplitStrategy;
 import com.nexarag.document.enums.DocumentErrorCode;
+import com.nexarag.document.model.bo.split.ChunkDraft;
+import com.nexarag.document.model.bo.split.DocumentSplitContext;
+import com.nexarag.document.model.bo.split.DocumentSplitResult;
 import org.junit.jupiter.api.Test;
 
 import java.util.LinkedHashMap;

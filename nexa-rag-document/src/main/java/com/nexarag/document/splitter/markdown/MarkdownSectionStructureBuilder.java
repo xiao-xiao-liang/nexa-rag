@@ -1,15 +1,13 @@
 package com.nexarag.document.splitter.markdown;
 
+import com.nexarag.common.exception.ServiceException;
+import com.nexarag.document.enums.DocumentErrorCode;
+import com.nexarag.document.enums.SplitStrategy;
+import com.nexarag.document.model.bo.split.*;
 import com.nexarag.document.model.dto.MarkdownSplitOptions;
 import com.nexarag.document.model.dto.SplitConfigRequest;
-import com.nexarag.document.enums.SplitStrategy;
-import com.nexarag.document.splitter.ChunkDraft;
+import com.nexarag.document.toolkit.resolver.DocumentStructureResolver;
 import com.nexarag.document.toolkit.DocumentChunkIdGenerator;
-import com.nexarag.document.splitter.DocumentSectionDraft;
-import com.nexarag.document.splitter.DocumentSplitContext;
-import com.nexarag.document.splitter.DocumentSplitResult;
-import com.nexarag.document.splitter.support.TextWindowRange;
-import com.nexarag.document.splitter.support.TextWindowSplitter;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -29,8 +27,9 @@ import java.util.Map;
 public class MarkdownSectionStructureBuilder {
 
     private final MarkdownHeadingScanner headingScanner;
-    private final TextWindowSplitter textWindowSplitter;
+    private final MarkdownSafeWindowSplitter markdownSafeWindowSplitter;
     private final DocumentChunkIdGenerator chunkIdGenerator;
+    private final DocumentStructureResolver documentStructureResolver;
 
     /**
      * 构建 Markdown 章节与片段；标题树不可信时自动降级为非结构化窗口片段。
@@ -45,7 +44,8 @@ public class MarkdownSectionStructureBuilder {
             List<MarkdownSection> sections = headingScanner.scan(
                     context.content(),
                     context.config().markdown(),
-                    context.documentId()
+                    context.documentId(),
+                    documentStructureResolver == null ? null : documentStructureResolver.resolve(context)
             );
             List<DocumentSectionDraft> sectionDrafts = sections.stream()
                     .map(section -> new DocumentSectionDraft(
@@ -67,7 +67,10 @@ public class MarkdownSectionStructureBuilder {
                 }
             }
             return new DocumentSplitResult(sectionDrafts, chunks, true);
-        } catch (MarkdownStructureException exception) {
+        } catch (ServiceException exception) {
+            if (!DocumentErrorCode.DOCUMENT_MARKDOWN_STRUCTURE_INVALID.code().equals(exception.getErrorCode())) {
+                throw exception;
+            }
             log.warn("Markdown标题树不可用，降级为非结构化切分，documentId={}，reason={}", context.documentId(), exception.getMessage());
             return fallbackToUnstructuredChunks(context, strategy);
         }
@@ -92,33 +95,21 @@ public class MarkdownSectionStructureBuilder {
         String parentChunkId = createParent ? chunkIdGenerator.nextChunkId(context.documentId()) : null;
         if (createParent) {
             chunks.add(ChunkDraft.builder()
-                            .chunkId(parentChunkId)
-                            .sectionId(section.sectionId())
-                            .text(sectionText)
-                            .indexContent(indexContent(context, section, bodyText))
-                            .metadata(metadata(context, strategy, section, true, null))
-                            .skipIndex(true)
-                            .build());
+                    .chunkId(parentChunkId)
+                    .sectionId(section.sectionId())
+                    .text(sectionText)
+                    .indexContent(indexContent(context, section, bodyText))
+                    .metadata(metadata(context, strategy, section, true, null))
+                    .skipIndex(true)
+                    .build());
         }
-        
-        // 如果保留了 Markdown 标题，sectionText 前部会比 bodyText 多出标题文本
-        // 计算正文在 sectionText 中真正开始的位置，避免标题自身成为独立索引内容
-        int bodyStartOffset = sectionText.length() - bodyText.length();
-        List<TextWindowRange> rawWindows = textWindowSplitter.splitRanges(sectionText, config.chunkSize(), config.chunkOverlap());
-        for (int i = 0; i < rawWindows.size(); i++) {
-            TextWindowRange rawWindow = rawWindows.get(i);
-            int indexStartOffset = Math.max(rawWindow.startOffset(), bodyStartOffset);
-            
-            // 当前窗口只有标题，没有正文，不生成可索引子片段
-            if (indexStartOffset >= rawWindow.endOffset()) {
-                continue;
-            }
-            
-            String rawText = sectionText.substring(rawWindow.startOffset(), rawWindow.endOffset());
-            String indexText = sectionText.substring(indexStartOffset, rawWindow.endOffset());
-            if (StringUtils.hasText(indexText)) {
-                chunks.add(newChunk(context, strategy, section, parentChunkId, rawText, indexText, i));
-            }
+
+        String rawHeading = shouldKeepHeaders(config) ? headingText(section, "").stripTrailing() : "";
+        List<String> bodyWindows = markdownSafeWindowSplitter.split(bodyText, config.chunkSize(), config.chunkOverlap());
+        for (int i = 0; i < bodyWindows.size(); i++) {
+            String indexText = bodyWindows.get(i);
+            String rawText = shouldKeepHeaders(config) ? rawHeading + "\n" + indexText : indexText;
+            chunks.add(newChunk(context, strategy, section, parentChunkId, rawText, indexText, i));
         }
     }
 
@@ -159,16 +150,16 @@ public class MarkdownSectionStructureBuilder {
      */
     private DocumentSplitResult fallbackToUnstructuredChunks(DocumentSplitContext context, SplitStrategy strategy) {
         SplitConfigRequest config = context.config();
-        List<ChunkDraft> chunks = textWindowSplitter.split(context.content(), config.chunkSize(), config.chunkOverlap())
-                        .stream()
-                        .map(text -> ChunkDraft.builder()
-                                        .chunkId(chunkIdGenerator.nextChunkId(context.documentId()))
-                                        .text(text)
-                                        .indexContent(text)
-                                        .metadata(fallbackMetadata(context, strategy))
-                                        .skipIndex(false)
-                                        .build())
-                        .toList();
+        List<ChunkDraft> chunks = markdownSafeWindowSplitter.split(context.content(), config.chunkSize(), config.chunkOverlap())
+                .stream()
+                .map(text -> ChunkDraft.builder()
+                        .chunkId(chunkIdGenerator.nextChunkId(context.documentId()))
+                        .text(text)
+                        .indexContent(text)
+                        .metadata(fallbackMetadata(context, strategy))
+                        .skipIndex(false)
+                        .build())
+                .toList();
         return DocumentSplitResult.unstructured(chunks);
     }
 

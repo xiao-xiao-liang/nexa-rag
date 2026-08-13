@@ -1,7 +1,7 @@
 package com.nexarag.document.service;
 
 import com.nexarag.document.model.dto.IndexConfigRequest;
-import com.nexarag.document.model.dto.ExcelSplitMode;
+import com.nexarag.document.enums.ExcelSplitMode;
 import com.nexarag.document.model.dto.ExcelSplitOptions;
 import com.nexarag.document.model.dto.MarkdownSplitOptions;
 import com.nexarag.document.model.dto.ParseConfigRequest;
