@@ -125,11 +125,11 @@ export function DocumentDetailPage() {
   const isProcessing = currentStatus !== null && isProcessingStatus(currentStatus)
 
   return (
-    <section className="min-h-full min-w-0 overflow-y-auto bg-gradient-to-b from-slate-50 via-slate-50/60 to-slate-100/80 px-4 py-6 sm:px-6 lg:px-10">
+    <section className="min-h-full min-w-0 overflow-y-auto bg-background px-4 py-5 sm:px-6 lg:px-10">
       {detailError && <LoadError message={detailError} onRetry={() => void loadDetail(documentId)} />}      
       {detailLoading && !document && (
-        <div className="flex min-h-[400px] flex-col items-center justify-center gap-3 text-slate-400">
-          <RefreshCw className="size-6 animate-spin text-indigo-500" />
+        <div className="flex min-h-[400px] flex-col items-center justify-center gap-3 text-tertiary">
+          <RefreshCw className="size-6 animate-spin text-primary" />
           <span className="text-sm font-medium">正在加载文档详情…</span>
         </div>
       )}
@@ -137,27 +137,27 @@ export function DocumentDetailPage() {
       {document && (
         <div className="mx-auto w-full max-w-[1280px] space-y-5">
           {/* 面包屑导航 */}
-          <nav aria-label="Breadcrumb" className="flex items-center gap-2 text-xs text-slate-500">
-            <Link to="/knowledge-base" className="transition-colors hover:text-indigo-600">知识库</Link>
-            <ChevronRight className="size-3.5 text-slate-400" />
-            <Link to="/knowledge-base?view=documents" className="transition-colors hover:text-indigo-600">默认知识库</Link>
-            <ChevronRight className="size-3.5 text-slate-400" />
-            <span className="font-medium text-slate-700">全部文档</span>
+          <nav aria-label="Breadcrumb" className="flex items-center gap-2 text-xs text-tertiary">
+            <Link to="/knowledge-base" className="transition-colors hover:text-primary">知识库</Link>
+            <ChevronRight className="size-3.5 text-tertiary" />
+            <Link to="/knowledge-base?view=documents" className="transition-colors hover:text-primary">默认知识库</Link>
+            <ChevronRight className="size-3.5 text-tertiary" />
+            <span className="font-medium text-secondary">全部文档</span>
           </nav>
 
           {/* 统一 Header 主 Banner 卡片 */}
-          <header className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm backdrop-blur-sm space-y-4">
+          <header className="rounded-lg border border-border bg-card p-5 space-y-4">
             {/* 上层：标题 + 操作组 */}
             <div className="flex flex-wrap items-start justify-between gap-4">
               <div className="flex min-w-0 items-center gap-4">
-                <div className="rounded-xl border border-slate-100 bg-slate-50/80 p-1.5 shadow-inner">
+                <div className="rounded-md border border-border bg-muted p-1.5">
                   <FileTypeIcon fileName={document.originalFileName} fileType={document.fileType} size="lg" />
                 </div>
                 <div className="min-w-0 space-y-1">
-                  <h1 className="truncate text-xl font-bold tracking-tight text-slate-900 sm:text-2xl">
+                  <h1 className="truncate text-xl font-semibold text-foreground">
                     {document.title || document.originalFileName || '未命名文档'}
                   </h1>
-                  <p className="flex items-center gap-1.5 text-xs text-slate-500">
+                  <p className="flex items-center gap-1.5 text-xs text-secondary">
                     <span className="truncate">{document.originalFileName || '未提供原始文件名'}</span>
                   </p>
                 </div>
@@ -170,7 +170,7 @@ export function DocumentDetailPage() {
                     href={document.originalFileUrl}
                     target="_blank"
                     rel="noreferrer"
-                    className="inline-flex h-9 items-center gap-1.5 rounded-xl border border-slate-200 bg-slate-50 px-3 text-xs font-semibold text-slate-700 shadow-sm transition-all hover:bg-slate-100 hover:text-indigo-600"
+                    className="inline-flex h-8 items-center gap-1.5 rounded-md border border-border bg-muted px-3 text-xs text-secondary transition-colors hover:bg-muted/70 hover:text-primary"
                   >
                     <Download className="size-3.5" />
                     下载源文件
@@ -182,7 +182,7 @@ export function DocumentDetailPage() {
                     href={document.parsedFileUrl}
                     target="_blank"
                     rel="noreferrer"
-                    className="inline-flex h-9 items-center gap-1.5 rounded-xl border border-slate-200 bg-slate-50 px-3 text-xs font-semibold text-slate-700 shadow-sm transition-all hover:bg-slate-100 hover:text-indigo-600"
+                    className="inline-flex h-8 items-center gap-1.5 rounded-md border border-border bg-muted px-3 text-xs text-secondary transition-colors hover:bg-muted/70 hover:text-primary"
                   >
                     <ExternalLink className="size-3.5" />
                     预览 Markdown
@@ -191,7 +191,7 @@ export function DocumentDetailPage() {
 
                 <Link
                   to="/knowledge-base?view=documents"
-                  className="inline-flex h-9 items-center gap-1.5 rounded-xl border border-slate-200/90 bg-white px-3.5 text-xs font-semibold text-slate-600 shadow-sm transition-all duration-200 hover:border-slate-300 hover:bg-slate-50 hover:text-slate-900"
+                  className="inline-flex h-8 items-center gap-1.5 rounded-md border border-border bg-card px-3.5 text-xs text-secondary transition-colors hover:bg-muted hover:text-foreground"
                 >
                   <ArrowLeft className="size-3.5" />
                   返回文档
@@ -201,7 +201,7 @@ export function DocumentDetailPage() {
                   <Button
                     onClick={() => void submitProcess('process')}
                     disabled={submitting}
-                    className="h-9 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 px-4 text-xs font-semibold text-white shadow-md shadow-indigo-200 transition-all duration-200 hover:from-indigo-500 hover:to-violet-500 hover:shadow-indigo-300 disabled:opacity-50"
+                    className="h-8 rounded-md bg-primary px-3.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
                   >
                     {submitting ? '提交中…' : '开始处理'}
                   </Button>
@@ -211,7 +211,7 @@ export function DocumentDetailPage() {
                   <Button
                     onClick={() => void submitProcess('retry')}
                     disabled={submitting}
-                    className="h-9 rounded-xl bg-gradient-to-r from-rose-600 to-red-600 px-4 text-xs font-semibold text-white shadow-md shadow-rose-200 transition-all duration-200 hover:from-rose-500 hover:to-red-500 disabled:opacity-50"
+                    className="h-8 rounded-md bg-danger px-3.5 text-sm font-medium text-white hover:bg-danger/90 disabled:opacity-50"
                   >
                     {submitting ? '提交中…' : '重新处理'}
                   </Button>
@@ -221,36 +221,36 @@ export function DocumentDetailPage() {
 
             {/* 文档描述字段 (description) */}
             {document.description && (
-              <div className="flex items-center gap-2 rounded-xl bg-slate-50/80 border border-slate-100 px-3.5 py-2 text-xs text-slate-600">
-                <Info className="size-3.5 shrink-0 text-slate-400" />
-                <span className="font-medium text-slate-500 mr-1">描述:</span>
-                <span className="truncate text-slate-700">{document.description}</span>
+              <div className="flex items-center gap-2 rounded-md bg-muted border border-border px-3.5 py-2 text-xs text-secondary">
+                <Info className="size-3.5 shrink-0 text-tertiary" />
+                <span className="font-medium text-tertiary mr-1">描述:</span>
+                <span className="truncate text-secondary">{document.description}</span>
               </div>
             )}
 
             {/* 动态 Pipeline 真实进度条 (处理中状态时展现) */}
             {isProcessing && (
-              <div className="rounded-xl border border-indigo-100 bg-indigo-50/60 p-3.5 space-y-2">
-                <div className="flex items-center justify-between text-xs font-semibold text-indigo-900">
+              <div className="rounded-md border border-primary/30 bg-primary-light p-3.5 space-y-2">
+                <div className="flex items-center justify-between text-xs font-medium text-foreground">
                   <span className="flex items-center gap-1.5">
-                    <RefreshCw className="size-3.5 animate-spin text-indigo-600" />
+                    <RefreshCw className="size-3.5 animate-spin text-primary" />
                     文档处理流水线进行中…
                   </span>
                   {processStatus?.consumedTimes !== null && processStatus?.consumedTimes !== undefined && (
-                    <span className="flex items-center gap-1 font-mono text-[11px] font-normal text-indigo-600">
+                    <span className="flex items-center gap-1 font-mono text-[11px] font-normal text-primary">
                       <Clock className="size-3" />
                       已耗时 {processStatus.consumedTimes} 秒
                     </span>
                   )}
                 </div>
-                <div className="grid grid-cols-3 gap-2 text-center text-[10px] font-semibold">
-                  <span className={`rounded-lg py-1.5 transition-colors ${currentStatus === 'QUEUED' || currentStatus === 'PARSING' ? 'bg-indigo-600 text-white shadow-sm' : 'bg-emerald-100 text-emerald-700'}`}>
+                <div className="grid grid-cols-3 gap-2 text-center text-[10px] font-medium">
+                  <span className={`rounded py-1.5 transition-colors ${currentStatus === 'QUEUED' || currentStatus === 'PARSING' ? 'bg-primary text-white' : 'bg-success-light text-success'}`}>
                     1. 格式解析
                   </span>
-                  <span className={`rounded-lg py-1.5 transition-colors ${currentStatus === 'CHUNKING' ? 'bg-indigo-600 text-white shadow-sm' : currentStatus === 'INDEXING' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-200/60 text-slate-500'}`}>
+                  <span className={`rounded py-1.5 transition-colors ${currentStatus === 'CHUNKING' ? 'bg-primary text-white' : currentStatus === 'INDEXING' ? 'bg-success-light text-success' : 'bg-muted text-tertiary'}`}>
                     2. 智能切分
                   </span>
-                  <span className={`rounded-lg py-1.5 transition-colors ${currentStatus === 'INDEXING' ? 'bg-indigo-600 text-white shadow-sm' : 'bg-slate-200/60 text-slate-500'}`}>
+                  <span className={`rounded py-1.5 transition-colors ${currentStatus === 'INDEXING' ? 'bg-primary text-white' : 'bg-muted text-tertiary'}`}>
                     3. 向量索引
                   </span>
                 </div>
@@ -258,66 +258,66 @@ export function DocumentDetailPage() {
             )}
 
             {/* 下层：4项基本指标横栏 */}
-            <div className="grid grid-cols-2 gap-4 border-t border-slate-100 pt-4 sm:grid-cols-4">
+            <div className="grid grid-cols-2 gap-4 border-t border-border pt-4 sm:grid-cols-4">
               <div className="flex items-center gap-3">
-                <div className="rounded-xl bg-indigo-50/80 p-2.5 text-indigo-500"><FileText className="size-4" /></div>
+                <div className="rounded-md bg-muted p-2.5 text-primary"><FileText className="size-4" /></div>
                 <div>
-                  <span className="block text-[10px] font-semibold uppercase tracking-wider text-slate-400">文档类型</span>
-                  <span className="text-xs font-bold text-slate-800">{document.fileType || '—'}</span>
+                  <span className="block text-[10px] font-medium uppercase tracking-wider text-tertiary">文档类型</span>
+                  <span className="text-xs font-semibold text-foreground">{document.fileType || '—'}</span>
                 </div>
               </div>
 
               <div className="flex items-center gap-3">
-                <div className="rounded-xl bg-blue-50/80 p-2.5 text-blue-500"><HardDrive className="size-4" /></div>
+                <div className="rounded-md bg-muted p-2.5 text-secondary"><HardDrive className="size-4" /></div>
                 <div>
-                  <span className="block text-[10px] font-semibold uppercase tracking-wider text-slate-400">文件大小</span>
-                  <span className="text-xs font-bold text-slate-800">{formatFileSize(document.fileSize)}</span>
+                  <span className="block text-[10px] font-medium uppercase tracking-wider text-tertiary">文件大小</span>
+                  <span className="text-xs font-semibold text-foreground">{formatFileSize(document.fileSize)}</span>
                 </div>
               </div>
 
               <div className="flex items-center gap-3">
-                <div className="rounded-xl bg-amber-50/80 p-2.5 text-amber-500"><Database className="size-4" /></div>
+                <div className="rounded-md bg-muted p-2.5 text-warning"><Database className="size-4" /></div>
                 <div>
-                  <span className="block text-[10px] font-semibold uppercase tracking-wider text-slate-400">处理状态</span>
-                  <div>{currentStatus ? <DocumentStatusBadge status={currentStatus} /> : <span className="text-slate-400 text-xs">状态未知</span>}</div>
+                  <span className="block text-[10px] font-medium uppercase tracking-wider text-tertiary">处理状态</span>
+                  <div>{currentStatus ? <DocumentStatusBadge status={currentStatus} /> : <span className="text-tertiary text-xs">状态未知</span>}</div>
                 </div>
               </div>
 
               <div className="flex items-center gap-3">
-                <div className="rounded-xl bg-emerald-50/80 p-2.5 text-emerald-500"><Layers className="size-4" /></div>
+                <div className="rounded-md bg-muted p-2.5 text-success"><Layers className="size-4" /></div>
                 <div>
-                  <span className="block text-[10px] font-semibold uppercase tracking-wider text-slate-400">文本分块</span>
-                  <span className="text-xs font-bold text-slate-800">{chunks.total} <span className="font-normal text-slate-400">个</span></span>
+                  <span className="block text-[10px] font-medium uppercase tracking-wider text-tertiary">文本分块</span>
+                  <span className="text-xs font-semibold text-foreground">{chunks.total} <span className="font-normal text-tertiary">个</span></span>
                 </div>
               </div>
             </div>
           </header>
 
           {/* Tab 导航 */}
-          <nav aria-label="文档视图选项" className="flex items-center gap-6 border-b border-slate-200/80 px-1 pt-1">
-            <span className="pb-2.5 text-xs font-medium text-slate-400 transition-colors">文档概览</span>
-            <span className="relative pb-2.5 text-xs font-semibold text-indigo-600 after:absolute after:bottom-0 after:left-0 after:h-0.5 after:w-full after:rounded-full after:bg-indigo-600">
+          <nav aria-label="文档视图选项" className="flex items-center gap-5 border-b border-border px-1 pt-1">
+            <span className="pb-2.5 text-sm text-tertiary">文档概览</span>
+            <span className="relative pb-2.5 text-sm font-medium text-primary after:absolute after:inset-x-0 after:bottom-0 after:h-0.5 after:rounded-full after:bg-primary">
               文本分块
             </span>
           </nav>
 
           {/* 异常诊断提示 */}
           {(processStatus?.messageStatus || currentStatus === 'FAILED' || processError) && (
-            <section className="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-sm">
+            <section className="rounded-lg border border-border bg-card p-4">
               <div className="flex items-start gap-3">
-                <div className="rounded-lg bg-indigo-50 p-2 text-indigo-600">
+                <div className="rounded-md bg-primary-light p-2 text-primary">
                   <Sparkles className="size-4" />
                 </div>
                 <div className="space-y-1.5 text-xs">
                   {processStatus?.messageStatus && (
-                    <p className="font-medium text-slate-700">任务信息：{processStatus.messageStatus}</p>
+                    <p className="font-medium text-secondary">任务信息：{processStatus.messageStatus}</p>
                   )}
                   {currentStatus === 'FAILED' && (
-                    <p className="rounded-lg bg-rose-50 p-2.5 font-medium text-rose-600">
+                    <p className="rounded bg-danger-light p-2.5 font-medium text-danger">
                       失败阶段：{processStatus?.failureStage || '未知'}；失败原因：{processStatus?.failureReason || '后端未返回具体原因'}
                     </p>
                   )}
-                  {processError && <p className="font-medium text-rose-600">{processError}</p>}
+                  {processError && <p className="font-medium text-danger">{processError}</p>}
                 </div>
               </div>
             </section>
@@ -325,12 +325,12 @@ export function DocumentDetailPage() {
 
           {/* 分块内容工作区 或 未就绪空状态 */}
           {currentStatus !== 'INDEXED' ? (
-            <section className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-slate-200 bg-white/60 px-6 py-16 text-center shadow-sm">
-              <div className="rounded-2xl bg-indigo-50/80 p-4 text-indigo-400">
+            <section className="flex flex-col items-center justify-center rounded-lg border border-dashed border-border bg-card px-6 py-16 text-center">
+              <div className="rounded-md bg-primary-light p-4 text-primary">
                 <FileText className="size-8" />
               </div>
-              <h2 className="mt-4 text-base font-semibold text-slate-800">分块尚未就绪</h2>
-              <p className="mt-1 max-w-sm text-xs text-slate-500">文档解析与向量索引完成后，可在此查看并在线编辑调整文本分块。</p>
+              <h2 className="mt-4 text-base font-semibold text-foreground">分块尚未就绪</h2>
+              <p className="mt-1 max-w-sm text-xs text-secondary">文档解析与向量索引完成后，可在此查看并在线编辑调整文本分块。</p>
             </section>
           ) : (
             <DocumentChunkBrowser
@@ -356,13 +356,13 @@ export function DocumentDetailPage() {
 /** 无效地址提示。 */
 function InvalidDocumentAddress() {
   return (
-    <section className="flex min-h-full min-w-0 flex-1 items-center justify-center bg-slate-50 p-6">
-      <div className="max-w-md rounded-2xl border border-slate-200 bg-white p-8 text-center shadow-md">
-        <h1 className="text-lg font-bold text-slate-800">文档地址无效</h1>
-        <p className="mt-2 text-xs text-slate-500">无法检索到对应的文档记录，请核对文档 URL 地址。</p>
+    <section className="flex min-h-full min-w-0 flex-1 items-center justify-center bg-background p-6">
+      <div className="max-w-md rounded-lg border border-border bg-card p-8 text-center">
+        <h1 className="text-lg font-semibold text-foreground">文档地址无效</h1>
+        <p className="mt-2 text-xs text-secondary">无法检索到对应的文档记录，请核对文档 URL 地址。</p>
         <Link
           to="/knowledge-base"
-          className="mt-5 inline-flex items-center gap-1.5 rounded-xl bg-indigo-600 px-4 py-2.5 text-xs font-semibold text-white shadow-sm transition-all hover:bg-indigo-500"
+          className="mt-5 inline-flex items-center gap-1.5 rounded-md bg-primary px-4 py-2 text-xs font-medium text-white transition-colors hover:bg-primary/90"
         >
           返回文档列表
         </Link>
@@ -374,12 +374,12 @@ function InvalidDocumentAddress() {
 /** 详情请求失败提示。 */
 function LoadError({ message, onRetry }: { message: string; onRetry: () => void }) {
   return (
-    <div className="mx-auto mb-6 flex w-full max-w-[1280px] flex-wrap items-center justify-between gap-3 rounded-2xl border border-rose-200 bg-rose-50/80 px-4 py-3 text-xs text-rose-700 shadow-sm backdrop-blur-sm">
+    <div className="mx-auto mb-6 flex w-full max-w-[1280px] flex-wrap items-center justify-between gap-3 rounded-md border border-danger-light bg-danger-light px-4 py-3 text-xs text-danger">
       <span className="font-medium">{message}</span>
       <button
         type="button"
         onClick={onRetry}
-        className="inline-flex items-center gap-1.5 rounded-xl border border-rose-200 bg-white px-3 py-1.5 font-semibold text-rose-600 shadow-sm hover:bg-rose-50 transition-colors"
+        className="inline-flex items-center gap-1.5 rounded border border-danger bg-card px-3 py-1.5 font-medium text-danger transition-colors hover:bg-danger-light"
       >
         <RefreshCw className="size-3.5" />
         重新加载
@@ -392,23 +392,23 @@ function LoadError({ message, onRetry }: { message: string; onRetry: () => void 
 function ChunkPagination({ page, pageNum, onChange }: { page: PageVO<DocumentChunk>; pageNum: number; onChange: (pageNum: number) => void }) {
   const totalPages = Math.max(page.pages, 1)
   return (
-    <div className="mt-6 flex items-center justify-between border-t border-slate-200/80 pt-4 text-xs text-slate-500">
-      <span className="text-slate-400">共 {page.total} 个文本分块</span>
+    <div className="mt-6 flex items-center justify-between border-t border-border pt-4 text-xs text-secondary">
+      <span className="text-tertiary">共 {page.total} 个文本分块</span>
       <div className="flex items-center gap-3">
         <button
           type="button"
           disabled={pageNum <= 1}
           onClick={() => onChange(pageNum - 1)}
-          className="rounded-xl border border-slate-200 bg-white px-3.5 py-1.5 font-medium shadow-sm transition-all hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+          className="rounded border border-border bg-card px-3.5 py-1.5 font-medium transition-colors hover:bg-muted disabled:cursor-not-allowed disabled:opacity-40"
         >
           上一页
         </button>
-        <span className="font-semibold text-slate-700">第 {pageNum} / {totalPages} 页</span>
+        <span className="font-medium text-secondary">第 {pageNum} / {totalPages} 页</span>
         <button
           type="button"
           disabled={pageNum >= totalPages}
           onClick={() => onChange(pageNum + 1)}
-          className="rounded-xl border border-slate-200 bg-white px-3.5 py-1.5 font-medium shadow-sm transition-all hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+          className="rounded border border-border bg-card px-3.5 py-1.5 font-medium transition-colors hover:bg-muted disabled:cursor-not-allowed disabled:opacity-40"
         >
           下一页
         </button>
