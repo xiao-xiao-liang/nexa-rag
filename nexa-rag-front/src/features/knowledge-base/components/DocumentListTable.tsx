@@ -77,16 +77,17 @@ export function DocumentListTable({
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>文档信息</TableHead>
+                <TableHead>文档</TableHead>
                 <TableHead>类型</TableHead>
-                <TableHead>处理状态</TableHead>
+                <TableHead>状态</TableHead>
+                <TableHead>更新时间</TableHead>
                 <TableHead className="text-right">操作</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {loading && (
                 <TableRow>
-                  <TableCell colSpan={4} className="py-14 text-center text-sm text-tertiary">
+                  <TableCell colSpan={5} className="py-14 text-center text-sm text-tertiary">
                     正在加载文档…
                   </TableCell>
                 </TableRow>
@@ -94,7 +95,7 @@ export function DocumentListTable({
 
               {!loading && filteredRecords.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={4} className="py-14 text-center text-sm text-tertiary">
+                  <TableCell colSpan={5} className="py-14 text-center text-sm text-tertiary">
                     {keyword || statusFilter !== 'ALL' ? '未找到匹配的文档' : '暂无文档，上传文件后即可开始构建知识库。'}
                   </TableCell>
                 </TableRow>
@@ -126,6 +127,8 @@ export function DocumentListTable({
                     <TableCell>
                       <DocumentStatusBadge status={document.status} />
                     </TableCell>
+
+                    <TableCell className="text-tertiary">{formatUpdateTime(document.updatedTime)}</TableCell>
 
                     <TableCell className="text-right">
                       <div className="flex items-center justify-end gap-2 text-xs font-medium">
@@ -170,6 +173,7 @@ export function DocumentListTable({
                 total={page.total}
                 current={pageNum}
                 totalPages={totalPages}
+                totalLabel="个文档"
                 onPageChange={(nextPage) => (nextPage > pageNum ? onNext() : onPrevious())}
               />
             </div>
@@ -215,4 +219,12 @@ export function DocumentListTable({
       </Dialog>
     </>
   )
+}
+
+function formatUpdateTime(value: string | null | undefined): string {
+  if (!value) return '—'
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return '—'
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`
 }

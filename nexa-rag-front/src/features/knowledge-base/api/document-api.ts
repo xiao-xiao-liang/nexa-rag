@@ -9,6 +9,7 @@ export interface DocumentSummary {
   originalFileName: string | null
   fileType: string | null
   status: DocumentStatus
+  updatedTime?: string | null
 }
 
 /** 文档详情。 */

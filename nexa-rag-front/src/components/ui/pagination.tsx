@@ -6,13 +6,14 @@ export interface PaginationProps {
   totalPages: number
   onPageChange: (page: number) => void
   className?: string
+  totalLabel?: string
 }
 
 /** 飞书风格分页组件。 */
-export function Pagination({ total, current, totalPages, onPageChange, className }: PaginationProps) {
+export function Pagination({ total, current, totalPages, onPageChange, className, totalLabel = '条' }: PaginationProps) {
   return (
     <div className={cn('flex items-center justify-between text-xs text-tertiary', className)}>
-      <span>共 {total} 条</span>
+      <span>共 {total} {totalLabel}</span>
       <div className="flex items-center gap-2">
         <button
           type="button"
