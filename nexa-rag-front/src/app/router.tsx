@@ -6,7 +6,9 @@ import { DocumentDetailPage } from '@/features/knowledge-base/pages/DocumentDeta
 import { KnowledgeBaseListPage } from '@/features/knowledge-base/pages/KnowledgeBaseListPage'
 import ModelConfigPage from '@/features/models/pages/ModelConfigPage'
 import ModelGovernancePage from '@/features/models/pages/ModelGovernancePage'
+import ModelRoutePage from '@/features/models/pages/ModelRoutePage'
 import PromptManagementPage from '@/features/prompts/pages/PromptManagementPage'
+import { SettingsPage } from '@/features/settings/SettingsPage'
 
 /** 应用可复用路由表，供浏览器路由和测试内存路由共同使用。 */
 export const routes: RouteObject[] = [{
@@ -19,8 +21,10 @@ export const routes: RouteObject[] = [{
     { path: 'knowledge-base', element: <KnowledgeBaseListPage /> },
     { path: 'knowledge-base/:documentId', element: <DocumentDetailPage /> },
     { path: 'models', element: <ModelConfigPage /> },
+    { path: 'models/routes', element: <ModelRoutePage /> },
     { path: 'models/governance', element: <ModelGovernancePage /> },
     { path: 'prompts', element: <PromptManagementPage /> },
+    { path: 'settings', element: <SettingsPage /> },
     { path: '*', element: <Navigate to="/chat" replace /> },
   ],
 }]

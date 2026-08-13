@@ -27,4 +27,20 @@ describe('应用路由', () => {
 
     expect(await screen.findByRole('heading', { name: '知识库' })).toBeInTheDocument()
   })
+
+  it('路由管理路由应显示路由管理页面', async () => {
+    const router = createMemoryRouter(routes, { initialEntries: ['/models/routes'] })
+
+    render(<RouterProvider router={router} />)
+
+    expect(await screen.findByRole('heading', { name: '路由管理' })).toBeInTheDocument()
+  })
+
+  it('设置路由应显示设置占位页', async () => {
+    const router = createMemoryRouter(routes, { initialEntries: ['/settings'] })
+
+    render(<RouterProvider router={router} />)
+
+    expect(await screen.findByRole('heading', { name: '设置' })).toBeInTheDocument()
+  })
 })
