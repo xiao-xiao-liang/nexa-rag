@@ -21,7 +21,7 @@ export function ModelPanel() {
   return (
     <aside aria-label="模型管理导航" className="flex w-[232px] shrink-0 flex-col border-r border-border bg-card py-3">
       {groups.map((group) => (
-        <div key={group.label} className="mb-3">
+        <div key={group.label} className="mb-3 flex flex-col">
           <p className="px-4 pb-1 text-xs font-medium text-tertiary">{group.label}</p>
           {group.items.map((item) => (
             <NavLink

@@ -171,7 +171,7 @@ export default function ModelGovernancePage() {
     <div className="flex h-full min-h-0 flex-1 flex-col overflow-y-auto bg-background">
       {/* 顶部 Header：独立模型治理页面控制台 */}
       <header className="border-b border-border bg-card px-6 py-4">
-        <div className="mx-auto max-w-[1200px]">
+        <div className="w-full px-6">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <span className="flex size-8 items-center justify-center rounded-md bg-primary-light text-primary">
@@ -199,7 +199,7 @@ export default function ModelGovernancePage() {
       </header>
 
       {/* 主体：全量模型治理列表 */}
-      <main className="mx-auto w-full max-w-[1200px] min-w-0 flex-1 px-6 py-5">
+      <main className="w-full min-w-0 flex-1 px-6 py-5">
         {/* 全局防护指标卡片 */}
         <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-4">
           <div className="flex items-center gap-3 rounded-md border border-border bg-card p-3">

@@ -278,7 +278,7 @@ export default function ModelConfigPage() {
 
       {/* 顶部 Header */}
       <header className="border-b border-border bg-card px-6 py-4">
-        <div className="mx-auto w-full max-w-[1200px]">
+        <div className="w-full px-6">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <span className="flex size-8 items-center justify-center rounded-md bg-primary-light text-primary">
@@ -299,7 +299,7 @@ export default function ModelConfigPage() {
       </header>
 
       {/* 主体：两栏布局 */}
-      <main className="mx-auto w-full max-w-[1200px] min-w-0 flex-1 px-6 py-5">
+      <main className="w-full min-w-0 flex-1 px-6 py-5">
         <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-[200px_minmax(0,1fr)]">
           {/* 左侧供应商列表 */}
           <aside className="rounded-lg border border-border bg-card p-3">

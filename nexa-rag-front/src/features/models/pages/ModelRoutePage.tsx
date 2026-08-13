@@ -150,7 +150,7 @@ export default function ModelRoutePage() {
   return (
     <div className="flex h-full min-h-0 flex-1 flex-col overflow-y-auto bg-background">
       <Toast message={toastMessage} />
-      <div className="mx-auto w-full max-w-[1200px] px-6 py-5">
+      <div className="w-full px-6 py-5">
         <div className="mb-4 flex items-center justify-between">
           <div>
             <h1 className="text-xl font-semibold text-foreground">路由管理</h1>
