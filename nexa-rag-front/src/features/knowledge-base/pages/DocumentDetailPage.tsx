@@ -158,6 +158,7 @@ export function DocumentDetailPage() {
                     {document.title || document.originalFileName || '未命名文档'}
                   </h1>
                   <p className="flex items-center gap-1.5 text-xs text-secondary">
+                    <span className="shrink-0 font-medium text-tertiary">原始文件名</span>
                     <span className="truncate">{document.originalFileName || '未提供原始文件名'}</span>
                   </p>
                 </div>

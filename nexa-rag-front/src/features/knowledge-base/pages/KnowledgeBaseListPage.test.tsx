@@ -52,7 +52,7 @@ describe('知识库文档列表页面', () => {
     renderList()
 
     expect(await screen.findByRole('heading', { name: '全部文档' })).toBeInTheDocument()
-    expect(await screen.findByText('员工手册.pdf')).toBeInTheDocument()
+    expect(await screen.findByText('员工手册')).toBeInTheDocument()
   })
 
   it('概览视图下可切换至全部文档表格', async () => {
@@ -71,7 +71,7 @@ describe('知识库文档列表页面', () => {
     renderList('/knowledge-base?page=2')
 
     await waitFor(() => expect(listDocuments).toHaveBeenCalledWith(2, 20, expect.anything()))
-    expect(await screen.findByText('员工手册.pdf')).toBeInTheDocument()
+    expect(await screen.findByText('员工手册')).toBeInTheDocument()
   })
 
   it('列表失败后应支持重新加载', async () => {

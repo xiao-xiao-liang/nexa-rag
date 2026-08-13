@@ -463,10 +463,7 @@ function DocumentCell({ document }: { document: DocumentSummary }) {
   return (
     <span className="flex min-w-0 items-center gap-3">
       <FileTypeIcon fileName={document.originalFileName} fileType={document.fileType} />
-      <span className="min-w-0 space-y-0.5">
-        <b className="block truncate text-xs font-semibold text-foreground">{documentName(document)}</b>
-        <small className="block truncate text-[10px] text-tertiary">{document.originalFileName || '未提供原始文件名'}</small>
-      </span>
+      <span className="min-w-0 truncate text-foreground">{documentName(document)}</span>
     </span>
   )
 }

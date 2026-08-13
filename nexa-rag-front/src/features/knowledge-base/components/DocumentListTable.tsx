@@ -74,7 +74,7 @@ export function DocumentListTable({
     <>
       <section className="overflow-hidden rounded-lg border border-border bg-card">
         <div className="min-w-[720px]">
-          <Table>
+          <Table className="text-[13px]">
             <TableHeader>
               <TableRow>
                 <TableHead>文档</TableHead>
@@ -110,14 +110,11 @@ export function DocumentListTable({
                         <button
                           type="button"
                           onClick={() => onView(document.documentId)}
-                          className="min-w-0 text-left group"
+                          className="min-w-0 text-left"
                         >
-                          <b className="block truncate text-sm font-semibold text-foreground transition-colors group-hover:text-primary">
+                          <span className="block truncate text-foreground transition-colors hover:text-primary">
                             {document.title || document.originalFileName || '未命名文档'}
-                          </b>
-                          <small className="block truncate text-xs text-tertiary">
-                            {document.originalFileName || '未提供原始文件名'}
-                          </small>
+                          </span>
                         </button>
                       </div>
                     </TableCell>

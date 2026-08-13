@@ -8,7 +8,7 @@ export function Table({ className, ...props }: HTMLAttributes<HTMLTableElement>)
 
 /** 表格头部容器。 */
 export function TableHeader({ className, ...props }: HTMLAttributes<HTMLTableSectionElement>) {
-  return <thead className={cn('bg-muted text-xs text-secondary', className)} {...props} />
+  return <thead className={cn('bg-muted text-xs text-tertiary', className)} {...props} />
 }
 
 /** 表格主体容器。 */
@@ -23,7 +23,7 @@ export function TableRow({ className, ...props }: HTMLAttributes<HTMLTableRowEle
 
 /** 表头单元格。 */
 export function TableHead({ className, ...props }: ThHTMLAttributes<HTMLTableCellElement>) {
-  return <th className={cn('px-4 py-2.5 text-left font-medium', className)} {...props} />
+  return <th className={cn('px-4 py-2.5 text-left font-semibold', className)} {...props} />
 }
 
 /** 数据单元格。 */

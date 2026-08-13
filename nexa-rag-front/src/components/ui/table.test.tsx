@@ -21,6 +21,6 @@ describe('Table', () => {
       </Table>,
     )
     expect(screen.getByText('Q3 财报.pdf')).toBeInTheDocument()
-    expect(container.querySelector('thead')?.className).toContain('text-secondary')
+    expect(container.querySelector('thead')?.className).toContain('text-tertiary')
   })
 })
