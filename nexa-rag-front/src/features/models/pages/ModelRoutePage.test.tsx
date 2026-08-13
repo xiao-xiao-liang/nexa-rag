@@ -7,6 +7,7 @@ vi.mock('../api/model-api', () => ({
   getModelRoutes: vi.fn().mockResolvedValue([
     { routeId: 1, routeKey: 'DEFAULT_LLM', modelType: 'CHAT', strategy: 'FAILOVER', enabled: true },
   ]),
+  getModelRouteConfigs: vi.fn().mockResolvedValue([]),
   getModelConfigs: vi.fn().mockResolvedValue([]),
   deleteModelRoute: vi.fn(),
 }))

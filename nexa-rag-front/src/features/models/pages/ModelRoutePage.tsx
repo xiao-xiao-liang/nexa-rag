@@ -4,7 +4,6 @@ import { useNavigate } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
-import { Pagination } from '@/components/ui/pagination'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Tag } from '@/components/ui/tag'
 import { Toast } from '@/components/ui/toast'
@@ -25,6 +24,7 @@ import {
 export default function ModelRoutePage() {
   const navigate = useNavigate()
   const [routes, setRoutes] = useState<ModelRouteItem[]>([])
+  const [candidateCounts, setCandidateCounts] = useState<Record<number | string, number>>({})
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [toastMessage, setToastMessage] = useState<string | null>(null)
@@ -51,7 +51,19 @@ export default function ModelRoutePage() {
     setLoading(true)
     setError(null)
     try {
-      setRoutes(await getModelRoutes())
+      const routeList = await getModelRoutes()
+      setRoutes(routeList)
+      const countEntries = await Promise.all(
+        routeList.map(async (route) => {
+          try {
+            const items = await getModelRouteConfigs(route.routeId)
+            return [route.routeId, items.length] as const
+          } catch {
+            return [route.routeId, 0] as const
+          }
+        }),
+      )
+      setCandidateCounts(Object.fromEntries(countEntries))
     } catch (err) {
       setError(err instanceof Error ? err.message : '路由列表加载失败')
     } finally {
@@ -167,8 +179,6 @@ export default function ModelRoutePage() {
                 <TableHead>路由名称</TableHead>
                 <TableHead>routeKey</TableHead>
                 <TableHead>模型类型</TableHead>
-                <TableHead>策略</TableHead>
-                <TableHead>状态</TableHead>
                 <TableHead>候选配置数</TableHead>
                 <TableHead className="text-right">操作</TableHead>
               </TableRow>
@@ -176,23 +186,24 @@ export default function ModelRoutePage() {
             <TableBody>
               {loading ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="py-10 text-center text-xs text-tertiary">正在加载…</TableCell>
+                  <TableCell colSpan={5} className="py-10 text-center text-xs text-tertiary">正在加载…</TableCell>
                 </TableRow>
               ) : routes.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="py-10 text-center text-xs text-tertiary">暂无路由，点击右上角新建</TableCell>
+                  <TableCell colSpan={5} className="py-10 text-center text-xs text-tertiary">暂无路由，点击右上角新建</TableCell>
                 </TableRow>
               ) : (
                 routes.map((route) => (
                   <TableRow key={route.routeId}>
-                    <TableCell className="font-medium">{route.routeKey}</TableCell>
+                    <TableCell>
+                      <div className="font-medium text-foreground">{route.routeKey}</div>
+                      <div className="text-[10px] text-tertiary">
+                        {route.strategy || 'FAILOVER'} · {route.enabled ? '已启用' : '已禁用'}
+                      </div>
+                    </TableCell>
                     <TableCell className="font-mono text-xs text-secondary">{route.routeKey}</TableCell>
                     <TableCell><Tag variant="info">{route.modelType}</Tag></TableCell>
-                    <TableCell className="text-secondary">{route.strategy || '—'}</TableCell>
-                    <TableCell>
-                      <Tag variant={route.enabled ? 'success' : 'neutral'}>{route.enabled ? '启用' : '禁用'}</Tag>
-                    </TableCell>
-                    <TableCell className="text-secondary">—</TableCell>
+                    <TableCell className="text-secondary">{candidateCounts[route.routeId] ?? '—'}</TableCell>
                     <TableCell className="text-right">
                       <div className="flex items-center justify-end gap-3 text-xs">
                         <button
@@ -226,8 +237,8 @@ export default function ModelRoutePage() {
             </TableBody>
           </Table>
           {!loading && routes.length > 0 && (
-            <div className="border-t border-border px-4 py-3">
-              <Pagination total={routes.length} current={1} totalPages={1} onPageChange={() => undefined} />
+            <div className="border-t border-border px-4 py-3 text-xs text-tertiary">
+              共 {routes.length} 条路由
             </div>
           )}
         </div>

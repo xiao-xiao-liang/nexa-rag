@@ -195,45 +195,46 @@ export default function ModelGovernancePage() {
             </Button>
           </div>
 
-          {/* 全局防护指标卡片 */}
-          <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-4">
-            <div className="flex items-center gap-3 rounded-md border border-border bg-card p-3">
-              <ShieldCheck className="size-5 text-primary" />
-              <div>
-                <p className="text-[10px] font-medium text-tertiary">活跃治理规则</p>
-                <p className="text-sm font-semibold text-foreground">{modelConfigs.length} 项已配置节点防护</p>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-3 rounded-md border border-border bg-card p-3">
-              <Activity className="size-5 text-primary" />
-              <div>
-                <p className="text-[10px] font-medium text-tertiary">全局限流防护 (RateLimit)</p>
-                <p className="text-sm font-semibold text-foreground">默认 120 RPM / 1000ms</p>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-3 rounded-md border border-border bg-card p-3">
-              <ShieldAlert className="size-5 text-success" />
-              <div>
-                <p className="text-[10px] font-medium text-tertiary">熔断判定阈值 (CircuitBreaker)</p>
-                <p className="text-sm font-semibold text-foreground">50% 失败率 / 3000ms 慢调用</p>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-3 rounded-md border border-border bg-card p-3">
-              <Wrench className="size-5 text-warning" />
-              <div>
-                <p className="text-[10px] font-medium text-tertiary">绑定模式 (Binding Mode)</p>
-                <p className="text-sm font-semibold text-foreground">CONFIG 物理节点独立生效</p>
-              </div>
-            </div>
-          </div>
         </div>
       </header>
 
       {/* 主体：全量模型治理列表 */}
       <main className="mx-auto w-full max-w-[1200px] min-w-0 flex-1 px-6 py-5">
+        {/* 全局防护指标卡片 */}
+        <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-4">
+          <div className="flex items-center gap-3 rounded-md border border-border bg-card p-3">
+            <ShieldCheck className="size-5 text-primary" />
+            <div>
+              <p className="text-[10px] font-medium text-tertiary">活跃治理规则</p>
+              <p className="text-sm font-semibold text-foreground">{modelConfigs.length} 项已配置节点防护</p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3 rounded-md border border-border bg-card p-3">
+            <Activity className="size-5 text-primary" />
+            <div>
+              <p className="text-[10px] font-medium text-tertiary">全局限流防护 (RateLimit)</p>
+              <p className="text-sm font-semibold text-foreground">默认 120 RPM / 1000ms</p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3 rounded-md border border-border bg-card p-3">
+            <ShieldAlert className="size-5 text-success" />
+            <div>
+              <p className="text-[10px] font-medium text-tertiary">熔断判定阈值 (CircuitBreaker)</p>
+              <p className="text-sm font-semibold text-foreground">50% 失败率 / 3000ms 慢调用</p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3 rounded-md border border-border bg-card p-3">
+            <Wrench className="size-5 text-warning" />
+            <div>
+              <p className="text-[10px] font-medium text-tertiary">绑定模式 (Binding Mode)</p>
+              <p className="text-sm font-semibold text-foreground">CONFIG 物理节点独立生效</p>
+            </div>
+          </div>
+        </div>
+
         <section className="rounded-lg border border-border bg-card p-5">
           <div className="flex items-center justify-between border-b border-border pb-4">
             <div>

@@ -1,8 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import {
-  Copy, Cpu, Database, Edit3, Eye, EyeOff, Key, Link2, Loader2, Plus, RefreshCw, Search, SlidersHorizontal, Sparkles, Wrench,
+  Copy, Cpu, Database, Edit3, Eye, EyeOff, Key, Link2, Loader2, Plus, RefreshCw, Search, Sparkles, Wrench,
 } from 'lucide-react'
-import { NavLink } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import {
   Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle,
@@ -20,11 +19,8 @@ import {
   updateModelConfig,
   deleteModelConfig,
   testModelConfig,
-  getModelRoutes,
-  updateModelRoute,
   type ModelProviderCatalogItem,
   type ModelConfigItem,
-  type ModelRouteItem,
 } from '../api/model-api'
 
 // 对应 LobeHub 官方图片 CDN 镜像
@@ -54,25 +50,6 @@ const getProviderLogoUrl = (providerKey: string) => {
   return PROVIDER_LOGOS.compatible
 }
 
-const LLM_OPTIONS: SelectOption[] = [
-  { value: 'qwen-plus', label: 'qwen-plus (阿里云)' },
-  { value: 'qwen-max', label: 'qwen-max (阿里云)' },
-  { value: 'gpt-4o', label: 'gpt-4o (OpenAI)' },
-  { value: 'deepseek-chat', label: 'deepseek-chat (DeepSeek)' },
-  { value: 'moonshot-v1-8k', label: 'moonshot-v1-8k (月之暗面)' },
-]
-
-const EMBEDDING_OPTIONS: SelectOption[] = [
-  { value: 'text-embedding-v3', label: 'text-embedding-v3 (阿里云)' },
-  { value: 'text-embedding-3-large', label: 'text-embedding-3-large (OpenAI)' },
-  { value: 'bge-m3-local', label: 'bge-m3-local (私有化)' },
-]
-
-const RERANK_OPTIONS: SelectOption[] = [
-  { value: 'gte-rerank', label: 'gte-rerank (阿里云)' },
-  { value: 'bge-rerank-large', label: 'bge-rerank-large' },
-]
-
 const CATEGORY_OPTIONS: SelectOption[] = [
   { value: 'Chat', label: 'Chat (大语言模型对话)' },
   { value: 'Embedding', label: 'Embedding (文本向量嵌入)' },
@@ -83,7 +60,6 @@ const CATEGORY_OPTIONS: SelectOption[] = [
 export default function ModelConfigPage() {
   const [catalogProviders, setCatalogProviders] = useState<ModelProviderCatalogItem[]>([])
   const [realConfigs, setRealConfigs] = useState<ModelConfigItem[]>([])
-  const [realRoutes, setRealRoutes] = useState<ModelRouteItem[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -92,11 +68,6 @@ export default function ModelConfigPage() {
   const [categoryFilter, setCategoryFilter] = useState<'all' | 'joined'>('all')
   const [toastMessage, setToastMessage] = useState<string | null>(null)
   const [testingConfigId, setTestingConfigId] = useState<number | string | null>(null)
-
-  // 全局默认系统模型设置
-  const [defaultLLM, setDefaultLLM] = useState('qwen-plus')
-  const [defaultEmbedding, setDefaultEmbedding] = useState('text-embedding-v3')
-  const [defaultRerank, setDefaultRerank] = useState('gte-rerank')
 
   // Modals 控制
   const [credentialsModalOpen, setCredentialsModalOpen] = useState(false)
@@ -122,26 +93,15 @@ export default function ModelConfigPage() {
     setLoading(true)
     setError(null)
     try {
-      const [catalogRes, configsRes, routesRes] = await Promise.all([
+      const [catalogRes, configsRes] = await Promise.all([
         getModelProviderCatalog(),
         getModelConfigs(),
-        getModelRoutes().catch(() => []),
       ])
       setCatalogProviders(catalogRes || [])
       setRealConfigs(configsRes || [])
-      setRealRoutes(routesRes || [])
 
       if (catalogRes && catalogRes.length > 0) {
         setSelectedProviderId(catalogRes[0].provider)
-      }
-
-      if (routesRes && routesRes.length > 0) {
-        const llmRoute = routesRes.find((r) => r.modelType === 'CHAT' || r.routeKey === 'DEFAULT_LLM')
-        const embRoute = routesRes.find((r) => r.modelType === 'EMBEDDING' || r.routeKey === 'DEFAULT_EMBEDDING')
-        const rnkRoute = routesRes.find((r) => r.modelType === 'RERANK' || r.routeKey === 'DEFAULT_RERANK')
-        if (llmRoute?.routeKey) setDefaultLLM(llmRoute.routeKey)
-        if (embRoute?.routeKey) setDefaultEmbedding(embRoute.routeKey)
-        if (rnkRoute?.routeKey) setDefaultRerank(rnkRoute.routeKey)
       }
     } catch (err) {
       console.error('加载模型配置失败:', err)
@@ -154,27 +114,6 @@ export default function ModelConfigPage() {
   useEffect(() => {
     void loadData()
   }, [])
-
-  const dynamicLLMOptions = useMemo(() => {
-    const customList = realConfigs
-      .filter((c) => c.modelType === 'Chat' || c.modelType === 'LLM')
-      .map((c) => ({ value: c.modelName, label: `${c.modelName} (${c.provider})` }))
-    return customList.length > 0 ? customList : LLM_OPTIONS
-  }, [realConfigs])
-
-  const dynamicEmbeddingOptions = useMemo(() => {
-    const customList = realConfigs
-      .filter((c) => c.modelType === 'Embedding' || c.modelType === 'Text Embedding')
-      .map((c) => ({ value: c.modelName, label: `${c.modelName} (${c.provider})` }))
-    return customList.length > 0 ? customList : EMBEDDING_OPTIONS
-  }, [realConfigs])
-
-  const dynamicRerankOptions = useMemo(() => {
-    const customList = realConfigs
-      .filter((c) => c.modelType === 'Rerank')
-      .map((c) => ({ value: c.modelName, label: `${c.modelName} (${c.provider})` }))
-    return customList.length > 0 ? customList : RERANK_OPTIONS
-  }, [realConfigs])
 
   const selectedCatalog = useMemo(() => {
     return catalogProviders.find((p) => p.provider === selectedProviderId) || catalogProviders[0]
@@ -253,45 +192,6 @@ export default function ModelConfigPage() {
     setEditApiKey('')
     setShowEditApiKey(false)
     setEditModelModalOpen(true)
-  }
-
-  const handleSelectDefaultLLM = async (val: string) => {
-    setDefaultLLM(val)
-    const route = realRoutes.find((r) => r.modelType === 'CHAT' || r.routeKey === 'DEFAULT_LLM')
-    if (route) {
-      try {
-        await updateModelRoute(route.routeId, { routeKey: val })
-        showToast(`对话模型全局路由已成功保存为 [${val}]`)
-      } catch {
-        showToast('保存对话模型路由失败')
-      }
-    }
-  }
-
-  const handleSelectDefaultEmbedding = async (val: string) => {
-    setDefaultEmbedding(val)
-    const route = realRoutes.find((r) => r.modelType === 'EMBEDDING' || r.routeKey === 'DEFAULT_EMBEDDING')
-    if (route) {
-      try {
-        await updateModelRoute(route.routeId, { routeKey: val })
-        showToast(`向量检索全局路由已成功保存为 [${val}]`)
-      } catch {
-        showToast('保存向量检索路由失败')
-      }
-    }
-  }
-
-  const handleSelectDefaultRerank = async (val: string) => {
-    setDefaultRerank(val)
-    const route = realRoutes.find((r) => r.modelType === 'RERANK' || r.routeKey === 'DEFAULT_RERANK')
-    if (route) {
-      try {
-        await updateModelRoute(route.routeId, { routeKey: val })
-        showToast(`精细重排全局路由已成功保存为 [${val}]`)
-      } catch {
-        showToast('保存精细重排路由失败')
-      }
-    }
   }
 
   const handleCreateSubmit = async (e: React.FormEvent) => {
@@ -395,30 +295,12 @@ export default function ModelConfigPage() {
             </Button>
           </div>
 
-          {/* 全局默认模型 + 治理入口 */}
-          <div className="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-md border border-border bg-muted px-3.5 py-2.5">
-            <div className="flex flex-wrap items-center gap-2.5">
-              <span className="flex items-center gap-1.5 text-xs font-medium text-secondary">
-                <Sparkles className="size-3.5 text-primary" />
-                全站默认模型：
-              </span>
-              <CustomSelect value={defaultLLM} onChange={handleSelectDefaultLLM} options={dynamicLLMOptions} className="w-44" />
-              <CustomSelect value={defaultEmbedding} onChange={handleSelectDefaultEmbedding} options={dynamicEmbeddingOptions} className="w-48" />
-              <CustomSelect value={defaultRerank} onChange={handleSelectDefaultRerank} options={dynamicRerankOptions} className="w-44" />
-            </div>
-            <NavLink to="/models/governance">
-              <Button variant="outline" size="sm">
-                <SlidersHorizontal className="size-3.5" />
-                前往模型治理控制台
-              </Button>
-            </NavLink>
-          </div>
         </div>
       </header>
 
       {/* 主体：两栏布局 */}
       <main className="mx-auto w-full max-w-[1200px] min-w-0 flex-1 px-6 py-5">
-        <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-[232px_minmax(0,1fr)]">
+        <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-[200px_minmax(0,1fr)]">
           {/* 左侧供应商列表 */}
           <aside className="rounded-lg border border-border bg-card p-3">
             <div className="relative mb-2">
