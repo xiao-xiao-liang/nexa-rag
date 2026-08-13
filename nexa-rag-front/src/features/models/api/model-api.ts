@@ -182,4 +182,79 @@ export function getModelRegistrySnapshot(): Promise<any> {
   return request<any>('/api/model/registry/snapshot')
 }
 
+export interface ModelRouteConfigItem {
+  routeConfigId: number | string
+  routeId: number | string
+  configId: number | string
+  modelName?: string
+  provider?: string
+  priority?: number
+  weight?: number
+  enabled?: boolean
+}
+
+export interface ModelRouteConfigCreateRequest {
+  configId: number | string
+  priority?: number
+  weight?: number
+}
+
+export interface ModelRouteConfigUpdateRequest {
+  priority?: number
+  weight?: number
+  enabled?: boolean
+}
+
+/** 查询路由候选配置列表 */
+export function getModelRouteConfigs(routeId: number | string): Promise<ModelRouteConfigItem[]> {
+  return request<ModelRouteConfigItem[]>(`/api/model/routes/${routeId}/configs`)
+}
+
+/** 创建路由候选配置 */
+export function createModelRouteConfig(routeId: number | string, data: ModelRouteConfigCreateRequest): Promise<ModelRouteConfigItem> {
+  return request<ModelRouteConfigItem>(`/api/model/routes/${routeId}/configs`, {
+    method: 'POST',
+    body: JSON.stringify(data),
+  })
+}
+
+/** 更新路由候选配置 */
+export function updateModelRouteConfig(
+  routeId: number | string,
+  routeConfigId: number | string,
+  data: ModelRouteConfigUpdateRequest,
+): Promise<ModelRouteConfigItem> {
+  return request<ModelRouteConfigItem>(`/api/model/routes/${routeId}/configs/${routeConfigId}`, {
+    method: 'PATCH',
+    body: JSON.stringify(data),
+  })
+}
+
+/** 删除路由候选配置 */
+export function deleteModelRouteConfig(routeId: number | string, routeConfigId: number | string): Promise<void> {
+  return request<void>(`/api/model/routes/${routeId}/configs/${routeConfigId}`, {
+    method: 'DELETE',
+  })
+}
+
+/** 创建模型路由 */
+export function createModelRoute(data: {
+  routeKey: string
+  modelType: string
+  strategy?: string
+  enabled?: boolean
+  remark?: string
+}): Promise<ModelRouteItem> {
+  return request<ModelRouteItem>('/api/model/routes', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  })
+}
+
+/** 删除模型路由 */
+export function deleteModelRoute(routeId: number | string): Promise<void> {
+  return request<void>(`/api/model/routes/${routeId}`, {
+    method: 'DELETE',
+  })
+}
 
