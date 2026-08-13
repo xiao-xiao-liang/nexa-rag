@@ -8,21 +8,20 @@ import {
   Edit3,
   Eye,
   GitBranch,
-  History,
   Layers,
   Loader2,
   Moon,
   RotateCcw,
-  Search,
   Send,
   Settings2,
-  SlidersHorizontal,
   Sparkles,
   Sun,
   Terminal,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { CustomSelect, type SelectOption } from '@/components/ui/select'
+import { Tabs } from '@/components/ui/tabs'
+import { Toast } from '@/components/ui/toast'
 import {
   Dialog,
   DialogContent,
@@ -52,7 +51,6 @@ export default function PromptManagementPage() {
   const [loading, setLoading] = useState(true)
   const [detailLoading, setDetailLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [search, setSearch] = useState('')
 
   // 编辑器主题模式: 'light' | 'dark'
   const [editorTheme, setEditorTheme] = useState<'light' | 'dark'>('light')
@@ -147,21 +145,6 @@ export default function PromptManagementPage() {
   useEffect(() => {
     loadPrompts()
   }, [])
-
-  const handleSelectPrompt = (code: string) => {
-    if (code === selectedCode) return
-    setSelectedCode(code)
-    loadPromptDetail(code)
-  }
-
-  // 过滤提示词列表
-  const filteredPrompts = useMemo(() => {
-    if (!search.trim()) return prompts
-    const kw = search.trim().toLowerCase()
-    return prompts.filter(
-      (p) => p.name.toLowerCase().includes(kw) || p.promptCode.toLowerCase().includes(kw),
-    )
-  }, [prompts, search])
 
   // 计算行数
   const lineCount = useMemo(() => {
@@ -396,50 +379,43 @@ export default function PromptManagementPage() {
 
   if (loading) {
     return (
-      <div className="flex h-full min-h-0 flex-1 items-center justify-center bg-[#f8f9fc]">
-        <div className="flex flex-col items-center gap-3 text-slate-500">
-          <Loader2 className="size-8 animate-spin text-[#6f62e8]" />
-          <p className="text-xs font-semibold">正在从后端加载提示词定义与发布历史…</p>
+      <div className="flex h-full min-h-0 flex-1 items-center justify-center bg-background">
+        <div className="flex flex-col items-center gap-3 text-secondary">
+          <Loader2 className="size-8 animate-spin text-primary" />
+          <p className="text-xs font-medium">正在从后端加载提示词定义与发布历史…</p>
         </div>
       </div>
     )
   }
 
   return (
-    <div className="flex h-full min-h-0 flex-1 flex-col overflow-hidden bg-[#f6f7fb] text-slate-800">
+    <div className="flex h-full min-h-0 flex-1 flex-col overflow-hidden bg-background">
       {/* Toast 信息指示器 */}
-      {toastMessage && (
-        <div className="fixed top-4 right-4 z-50 rounded-xl bg-slate-900 px-4 py-2.5 text-xs font-semibold text-white shadow-lg animate-in fade-in slide-in-from-top-2">
-          {toastMessage}
-        </div>
-      )}
+      <Toast message={toastMessage} />
 
       {/* 顶部 Header: 紧凑高质感 Studio 顶栏 */}
-      <header className="flex h-14 shrink-0 items-center justify-between border-b border-[#e8ebf1] bg-white px-5">
+      <header className="flex h-11 shrink-0 items-center justify-between border-b border-border bg-card px-5">
         <div className="flex items-center gap-3">
-          <span className="flex size-8 items-center justify-center rounded-lg bg-gradient-to-br from-[#6f62e8] to-[#9285f8] text-white shadow-xs">
+          <span className="flex size-7 items-center justify-center rounded-md bg-primary-light text-primary">
             <Sparkles className="size-4" />
           </span>
           <div className="flex items-center gap-2">
-            <h1 className="text-sm font-bold tracking-tight text-slate-900">提示词编排与版本管理 Studio</h1>
-            <span className="rounded-md bg-[#eeecff] px-2 py-0.5 text-[10px] font-bold text-[#5649ce]">
-              Dify Studio
-            </span>
+            <h1 className="text-sm font-semibold text-foreground">提示词编排与版本管理 Studio</h1>
+            <span className="rounded bg-primary-light px-2 py-0.5 text-[10px] font-medium text-primary">Dify Studio</span>
           </div>
         </div>
 
         <div className="flex items-center gap-3">
-          <div className="flex items-center gap-2 rounded-lg bg-slate-100/80 px-2.5 py-1 text-xs text-slate-600">
-            <Layers className="size-3.5 text-[#6f62e8]" />
-            <span>模板数: <strong className="text-slate-900">{prompts.length}</strong></span>
+          <div className="flex items-center gap-2 rounded-md bg-muted px-2.5 py-1 text-xs text-secondary">
+            <Layers className="size-3.5 text-primary" />
+            <span>模板数: <strong className="text-foreground">{prompts.length}</strong></span>
           </div>
           <Button
             variant="outline"
             size="sm"
             onClick={() => loadPrompts(selectedCode)}
-            className="h-8 gap-1.5 rounded-lg border-slate-200 text-xs font-semibold text-slate-700"
           >
-            <RotateCcw className="size-3.5 text-slate-500" />
+            <RotateCcw className="size-3.5" />
             刷新
           </Button>
         </div>
@@ -448,7 +424,7 @@ export default function PromptManagementPage() {
       {/* 全局 Error 提示 */}
       {error && (
         <div className="px-5 pt-3 shrink-0">
-          <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-xs text-red-700">
+          <div className="rounded-md border border-danger-light bg-danger-light p-3 text-xs text-danger">
             {error}
           </div>
         </div>
@@ -456,83 +432,26 @@ export default function PromptManagementPage() {
 
       {/* 主体 3 栏/固定视口 Studio 布局 (Left Sidebar, Center Workspace, Right Inspector) */}
       <div className="flex min-h-0 flex-1 overflow-hidden">
-
-        {/* Pane 1: 左侧提示词导航面板 (270px) */}
-        <aside className="flex w-[270px] shrink-0 flex-col border-r border-[#e8ebf1] bg-white">
-          <div className="p-3.5 border-b border-slate-100 space-y-2">
-            <div className="relative">
-              <Search className="absolute left-2.5 top-2.5 size-3.5 text-slate-400" />
-              <input
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder="搜索 Prompt 编码或名称…"
-                className="w-full rounded-lg border border-slate-200 bg-slate-50 py-1.5 pl-8 pr-3 text-xs text-slate-700 outline-none placeholder:text-slate-400 focus:border-[#6f62e8] focus:bg-white"
-              />
-            </div>
-            <div className="flex items-center justify-between text-[10px] font-semibold uppercase tracking-wider text-slate-400 px-1">
-              <span>提示词目录 ({filteredPrompts.length})</span>
-              <Terminal className="size-3" />
-            </div>
-          </div>
-
-          <div className="min-h-0 flex-1 overflow-y-auto p-2 space-y-1">
-            {filteredPrompts.map((p) => {
-              const isSelected = selectedCode === p.promptCode
-              return (
-                <div
-                  key={p.promptCode}
-                  onClick={() => handleSelectPrompt(p.promptCode)}
-                  className={cn(
-                    'group flex cursor-pointer flex-col gap-1 rounded-xl p-3 transition-all border text-left',
-                    isSelected
-                      ? 'border-[#b6aeff] bg-[#f5f3ff] text-[#5649ce] shadow-2xs font-semibold'
-                      : 'border-transparent hover:bg-slate-50 text-slate-700',
-                  )}
-                >
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs truncate font-bold">{p.name}</span>
-                    <span
-                      className={cn(
-                        'rounded-md px-1.5 py-0.5 text-[9px] font-bold shrink-0',
-                        p.enabled ? 'bg-emerald-50 text-emerald-600' : 'bg-slate-100 text-slate-400',
-                      )}
-                    >
-                      {p.enabled ? '启用' : '禁用'}
-                    </span>
-                  </div>
-
-                  <div className="flex items-center justify-between text-[10px] opacity-75">
-                    <span className="font-mono truncate">{p.promptCode}</span>
-                    <span className="font-medium text-[#6f62e8]">
-                      Rev {p.currentReleaseRevision ?? 1}
-                    </span>
-                  </div>
-                </div>
-              )
-            })}
-          </div>
-        </aside>
-
         {/* Pane 2: 中间主工作区 - Prompt 编辑器 (Flex-1 充盈视口) */}
-        <section className="flex min-w-0 flex-1 flex-col overflow-hidden bg-white">
+        <section className="flex min-w-0 flex-1 flex-col overflow-hidden bg-card">
           {detailLoading ? (
             <div className="flex flex-1 items-center justify-center">
-              <Loader2 className="size-7 animate-spin text-[#6f62e8]" />
+              <Loader2 className="size-7 animate-spin text-primary" />
             </div>
           ) : currentPrompt ? (
             <>
               {/* 编辑器 Top Bar: 干净精简的操作栏 + 可编辑基础定义控制 */}
-              <div className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-b border-[#e8ebf1] bg-[#fafafc] px-5 py-3">
+              <div className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-b border-border bg-muted px-5 py-2.5">
                 <div className="flex items-center gap-3 min-w-0">
                   <div className="flex items-center gap-1.5 min-w-0">
-                    <h2 className="text-base font-bold text-slate-900 truncate">{currentPrompt.name}</h2>
+                    <h2 className="truncate text-base font-semibold text-foreground">{currentPrompt.name}</h2>
                     <TooltipProvider>
                       <Tooltip>
                         <TooltipTrigger asChild>
                           <button
                             type="button"
                             onClick={handleOpenEditDefinition}
-                            className="flex size-6 items-center justify-center rounded-md text-slate-400 hover:bg-slate-200 hover:text-[#6f62e8] transition-colors"
+                            className="flex size-6 items-center justify-center rounded text-tertiary transition-colors hover:bg-muted hover:text-primary"
                           >
                             <Edit3 className="size-3.5" />
                           </button>
@@ -544,7 +463,7 @@ export default function PromptManagementPage() {
 
                   <div
                     onClick={() => handleCopyCode(currentPrompt.promptCode)}
-                    className="flex cursor-pointer items-center gap-1 rounded-md bg-white border border-slate-200 px-2 py-0.5 font-mono text-xs font-semibold text-slate-700 hover:border-[#6f62e8] hover:text-[#5649ce] transition-colors shrink-0"
+                    className="flex shrink-0 cursor-pointer items-center gap-1 rounded border border-border bg-card px-2 py-0.5 font-mono text-xs font-medium text-secondary transition-colors hover:border-primary hover:text-primary"
                     title="点击复制编码"
                   >
                     <span>{currentPrompt.promptCode}</span>
@@ -560,13 +479,13 @@ export default function PromptManagementPage() {
                           disabled={updatingDefinition}
                           onClick={handleToggleEnabled}
                           className={cn(
-                            'flex items-center gap-1 rounded-md px-2 py-0.5 text-[10px] font-bold transition-all shrink-0 cursor-pointer',
+                            'flex shrink-0 cursor-pointer items-center gap-1 rounded px-2 py-0.5 text-[10px] font-medium transition-colors',
                             currentPrompt.enabled
-                              ? 'bg-emerald-50 text-emerald-600 hover:bg-emerald-100'
-                              : 'bg-slate-100 text-slate-500 hover:bg-slate-200',
+                              ? 'bg-success-light text-success hover:bg-success-light/70'
+                              : 'bg-muted text-secondary hover:bg-muted/70',
                           )}
                         >
-                          <span className={cn('size-1.5 rounded-full', currentPrompt.enabled ? 'bg-emerald-500' : 'bg-slate-400')} />
+                          <span className={cn('size-1.5 rounded-full', currentPrompt.enabled ? 'bg-success' : 'bg-tertiary')} />
                           {currentPrompt.enabled ? '已启用 (点击禁用)' : '已禁用 (点击启用)'}
                         </button>
                       </TooltipTrigger>
@@ -574,7 +493,7 @@ export default function PromptManagementPage() {
                     </Tooltip>
                   </TooltipProvider>
 
-                  <span className="rounded-md bg-purple-50 px-2 py-0.5 text-[10px] font-bold text-[#6f62e8] shrink-0">
+                  <span className="shrink-0 rounded bg-primary-light px-2 py-0.5 text-[10px] font-medium text-primary">
                     Rev {currentPrompt.currentReleaseRevision ?? 1}
                   </span>
                 </div>
@@ -588,9 +507,9 @@ export default function PromptManagementPage() {
                         <button
                           type="button"
                           onClick={() => setEditorTheme(editorTheme === 'light' ? 'dark' : 'light')}
-                          className="flex size-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 transition-colors hover:bg-slate-50 hover:text-[#6f62e8]"
+                          className="flex size-8 items-center justify-center rounded-md border border-border bg-card text-secondary transition-colors hover:bg-muted hover:text-primary"
                         >
-                          {editorTheme === 'light' ? <Sun className="size-4 text-amber-500" /> : <Moon className="size-4 text-indigo-400" />}
+                          {editorTheme === 'light' ? <Sun className="size-4 text-warning" /> : <Moon className="size-4 text-primary" />}
                         </button>
                       </TooltipTrigger>
                       <TooltipContent side="bottom" className="text-[11px]">
@@ -604,7 +523,7 @@ export default function PromptManagementPage() {
                         <button
                           type="button"
                           onClick={handleOpenPreview}
-                          className="flex size-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-[#6f62e8] transition-colors hover:bg-purple-50 hover:border-[#6f62e8]"
+                          className="flex size-8 items-center justify-center rounded-md border border-border bg-card text-primary transition-colors hover:bg-primary-light"
                         >
                           <Eye className="size-4" />
                         </button>
@@ -620,9 +539,8 @@ export default function PromptManagementPage() {
                     size="sm"
                     variant="outline"
                     onClick={handleOpenReleaseModal}
-                    className="h-8 gap-1.5 rounded-lg border-slate-200 text-xs font-semibold text-slate-700 hover:border-[#6f62e8] hover:text-[#6f62e8]"
                   >
-                    <GitBranch className="size-3.5 text-amber-500" />
+                    <GitBranch className="size-3.5 text-warning" />
                     灰度与发布
                   </Button>
 
@@ -631,7 +549,6 @@ export default function PromptManagementPage() {
                     size="sm"
                     disabled={isSubmitting}
                     onClick={handleSubmitPromptContent}
-                    className="h-8 gap-1.5 rounded-lg bg-[#6f62e8] text-xs font-bold text-white shadow-xs hover:bg-[#5f52d9]"
                   >
                     {isSubmitting ? (
                       <Loader2 className="size-3.5 animate-spin" />
@@ -644,15 +561,15 @@ export default function PromptManagementPage() {
               </div>
 
               {/* Dify 动态 Mustache 变量解析条 + 契约 JSON 配置按钮 */}
-              <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-b border-[#e8ebf1] bg-[#fcfcff] px-5 py-2">
-                <div className="flex items-center gap-2 text-xs font-bold text-slate-800">
-                  <Code2 className="size-3.5 text-[#6f62e8]" />
+              <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-b border-border bg-card px-5 py-2">
+                <div className="flex items-center gap-2 text-xs font-medium text-foreground">
+                  <Code2 className="size-3.5 text-primary" />
                   <span>变量契约:</span>
                 </div>
 
                 <div className="flex flex-1 flex-wrap items-center gap-1.5 px-2">
                   {detectedVariables.length === 0 ? (
-                    <span className="text-[11px] text-slate-400 italic">
+                    <span className="text-[11px] italic text-tertiary">
                       编辑框中使用 {'{{varName}}'} 自动提取变量
                     </span>
                   ) : (
@@ -666,14 +583,14 @@ export default function PromptManagementPage() {
                                 type="button"
                                 onClick={() => handleInsertVariable(v)}
                                 className={cn(
-                                  'flex items-center gap-1 rounded-md border px-2 py-0.5 font-mono text-[11px] font-semibold transition-transform hover:scale-105',
+                                  'flex items-center gap-1 rounded border px-2 py-0.5 font-mono text-[11px] font-medium transition-transform hover:scale-105',
                                   isRequired
-                                    ? 'border-purple-200 bg-purple-100 text-[#5649ce]'
-                                    : 'border-slate-200 bg-white text-slate-700',
+                                    ? 'border-primary/40 bg-primary-light text-primary'
+                                    : 'border-border bg-card text-secondary',
                                 )}
                               >
                                 <span>{`{{${v}}}`}</span>
-                                {isRequired && <span className="text-[8px] text-purple-600 font-sans font-bold">必填</span>}
+                                {isRequired && <span className="font-sans text-[8px] font-medium text-primary">必填</span>}
                               </button>
                             </TooltipTrigger>
                             <TooltipContent side="bottom" className="text-[10px]">点击插入光标尾部</TooltipContent>
@@ -684,12 +601,12 @@ export default function PromptManagementPage() {
                   )}
                 </div>
 
-                <div className="flex items-center gap-2 text-[10px] text-slate-400">
+                <div className="flex items-center gap-2 text-[10px] text-tertiary">
                   <span>Schema 要求: {requiredSchemaVariables.length > 0 ? requiredSchemaVariables.join(', ') : '无'}</span>
                   <button
                     type="button"
                     onClick={handleOpenEditDefinition}
-                    className="flex items-center gap-1 font-semibold text-[#6f62e8] hover:underline"
+                    className="flex items-center gap-1 font-medium text-primary hover:underline"
                   >
                     <Settings2 className="size-3" />
                     配置契约
@@ -701,7 +618,7 @@ export default function PromptManagementPage() {
               <div
                 className={cn(
                   'relative flex min-h-0 flex-1 transition-colors',
-                  editorTheme === 'light' ? 'bg-[#fdfdff]' : 'bg-[#1e1e2e]',
+                  editorTheme === 'light' ? 'bg-card' : 'bg-[#1e1e2e]',
                 )}
               >
                 {/* 行号列 */}
@@ -710,8 +627,8 @@ export default function PromptManagementPage() {
                   className={cn(
                     'w-11 shrink-0 select-none overflow-hidden py-4 text-right font-mono text-xs leading-6 pr-2.5 border-r transition-colors',
                     editorTheme === 'light'
-                      ? 'border-[#e8ebf1] bg-[#f4f3f8] text-slate-400'
-                      : 'border-[#2d2d3f] bg-[#181825] text-slate-600',
+                      ? 'border-border bg-muted text-tertiary'
+                      : 'border-[#2d2d3f] bg-[#181825] text-tertiary',
                   )}
                 >
                   {Array.from({ length: lineCount }).map((_, i) => (
@@ -729,22 +646,22 @@ export default function PromptManagementPage() {
                   className={cn(
                     'h-full w-full resize-none bg-transparent p-4 font-mono text-xs leading-6 outline-none transition-colors',
                     editorTheme === 'light'
-                      ? 'text-slate-800 placeholder:text-slate-400'
-                      : 'text-slate-100 placeholder:text-slate-500',
+                      ? 'text-foreground placeholder:text-tertiary'
+                      : 'text-primary-foreground placeholder:text-tertiary',
                   )}
                 />
               </div>
 
               {/* 编辑器状态 Bottom Status Bar */}
-              <div className="flex h-8 shrink-0 items-center justify-between border-t border-[#e8ebf1] bg-[#fafafc] px-5 text-[11px] text-slate-500">
+              <div className="flex h-8 shrink-0 items-center justify-between border-t border-border bg-muted px-5 text-[11px] text-secondary">
                 <div className="flex items-center gap-3">
                   {isDirty ? (
-                    <span className="flex items-center gap-1 font-semibold text-amber-600">
+                    <span className="flex items-center gap-1 font-medium text-warning">
                       <AlertCircle className="size-3" />
                       存在未保存修改
                     </span>
                   ) : (
-                    <span className="flex items-center gap-1 text-emerald-600 font-medium">
+                    <span className="flex items-center gap-1 font-medium text-success">
                       <CheckCircle2 className="size-3" />
                       与当前版本同步
                     </span>
@@ -756,96 +673,78 @@ export default function PromptManagementPage() {
               </div>
             </>
           ) : (
-            <div className="flex flex-1 flex-col items-center justify-center text-slate-400">
-              <Terminal className="size-10 text-slate-300" />
-              <p className="mt-3 text-sm font-semibold">请在左侧选择一个 Prompt 定义以进行在线编辑与发布控制。</p>
+            <div className="flex flex-1 flex-col items-center justify-center text-tertiary">
+              <Terminal className="size-10 text-border" />
+              <p className="mt-3 text-sm font-medium">请在左侧面板选择一个 Prompt 定义以进行在线编辑与发布控制。</p>
             </div>
           )}
         </section>
 
-        {/* Pane 3: 右侧 Inspector 检查器面板 - 灰度发布与版本历史 (340px) */}
-        <aside className="flex w-[340px] shrink-0 flex-col border-l border-[#e8ebf1] bg-white">
+        {/* Pane 3: 右侧 Inspector 检查器面板 - 灰度发布与版本历史 */}
+        <aside className="flex w-[300px] shrink-0 flex-col border-l border-border bg-card">
           {/* Inspector Tab Header */}
-          <div className="flex h-11 shrink-0 items-center border-b border-[#e8ebf1] bg-[#fafafc] px-3">
-            <button
-              type="button"
-              onClick={() => setInspectorTab('release')}
-              className={cn(
-                'flex flex-1 items-center justify-center gap-1.5 py-2 text-xs font-bold transition-all border-b-2',
-                inspectorTab === 'release'
-                  ? 'border-[#6f62e8] text-[#5649ce]'
-                  : 'border-transparent text-slate-500 hover:text-slate-800',
-              )}
-            >
-              <SlidersHorizontal className="size-3.5" />
-              发布分流
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setInspectorTab('history')}
-              className={cn(
-                'flex flex-1 items-center justify-center gap-1.5 py-2 text-xs font-bold transition-all border-b-2',
-                inspectorTab === 'history'
-                  ? 'border-[#6f62e8] text-[#5649ce]'
-                  : 'border-transparent text-slate-500 hover:text-slate-800',
-              )}
-            >
-              <History className="size-3.5" />
-              版本历史 ({currentPrompt?.versions?.length || 0})
-            </button>
+          <div className="flex h-11 shrink-0 items-center border-b border-border bg-muted px-4">
+            <Tabs
+              items={[
+                { value: 'release', label: `发布分流` },
+                { value: 'history', label: `版本历史 (${currentPrompt?.versions?.length || 0})` },
+              ]}
+              value={inspectorTab}
+              onChange={(value) => setInspectorTab(value as 'release' | 'history')}
+              className="w-full border-none"
+            />
           </div>
 
           {/* Inspector Tab 1: 发布分流卡片 */}
           {inspectorTab === 'release' && (
             <div className="min-h-0 flex-1 overflow-y-auto p-4 space-y-4">
-              <div className="rounded-xl border border-slate-200 bg-[#fbfaff] p-3.5">
-                <div className="flex items-center justify-between text-xs font-bold text-slate-800 pb-2 border-b border-slate-100">
+              <div className="rounded-md border border-border bg-muted p-3.5">
+                <div className="flex items-center justify-between border-b border-border pb-2 text-xs font-medium text-foreground">
                   <span>当前物理发布 (Release)</span>
-                  <span className="rounded-md bg-emerald-50 px-1.5 py-0.5 text-[9px] text-emerald-600">生效中</span>
+                  <span className="rounded bg-success-light px-1.5 py-0.5 text-[9px] text-success">生效中</span>
                 </div>
 
                 <div className="mt-3 space-y-3">
                   {/* 正式版本 */}
-                  <div className="rounded-lg border border-emerald-200 bg-emerald-50/60 p-3">
+                  <div className="rounded-md border border-success/30 bg-success-light p-3">
                     <div className="flex items-center justify-between text-xs">
-                      <span className="font-bold text-emerald-800">🟢 正式版本 (Stable)</span>
-                      <span className="font-mono font-bold text-emerald-700">
+                      <span className="font-medium text-success">🟢 正式版本 (Stable)</span>
+                      <span className="font-mono font-medium text-success">
                         {activeStableVersion ? `v${activeStableVersion.versionNo}` : '暂无'}
                       </span>
                     </div>
-                    <p className="mt-1 font-mono text-[10px] text-emerald-900 truncate">
+                    <p className="mt-1 truncate font-mono text-[10px] text-secondary">
                       ID: {activeRelease?.stableVersionId || '未配置'}
                     </p>
-                    <p className="mt-0.5 text-[10px] text-slate-500">
+                    <p className="mt-0.5 text-[10px] text-secondary">
                       发布时间: {activeRelease?.releasedAt ? new Date(activeRelease.releasedAt).toLocaleString() : '-'}
                     </p>
                   </div>
 
                   {/* 灰度版本 */}
-                  <div className="rounded-lg border border-amber-200 bg-amber-50/60 p-3">
+                  <div className="rounded-md border border-warning/30 bg-warning-light p-3">
                     <div className="flex items-center justify-between text-xs">
-                      <span className="font-bold text-amber-800">🟡 灰度分流 (Canary)</span>
-                      <span className="font-mono font-bold text-amber-700">
+                      <span className="font-medium text-warning">🟡 灰度分流 (Canary)</span>
+                      <span className="font-mono font-medium text-warning">
                         {activeCanaryVersion ? `v${activeCanaryVersion.versionNo}` : '未启用'}
                       </span>
                     </div>
 
                     {activeCanaryVersion ? (
                       <div className="mt-2 space-y-1.5">
-                        <div className="flex justify-between text-[10px] font-semibold text-amber-900">
+                        <div className="flex justify-between text-[10px] font-medium text-secondary">
                           <span>灰度流量比例</span>
                           <span>{canaryPercentage}%</span>
                         </div>
-                        <div className="h-2 w-full overflow-hidden rounded-full bg-amber-200/70">
+                        <div className="h-2 w-full overflow-hidden rounded-full bg-warning/20">
                           <div
-                            className="h-full bg-amber-500 transition-all duration-300"
+                            className="h-full bg-warning transition-all duration-300"
                             style={{ width: `${canaryPercentage}%` }}
                           />
                         </div>
                       </div>
                     ) : (
-                      <p className="mt-1 text-[11px] text-slate-500">
+                      <p className="mt-1 text-[11px] text-secondary">
                         100% 流量走向正式版本。
                       </p>
                     )}
@@ -855,7 +754,7 @@ export default function PromptManagementPage() {
                 <Button
                   size="sm"
                   onClick={handleOpenReleaseModal}
-                  className="mt-3.5 w-full gap-1.5 rounded-lg bg-[#6f62e8] text-xs font-bold text-white hover:bg-[#5f52d9]"
+                  className="mt-3.5 w-full gap-1.5"
                 >
                   <GitBranch className="size-3.5" />
                   配置灰度与正式发布
@@ -874,37 +773,37 @@ export default function PromptManagementPage() {
                   return (
                     <div
                       key={ver.versionId}
-                      className="rounded-xl border border-slate-200/80 bg-slate-50/70 p-3 text-xs transition-colors hover:bg-slate-100/70 space-y-1.5"
+                      className="rounded-md border border-border bg-muted p-3 text-xs transition-colors hover:bg-muted/70 space-y-1.5"
                     >
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-1.5">
-                          <span className="font-mono font-bold text-slate-900">v{ver.versionNo}</span>
+                          <span className="font-mono font-medium text-foreground">v{ver.versionNo}</span>
                           {isStable && (
-                            <span className="rounded-md bg-emerald-100 px-1.5 py-0.5 text-[9px] font-bold text-emerald-700">
+                            <span className="rounded bg-success-light px-1.5 py-0.5 text-[9px] font-medium text-success">
                               正式版
                             </span>
                           )}
                           {isCanary && (
-                            <span className="rounded-md bg-amber-100 px-1.5 py-0.5 text-[9px] font-bold text-amber-700">
+                            <span className="rounded bg-warning-light px-1.5 py-0.5 text-[9px] font-medium text-warning">
                               灰度版
                             </span>
                           )}
                         </div>
-                        <span className="text-[10px] text-slate-400">ID: {ver.versionId}</span>
+                        <span className="text-[10px] text-tertiary">ID: {ver.versionId}</span>
                       </div>
 
-                      <p className="text-[11px] text-slate-500 leading-4">
+                      <p className="text-[11px] leading-4 text-secondary">
                         {ver.remark || '初始模板更新'}
                       </p>
-                      <p className="text-[10px] text-slate-400">
+                      <p className="text-[10px] text-tertiary">
                         {ver.createdBy} · {new Date(ver.createdAt).toLocaleString()}
                       </p>
 
-                      <div className="flex items-center justify-end gap-2 pt-1 border-t border-slate-200/50">
+                      <div className="flex items-center justify-end gap-2 border-t border-border/60 pt-1">
                         <button
                           type="button"
                           onClick={() => handleOpenDiff(ver)}
-                          className="flex items-center gap-1 text-[11px] font-semibold text-[#6f62e8] hover:underline"
+                          className="flex items-center gap-1 text-[11px] font-medium text-primary hover:underline"
                         >
                           <ArrowLeftRight className="size-3" />
                           对比
@@ -915,8 +814,8 @@ export default function PromptManagementPage() {
                           disabled={isStable}
                           onClick={() => handleOpenRollback(ver)}
                           className={cn(
-                            'flex items-center gap-1 text-[11px] font-semibold',
-                            isStable ? 'text-slate-300 cursor-not-allowed' : 'text-amber-600 hover:underline',
+                            'flex items-center gap-1 text-[11px] font-medium',
+                            isStable ? 'cursor-not-allowed text-border' : 'text-warning hover:underline',
                           )}
                         >
                           <RotateCcw className="size-3" />
@@ -927,7 +826,7 @@ export default function PromptManagementPage() {
                   )
                 })
               ) : (
-                <p className="py-6 text-center text-xs text-slate-400">暂无版本历史</p>
+                <p className="py-6 text-center text-xs text-tertiary">暂无版本历史</p>
               )}
             </div>
           )}
@@ -937,39 +836,39 @@ export default function PromptManagementPage() {
 
       {/* 编辑定义信息 Dialog (支持修改名称、变量契约 JSON) */}
       <Dialog open={editDefinitionModalOpen} onOpenChange={setEditDefinitionModalOpen}>
-        <DialogContent className="max-w-lg bg-white">
+        <DialogContent className="max-w-lg bg-card">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-base font-bold text-slate-900">
-              <Edit3 className="size-4 text-[#6f62e8]" />
+            <DialogTitle className="flex items-center gap-2 text-base font-semibold text-foreground">
+              <Edit3 className="size-4 text-primary" />
               编辑 Prompt 基础定义与契约
             </DialogTitle>
-            <DialogDescription className="text-xs text-slate-500">
+            <DialogDescription className="text-xs text-secondary">
               修改提示词名称或变量契约 JSON Schema，将更新后端 `prompt_definition` 主记录。
             </DialogDescription>
           </DialogHeader>
 
           <div className="mt-3 space-y-4">
             <div className="space-y-1.5">
-              <label className="text-xs font-bold text-slate-800">提示词名称 (Prompt Name)</label>
+              <label className="text-xs font-medium text-foreground">提示词名称 (Prompt Name)</label>
               <input
                 value={editPromptName}
                 onChange={(e) => setEditPromptName(e.target.value)}
                 placeholder="例如: 会话问题改写"
-                className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2 px-3 text-xs text-slate-800 outline-none focus:border-[#6f62e8] focus:bg-white"
+                className="w-full rounded-md border border-input bg-card px-3 py-2 text-xs text-foreground outline-none focus:border-primary focus:ring-2 focus:ring-primary/30"
               />
             </div>
 
             <div className="space-y-1.5">
-              <div className="flex items-center justify-between text-xs font-bold text-slate-800">
+              <div className="flex items-center justify-between text-xs font-medium text-foreground">
                 <span>变量契约 JSON (Variable Schema JSON)</span>
-                <span className="text-[10px] text-slate-400 font-normal">须符合合法 JSON 结构</span>
+                <span className="text-[10px] font-normal text-tertiary">须符合合法 JSON 结构</span>
               </div>
               <textarea
                 value={editVariableSchema}
                 onChange={(e) => setEditVariableSchema(e.target.value)}
                 rows={5}
                 placeholder='例如: {"required":["question"]}'
-                className="w-full resize-y rounded-xl border border-slate-200 bg-[#1e1e2e] p-3 font-mono text-xs text-slate-100 outline-none placeholder:text-slate-500 focus:border-[#6f62e8]"
+                className="w-full resize-y rounded-md border border-input bg-[#1e1e2e] p-3 font-mono text-xs text-primary-foreground outline-none placeholder:text-tertiary focus:border-primary"
               />
             </div>
 
@@ -979,7 +878,7 @@ export default function PromptManagementPage() {
                 size="sm"
                 disabled={updatingDefinition}
                 onClick={() => setEditDefinitionModalOpen(false)}
-                className="rounded-xl text-xs"
+                className="text-xs"
               >
                 取消
               </Button>
@@ -987,7 +886,6 @@ export default function PromptManagementPage() {
                 size="sm"
                 disabled={updatingDefinition}
                 onClick={handleSaveDefinition}
-                className="gap-1.5 rounded-xl bg-[#6f62e8] text-xs font-bold text-white hover:bg-[#5f52d9]"
               >
                 {updatingDefinition ? <Loader2 className="size-3.5 animate-spin" /> : <CheckCircle2 className="size-3.5" />}
                 保存定义修改
@@ -999,21 +897,21 @@ export default function PromptManagementPage() {
 
       {/* 脱敏试运行预览 Dialog */}
       <Dialog open={previewOpen} onOpenChange={setPreviewOpen}>
-        <DialogContent className="max-w-2xl bg-white">
+        <DialogContent className="max-w-2xl bg-card">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-base font-bold text-slate-900">
-              <Eye className="size-4 text-[#6f62e8]" />
+            <DialogTitle className="flex items-center gap-2 text-base font-semibold text-foreground">
+              <Eye className="size-4 text-primary" />
               Prompt 脱敏预览 (Preview Render)
             </DialogTitle>
-            <DialogDescription className="text-xs text-slate-500">
+            <DialogDescription className="text-xs text-secondary">
               使用后端脱敏示例变量实时渲染当前编辑模板，不会写入数据库或触发模型实际扣费。
             </DialogDescription>
           </DialogHeader>
 
           <div className="mt-3 space-y-3">
-            <div className="rounded-xl border border-slate-200 bg-[#fdfdff] p-4 text-xs font-mono text-slate-800 max-h-[360px] overflow-y-auto whitespace-pre-wrap leading-6">
+            <div className="max-h-[360px] overflow-y-auto whitespace-pre-wrap rounded-md border border-border bg-card p-4 font-mono text-xs leading-6 text-foreground">
               {previewing ? (
-                <div className="flex items-center gap-2 text-[#6f62e8]">
+                <div className="flex items-center gap-2 text-primary">
                   <Loader2 className="size-4 animate-spin" />
                   <span>正在渲染脱敏正文…</span>
                 </div>
@@ -1027,7 +925,7 @@ export default function PromptManagementPage() {
                 variant="outline"
                 size="sm"
                 onClick={() => setPreviewOpen(false)}
-                className="rounded-xl text-xs"
+                className="text-xs"
               >
                 关闭预览
               </Button>
@@ -1038,20 +936,20 @@ export default function PromptManagementPage() {
 
       {/* 灰度分流与正式发布 Dialog */}
       <Dialog open={releaseModalOpen} onOpenChange={setReleaseModalOpen}>
-        <DialogContent className="max-w-md bg-white">
+        <DialogContent className="max-w-md bg-card">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-base font-bold text-slate-900">
-              <GitBranch className="size-4 text-amber-500" />
+            <DialogTitle className="flex items-center gap-2 text-base font-semibold text-foreground">
+              <GitBranch className="size-4 text-warning" />
               配置 Prompt 正式版与灰度分流发布
             </DialogTitle>
-            <DialogDescription className="text-xs text-slate-500">
+            <DialogDescription className="text-xs text-secondary">
               将历史已提交的物理版本上线。灰度流量触发时，全站根据固定百分比随机路由给灰度版本。
             </DialogDescription>
           </DialogHeader>
 
           <div className="mt-4 space-y-4">
             <div className="space-y-1.5">
-              <label className="text-xs font-bold text-slate-800">1. 正式物理版本 (Stable Version)</label>
+              <label className="text-xs font-medium text-foreground">1. 正式物理版本 (Stable Version)</label>
               <CustomSelect
                 value={String(selectedStableVersionId)}
                 onChange={(val) => setSelectedStableVersionId(val)}
@@ -1060,13 +958,13 @@ export default function PromptManagementPage() {
               />
             </div>
 
-            <div className="space-y-3 rounded-xl border border-amber-100 bg-amber-50/40 p-3.5">
-              <label className="flex items-center gap-2 cursor-pointer text-xs font-bold text-amber-900">
+            <div className="space-y-3 rounded-md border border-warning/30 bg-warning-light p-3.5">
+              <label className="flex cursor-pointer items-center gap-2 text-xs font-medium text-warning">
                 <input
                   type="checkbox"
                   checked={enableCanary}
                   onChange={(e) => setEnableCanary(e.target.checked)}
-                  className="rounded border-amber-300 text-[#6f62e8] focus:ring-[#6f62e8]"
+                  className="rounded border-warning/60 text-primary focus:ring-primary/30"
                 />
                 开启灰度版本分流 (Enable Canary)
               </label>
@@ -1074,7 +972,7 @@ export default function PromptManagementPage() {
               {enableCanary && (
                 <div className="space-y-3 pt-2">
                   <div className="space-y-1.5">
-                    <label className="text-xs font-semibold text-slate-700">2. 灰度物理版本 (Canary Version)</label>
+                    <label className="text-xs font-medium text-secondary">2. 灰度物理版本 (Canary Version)</label>
                     <CustomSelect
                       value={String(selectedCanaryVersionId)}
                       onChange={(val) => setSelectedCanaryVersionId(val)}
@@ -1084,9 +982,9 @@ export default function PromptManagementPage() {
                   </div>
 
                   <div className="space-y-1.5">
-                    <div className="flex justify-between text-xs font-semibold text-slate-700">
+                    <div className="flex justify-between text-xs font-medium text-secondary">
                       <span>灰度分配百分比</span>
-                      <span className="font-mono font-bold text-[#6f62e8]">{canaryPercentage}%</span>
+                      <span className="font-mono font-medium text-primary">{canaryPercentage}%</span>
                     </div>
                     <input
                       type="range"
@@ -1094,7 +992,7 @@ export default function PromptManagementPage() {
                       max={100}
                       value={canaryPercentage}
                       onChange={(e) => setCanaryPercentage(Number(e.target.value))}
-                      className="w-full accent-[#6f62e8]"
+                      className="w-full accent-primary"
                     />
                   </div>
                 </div>
@@ -1107,7 +1005,7 @@ export default function PromptManagementPage() {
                 size="sm"
                 disabled={releasing}
                 onClick={() => setReleaseModalOpen(false)}
-                className="rounded-xl text-xs"
+                className="text-xs"
               >
                 取消
               </Button>
@@ -1115,7 +1013,6 @@ export default function PromptManagementPage() {
                 size="sm"
                 disabled={releasing}
                 onClick={handleConfirmRelease}
-                className="gap-1.5 rounded-xl bg-[#6f62e8] text-xs font-bold text-white hover:bg-[#5f52d9]"
               >
                 {releasing ? <Loader2 className="size-3.5 animate-spin" /> : <CheckCircle2 className="size-3.5" />}
                 确认发布此配置
@@ -1127,13 +1024,13 @@ export default function PromptManagementPage() {
 
       {/* 回滚确认 Dialog */}
       <Dialog open={rollbackModalOpen} onOpenChange={setRollbackModalOpen}>
-        <DialogContent className="max-w-md bg-white">
+        <DialogContent className="max-w-md bg-card">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-base font-bold text-slate-900">
-              <RotateCcw className="size-4 text-amber-600" />
+            <DialogTitle className="flex items-center gap-2 text-base font-semibold text-foreground">
+              <RotateCcw className="size-4 text-warning" />
               确认回滚 Prompt 版本？
             </DialogTitle>
-            <DialogDescription className="mt-2 text-xs text-slate-500">
+            <DialogDescription className="mt-2 text-xs text-secondary">
               确定要将 Prompt [{selectedCode}] 回滚至版本 v{rollbackTargetVersion?.versionNo} (ID: {rollbackTargetVersion?.versionId}) 吗？操作将立即生成新发布代次并对生产生效。
             </DialogDescription>
           </DialogHeader>
@@ -1144,7 +1041,7 @@ export default function PromptManagementPage() {
               size="sm"
               disabled={rollingBack}
               onClick={() => setRollbackModalOpen(false)}
-              className="rounded-xl text-xs"
+              className="text-xs"
             >
               取消
             </Button>
@@ -1152,7 +1049,7 @@ export default function PromptManagementPage() {
               size="sm"
               disabled={rollingBack}
               onClick={handleConfirmRollback}
-              className="gap-1.5 rounded-xl bg-amber-600 text-xs font-bold text-white hover:bg-amber-700"
+              variant="danger"
             >
               {rollingBack ? <Loader2 className="size-3.5 animate-spin" /> : <RotateCcw className="size-3.5" />}
               确认执行回滚
@@ -1163,25 +1060,25 @@ export default function PromptManagementPage() {
 
       {/* 版本 Diff 对比 Dialog */}
       <Dialog open={diffModalOpen} onOpenChange={setDiffModalOpen}>
-        <DialogContent className="max-w-3xl bg-white">
+        <DialogContent className="max-w-3xl bg-card">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-base font-bold text-slate-900">
-              <ArrowLeftRight className="size-4 text-[#6f62e8]" />
+            <DialogTitle className="flex items-center gap-2 text-base font-semibold text-foreground">
+              <ArrowLeftRight className="size-4 text-primary" />
               版本对比 (Version Comparison: v{diffVersion?.versionNo} vs 当前编辑器)
             </DialogTitle>
           </DialogHeader>
 
           <div className="mt-3 grid grid-cols-2 gap-4">
             <div className="space-y-1.5">
-              <span className="text-xs font-bold text-slate-700">历史版本 v{diffVersion?.versionNo} 正文</span>
-              <div className="rounded-xl border border-slate-200 bg-[#fdfdff] p-3 font-mono text-xs text-slate-800 max-h-[300px] overflow-y-auto whitespace-pre-wrap leading-5">
+              <span className="text-xs font-medium text-secondary">历史版本 v{diffVersion?.versionNo} 正文</span>
+              <div className="max-h-[300px] overflow-y-auto whitespace-pre-wrap rounded-md border border-border bg-card p-3 font-mono text-xs leading-5 text-foreground">
                 {diffVersion?.content || '无内容'}
               </div>
             </div>
 
             <div className="space-y-1.5">
-              <span className="text-xs font-bold text-[#6f62e8]">当前编辑器窗口正文</span>
-              <div className="rounded-xl border border-purple-200 bg-[#fcfcff] p-3 font-mono text-xs text-slate-800 max-h-[300px] overflow-y-auto whitespace-pre-wrap leading-5">
+              <span className="text-xs font-medium text-primary">当前编辑器窗口正文</span>
+              <div className="max-h-[300px] overflow-y-auto whitespace-pre-wrap rounded-md border border-primary/40 bg-primary-light p-3 font-mono text-xs leading-5 text-foreground">
                 {editorContent || '无内容'}
               </div>
             </div>
@@ -1192,7 +1089,7 @@ export default function PromptManagementPage() {
               variant="outline"
               size="sm"
               onClick={() => setDiffModalOpen(false)}
-              className="rounded-xl text-xs"
+              className="text-xs"
             >
               关闭对比
             </Button>
