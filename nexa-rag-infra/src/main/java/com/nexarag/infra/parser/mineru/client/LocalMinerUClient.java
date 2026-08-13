@@ -114,7 +114,7 @@ public class LocalMinerUClient implements MinerUClient {
         writeTextPart(outputStream, boundary, "response_format_zip", "true");
         writeTextPart(outputStream, boundary, "return_images", "true");
         writeTextPart(outputStream, boundary, "return_model_output", "false");
-        writeTextPart(outputStream, boundary, "return_middle_json", "false");
+        writeTextPart(outputStream, boundary, "return_middle_json", "true");
         writeFilePart(outputStream, boundary, command);
         writeAscii(outputStream, "--" + boundary + "--\r\n");
     }

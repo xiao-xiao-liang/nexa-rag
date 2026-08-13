@@ -76,6 +76,23 @@ public class ObjectNameResolver {
     }
 
     /**
+     * 生成解析结构辅助制品对象名。
+     *
+     * @param documentId 文档ID
+     * @param fileName 已验证的简单文件名
+     * @return 结构制品对象名
+     */
+    public String resolveParsedStructureObjectName(Long documentId, String fileName) {
+        validateDocumentId(documentId);
+        String simpleFileName = extractSimpleFileName(fileName);
+        if (!StringUtils.hasText(fileName) || !simpleFileName.equals(fileName)
+                || !simpleFileName.matches("[A-Za-z0-9._-]+")) {
+            throw new ServiceException("解析结构制品文件名不合法，fileName=" + fileName);
+        }
+        return "parsed/" + documentId + "/structure/" + simpleFileName;
+    }
+
+    /**
      * 生成指定文档全部解析制品的对象前缀。
      *
      * @param documentId 文档ID

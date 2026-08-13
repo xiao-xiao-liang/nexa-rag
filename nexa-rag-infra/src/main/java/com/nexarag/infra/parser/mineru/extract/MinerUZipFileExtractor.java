@@ -4,6 +4,7 @@ import com.nexarag.common.error.BaseErrorCode;
 import com.nexarag.common.exception.ServiceException;
 import com.nexarag.infra.parser.model.ExtractedAssetBO;
 import com.nexarag.infra.parser.model.ExtractedDocumentBO;
+import com.nexarag.infra.parser.model.ExtractedStructureArtifactBO;
 import com.nexarag.infra.parser.workspace.ArtifactWorkspace;
 import com.nexarag.infra.parser.workspace.BoundedFileTransfer;
 import lombok.RequiredArgsConstructor;
@@ -29,6 +30,8 @@ import java.util.zip.ZipInputStream;
 @RequiredArgsConstructor
 public class MinerUZipFileExtractor {
 
+    private static final int MAX_RECORDED_JSON_ENTRY_NAMES = 64;
+
     private final BoundedFileTransfer boundedFileTransfer;
 
     /**
@@ -51,8 +54,11 @@ public class MinerUZipFileExtractor {
         // 2. 逐条目流式解压，并记录正文候选文件与图片文件。
         List<MarkdownCandidate> markdownCandidates = new ArrayList<>();
         List<ExtractedAssetBO> assets = new ArrayList<>();
+        List<ExtractedStructureArtifactBO> structureArtifacts = new ArrayList<>();
+        List<String> jsonEntryNames = new ArrayList<>();
         long extractedBytes = 0L;
         int entryCount = 0;
+        int jsonEntryCount = 0;
         try (ZipInputStream inputStream = new ZipInputStream(zipInputStream)) {
             ZipEntry entry;
             while ((entry = inputStream.getNextEntry()) != null) {
@@ -61,6 +67,12 @@ public class MinerUZipFileExtractor {
                 }
                 entryCount++;
                 String safeName = normalizeAndValidateEntryName(entry.getName());
+                if (isJson(safeName)) {
+                    jsonEntryCount++;
+                    if (jsonEntryNames.size() < MAX_RECORDED_JSON_ENTRY_NAMES) {
+                        jsonEntryNames.add(safeName);
+                    }
+                }
                 long remainingBytes = maxExtractedBytes - extractedBytes;
                 if (remainingBytes <= 0) {
                     throw new ServiceException("MinerU ZIP 解压内容超过大小限制");
@@ -74,6 +86,12 @@ public class MinerUZipFileExtractor {
                     Path assetPath = workspace.resolve("assets/" + relativePath);
                     extractedBytes += copyEntry(inputStream, assetPath, remainingBytes);
                     assets.add(new ExtractedAssetBO(assetPath, relativePath, resolveContentType(assetPath)));
+                } else if (isStructureJson(safeName)) {
+                    String structureFileName = structureFileName(safeName);
+                    Path structurePath = workspace.resolve("structure/" + structureFileName);
+                    extractedBytes += copyEntry(inputStream, structurePath, remainingBytes);
+                    structureArtifacts.add(new ExtractedStructureArtifactBO(structurePath, structureFileName,
+                            "application/json"));
                 }
                 inputStream.closeEntry();
             }
@@ -87,8 +105,11 @@ public class MinerUZipFileExtractor {
         MarkdownCandidate markdownCandidate = markdownCandidates.stream()
                 .min(Comparator.comparingInt(candidate -> markdownPriority(candidate.fileName())))
                 .orElseThrow(() -> new ServiceException("MinerU ZIP 产物中未找到 Markdown 文件"));
-        return new ExtractedDocumentBO(markdownCandidate.path(), List.copyOf(assets),
-                Map.of("parser", "mineru", "entryCount", entryCount, "assetCount", assets.size()));
+        return new ExtractedDocumentBO(markdownCandidate.path(), List.copyOf(assets), List.copyOf(structureArtifacts),
+                Map.of("parser", "mineru", "entryCount", entryCount, "assetCount", assets.size(),
+                        "structureArtifactCount", structureArtifacts.size(),
+                        "zipJsonEntries", List.copyOf(jsonEntryNames), "zipJsonEntryCount", jsonEntryCount,
+                        "zipJsonEntriesTruncated", jsonEntryCount > jsonEntryNames.size()));
     }
 
     /**
@@ -119,6 +140,49 @@ public class MinerUZipFileExtractor {
         String lower = fileName.toLowerCase(Locale.ROOT);
         return lower.endsWith(".png") || lower.endsWith(".jpg") || lower.endsWith(".jpeg")
                 || lower.endsWith(".webp") || lower.endsWith(".gif") || lower.endsWith(".svg");
+    }
+
+    /**
+     * 判断 ZIP 条目是否为 JSON，供诊断元数据使用。
+     */
+    private boolean isJson(String fileName) {
+        return fileName.toLowerCase(Locale.ROOT).endsWith(".json");
+    }
+
+    private boolean isStructureJson(String fileName) {
+        String simpleName = simpleName(fileName).toLowerCase(Locale.ROOT);
+        return isMiddleJson(simpleName) || isLayoutJson(simpleName) || isContentListJson(simpleName)
+                || isContentListV2Json(simpleName);
+    }
+
+    private String structureFileName(String fileName) {
+        String simpleName = simpleName(fileName).toLowerCase(Locale.ROOT);
+        if (isMiddleJson(simpleName) || isLayoutJson(simpleName)) {
+            return "mineru-middle.json";
+        }
+        if (isContentListV2Json(simpleName)) {
+            return "mineru-content-list-v2.json";
+        }
+        return "mineru-content-list.json";
+    }
+
+    private boolean isMiddleJson(String simpleName) {
+        return "middle.json".equals(simpleName) || simpleName.endsWith("_middle.json");
+    }
+
+    /**
+     * 官方 v4 ZIP 将中间布局结果命名为 layout.json，语义对应本地部署的 middle.json。
+     */
+    private boolean isLayoutJson(String simpleName) {
+        return "layout.json".equals(simpleName) || simpleName.endsWith("_layout.json");
+    }
+
+    private boolean isContentListJson(String simpleName) {
+        return "content_list.json".equals(simpleName) || simpleName.endsWith("_content_list.json");
+    }
+
+    private boolean isContentListV2Json(String simpleName) {
+        return "content_list_v2.json".equals(simpleName) || simpleName.endsWith("_content_list_v2.json");
     }
 
     private String toRelativeAssetPath(String fileName) {

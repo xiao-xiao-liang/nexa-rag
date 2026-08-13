@@ -6,6 +6,7 @@ import com.nexarag.infra.constants.ParsedContentTypes;
 import com.nexarag.infra.parser.model.DocumentArtifactDTO;
 import com.nexarag.infra.parser.model.ExtractedAssetBO;
 import com.nexarag.infra.parser.model.ExtractedDocumentBO;
+import com.nexarag.infra.parser.model.ExtractedStructureArtifactBO;
 import com.nexarag.infra.parser.model.ParsedArtifact;
 import com.nexarag.infra.storage.ObjectNameResolver;
 import com.nexarag.infra.storage.StoredFile;
@@ -17,6 +18,7 @@ import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.LinkedHashMap;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -44,6 +46,8 @@ public class ArtifactPublisher {
         String parsedPrefix = objectNameResolver.resolveParsedPrefix(artifactDTO.documentId());
         try {
             Map<String, String> assetUrls = publishAssets(artifactDTO.documentId(), documentBO.assets());
+            List<Map<String, Object>> structureArtifacts = publishStructureArtifacts(artifactDTO.documentId(),
+                    documentBO.structureArtifacts());
             Path rewrittenMarkdown = documentBO.markdownPath().resolveSibling(REWRITTEN_MARKDOWN_FILE);
             markdownAssetFileRewriter.rewrite(documentBO.markdownPath(), rewrittenMarkdown, assetUrls);
             String objectName = objectNameResolver.resolveParsedObjectName(artifactDTO.documentId(),
@@ -52,7 +56,8 @@ public class ArtifactPublisher {
                 StoredFile storedFile = fileStorageService.saveAs(objectName, inputStream, Files.size(rewrittenMarkdown),
                         ParsedContentTypes.TEXT_MARKDOWN);
                 return ParsedArtifact.builder().objectKey(storedFile.objectName())
-                        .contentType(ParsedContentTypes.TEXT_MARKDOWN).metadata(documentBO.metadata()).build();
+                        .contentType(ParsedContentTypes.TEXT_MARKDOWN)
+                        .metadata(mergeMetadata(documentBO.metadata(), structureArtifacts)).build();
             }
         } catch (Exception exception) {
             fileStorageService.deleteByPrefix(parsedPrefix);
@@ -79,5 +84,47 @@ public class ArtifactPublisher {
             }
         }
         return assetUrls;
+    }
+
+    private List<Map<String, Object>> publishStructureArtifacts(Long documentId,
+                                                                 List<ExtractedStructureArtifactBO> artifacts)
+            throws Exception {
+        List<Map<String, Object>> metadata = new ArrayList<>();
+        if (artifacts == null) {
+            return metadata;
+        }
+        for (ExtractedStructureArtifactBO artifact : artifacts) {
+            String objectName = objectNameResolver.resolveParsedStructureObjectName(documentId, artifact.relativePath());
+            try (InputStream inputStream = Files.newInputStream(artifact.file())) {
+                StoredFile storedFile = fileStorageService.saveAs(objectName, inputStream, Files.size(artifact.file()),
+                        artifact.contentType());
+                metadata.add(Map.of("type", resolveStructureArtifactType(artifact.relativePath()),
+                        "objectKey", storedFile.objectName(), "contentType", artifact.contentType(),
+                        "size", Files.size(artifact.file())));
+            }
+        }
+        return List.copyOf(metadata);
+    }
+
+    private Map<String, Object> mergeMetadata(Map<String, Object> sourceMetadata,
+                                               List<Map<String, Object>> structureArtifacts) {
+        Map<String, Object> metadata = new LinkedHashMap<>();
+        if (sourceMetadata != null) {
+            metadata.putAll(sourceMetadata);
+        }
+        if (!structureArtifacts.isEmpty()) {
+            metadata.put("structureArtifacts", structureArtifacts);
+        }
+        return metadata;
+    }
+
+    private String resolveStructureArtifactType(String relativePath) {
+        if ("mineru-middle.json".equals(relativePath)) {
+            return "MINERU_MIDDLE_JSON";
+        }
+        if ("mineru-content-list-v2.json".equals(relativePath)) {
+            return "MINERU_CONTENT_LIST_V2_JSON";
+        }
+        return "MINERU_CONTENT_LIST_JSON";
     }
 }

@@ -13,5 +13,13 @@ import java.util.Map;
  */
 public record ExtractedDocumentBO(Path markdownPath,
                                   List<ExtractedAssetBO> assets,
+                                  List<ExtractedStructureArtifactBO> structureArtifacts,
                                   Map<String, Object> metadata) {
+
+    /**
+     * 兼容不产生结构辅助制品的转换器。
+     */
+    public ExtractedDocumentBO(Path markdownPath, List<ExtractedAssetBO> assets, Map<String, Object> metadata) {
+        this(markdownPath, assets, List.of(), metadata);
+    }
 }
