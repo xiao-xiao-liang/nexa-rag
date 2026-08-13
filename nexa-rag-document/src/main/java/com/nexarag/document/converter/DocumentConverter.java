@@ -25,7 +25,7 @@ public final class DocumentConverter {
      */
     public static DocumentSummaryVO toSummaryVO(Document document) {
         return new DocumentSummaryVO(document.getDocumentId(), document.getTitle(), document.getOriginalFileName(),
-                document.getFileType(), document.getStatus());
+                document.getFileType(), document.getStatus(), document.getUpdateTime());
     }
 
     /**

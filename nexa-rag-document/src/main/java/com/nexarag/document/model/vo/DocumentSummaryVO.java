@@ -3,6 +3,8 @@ package com.nexarag.document.model.vo;
 import com.nexarag.document.enums.DocumentStatus;
 import com.nexarag.document.enums.FileType;
 
+import java.time.LocalDateTime;
+
 /**
  * 文档摘要响应。
  *
@@ -11,7 +13,8 @@ import com.nexarag.document.enums.FileType;
  * @param originalFileName 原始文件名
  * @param fileType         文件类型
  * @param status           文档状态
+ * @param updatedTime      更新时间
  */
 public record DocumentSummaryVO(Long documentId, String title, String originalFileName,
-                                FileType fileType, DocumentStatus status) {
+                                FileType fileType, DocumentStatus status, LocalDateTime updatedTime) {
 }

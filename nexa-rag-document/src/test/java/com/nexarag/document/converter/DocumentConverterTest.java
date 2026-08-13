@@ -11,6 +11,7 @@ import com.nexarag.document.model.vo.DocumentChunkVO;
 import com.nexarag.document.model.vo.DocumentSummaryVO;
 import org.junit.jupiter.api.Test;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -28,6 +29,7 @@ class DocumentConverterTest {
                 .originalFileName("demo.pdf")
                 .fileType(FileType.PDF)
                 .status(DocumentStatus.UPLOADED)
+                .updateTime(LocalDateTime.of(2026, 8, 13, 10, 30))
                 .build();
 
         DocumentSummaryVO vo = DocumentConverter.toSummaryVO(document);
@@ -36,6 +38,7 @@ class DocumentConverterTest {
         assertThat(vo.title()).isEqualTo("测试文档");
         assertThat(vo.fileType()).isEqualTo(FileType.PDF);
         assertThat(vo.status()).isEqualTo(DocumentStatus.UPLOADED);
+        assertThat(vo.updatedTime()).isEqualTo(LocalDateTime.of(2026, 8, 13, 10, 30));
     }
 
     @Test
