@@ -12,6 +12,7 @@ import com.nexarag.workflow.node.chat.IntentRecognitionNode;
 import com.nexarag.workflow.node.chat.QuestionRewriteNode;
 import com.nexarag.workflow.node.chat.RerankNode;
 import com.nexarag.workflow.node.chat.EvidenceQualityNode;
+import com.nexarag.workflow.node.chat.ParentContextExpansionNode;
 import com.nexarag.workflow.node.chat.RetrievalFusionNode;
 import com.nexarag.workflow.node.chat.RetrievalNode;
 import com.nexarag.workflow.node.chat.SectionExpansionNode;
@@ -46,6 +47,7 @@ public class ChatWorkflowConfiguration {
                 .addNode(RETRIEVAL_FUSION_NODE, nodeBeanUtil.toAsyncNode(RetrievalFusionNode.class))
                 .addNode(SECTION_EXPANSION_NODE, nodeBeanUtil.toAsyncNode(SectionExpansionNode.class))
                 .addNode(RERANK_NODE, nodeBeanUtil.toAsyncNode(RerankNode.class))
+                .addNode(PARENT_CONTEXT_EXPANSION_NODE, nodeBeanUtil.toAsyncNode(ParentContextExpansionNode.class))
                 .addNode(EVIDENCE_QUALITY_NODE, nodeBeanUtil.toAsyncNode(EvidenceQualityNode.class))
                 .addNode(ANSWER_GENERATION_NODE, nodeBeanUtil.toAsyncNode(AnswerGenerationNode.class))
                 .addNode(ASSISTANT_MESSAGE_PERSISTENCE_NODE,
@@ -60,7 +62,8 @@ public class ChatWorkflowConfiguration {
                         nodeBeanUtil.toAsyncEdge(RetrievalFusionDispatcher.class),
                         Map.of(SECTION_EXPANSION_NODE, SECTION_EXPANSION_NODE, RERANK_NODE, RERANK_NODE))
                 .addEdge(SECTION_EXPANSION_NODE, RERANK_NODE)
-                .addEdge(RERANK_NODE, EVIDENCE_QUALITY_NODE)
+                .addEdge(RERANK_NODE, PARENT_CONTEXT_EXPANSION_NODE)
+                .addEdge(PARENT_CONTEXT_EXPANSION_NODE, EVIDENCE_QUALITY_NODE)
                 .addEdge(EVIDENCE_QUALITY_NODE, ANSWER_GENERATION_NODE)
                 .addEdge(ANSWER_GENERATION_NODE, ASSISTANT_MESSAGE_PERSISTENCE_NODE)
                 .addEdge(ASSISTANT_MESSAGE_PERSISTENCE_NODE, END);

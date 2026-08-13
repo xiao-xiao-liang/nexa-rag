@@ -3,8 +3,8 @@ package com.nexarag.document.service.impl;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.nexarag.document.model.entity.DocumentChunk;
-import com.nexarag.document.splitter.ChunkDraft;
-import com.nexarag.document.splitter.DocumentSplitResult;
+import com.nexarag.document.model.bo.split.ChunkDraft;
+import com.nexarag.document.model.bo.split.DocumentSplitResult;
 import org.junit.jupiter.api.Test;
 import org.springframework.transaction.annotation.Transactional;
 

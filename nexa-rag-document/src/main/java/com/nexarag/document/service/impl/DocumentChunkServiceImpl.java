@@ -11,7 +11,7 @@ import com.nexarag.document.enums.ChunkStatus;
 import com.nexarag.document.enums.DocumentErrorCode;
 import com.nexarag.document.mapper.DocumentChunkMapper;
 import com.nexarag.document.service.DocumentChunkService;
-import com.nexarag.document.splitter.ChunkDraft;
+import com.nexarag.document.model.bo.split.ChunkDraft;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -36,6 +36,19 @@ public class DocumentChunkServiceImpl extends ServiceImpl<DocumentChunkMapper, D
         // 1. 使用 lambdaQuery 按文档ID和片段顺序查询
         return this.lambdaQuery()
                 .eq(DocumentChunk::getDocumentId, documentId)
+                .orderByAsc(DocumentChunk::getChunkOrder)
+                .list();
+    }
+
+    @Override
+    public List<DocumentChunk> listByParentChunkIds(List<String> parentChunkIds) {
+        if (parentChunkIds == null || parentChunkIds.isEmpty()) {
+            return List.of();
+        }
+        // 1. 批量读取同一批父片段的子项，避免检索扩展阶段出现 N+1 查询
+        return this.lambdaQuery()
+                .in(DocumentChunk::getParentChunkId, parentChunkIds)
+                .orderByAsc(DocumentChunk::getDocumentId)
                 .orderByAsc(DocumentChunk::getChunkOrder)
                 .list();
     }

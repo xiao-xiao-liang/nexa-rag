@@ -3,7 +3,7 @@ package com.nexarag.document.service;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.service.IService;
 import com.nexarag.document.model.entity.DocumentChunk;
-import com.nexarag.document.splitter.ChunkDraft;
+import com.nexarag.document.model.bo.split.ChunkDraft;
 
 import java.util.List;
 
@@ -19,6 +19,14 @@ public interface DocumentChunkService extends IService<DocumentChunk> {
      * @return 文档片段列表
      */
     List<DocumentChunk> listByDocumentId(Long documentId);
+
+    /**
+     * 根据父片段ID批量查询子片段，并按文档内片段顺序排序。
+     *
+     * @param parentChunkIds 父片段ID集合
+     * @return 子片段列表
+     */
+    List<DocumentChunk> listByParentChunkIds(List<String> parentChunkIds);
 
     /**
      * 分页查询指定文档的片段。
