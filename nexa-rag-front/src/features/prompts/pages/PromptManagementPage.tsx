@@ -8,13 +8,11 @@ import {
   Edit3,
   Eye,
   GitBranch,
-  Layers,
   Loader2,
   Moon,
   RotateCcw,
   Send,
   Settings2,
-  Sparkles,
   Sun,
   Terminal,
 } from 'lucide-react'
@@ -45,7 +43,6 @@ import {
 } from '../api/prompt-api'
 
 export default function PromptManagementPage() {
-  const [prompts, setPrompts] = useState<PromptItem[]>([])
   const [selectedCode, setSelectedCode] = useState<string>('')
   const [currentPrompt, setCurrentPrompt] = useState<PromptItem | null>(null)
   const [loading, setLoading] = useState(true)
@@ -110,7 +107,6 @@ export default function PromptManagementPage() {
     setError(null)
     try {
       const list = await getPrompts()
-      setPrompts(list || [])
       const targetCode = autoSelectCode || (list.length > 0 ? list[0].promptCode : '')
       if (targetCode) {
         setSelectedCode(targetCode)
@@ -393,34 +389,6 @@ export default function PromptManagementPage() {
       {/* Toast 信息指示器 */}
       <Toast message={toastMessage} />
 
-      {/* 顶部 Header: 紧凑高质感 Studio 顶栏 */}
-      <header className="flex h-11 shrink-0 items-center justify-between border-b border-border bg-card px-5">
-        <div className="flex items-center gap-3">
-          <span className="flex size-7 items-center justify-center rounded-md bg-primary-light text-primary">
-            <Sparkles className="size-4" />
-          </span>
-          <div className="flex items-center gap-2">
-            <h1 className="text-sm font-semibold text-foreground">提示词编排与版本管理 Studio</h1>
-            <span className="rounded bg-primary-light px-2 py-0.5 text-[10px] font-medium text-primary">Dify Studio</span>
-          </div>
-        </div>
-
-        <div className="flex items-center gap-3">
-          <div className="flex items-center gap-2 rounded-md bg-muted px-2.5 py-1 text-xs text-secondary">
-            <Layers className="size-3.5 text-primary" />
-            <span>模板数: <strong className="text-foreground">{prompts.length}</strong></span>
-          </div>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => loadPrompts(selectedCode)}
-          >
-            <RotateCcw className="size-3.5" />
-            刷新
-          </Button>
-        </div>
-      </header>
-
       {/* 全局 Error 提示 */}
       {error && (
         <div className="px-5 pt-3 shrink-0">
@@ -445,6 +413,12 @@ export default function PromptManagementPage() {
                 <div className="flex items-center gap-3 min-w-0">
                   <div className="flex items-center gap-1.5 min-w-0">
                     <h2 className="truncate text-base font-semibold text-foreground">{currentPrompt.name}</h2>
+                    {isDirty && (
+                      <span className="flex shrink-0 items-center gap-1 text-[10px] font-medium text-warning">
+                        <AlertCircle className="size-3" />
+                        未保存
+                      </span>
+                    )}
                     <TooltipProvider>
                       <Tooltip>
                         <TooltipTrigger asChild>
@@ -500,6 +474,15 @@ export default function PromptManagementPage() {
 
                 {/* 精简操作按钮组: 图标化工具项 + 主次清晰的操作按钮 */}
                 <div className="flex items-center gap-2 shrink-0">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    aria-label="刷新"
+                    onClick={() => loadPrompts(selectedCode)}
+                    className="size-8"
+                  >
+                    <RotateCcw className="size-3.5" />
+                  </Button>
                   <TooltipProvider>
                     {/* 主题切换图标按钮 */}
                     <Tooltip>
@@ -652,25 +635,6 @@ export default function PromptManagementPage() {
                 />
               </div>
 
-              {/* 编辑器状态 Bottom Status Bar */}
-              <div className="flex h-8 shrink-0 items-center justify-between border-t border-border bg-muted px-5 text-[11px] text-secondary">
-                <div className="flex items-center gap-3">
-                  {isDirty ? (
-                    <span className="flex items-center gap-1 font-medium text-warning">
-                      <AlertCircle className="size-3" />
-                      存在未保存修改
-                    </span>
-                  ) : (
-                    <span className="flex items-center gap-1 font-medium text-success">
-                      <CheckCircle2 className="size-3" />
-                      与当前版本同步
-                    </span>
-                  )}
-                </div>
-                <div>
-                  <span>总行数: {lineCount}</span> · <span>字符数: {editorContent.length}</span>
-                </div>
-              </div>
             </>
           ) : (
             <div className="flex flex-1 flex-col items-center justify-center text-tertiary">

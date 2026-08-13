@@ -52,7 +52,7 @@ describe('PromptManagementPage 提示词管理页面', () => {
       </MemoryRouter>,
     )
 
-    expect(await screen.findByText('提示词编排与版本管理 Studio')).toBeInTheDocument()
+    expect(await screen.findByText('已启用 (点击禁用)')).toBeInTheDocument()
     const titleElements = await screen.findAllByText('会话问题改写')
     expect(titleElements.length).toBeGreaterThan(0)
     const codeElements = await screen.findAllByText('chat.rewrite.instruction')
