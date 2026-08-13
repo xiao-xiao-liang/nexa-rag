@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type KeyboardEvent } from 'react'
 import {
-  ArrowUp, BookOpen, ChevronUp, CircleStop, Compass, FileText, HelpCircle, Paperclip, RefreshCw, Sparkles,
+  ArrowUp, BookOpen, ChevronUp, CircleStop, Compass, Copy, FileText, HelpCircle, Paperclip, RefreshCw, Sparkles,
 } from 'lucide-react'
 import { useSearchParams } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
@@ -13,7 +13,6 @@ import {
   getConversationMessages, type ConversationMessage,
 } from '@/features/conversations/api/conversation-api'
 import { useConversationNavigation } from '@/features/conversations/ConversationNavigationContext'
-import { cn } from '@/lib/utils'
 
 interface TimelineMessage extends ConversationMessage {
   local?: boolean
@@ -291,7 +290,7 @@ export default function ChatWorkspace() {
         <div><p className="text-sm font-semibold text-foreground">{selectedId ? conversations.find((conversation) => conversation.conversationId === selectedId)?.title || '新对话' : '新对话'}</p><p className="mt-0.5 text-xs text-tertiary">智能问答工作台</p></div>
         <div className="flex items-center gap-4 text-xs text-secondary"><button type="button" className="flex items-center gap-1.5 hover:text-primary"><HelpCircle className="size-3.5" />帮助</button><button type="button" className="flex items-center gap-1.5 hover:text-primary"><Compass className="size-3.5" />我的工作区</button></div>
       </header>
-      <div className="min-h-0 flex-1 overflow-y-auto">
+      <div className="min-h-0 flex-1 overflow-y-auto bg-muted">
         <div className="mx-auto flex min-h-full w-full max-w-[880px] flex-col px-5 py-6 sm:px-10">
           {messages.length === 0 && !historyLoading && !historyError && <Welcome onSuggestion={setDraft} />}
           {historyLoading && messages.length === 0 && <TimelineSkeleton />}
@@ -319,9 +318,9 @@ function Welcome({ onSuggestion }: { onSuggestion: (value: string) => void }) {
 function Composer({ draft, streaming, agent: _agent, onDraftChange, onKeyDown, onSend, onStop }: {
   draft: string; streaming: boolean; agent: ConversationAgentMeta; onDraftChange: (value: string) => void; onKeyDown: (event: KeyboardEvent<HTMLTextAreaElement>) => void; onSend: () => void; onStop: () => void
 }) {
-  return <div className="shrink-0 bg-background px-5 pb-4 pt-2 sm:px-10"><div className="mx-auto max-w-[880px] rounded-lg border border-border bg-card p-2 transition-all focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/30">
+  return <div className="shrink-0 bg-muted px-5 pb-4 pt-2 sm:px-10"><div className="mx-auto max-w-[880px] rounded-lg border border-border bg-card p-2 transition-all focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/30">
     <Textarea aria-label="消息内容" value={draft} onChange={(event) => onDraftChange(event.target.value)} onKeyDown={onKeyDown} disabled={streaming} placeholder="输入你的问题，或选择上方的快捷任务…" className="min-h-[92px] resize-none border-0 px-3 py-2 text-sm leading-6 shadow-none placeholder:text-tertiary focus-visible:ring-0" />
-    <div className="flex items-center justify-between gap-3 px-1 pb-1"><div className="flex min-w-0 items-center gap-2"><button type="button" className="flex items-center gap-1.5 rounded px-2 py-1.5 text-xs text-secondary hover:bg-muted"><Sparkles className="size-3.5 text-primary" />Qwen 3</button><button type="button" className="hidden items-center gap-1.5 rounded px-2 py-1.5 text-xs text-secondary hover:bg-muted sm:flex"><BookOpen className="size-3.5" />未选择知识库</button><button type="button" aria-label="添加附件" className="flex size-7 items-center justify-center rounded text-tertiary hover:bg-muted"><Paperclip className="size-3.5" /></button></div>
+    <div className="flex items-center justify-between gap-3 px-1 pb-1"><div className="flex min-w-0 items-center gap-2"><button type="button" className="flex items-center gap-1.5 rounded px-2 py-1.5 text-xs text-secondary hover:bg-muted"><Sparkles className="size-3.5 text-primary" />Qwen 3</button><button type="button" className="hidden items-center gap-1.5 rounded px-2 py-1.5 text-xs text-secondary hover:bg-muted sm:flex"><BookOpen className="size-3.5" />默认知识库</button><button type="button" aria-label="添加附件" className="flex size-7 items-center justify-center rounded text-tertiary hover:bg-muted"><Paperclip className="size-3.5" /></button></div>
       {streaming ? <Button type="button" variant="outline" size="icon" aria-label="停止生成" onClick={onStop}><CircleStop className="size-4" /></Button> : <Button type="button" size="icon" aria-label="发送消息" disabled={!draft.trim()} onClick={onSend} className="size-7 rounded-md bg-primary hover:bg-primary/90"><ArrowUp className="size-4" /></Button>}
     </div>
   </div><p className="mx-auto mt-2 max-w-[880px] px-2 text-[11px] text-tertiary">Enter 发送，Shift + Enter 换行</p></div>
@@ -329,14 +328,71 @@ function Composer({ draft, streaming, agent: _agent, onDraftChange, onKeyDown, o
 
 function MessageBubble({ message, onRetry }: { message: TimelineMessage; onRetry: () => void }) {
   const isUser = message.role === 'USER'
-  return <article className={cn('mb-6 flex gap-3', isUser && 'justify-end')}><div className={cn('max-w-[86%] rounded-lg px-4 py-3 text-sm leading-7', isUser ? 'bg-primary text-primary-foreground' : 'bg-muted')}>
-    {!isUser && <div className="mb-1 flex items-center gap-1.5 text-xs font-medium text-primary"><Sparkles className="size-3.5" />RAG</div>}
-    {isUser
-      ? <p className="whitespace-pre-wrap break-words">{message.content}</p>
-      : <AssistantMarkdown content={message.content || (message.status === 'GENERATING' ? '正在生成…' : '')} status={message.status} />}
-    {message.status === 'FAILED' && <div className="mt-2 flex items-center gap-2 text-xs text-danger"><span>{message.errorMessage || '生成失败'}</span><Button variant="ghost" size="sm" onClick={onRetry}><RefreshCw className="size-3.5" />重试</Button></div>}
-    {message.status === 'CANCELLED' && <p className="mt-2 text-xs text-tertiary">已停止生成</p>}
-  </div></article>
+  if (isUser) {
+    return (
+      <article className="mb-6 flex justify-end">
+        <div className="max-w-[86%] text-right">
+          <p className="mb-1 pr-1 text-[10px] text-tertiary">{formatMessageTime(message.createdTime)}</p>
+          <div className="whitespace-pre-wrap break-words rounded-lg rounded-br-sm bg-primary px-4 py-3 text-left text-sm leading-7 text-primary-foreground">
+            {message.content}
+          </div>
+          {message.status === 'FAILED' && (
+            <p className="mt-1.5 pr-1 text-xs text-danger">{message.errorMessage || '生成失败'}</p>
+          )}
+        </div>
+      </article>
+    )
+  }
+
+  return (
+    <article className="mb-6 flex gap-3">
+      <span className="mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-md bg-primary text-xs font-bold text-primary-foreground" aria-hidden="true">
+        N
+      </span>
+      <div className="min-w-0 max-w-[86%]">
+        <div className="mb-1 flex items-center gap-2">
+          <span className="text-xs font-medium text-secondary">NexaRAG</span>
+          <span className="text-[10px] text-tertiary">{formatMessageTime(message.createdTime)}</span>
+          {message.status === 'COMPLETED' && message.content && (
+            <button
+              type="button"
+              onClick={() => navigator.clipboard.writeText(message.content)}
+              className="flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] text-tertiary transition-colors hover:bg-muted hover:text-primary"
+            >
+              <Copy className="size-3" />
+              复制
+            </button>
+          )}
+          {message.status === 'FAILED' && (
+            <button
+              type="button"
+              onClick={onRetry}
+              className="flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] text-primary transition-colors hover:bg-primary-light"
+            >
+              <RefreshCw className="size-3" />
+              重试
+            </button>
+          )}
+        </div>
+        <div className="rounded-lg border border-border bg-card px-4 py-3 text-sm leading-7">
+          <AssistantMarkdown content={message.content || (message.status === 'GENERATING' ? '正在生成…' : '')} status={message.status} />
+        </div>
+        {message.status === 'FAILED' && (
+          <p className="mt-1.5 text-xs text-danger">{message.errorMessage || '生成失败'}</p>
+        )}
+        {message.status === 'CANCELLED' && (
+          <p className="mt-1.5 text-xs text-tertiary">已停止生成</p>
+        )}
+      </div>
+    </article>
+  )
+}
+
+function formatMessageTime(value: string): string {
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return ''
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${pad(date.getHours())}:${pad(date.getMinutes())}`
 }
 
 function TimelineSkeleton() { return <div className="space-y-5"><Skeleton className="h-20 w-3/4" /><Skeleton className="ml-auto h-16 w-2/3" /><Skeleton className="h-28 w-4/5" /></div> }

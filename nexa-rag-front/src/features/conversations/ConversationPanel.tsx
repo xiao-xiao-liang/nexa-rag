@@ -339,7 +339,12 @@ export function ConversationPanel() {
 }
 
 interface ConversationListItemRowProps {
-  conversation: { conversationId: string; title: string | null }
+  conversation: {
+    conversationId: string
+    title: string | null
+    lastMessageTime: string | null
+    updatedTime: string
+  }
   isSelected: boolean
   isEditing: boolean
   isPinned: boolean
@@ -398,16 +403,14 @@ function ConversationListItemRow({
     <div
       onClick={onSelect}
       className={cn(
-        'group relative flex cursor-pointer items-center justify-between rounded-md px-2.5 py-2 text-left text-[13px] transition-colors',
+        'group relative flex cursor-pointer items-center gap-2 rounded-md px-2.5 py-2 text-left text-[13px] transition-colors',
         isSelected ? 'bg-primary-light text-primary' : 'text-secondary hover:bg-muted',
       )}
     >
-      <div className="flex min-w-0 items-center gap-2">
-        <span
-          className={cn('size-1.5 shrink-0 rounded-full', isSelected ? 'bg-primary' : 'bg-border')}
-        />
-        <span className="truncate">{conversation.title || '未命名会话'}</span>
-      </div>
+      <span className="min-w-0 flex-1 truncate">{conversation.title || '未命名会话'}</span>
+      <span className="shrink-0 pr-6 text-[10px] text-tertiary">
+        {formatConversationTime(conversation.lastMessageTime ?? conversation.updatedTime)}
+      </span>
 
       <div onClick={(e: MouseEvent) => e.stopPropagation()}>
         <DropdownMenu>
@@ -415,7 +418,7 @@ function ConversationListItemRow({
             <button
               type="button"
               className={cn(
-                'flex size-6 items-center justify-center rounded text-tertiary opacity-0 transition-opacity group-hover:opacity-100 hover:bg-muted hover:text-primary',
+                'absolute right-1.5 top-1/2 flex size-6 -translate-y-1/2 items-center justify-center rounded text-tertiary opacity-0 transition-opacity group-hover:opacity-100 hover:bg-muted hover:text-primary',
                 isSelected && 'opacity-100 text-primary',
               )}
               aria-label="更多操作"
@@ -442,4 +445,14 @@ function ConversationListItemRow({
       </div>
     </div>
   )
+}
+
+function formatConversationTime(value: string | null | undefined): string {
+  if (!value) return ''
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return ''
+  const pad = (n: number) => String(n).padStart(2, '0')
+  const sameDay = date.toDateString() === new Date().toDateString()
+  if (sameDay) return `${pad(date.getHours())}:${pad(date.getMinutes())}`
+  return `${pad(date.getMonth() + 1)}-${pad(date.getDate())}`
 }
