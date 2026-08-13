@@ -122,6 +122,16 @@ nexa:
       temp-root: ${NEXA_ARTIFACT_TEMP_ROOT:${java.io.tmpdir}/nexa-rag-artifacts}
       max-workspace-bytes: 524288000
       max-concurrent: 2
+      structure:
+        heuristic-heading-enabled: true
+        heuristic-heading-min-confidence: 0.80
+        max-diagnostics: 100
+        llm-fallback:
+          enabled: false # 默认关闭；评测达标后再按需开启。
+          route-key: chat # 开启时使用的模型路由键。
+          candidate-max-confidence: 0.80 # 仅精修不高于该置信度的既有标题。
+          accepted-min-confidence: 0.85 # 仅接受高于该阈值的模型判断。
+          max-candidates: 20 # 单篇文档最多发送的标题数量。
     pandoc:
       enabled: true
       executable: ${NEXA_PANDOC_EXECUTABLE:D:\Software\笔记&协助\pandoc-3.1.13\pandoc.exe}
@@ -162,6 +172,10 @@ nexa:
       expansion-minimum-body-tokens: 64 # 初始正文少于此估算 Token 数时触发章节扩展。
       expansion-confidence-threshold: 0.1 # 初始正文最高相关度低于此值时触发章节扩展。
       accepted-rerank-score: 0.0 # 重排序结果最低可接受分数。
+      parent-context-expansion-enabled: true # 重排序后是否按父子关系补全上下文。
+      parent-context-full-parent-max-tokens: 800 # 可直接使用完整父片段的估算 Token 上限。
+      parent-context-full-parent-minimum-hits: 2 # 同一父片段达到该命中数时可放宽为完整父片段。
+      parent-context-neighbor-window-count: 1 # 未使用完整父片段时，每侧补充的相邻子片段数量。
     vector:
       type: milvus # 向量索引类型，可选值：milvus。
       host: 192.168.0.134 # 101.132.158.169 # 向量索引服务地址。
