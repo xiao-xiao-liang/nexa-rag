@@ -52,7 +52,7 @@ describe('RAG 对话工作台', () => {
 
     await user.click(await screen.findByRole('link', { name: '知识库' }))
 
-    expect(await screen.findByRole('heading', { name: '知识库' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: '全部文档' })).toBeInTheDocument()
     expect(screen.queryByText('处理状态筛选')).not.toBeInTheDocument()
     expect(screen.queryByText('查看原文件')).not.toBeInTheDocument()
     expect(screen.queryByText('OCR 配置')).not.toBeInTheDocument()

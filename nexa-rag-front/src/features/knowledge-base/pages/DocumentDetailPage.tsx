@@ -135,7 +135,7 @@ export function DocumentDetailPage() {
       )}
 
       {document && (
-        <div className="mx-auto w-full max-w-[1280px] space-y-5">
+        <div className="w-full space-y-5">
           {/* 面包屑导航 */}
           <nav aria-label="Breadcrumb" className="flex items-center gap-2 text-xs text-tertiary">
             <Link to="/knowledge-base" className="transition-colors hover:text-primary">知识库</Link>
@@ -374,7 +374,7 @@ function InvalidDocumentAddress() {
 /** 详情请求失败提示。 */
 function LoadError({ message, onRetry }: { message: string; onRetry: () => void }) {
   return (
-    <div className="mx-auto mb-6 flex w-full max-w-[1280px] flex-wrap items-center justify-between gap-3 rounded-md border border-danger-light bg-danger-light px-4 py-3 text-xs text-danger">
+    <div className="mb-6 flex w-full flex-wrap items-center justify-between gap-3 rounded-md border border-danger-light bg-danger-light px-4 py-3 text-xs text-danger">
       <span className="font-medium">{message}</span>
       <button
         type="button"

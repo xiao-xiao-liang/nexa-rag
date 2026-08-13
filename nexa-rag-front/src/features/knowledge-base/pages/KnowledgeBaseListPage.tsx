@@ -21,7 +21,7 @@ export function KnowledgeBaseListPage() {
   const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
   const pageNum = parsePageNum(searchParams.get('page'))
-  const view = searchParams.get('view') === 'documents' ? 'documents' : 'overview'
+  const view = searchParams.get('view') === 'overview' ? 'overview' : 'documents'
   const [page, setPage] = useState<PageVO<DocumentSummary>>(EMPTY_PAGE)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -68,7 +68,7 @@ export function KnowledgeBaseListPage() {
 
   const updateLocation = (nextView: 'overview' | 'documents', nextPage = 1) => {
     const nextParams = new URLSearchParams()
-    if (nextView === 'documents') nextParams.set('view', 'documents')
+    nextParams.set('view', nextView)
     if (nextPage > 1) nextParams.set('page', String(nextPage))
     setSearchParams(nextParams)
   }
@@ -96,8 +96,8 @@ export function KnowledgeBaseListPage() {
   const openDocument = (documentId: number | string) => navigate(`/knowledge-base/${documentId}`)
 
   return (
-    <section className="min-h-full min-w-0 overflow-y-auto bg-background px-4 py-5 sm:px-6 lg:px-10">
-      <div className="mx-auto w-full max-w-[1280px]">
+    <section className="min-h-full min-w-0 overflow-y-auto bg-background px-4 py-5 sm:px-6 lg:px-8">
+      <div className="w-full">
         {view === 'overview' ? (
           <KnowledgeOverview
             total={page.total}
@@ -249,11 +249,10 @@ function KnowledgeOverview({
         </div>
 
         <section className="overflow-hidden rounded-lg border border-border bg-card">
-          <div className="grid grid-cols-[minmax(190px,2.2fr)_0.8fr_0.75fr] gap-3 bg-muted px-5 py-2.5 text-xs font-medium text-tertiary sm:grid-cols-[minmax(260px,2.2fr)_0.8fr_0.75fr_0.7fr]">
+          <div className="grid grid-cols-[minmax(190px,2.2fr)_0.8fr_0.75fr] gap-3 bg-muted px-5 py-2.5 text-xs font-medium text-tertiary sm:grid-cols-[minmax(260px,2.2fr)_0.8fr_0.75fr]">
             <span>文档</span>
             <span>类型</span>
             <span>状态</span>
-            <span className="hidden sm:block">编号</span>
           </div>
 
           {loading && (
@@ -270,12 +269,11 @@ function KnowledgeOverview({
                 key={document.documentId}
                 type="button"
                 onClick={() => onView(document.documentId)}
-                className="grid w-full grid-cols-[minmax(190px,2.2fr)_0.8fr_0.75fr] items-center gap-3 border-t border-border px-5 py-3.5 text-left text-xs text-secondary transition-colors hover:bg-muted/60 sm:grid-cols-[minmax(260px,2.2fr)_0.8fr_0.75fr_0.7fr]"
+                className="grid w-full grid-cols-[minmax(190px,2.2fr)_0.8fr_0.75fr] items-center gap-3 border-t border-border px-5 py-3.5 text-left text-xs text-secondary transition-colors hover:bg-muted/60 sm:grid-cols-[minmax(260px,2.2fr)_0.8fr_0.75fr]"
               >
                 <DocumentCell document={document} />
                 <span className="font-medium text-secondary">{document.fileType || '—'}</span>
                 <DocumentStatusBadge status={document.status} />
-                <span className="hidden font-mono text-[11px] text-tertiary sm:block">#{document.documentId}</span>
               </button>
             ))}
         </section>
@@ -419,6 +417,9 @@ function DocumentLibrary({
         </div>
 
         <div className="flex items-center gap-2">
+          <span className="h-7 rounded border border-border bg-card px-3 text-xs leading-7 text-secondary">
+            20 条 / 页
+          </span>
           <button
             type="button"
             aria-label="刷新文档列表"

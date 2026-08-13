@@ -48,13 +48,19 @@ describe('知识库文档列表页面', () => {
     vi.clearAllMocks()
   })
 
-  it('默认展示知识库概览，并可切换至全部文档表格', async () => {
-    const user = userEvent.setup()
+  it('默认展示全部文档列表，概览视图可切换回列表', async () => {
     renderList()
+
+    expect(await screen.findByRole('heading', { name: '全部文档' })).toBeInTheDocument()
+    expect(await screen.findByText('员工手册.pdf')).toBeInTheDocument()
+  })
+
+  it('概览视图下可切换至全部文档表格', async () => {
+    const user = userEvent.setup()
+    renderList('/knowledge-base?view=overview')
 
     expect(await screen.findByRole('heading', { name: '知识库' })).toBeInTheDocument()
     expect(screen.getByText('默认知识库')).toBeInTheDocument()
-    expect(screen.getByText('全部文档')).toBeInTheDocument()
 
     await user.click(screen.getByRole('button', { name: '查看全部文档' }))
 
@@ -100,7 +106,6 @@ describe('知识库文档列表页面', () => {
     const user = userEvent.setup()
     renderList('/knowledge-base?page=2')
 
-    await user.click(await screen.findByRole('button', { name: '查看全部文档' }))
     await user.click(await screen.findByRole('button', { name: '删除 员工手册.pdf' }))
     await user.click(screen.getByRole('button', { name: '确认删除' }))
 

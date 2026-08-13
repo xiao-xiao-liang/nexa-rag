@@ -25,7 +25,7 @@ describe('应用路由', () => {
 
     render(<RouterProvider router={router} />)
 
-    expect(await screen.findByRole('heading', { name: '知识库' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: '全部文档' })).toBeInTheDocument()
   })
 
   it('路由管理路由应显示路由管理页面', async () => {
