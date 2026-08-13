@@ -1,14 +1,15 @@
 import { useEffect, useMemo, useState } from 'react'
 import {
-  CheckCircle2, Copy, Cpu, Database, Eye, EyeOff, Key,
-  Link2, Plus, RefreshCw, Search, Sparkles, Trash2, Wrench,
-  Edit3, Loader2, SlidersHorizontal
+  Copy, Cpu, Database, Edit3, Eye, EyeOff, Key, Link2, Loader2, Plus, RefreshCw, Search, SlidersHorizontal, Sparkles, Wrench,
 } from 'lucide-react'
 import { NavLink } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import {
   Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle,
 } from '@/components/ui/dialog'
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { Tag } from '@/components/ui/tag'
+import { Toast } from '@/components/ui/toast'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { CustomSelect, type SelectOption } from '@/components/ui/select'
 import { cn } from '@/lib/utils'
@@ -78,6 +79,7 @@ const CATEGORY_OPTIONS: SelectOption[] = [
   { value: 'Rerank', label: 'Rerank (精细重排引擎)' },
 ]
 
+/** 模型供应商与治理网关页：飞书式两栏布局。 */
 export default function ModelConfigPage() {
   const [catalogProviders, setCatalogProviders] = useState<ModelProviderCatalogItem[]>([])
   const [realConfigs, setRealConfigs] = useState<ModelConfigItem[]>([])
@@ -87,7 +89,7 @@ export default function ModelConfigPage() {
 
   const [selectedProviderId, setSelectedProviderId] = useState<string>('')
   const [searchKeyword, setSearchKeyword] = useState('')
-  const [categoryFilter, setCategoryFilter] = useState<'all' | 'joined' | 'domestic' | 'international' | 'compatible'>('all')
+  const [categoryFilter, setCategoryFilter] = useState<'all' | 'joined'>('all')
   const [toastMessage, setToastMessage] = useState<string | null>(null)
   const [testingConfigId, setTestingConfigId] = useState<number | string | null>(null)
 
@@ -116,7 +118,6 @@ export default function ModelConfigPage() {
   const [editApiKey, setEditApiKey] = useState('')
   const [showEditApiKey, setShowEditApiKey] = useState(false)
 
-
   const loadData = async () => {
     setLoading(true)
     setError(null)
@@ -134,7 +135,6 @@ export default function ModelConfigPage() {
         setSelectedProviderId(catalogRes[0].provider)
       }
 
-      // 如果有路由数据，设置系统默认模型
       if (routesRes && routesRes.length > 0) {
         const llmRoute = routesRes.find((r) => r.modelType === 'CHAT' || r.routeKey === 'DEFAULT_LLM')
         const embRoute = routesRes.find((r) => r.modelType === 'EMBEDDING' || r.routeKey === 'DEFAULT_EMBEDDING')
@@ -143,41 +143,37 @@ export default function ModelConfigPage() {
         if (embRoute?.routeKey) setDefaultEmbedding(embRoute.routeKey)
         if (rnkRoute?.routeKey) setDefaultRerank(rnkRoute.routeKey)
       }
-    } catch (err: any) {
+    } catch (err) {
       console.error('加载模型配置失败:', err)
-      setError(err?.message || '无法连接至后端模型配置服务，请检查网络或后端状态')
+      setError(err instanceof Error ? err.message : '无法连接至后端模型配置服务，请检查网络或后端状态')
     } finally {
       setLoading(false)
     }
   }
 
   useEffect(() => {
-    loadData()
+    void loadData()
   }, [])
 
-  // 根据真实的已配置模型动态生成下拉可选项
   const dynamicLLMOptions = useMemo(() => {
     const customList = realConfigs
       .filter((c) => c.modelType === 'Chat' || c.modelType === 'LLM')
       .map((c) => ({ value: c.modelName, label: `${c.modelName} (${c.provider})` }))
-    if (customList.length > 0) return customList
-    return LLM_OPTIONS
+    return customList.length > 0 ? customList : LLM_OPTIONS
   }, [realConfigs])
 
   const dynamicEmbeddingOptions = useMemo(() => {
     const customList = realConfigs
       .filter((c) => c.modelType === 'Embedding' || c.modelType === 'Text Embedding')
       .map((c) => ({ value: c.modelName, label: `${c.modelName} (${c.provider})` }))
-    if (customList.length > 0) return customList
-    return EMBEDDING_OPTIONS
+    return customList.length > 0 ? customList : EMBEDDING_OPTIONS
   }, [realConfigs])
 
   const dynamicRerankOptions = useMemo(() => {
     const customList = realConfigs
       .filter((c) => c.modelType === 'Rerank')
       .map((c) => ({ value: c.modelName, label: `${c.modelName} (${c.provider})` }))
-    if (customList.length > 0) return customList
-    return RERANK_OPTIONS
+    return customList.length > 0 ? customList : RERANK_OPTIONS
   }, [realConfigs])
 
   const selectedCatalog = useMemo(() => {
@@ -208,11 +204,10 @@ export default function ModelConfigPage() {
       const hasConfigs = realConfigs.some((c) => c.provider?.toUpperCase() === p.provider?.toUpperCase())
       if (categoryFilter === 'joined' && !hasConfigs) return false
 
-      const name = p.displayName || p.provider
       if (searchKeyword.trim()) {
         const query = searchKeyword.trim().toLowerCase()
         return (
-          name.toLowerCase().includes(query) ||
+          (p.displayName || p.provider).toLowerCase().includes(query) ||
           p.provider.toLowerCase().includes(query)
         )
       }
@@ -260,8 +255,6 @@ export default function ModelConfigPage() {
     setEditModelModalOpen(true)
   }
 
-
-  // 路由更改事件处理
   const handleSelectDefaultLLM = async (val: string) => {
     setDefaultLLM(val)
     const route = realRoutes.find((r) => r.modelType === 'CHAT' || r.routeKey === 'DEFAULT_LLM')
@@ -269,8 +262,8 @@ export default function ModelConfigPage() {
       try {
         await updateModelRoute(route.routeId, { routeKey: val })
         showToast(`对话模型全局路由已成功保存为 [${val}]`)
-      } catch (e) {
-        showToast(`保存对话模型路由失败`)
+      } catch {
+        showToast('保存对话模型路由失败')
       }
     }
   }
@@ -282,8 +275,8 @@ export default function ModelConfigPage() {
       try {
         await updateModelRoute(route.routeId, { routeKey: val })
         showToast(`向量检索全局路由已成功保存为 [${val}]`)
-      } catch (e) {
-        showToast(`保存向量检索路由失败`)
+      } catch {
+        showToast('保存向量检索路由失败')
       }
     }
   }
@@ -295,18 +288,15 @@ export default function ModelConfigPage() {
       try {
         await updateModelRoute(route.routeId, { routeKey: val })
         showToast(`精细重排全局路由已成功保存为 [${val}]`)
-      } catch (e) {
-        showToast(`保存精细重排路由失败`)
+      } catch {
+        showToast('保存精细重排路由失败')
       }
     }
   }
 
-  // 路由更改事件处理
-
   const handleCreateSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!newModelName.trim()) return
-
     try {
       const created = await createModelConfig({
         modelName: newModelName.trim(),
@@ -319,15 +309,14 @@ export default function ModelConfigPage() {
       setAddModelModalOpen(false)
       setCredentialsModalOpen(false)
       showToast(`保存模型节点 [${created.modelName}] 成功！`)
-    } catch (err: any) {
-      showToast(`创建失败: ${err?.message || '服务器未响应'}`)
+    } catch (err) {
+      showToast(`创建失败: ${err instanceof Error ? err.message : '服务器未响应'}`)
     }
   }
 
   const handleEditSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!editingConfigId || !editModelName.trim()) return
-
     try {
       const updated = await updateModelConfig(editingConfigId, {
         modelName: editModelName.trim(),
@@ -338,23 +327,18 @@ export default function ModelConfigPage() {
       setRealConfigs((prev) => prev.map((c) => (c.configId === editingConfigId ? updated : c)))
       setEditModelModalOpen(false)
       showToast(`已成功修改模型 [${updated.modelName}] 的配置与 API Key！`)
-    } catch (err: any) {
-      showToast(`修改失败: ${err?.message || '服务器拒绝'}`)
+    } catch (err) {
+      showToast(`修改失败: ${err instanceof Error ? err.message : '服务器拒绝'}`)
     }
   }
-
 
   const handleTestConnectionReal = async (configId: number | string, modelName: string) => {
     setTestingConfigId(configId)
     try {
       const res = await testModelConfig(configId)
-      if (res?.success) {
-        showToast(`探针测试: [${modelName}] 连通物理成功！`)
-      } else {
-        showToast(`测试反馈: ${res?.message || '连接失败'}`)
-      }
-    } catch (err: any) {
-      showToast(`测试失败: ${err?.message || '物理端口拒绝'}`)
+      showToast(res?.success ? `探针测试: [${modelName}] 连通物理成功！` : `测试反馈: ${res?.message || '连接失败'}`)
+    } catch (err) {
+      showToast(`测试失败: ${err instanceof Error ? err.message : '物理端口拒绝'}`)
     } finally {
       setTestingConfigId(null)
     }
@@ -365,167 +349,108 @@ export default function ModelConfigPage() {
       await deleteModelConfig(configId)
       setRealConfigs((prev) => prev.filter((c) => c.configId !== configId))
       showToast(`已成功删除模型节点配置 [${modelName}]`)
-    } catch (err: any) {
-      showToast(`删除失败: ${err?.message}`)
+    } catch (err) {
+      showToast(`删除失败: ${err instanceof Error ? err.message : '未知错误'}`)
     }
   }
 
   if (loading) {
     return (
-      <div className="flex h-full min-h-0 flex-1 items-center justify-center bg-[#f8f9fc]">
-        <div className="flex flex-col items-center gap-3 text-slate-500">
-          <Loader2 className="size-8 animate-spin text-[#6f62e8]" />
-          <p className="text-xs font-semibold">正在从后端加载真实模型配置与厂商目录…</p>
+      <div className="flex h-full min-h-0 flex-1 items-center justify-center bg-background">
+        <div className="flex flex-col items-center gap-3 text-secondary">
+          <Loader2 className="size-8 animate-spin text-primary" />
+          <p className="text-xs font-medium">正在从后端加载真实模型配置与厂商目录…</p>
         </div>
       </div>
     )
   }
 
+  const inputClass = 'w-full rounded-md border border-input bg-card px-2.5 py-1.5 text-xs text-foreground outline-none focus:border-primary focus:ring-2 focus:ring-primary/30'
+
   return (
-    <div className="flex h-full min-h-0 flex-1 flex-col overflow-y-auto bg-[#f8f9fc] text-slate-800">
+    <div className="flex h-full min-h-0 flex-1 flex-col overflow-y-auto bg-background">
+      <Toast message={toastMessage} />
       {error && (
-        <div className="mx-auto mt-4 w-full max-w-[1500px] px-6 sm:px-8">
-          <div className="rounded-xl border border-red-200 bg-red-50 p-3.5 text-xs text-red-700">
-            {error}
-          </div>
+        <div className="mx-auto mt-4 w-full max-w-[1200px] px-6">
+          <div className="rounded-md border border-danger-light bg-danger-light p-3 text-xs text-danger">{error}</div>
         </div>
       )}
-      {/* 顶部 Header：干净利落 */}
-      <header className="border-b border-[#e8ebf1] bg-white px-6 py-4 sm:px-8">
-        <div className="mx-auto max-w-[1500px]">
+
+      {/* 顶部 Header */}
+      <header className="border-b border-border bg-card px-6 py-4">
+        <div className="mx-auto w-full max-w-[1200px]">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <span className="flex size-9 items-center justify-center rounded-xl bg-[#eeecff] text-[#6f62e8]">
-                <Cpu className="size-5" />
+              <span className="flex size-8 items-center justify-center rounded-md bg-primary-light text-primary">
+                <Cpu className="size-4" />
               </span>
               <div>
-                <h1 className="text-lg font-bold tracking-tight text-slate-900">模型供应商与治理网关</h1>
-                <p className="text-[11px] text-slate-500">
-                  真实接入后端 API，统一管理厂商连接凭据与全站模型调度路由。
-                </p>
+                <h1 className="text-lg font-semibold text-foreground">模型供应商与治理网关</h1>
+                <p className="text-[11px] text-tertiary">统一管理厂商连接凭据与全站模型调度路由。</p>
               </div>
             </div>
-
-            <Button
-              onClick={() => handleOpenCredentials(selectedProviderId)}
-              className="gap-2 rounded-xl bg-[#6f62e8] text-xs font-semibold text-white shadow-sm hover:bg-[#5f52d9]"
-            >
+            <Button size="sm" onClick={() => handleOpenCredentials(selectedProviderId)}>
               <Key className="size-3.5" />
               配置当前供应商凭据
             </Button>
           </div>
 
-          {/* 全局默认系统模型选择 & 全局治理控制台（紧凑双栏设计，解决横向拉伸留白问题） */}
-          <div className="mt-3.5 rounded-xl border border-purple-100 bg-gradient-to-r from-[#fbfaff] via-[#f8f6ff] to-[#f4f2ff] p-3.5 shadow-sm">
-            <div className="grid grid-cols-1 items-center gap-4 lg:grid-cols-[1fr_auto]">
-              
-              {/* 左侧紧凑默认模型下拉区 */}
-              <div className="space-y-2">
-                <div className="flex items-center gap-2">
-                  <Sparkles className="size-3.5 text-[#6f62e8]" />
-                  <span className="text-xs font-bold text-slate-800">全站 RAG 默认模型调度引擎 (System Defaults)</span>
-                </div>
-
-                <div className="flex flex-wrap items-center gap-2.5">
-                  <div className="flex items-center gap-2 rounded-lg border border-white bg-white/90 px-2.5 py-1 text-xs shadow-2xs">
-                    <span className="font-bold text-purple-600 shrink-0 text-[11px]">对话生成</span>
-                    <CustomSelect
-                      value={defaultLLM}
-                      onChange={handleSelectDefaultLLM}
-                      options={dynamicLLMOptions}
-                      className="w-44"
-                    />
-                  </div>
-
-                  <div className="flex items-center gap-2 rounded-lg border border-white bg-white/90 px-2.5 py-1 text-xs shadow-2xs">
-                    <span className="font-bold text-emerald-600 shrink-0 text-[11px]">向量检索</span>
-                    <CustomSelect
-                      value={defaultEmbedding}
-                      onChange={handleSelectDefaultEmbedding}
-                      options={dynamicEmbeddingOptions}
-                      className="w-48"
-                    />
-                  </div>
-
-                  <div className="flex items-center gap-2 rounded-lg border border-white bg-white/90 px-2.5 py-1 text-xs shadow-2xs">
-                    <span className="font-bold text-amber-600 shrink-0 text-[11px]">精细重排</span>
-                    <CustomSelect
-                      value={defaultRerank}
-                      onChange={handleSelectDefaultRerank}
-                      options={dynamicRerankOptions}
-                      className="w-44"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {/* 右侧跳转至独立模型治理控制台卡片 */}
-              <div className="flex flex-col items-start gap-2 border-t border-purple-100/60 pt-3 lg:items-end lg:border-l lg:border-t-0 lg:pl-5 lg:pt-0">
-                <div className="flex items-center gap-2">
-                  <span className="rounded-md bg-purple-100 px-2 py-0.5 text-[10px] font-bold text-[#5649ce]">
-                    Resilience4j 物理防护
-                  </span>
-
-                  <NavLink to="/models/governance">
-                    <Button
-                      className="gap-2 rounded-xl bg-[#6f62e8] px-3.5 py-1.5 text-xs font-bold text-white shadow-md shadow-purple-200 transition-all hover:bg-[#5f52d9] hover:shadow-lg"
-                    >
-                      <SlidersHorizontal className="size-3.5 text-purple-200" />
-                      前往【模型治理控制台】
-                    </Button>
-                  </NavLink>
-                </div>
-
-                <p className="text-[11px] text-slate-500">
-                  配置物理节点的限流、慢调用熔断判定、并发隔离与流式超时规则。
-                </p>
-              </div>
-
+          {/* 全局默认模型 + 治理入口 */}
+          <div className="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-md border border-border bg-muted px-3.5 py-2.5">
+            <div className="flex flex-wrap items-center gap-2.5">
+              <span className="flex items-center gap-1.5 text-xs font-medium text-secondary">
+                <Sparkles className="size-3.5 text-primary" />
+                全站默认模型：
+              </span>
+              <CustomSelect value={defaultLLM} onChange={handleSelectDefaultLLM} options={dynamicLLMOptions} className="w-44" />
+              <CustomSelect value={defaultEmbedding} onChange={handleSelectDefaultEmbedding} options={dynamicEmbeddingOptions} className="w-48" />
+              <CustomSelect value={defaultRerank} onChange={handleSelectDefaultRerank} options={dynamicRerankOptions} className="w-44" />
             </div>
+            <NavLink to="/models/governance">
+              <Button variant="outline" size="sm">
+                <SlidersHorizontal className="size-3.5" />
+                前往模型治理控制台
+              </Button>
+            </NavLink>
           </div>
         </div>
       </header>
 
-      {/* 主体核心： Split 布局 */}
-      <main className="mx-auto w-full max-w-[1500px] min-w-0 flex-1 px-6 py-6 sm:px-8">
-        <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-[300px_minmax(0,1fr)]">
-          {/* 左侧供应商侧边菜单 */}
-          <aside className="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-sm">
-            <div className="space-y-3">
-              <div className="relative">
-                <Search className="absolute left-2.5 top-2.5 size-3.5 text-slate-400" />
-                <input
-                  value={searchKeyword}
-                  onChange={(e) => setSearchKeyword(e.target.value)}
-                  placeholder="搜索供应商或模型…"
-                  className="w-full rounded-xl border border-slate-200 bg-slate-50 py-1.5 pl-8 pr-3 text-xs text-slate-700 outline-none placeholder:text-slate-400 focus:border-[#6f62e8] focus:bg-white"
-                />
-              </div>
-
-              <div className="flex flex-wrap gap-1 border-b border-slate-100 pb-3">
-                {[
-                  { id: 'all', label: '全部' },
-                  { id: 'joined', label: '已配置' },
-                ].map((item) => (
-                  <button
-                    key={item.id}
-                    type="button"
-                    onClick={() => setCategoryFilter(item.id as any)}
-                    className={cn(
-                      'rounded-lg px-2.5 py-1 text-[11px] font-medium transition-all',
-                      categoryFilter === item.id
-                        ? 'bg-[#eeecff] font-bold text-[#6f62e8]'
-                        : 'text-slate-500 hover:bg-slate-100',
-                    )}
-                  >
-                    {item.label}
-                  </button>
-                ))}
-              </div>
+      {/* 主体：两栏布局 */}
+      <main className="mx-auto w-full max-w-[1200px] min-w-0 flex-1 px-6 py-5">
+        <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-[232px_minmax(0,1fr)]">
+          {/* 左侧供应商列表 */}
+          <aside className="rounded-lg border border-border bg-card p-3">
+            <div className="relative mb-2">
+              <Search className="absolute left-2.5 top-2.5 size-3.5 text-tertiary" />
+              <input
+                value={searchKeyword}
+                onChange={(e) => setSearchKeyword(e.target.value)}
+                placeholder="搜索供应商或模型…"
+                className="h-8 w-full rounded-md border border-border bg-muted pl-8 pr-3 text-xs text-foreground outline-none placeholder:text-tertiary focus:border-primary focus:bg-card"
+              />
             </div>
-
-            {/* 供应商列表 */}
-            <div className="mt-3 max-h-[calc(100vh-360px)] overflow-y-auto space-y-1 pr-1">
+            <div className="mb-2 flex gap-1 border-b border-border pb-2">
+              {[
+                { id: 'all', label: '全部' },
+                { id: 'joined', label: '已配置' },
+              ].map((item) => (
+                <button
+                  key={item.id}
+                  type="button"
+                  onClick={() => setCategoryFilter(item.id as 'all' | 'joined')}
+                  className={cn(
+                    'rounded px-2.5 py-1 text-xs transition-colors',
+                    categoryFilter === item.id
+                      ? 'bg-primary-light font-medium text-primary'
+                      : 'text-secondary hover:bg-muted',
+                  )}
+                >
+                  {item.label}
+                </button>
+              ))}
+            </div>
+            <div className="max-h-[calc(100vh-340px)] space-y-1 overflow-y-auto">
               <TooltipProvider>
                 {filteredCatalogProviders.map((provider) => {
                   const isSelected = selectedProviderId === provider.provider
@@ -540,32 +465,25 @@ export default function ModelConfigPage() {
                       key={provider.provider}
                       onClick={() => setSelectedProviderId(provider.provider)}
                       className={cn(
-                        'group flex cursor-pointer items-center justify-between rounded-xl px-3 py-2.5 transition-all',
-                        isSelected
-                          ? 'bg-[#eeecff] text-[#5649ce] shadow-sm font-semibold'
-                          : 'text-slate-700 hover:bg-slate-100/80',
+                        'group flex cursor-pointer items-center justify-between rounded px-3 py-2 transition-colors',
+                        isSelected ? 'bg-primary-light text-primary' : 'text-secondary hover:bg-muted',
                       )}
                     >
-                      <div className="flex items-center gap-2.5 min-w-0">
-                        <div className="flex size-7 shrink-0 items-center justify-center rounded-xl bg-white p-1 shadow-xs ring-1 ring-slate-100">
-                          <img
-                            src={getProviderLogoUrl(provider.provider)}
-                            alt={displayName}
-                            className="size-full object-contain"
-                          />
+                      <div className="flex min-w-0 items-center gap-2.5">
+                        <div className="flex size-7 shrink-0 items-center justify-center rounded bg-card p-1 ring-1 ring-border">
+                          <img src={getProviderLogoUrl(provider.provider)} alt={displayName} className="size-full object-contain" />
                         </div>
                         <div className="min-w-0 flex-1">
-                          <p className="truncate text-xs font-bold">{displayName}</p>
-                          <p className="truncate text-[10px] opacity-75">{providerConfigs.length} 项已接入配置</p>
+                          <p className="truncate text-xs font-medium">{displayName}</p>
+                          <p className="truncate text-[10px] text-tertiary">{providerConfigs.length} 项已接入配置</p>
                         </div>
                       </div>
-
                       <Tooltip>
                         <TooltipTrigger asChild>
                           <span
                             className={cn(
-                              'size-2.5 shrink-0 rounded-full transition-transform group-hover:scale-125',
-                              hasJoined ? 'bg-emerald-500 ring-2 ring-emerald-100' : 'bg-slate-300',
+                              'size-2 shrink-0 rounded-full',
+                              hasJoined ? 'bg-success' : 'bg-border',
                             )}
                           />
                         </TooltipTrigger>
@@ -580,14 +498,13 @@ export default function ModelConfigPage() {
             </div>
           </aside>
 
-          {/* 右侧选中的供应商详情 & 真实数据表格 */}
-          <section className="rounded-2xl border border-slate-200/80 bg-white p-6 shadow-sm">
-            {/* 供应商 Detail 顶栏 */}
+          {/* 右侧供应商详情 */}
+          <section className="rounded-lg border border-border bg-card p-5">
             {selectedCatalog && (
               <>
-                <div className="flex flex-col gap-4 border-b border-slate-100 pb-5 sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex flex-col gap-4 border-b border-border pb-4 sm:flex-row sm:items-center sm:justify-between">
                   <div className="flex items-center gap-4">
-                    <div className="flex size-12 items-center justify-center rounded-2xl bg-white p-2 shadow-md ring-1 ring-slate-100">
+                    <div className="flex size-11 items-center justify-center rounded-md bg-card p-2 ring-1 ring-border">
                       <img
                         src={getProviderLogoUrl(selectedCatalog.provider)}
                         alt={selectedCatalog.displayName || selectedCatalog.provider}
@@ -596,41 +513,25 @@ export default function ModelConfigPage() {
                     </div>
                     <div>
                       <div className="flex items-center gap-2">
-                        <h2 className="text-lg font-bold text-slate-900">
+                        <h2 className="text-base font-semibold text-foreground">
                           {selectedCatalog.displayName || selectedCatalog.provider}
                         </h2>
-                        <span
-                          className={cn(
-                            'rounded-md px-2 py-0.5 text-[10px] font-bold',
-                            currentProviderConfigs.length > 0
-                              ? 'bg-emerald-50 text-emerald-600'
-                              : 'bg-slate-100 text-slate-500',
-                          )}
-                        >
+                        <Tag variant={currentProviderConfigs.length > 0 ? 'success' : 'neutral'}>
                           {currentProviderConfigs.length > 0 ? '凭据与模型已生效' : '未配置模型'}
-                        </span>
+                        </Tag>
                       </div>
-                      <p className="mt-1 text-xs text-slate-500">
+                      <p className="mt-1 text-xs text-tertiary">
                         {selectedCatalog.defaultGovernanceDescription || '统一模型连接凭据与节点能力提供商。'}
                       </p>
                     </div>
                   </div>
 
                   <div className="flex items-center gap-2">
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => handleOpenCredentials(selectedCatalog.provider)}
-                      className="gap-1.5 rounded-xl border-slate-200 text-xs font-semibold"
-                    >
-                      <Wrench className="size-3.5 text-slate-500" />
+                    <Button size="sm" variant="outline" onClick={() => handleOpenCredentials(selectedCatalog.provider)}>
+                      <Wrench className="size-3.5" />
                       管理 API 凭据
                     </Button>
-                    <Button
-                      size="sm"
-                      onClick={() => handleOpenAddModel()}
-                      className="gap-1.5 rounded-xl bg-[#6f62e8] text-xs font-semibold text-white hover:bg-[#5f52d9]"
-                    >
+                    <Button size="sm" onClick={() => handleOpenAddModel()}>
                       <Plus className="size-3.5" />
                       增加自定义模型
                     </Button>
@@ -639,40 +540,26 @@ export default function ModelConfigPage() {
 
                 {/* 推荐的模型快捷配置区 */}
                 {recommendedModelsList.length > 0 && (
-                  <div className="mt-4 rounded-xl border border-blue-100 bg-[#f4f8ff] p-3.5">
-                    <div className="flex items-center justify-between">
-                      <p className="flex items-center gap-1.5 text-xs font-bold text-blue-900">
-                        <Sparkles className="size-3.5 text-blue-600" />
-                        【后端推荐预设模型 (Catalog Presets)】一键快捷接入：
-                      </p>
-                      <span className="text-[11px] text-blue-600">后端推荐规则</span>
-                    </div>
-
-                    <div className="mt-2.5 flex flex-wrap gap-2">
+                  <div className="mt-4 rounded-md border border-border bg-muted p-3">
+                    <p className="flex items-center gap-1.5 text-xs font-medium text-secondary">
+                      <Sparkles className="size-3.5 text-primary" />
+                      后端推荐预设模型，一键快捷接入：
+                    </p>
+                    <div className="mt-2 flex flex-wrap gap-2">
                       {recommendedModelsList.map((rec) => {
                         const isAlreadyConfigured = currentProviderConfigs.some((c) => c.modelName === rec.name)
                         return (
-                          <div
-                            key={rec.name}
-                            className="flex items-center gap-2 rounded-lg border border-white bg-white/90 px-3 py-1.5 shadow-xs"
-                          >
-                            <div>
-                              <span className="font-mono text-xs font-bold text-slate-800">{rec.name}</span>
-                              <span className="ml-1.5 rounded-md bg-purple-50 px-1.5 py-0.5 text-[9px] font-bold text-[#6f62e8]">
-                                {rec.type}
-                              </span>
-                            </div>
+                          <div key={rec.name} className="flex items-center gap-2 rounded-md border border-border bg-card px-2.5 py-1.5">
+                            <span className="font-mono text-xs font-medium text-foreground">{rec.name}</span>
+                            <Tag variant={rec.type === 'Chat' ? 'info' : rec.type === 'Embedding' ? 'success' : 'warning'}>
+                              {rec.type}
+                            </Tag>
                             <Button
+                              type="button"
                               size="sm"
-                              variant={isAlreadyConfigured ? 'ghost' : 'default'}
+                              variant={isAlreadyConfigured ? 'outline' : 'default'}
                               disabled={isAlreadyConfigured}
                               onClick={() => handleOpenAddModel(rec.name, rec.type)}
-                              className={cn(
-                                'h-6 rounded-md px-2 text-[10px] font-semibold',
-                                isAlreadyConfigured
-                                  ? 'text-emerald-600 bg-emerald-50'
-                                  : 'bg-[#6f62e8] text-white hover:bg-[#5f52d9]',
-                              )}
                             >
                               {isAlreadyConfigured ? '已接入' : '一键接入'}
                             </Button>
@@ -683,145 +570,128 @@ export default function ModelConfigPage() {
                   </div>
                 )}
 
-                {/* 当前供应商的密钥信息 Bar */}
-                <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-xl bg-[#f8f8fc] px-4 py-2.5 text-xs text-slate-600">
-                  <div className="flex items-center gap-4">
-                    <span className="flex items-center gap-1.5 font-medium">
-                      <Link2 className="size-3.5 text-[#6f62e8]" />
-                      Base URL: <span className="font-mono text-slate-800">{selectedCatalog.defaultBaseUrl}</span>
-                      <span title="复制端点">
-                        <Copy
-                          className="size-3 cursor-pointer text-slate-400 hover:text-[#6f62e8]"
-                          onClick={() => handleCopyText(selectedCatalog.defaultBaseUrl, 'Base URL 端点')}
-                        />
-                      </span>
+                {/* 密钥信息 Bar */}
+                <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-md bg-muted px-3.5 py-2.5 text-xs text-secondary">
+                  <div className="flex flex-wrap items-center gap-4">
+                    <span className="flex items-center gap-1.5">
+                      <Link2 className="size-3.5 text-primary" />
+                      Base URL: <span className="font-mono text-foreground">{selectedCatalog.defaultBaseUrl}</span>
+                      <Copy
+                        className="size-3 cursor-pointer text-tertiary hover:text-primary"
+                        onClick={() => handleCopyText(selectedCatalog.defaultBaseUrl, 'Base URL 端点')}
+                      />
                     </span>
-                    <span className="flex items-center gap-1.5 font-medium">
-                      <Key className="size-3.5 text-slate-400" />
-                      凭据 Key: <span className="font-mono text-slate-800">{currentProviderConfigs[0]?.apiKeyMask || currentProviderConfigs[0]?.apiKeyMasked || 'sk-****default'}</span>
+                    <span className="flex items-center gap-1.5">
+                      <Key className="size-3.5 text-tertiary" />
+                      凭据 Key: <span className="font-mono text-foreground">{currentProviderConfigs[0]?.apiKeyMask || currentProviderConfigs[0]?.apiKeyMasked || 'sk-****default'}</span>
                       {currentProviderConfigs[0] && (
-                        <span title="复制脱敏密钥">
-                          <Copy
-                            className="size-3 cursor-pointer text-slate-400 hover:text-[#6f62e8]"
-                            onClick={() => handleCopyText(currentProviderConfigs[0]?.apiKeyMask || currentProviderConfigs[0]?.apiKeyMasked || '', '脱敏密钥')}
-                          />
-                        </span>
+                        <Copy
+                          className="size-3 cursor-pointer text-tertiary hover:text-primary"
+                          onClick={() => handleCopyText(currentProviderConfigs[0]?.apiKeyMask || currentProviderConfigs[0]?.apiKeyMasked || '', '脱敏密钥')}
+                        />
                       )}
                     </span>
                   </div>
-                  <span className="text-[11px] text-slate-400">数据库已存储配置 {currentProviderConfigs.length} 项</span>
+                  <span className="text-[11px] text-tertiary">数据库已存储配置 {currentProviderConfigs.length} 项</span>
                 </div>
 
-                {/* 真实数据模型列表表格 */}
-                <div className="mt-5 overflow-hidden rounded-xl border border-slate-200">
-                  <table className="w-full text-left text-xs">
-                    <thead className="border-b border-slate-200 bg-[#fafafc] text-[11px] font-semibold text-slate-500 uppercase tracking-wider">
-                      <tr>
-                        <th className="px-4 py-3">模型标识 (MODEL NAME)</th>
-                        <th className="px-4 py-3">类型 (TYPE)</th>
-                        <th className="px-4 py-3">端点 (BASE URL)</th>
-                        <th className="px-4 py-3">脱敏密钥</th>
-                        <th className="px-4 py-3 text-right">操作</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100 bg-white">
+                {/* 模型配置表 */}
+                <div className="mt-4 overflow-hidden rounded-md border border-border">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>模型标识</TableHead>
+                        <TableHead>类型</TableHead>
+                        <TableHead>端点</TableHead>
+                        <TableHead>密钥</TableHead>
+                        <TableHead className="text-right">操作</TableHead>
+                        <TableHead>测试连接</TableHead>
+                        <TableHead>删除</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
                       {currentProviderConfigs.length === 0 ? (
-                        <tr>
-                          <td colSpan={5} className="px-4 py-10 text-center text-slate-400">
-                            <Database className="mx-auto size-8 text-slate-300" />
-                            <p className="mt-2 text-xs">数据库中暂无该供应商的已注册模型，可点击上方的【一键接入推荐模型】或【增加自定义模型】。</p>
-                          </td>
-                        </tr>
+                        <TableRow>
+                          <TableCell colSpan={7} className="py-10 text-center text-tertiary">
+                            <Database className="mx-auto size-8 text-border" />
+                            <p className="mt-2 text-xs">数据库中暂无该供应商的已注册模型，可点击【一键接入推荐模型】或【增加自定义模型】。</p>
+                          </TableCell>
+                        </TableRow>
                       ) : (
                         currentProviderConfigs.map((config) => {
                           const maskKey = config.apiKeyMask || config.apiKeyMasked || 'sk-****default'
                           return (
-                            <tr key={config.configId} className="transition-colors hover:bg-slate-50/80">
-                              <td className="px-4 py-3 font-mono font-bold text-slate-800">
+                            <TableRow key={config.configId}>
+                              <TableCell className="font-mono font-medium text-foreground">
                                 <div className="flex items-center gap-2">
                                   <span>{config.modelName}</span>
-                                  <span title="复制模型标识">
-                                    <Copy
-                                      className="size-3 cursor-pointer text-slate-300 transition-colors hover:text-[#6f62e8]"
-                                      onClick={() => handleCopyText(config.modelName, '模型名称')}
-                                    />
-                                  </span>
+                                  <Copy
+                                    className="size-3 cursor-pointer text-border hover:text-primary"
+                                    onClick={() => handleCopyText(config.modelName, '模型名称')}
+                                  />
                                 </div>
-                              </td>
-                              <td className="px-4 py-3">
-                                <span
-                                  className={cn(
-                                    'rounded-md px-2 py-0.5 text-[10px] font-bold',
-                                    config.modelType === 'Chat' || config.modelType === 'LLM'
-                                      ? 'bg-purple-50 text-[#6f62e8]'
-                                      : config.modelType === 'Embedding' || config.modelType === 'Text Embedding'
-                                        ? 'bg-emerald-50 text-emerald-600'
-                                        : 'bg-amber-50 text-amber-600',
-                                  )}
-                                >
+                              </TableCell>
+                              <TableCell>
+                                <Tag variant={config.modelType === 'Chat' || config.modelType === 'LLM' ? 'info' : config.modelType === 'Embedding' || config.modelType === 'Text Embedding' ? 'success' : 'warning'}>
                                   {config.modelType}
-                                </span>
-                              </td>
-                              <td className="max-w-[240px] truncate px-4 py-3 font-mono text-slate-600" title={config.baseUrl}>
+                                </Tag>
+                              </TableCell>
+                              <TableCell className="max-w-[220px] truncate font-mono text-secondary" title={config.baseUrl}>
                                 <div className="flex items-center gap-1.5">
                                   <span className="truncate">{config.baseUrl}</span>
-                                  <span title="复制端点">
-                                    <Copy
-                                      className="size-3 shrink-0 cursor-pointer text-slate-300 transition-colors hover:text-[#6f62e8]"
-                                      onClick={() => handleCopyText(config.baseUrl, 'Base URL 端点')}
-                                    />
-                                  </span>
+                                  <Copy
+                                    className="size-3 shrink-0 cursor-pointer text-border hover:text-primary"
+                                    onClick={() => handleCopyText(config.baseUrl, 'Base URL 端点')}
+                                  />
                                 </div>
-                              </td>
-                              <td className="px-4 py-3 font-mono text-slate-600">
+                              </TableCell>
+                              <TableCell className="font-mono text-secondary">
                                 <div className="flex items-center gap-1.5">
                                   <span>{maskKey}</span>
-                                  <span title="复制脱敏密钥">
-                                    <Copy
-                                      className="size-3 cursor-pointer text-slate-300 transition-colors hover:text-[#6f62e8]"
-                                      onClick={() => handleCopyText(maskKey, '脱敏密钥')}
-                                    />
-                                  </span>
+                                  <Copy
+                                    className="size-3 cursor-pointer text-border hover:text-primary"
+                                    onClick={() => handleCopyText(maskKey, '脱敏密钥')}
+                                  />
                                 </div>
-                              </td>
-                              <td className="px-4 py-3 text-right">
-                                <div className="flex items-center justify-end gap-2.5">
-                                  <button
-                                    type="button"
-                                    disabled={testingConfigId === config.configId}
-                                    onClick={() => handleTestConnectionReal(config.configId, config.modelName)}
-                                    className="flex items-center gap-1 font-semibold text-[#6f62e8] hover:underline"
-                                  >
-                                    <RefreshCw className={cn('size-3', testingConfigId === config.configId && 'animate-spin')} />
-                                    {testingConfigId === config.configId ? '探针测试' : '测试连接'}
-                                  </button>
-
-                                  <button
-                                    type="button"
-                                    onClick={() => handleOpenEditModel(config)}
-                                    className="flex items-center gap-1 font-semibold text-slate-600 hover:text-[#6f62e8] hover:underline"
-                                    title="编辑模型标识与 API Key"
-                                  >
-                                    <Edit3 className="size-3.5" />
-                                    编辑
-                                  </button>
-
-                                  <button
-                                    type="button"
-                                    onClick={() => handleDeleteConfigReal(config.configId, config.modelName)}
-                                    className="text-slate-400 hover:text-red-600"
-                                    title="移除此配置"
-                                  >
-                                    <Trash2 className="size-3.5" />
-                                  </button>
-                                </div>
-                              </td>
-                            </tr>
+                              </TableCell>
+                              <TableCell className="text-right">
+                                <button
+                                  type="button"
+                                  onClick={() => handleOpenEditModel(config)}
+                                  className="flex items-center gap-1 text-primary hover:underline"
+                                  title="编辑模型标识与 API Key"
+                                >
+                                  <Edit3 className="size-3.5" />
+                                  编辑
+                                </button>
+                              </TableCell>
+                              <TableCell>
+                                <button
+                                  type="button"
+                                  disabled={testingConfigId === config.configId}
+                                  onClick={() => void handleTestConnectionReal(config.configId, config.modelName)}
+                                  className="flex items-center gap-1 text-primary hover:underline disabled:opacity-50"
+                                >
+                                  <RefreshCw className={cn('size-3', testingConfigId === config.configId && 'animate-spin')} />
+                                  {testingConfigId === config.configId ? '测试中…' : '测试连接'}
+                                </button>
+                              </TableCell>
+                              <TableCell>
+                                <button
+                                  type="button"
+                                  onClick={() => void handleDeleteConfigReal(config.configId, config.modelName)}
+                                  className="text-danger hover:underline"
+                                  title="移除此配置"
+                                >
+                                  删除
+                                </button>
+                              </TableCell>
+                            </TableRow>
                           )
                         })
                       )}
-                    </tbody>
-                  </table>
+                    </TableBody>
+                  </Table>
                 </div>
               </>
             )}
@@ -831,10 +701,10 @@ export default function ModelConfigPage() {
 
       {/* 凭据 Modal */}
       <Dialog open={credentialsModalOpen} onOpenChange={setCredentialsModalOpen}>
-        <DialogContent className="max-w-lg rounded-2xl bg-white p-6 shadow-2xl">
+        <DialogContent className="max-w-lg bg-card">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2.5 text-base font-bold text-slate-900">
-              <span className="flex size-7 items-center justify-center rounded-xl bg-white p-1 shadow-xs ring-1 ring-slate-100">
+            <DialogTitle className="flex items-center gap-2.5 text-base font-semibold text-foreground">
+              <span className="flex size-7 items-center justify-center rounded bg-card p-1 ring-1 ring-border">
                 <img
                   src={getProviderLogoUrl(selectedProviderId)}
                   alt={selectedCatalog?.displayName}
@@ -843,34 +713,28 @@ export default function ModelConfigPage() {
               </span>
               配置 {selectedCatalog?.displayName || selectedCatalog?.provider} 凭据
             </DialogTitle>
-            <DialogDescription className="text-xs text-slate-500">
+            <DialogDescription className="text-xs text-secondary">
               添加密钥并调用后端真实 REST API 存入数据库。
             </DialogDescription>
           </DialogHeader>
 
           <form onSubmit={handleCreateSubmit} className="mt-4 space-y-4">
             <div>
-              <label className="mb-1 block text-xs font-semibold text-slate-700">配置激活的模型名称 (Model Name)</label>
+              <label className="mb-1 block text-xs font-medium text-secondary">配置激活的模型名称 (Model Name)</label>
               <input
                 required
                 value={newModelName}
                 onChange={(e) => setNewModelName(e.target.value)}
                 placeholder="例如: qwen-plus, gpt-4o 等"
-                className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-mono text-slate-800 outline-none focus:border-[#6f62e8]"
+                className={cn(inputClass, 'font-mono')}
               />
             </div>
-
             <div>
-              <label className="mb-1 block text-xs font-semibold text-slate-700">模型类型</label>
-              <CustomSelect
-                value={newModelCategory}
-                onChange={(v) => setNewModelCategory(v as any)}
-                options={CATEGORY_OPTIONS}
-              />
+              <label className="mb-1 block text-xs font-medium text-secondary">模型类型</label>
+              <CustomSelect value={newModelCategory} onChange={(v) => setNewModelCategory(v as 'Chat' | 'Embedding' | 'Rerank')} options={CATEGORY_OPTIONS} />
             </div>
-
             <div>
-              <label className="mb-1 block text-xs font-semibold text-slate-700">API Key 密钥</label>
+              <label className="mb-1 block text-xs font-medium text-secondary">API Key 密钥</label>
               <div className="relative">
                 <input
                   type={showApiKey ? 'text' : 'password'}
@@ -878,35 +742,25 @@ export default function ModelConfigPage() {
                   value={formApiKey}
                   onChange={(e) => setFormApiKey(e.target.value)}
                   placeholder="sk-..."
-                  className="w-full rounded-xl border border-slate-200 bg-white py-2 pl-3 pr-10 text-xs font-mono text-slate-800 outline-none focus:border-[#6f62e8]"
+                  className={cn(inputClass, 'pr-10 font-mono')}
                 />
-                <button
-                  type="button"
-                  onClick={() => setShowApiKey(!showApiKey)}
-                  className="absolute right-3 top-2.5 text-slate-400 hover:text-slate-600"
-                >
+                <button type="button" onClick={() => setShowApiKey(!showApiKey)} className="absolute right-3 top-2 text-tertiary hover:text-secondary">
                   {showApiKey ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
                 </button>
               </div>
             </div>
-
             <div>
-              <label className="mb-1 block text-xs font-semibold text-slate-700">API Base URL 端点</label>
+              <label className="mb-1 block text-xs font-medium text-secondary">API Base URL 端点</label>
               <input
                 value={formBaseUrl}
                 onChange={(e) => setFormBaseUrl(e.target.value)}
                 placeholder={selectedCatalog?.defaultBaseUrl}
-                className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-mono text-slate-800 outline-none focus:border-[#6f62e8]"
+                className={cn(inputClass, 'font-mono')}
               />
             </div>
-
             <div className="mt-6 flex justify-end gap-2.5">
-              <Button type="button" variant="outline" size="sm" onClick={() => setCredentialsModalOpen(false)}>
-                取消
-              </Button>
-              <Button type="submit" size="sm" className="bg-[#6f62e8] text-white hover:bg-[#5f52d9]">
-                提交至后端生效
-              </Button>
+              <Button type="button" variant="outline" size="sm" onClick={() => setCredentialsModalOpen(false)}>取消</Button>
+              <Button type="submit" size="sm">提交至后端生效</Button>
             </div>
           </form>
         </DialogContent>
@@ -914,56 +768,45 @@ export default function ModelConfigPage() {
 
       {/* 添加新模型 Modal */}
       <Dialog open={addModelModalOpen} onOpenChange={setAddModelModalOpen}>
-        <DialogContent className="max-w-md rounded-2xl bg-white p-6 shadow-2xl">
+        <DialogContent className="max-w-md bg-card">
           <DialogHeader>
-            <DialogTitle className="text-base font-bold text-slate-900">
+            <DialogTitle className="text-base font-semibold text-foreground">
               在 [{selectedCatalog?.displayName || selectedCatalog?.provider}] 下定义新模型
             </DialogTitle>
-            <DialogDescription className="text-xs text-slate-500">
+            <DialogDescription className="text-xs text-secondary">
               配置新模型的类型与标识，保存后可立即在全站路由调用。
             </DialogDescription>
           </DialogHeader>
 
           <form onSubmit={handleCreateSubmit} className="mt-4 space-y-4">
             <div>
-              <label className="mb-1 block text-xs font-semibold text-slate-700">模型类别 (Category)</label>
-              <CustomSelect
-                value={newModelCategory}
-                onChange={(v) => setNewModelCategory(v as any)}
-                options={CATEGORY_OPTIONS}
-              />
+              <label className="mb-1 block text-xs font-medium text-secondary">模型类别 (Category)</label>
+              <CustomSelect value={newModelCategory} onChange={(v) => setNewModelCategory(v as 'Chat' | 'Embedding' | 'Rerank')} options={CATEGORY_OPTIONS} />
             </div>
-
             <div>
-              <label className="mb-1 block text-xs font-semibold text-slate-700">模型标识名称 (Model ID)</label>
+              <label className="mb-1 block text-xs font-medium text-secondary">模型标识名称 (Model ID)</label>
               <input
                 required
                 value={newModelName}
                 onChange={(e) => setNewModelName(e.target.value)}
                 placeholder="例如: qwen-turbo, gpt-4o-mini 等"
-                className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-mono text-slate-800 outline-none focus:border-[#6f62e8]"
+                className={cn(inputClass, 'font-mono')}
               />
             </div>
-
             <div>
-              <label className="mb-1 block text-xs font-semibold text-slate-700">API Key 密钥</label>
+              <label className="mb-1 block text-xs font-medium text-secondary">API Key 密钥</label>
               <input
                 type="password"
                 required
                 value={formApiKey}
                 onChange={(e) => setFormApiKey(e.target.value)}
                 placeholder="sk-..."
-                className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-mono text-slate-800 outline-none focus:border-[#6f62e8]"
+                className={cn(inputClass, 'font-mono')}
               />
             </div>
-
             <div className="mt-6 flex justify-end gap-2.5">
-              <Button type="button" variant="outline" size="sm" onClick={() => setAddModelModalOpen(false)}>
-                取消
-              </Button>
-              <Button type="submit" size="sm" className="bg-[#6f62e8] text-white hover:bg-[#5f52d9]">
-                添加真实配置
-              </Button>
+              <Button type="button" variant="outline" size="sm" onClick={() => setAddModelModalOpen(false)}>取消</Button>
+              <Button type="submit" size="sm">添加真实配置</Button>
             </div>
           </form>
         </DialogContent>
@@ -971,41 +814,35 @@ export default function ModelConfigPage() {
 
       {/* 编辑模型配置 Modal */}
       <Dialog open={editModelModalOpen} onOpenChange={setEditModelModalOpen}>
-        <DialogContent className="max-w-md rounded-2xl bg-white p-6 shadow-2xl">
+        <DialogContent className="max-w-md bg-card">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-base font-bold text-slate-900">
-              <Edit3 className="size-4 text-[#6f62e8]" />
+            <DialogTitle className="flex items-center gap-2 text-base font-semibold text-foreground">
+              <Edit3 className="size-4 text-primary" />
               编辑模型配置 [{editModelName}]
             </DialogTitle>
-            <DialogDescription className="text-xs text-slate-500">
+            <DialogDescription className="text-xs text-secondary">
               直接修改当前模型的 API Key 密钥、Base URL 及配置参数。
             </DialogDescription>
           </DialogHeader>
 
           <form onSubmit={handleEditSubmit} className="mt-4 space-y-4">
             <div>
-              <label className="mb-1 block text-xs font-semibold text-slate-700">模型标识名称 (Model ID)</label>
+              <label className="mb-1 block text-xs font-medium text-secondary">模型标识名称 (Model ID)</label>
               <input
                 required
                 value={editModelName}
                 onChange={(e) => setEditModelName(e.target.value)}
                 placeholder="例如: qwen-plus, gpt-4o 等"
-                className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-mono text-slate-800 outline-none focus:border-[#6f62e8]"
+                className={cn(inputClass, 'font-mono')}
               />
             </div>
-
             <div>
-              <label className="mb-1 block text-xs font-semibold text-slate-700">模型类别 (Category)</label>
-              <CustomSelect
-                value={editModelCategory}
-                onChange={(v) => setEditModelCategory(v as any)}
-                options={CATEGORY_OPTIONS}
-              />
+              <label className="mb-1 block text-xs font-medium text-secondary">模型类别 (Category)</label>
+              <CustomSelect value={editModelCategory} onChange={(v) => setEditModelCategory(v as 'Chat' | 'Embedding' | 'Rerank')} options={CATEGORY_OPTIONS} />
             </div>
-
             <div>
-              <label className="mb-1 block text-xs font-semibold text-slate-700">
-                新 API Key 密钥 <span className="font-normal text-slate-400">（若不修改请留空）</span>
+              <label className="mb-1 block text-xs font-medium text-secondary">
+                新 API Key 密钥 <span className="font-normal text-tertiary">（若不修改请留空）</span>
               </label>
               <div className="relative">
                 <input
@@ -1013,49 +850,29 @@ export default function ModelConfigPage() {
                   value={editApiKey}
                   onChange={(e) => setEditApiKey(e.target.value)}
                   placeholder="留空则保持现有 Key 不变 (sk-...)"
-                  className="w-full rounded-xl border border-slate-200 bg-white py-2 pl-3 pr-10 text-xs font-mono text-slate-800 outline-none focus:border-[#6f62e8]"
+                  className={cn(inputClass, 'pr-10 font-mono')}
                 />
-                <button
-                  type="button"
-                  onClick={() => setShowEditApiKey(!showEditApiKey)}
-                  className="absolute right-3 top-2.5 text-slate-400 hover:text-slate-600"
-                >
+                <button type="button" onClick={() => setShowEditApiKey(!showEditApiKey)} className="absolute right-3 top-2 text-tertiary hover:text-secondary">
                   {showEditApiKey ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
                 </button>
               </div>
             </div>
-
             <div>
-              <label className="mb-1 block text-xs font-semibold text-slate-700">API Base URL 端点</label>
+              <label className="mb-1 block text-xs font-medium text-secondary">API Base URL 端点</label>
               <input
                 value={editBaseUrl}
                 onChange={(e) => setEditBaseUrl(e.target.value)}
                 placeholder="https://api.openai.com/v1"
-                className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-mono text-slate-800 outline-none focus:border-[#6f62e8]"
+                className={cn(inputClass, 'font-mono')}
               />
             </div>
-
             <div className="mt-6 flex justify-end gap-2.5">
-              <Button type="button" variant="outline" size="sm" onClick={() => setEditModelModalOpen(false)}>
-                取消
-              </Button>
-              <Button type="submit" size="sm" className="bg-[#6f62e8] text-white hover:bg-[#5f52d9]">
-                保存配置修改
-              </Button>
+              <Button type="button" variant="outline" size="sm" onClick={() => setEditModelModalOpen(false)}>取消</Button>
+              <Button type="submit" size="sm">保存配置修改</Button>
             </div>
           </form>
         </DialogContent>
       </Dialog>
-
-      {/* 底部 Toast */}
-      {toastMessage && (
-        <div className="fixed bottom-6 right-8 z-50 animate-in fade-in slide-in-from-bottom-2">
-          <div className="flex items-center gap-2 rounded-xl bg-slate-900 px-4 py-2.5 text-xs font-semibold text-white shadow-2xl">
-            <CheckCircle2 className="size-4 text-emerald-400" />
-            {toastMessage}
-          </div>
-        </div>
-      )}
     </div>
   )
 }
