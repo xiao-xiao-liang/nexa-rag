@@ -659,71 +659,48 @@ export default function PromptManagementPage() {
             />
           </div>
 
-          {/* Inspector Tab 1: 发布分流卡片 */}
+          {/* Inspector Tab 1: 发布信息 */}
           {inspectorTab === 'release' && (
-            <div className="min-h-0 flex-1 overflow-y-auto p-4 space-y-4">
+            <div className="min-h-0 flex-1 overflow-y-auto p-4">
               <div className="rounded-md border border-border bg-muted p-3.5">
-                <div className="flex items-center justify-between border-b border-border pb-2 text-xs font-medium text-foreground">
-                  <span>当前物理发布 (Release)</span>
-                  <span className="rounded bg-success-light px-1.5 py-0.5 text-[9px] text-success">生效中</span>
-                </div>
-
-                <div className="mt-3 space-y-3">
-                  {/* 正式版本 */}
-                  <div className="rounded-md border border-success/30 bg-success-light p-3">
-                    <div className="flex items-center justify-between text-xs">
-                      <span className="font-medium text-success">🟢 正式版本 (Stable)</span>
-                      <span className="font-mono font-medium text-success">
-                        {activeStableVersion ? `v${activeStableVersion.versionNo}` : '暂无'}
-                      </span>
-                    </div>
-                    <p className="mt-1 truncate font-mono text-[10px] text-secondary">
-                      ID: {activeRelease?.stableVersionId || '未配置'}
-                    </p>
-                    <p className="mt-0.5 text-[10px] text-secondary">
-                      发布时间: {activeRelease?.releasedAt ? new Date(activeRelease.releasedAt).toLocaleString() : '-'}
-                    </p>
+                <p className="mb-3 border-b border-border pb-2 text-xs font-medium text-foreground">发布信息</p>
+                <div className="space-y-3 text-xs">
+                  <div className="flex items-center justify-between">
+                    <span className="text-secondary">当前版本</span>
+                    <span className="font-medium text-foreground">
+                      {activeStableVersion ? `v${activeStableVersion.versionNo}` : '暂无'}
+                    </span>
                   </div>
-
-                  {/* 灰度版本 */}
-                  <div className="rounded-md border border-warning/30 bg-warning-light p-3">
-                    <div className="flex items-center justify-between text-xs">
-                      <span className="font-medium text-warning">🟡 灰度分流 (Canary)</span>
-                      <span className="font-mono font-medium text-warning">
-                        {activeCanaryVersion ? `v${activeCanaryVersion.versionNo}` : '未启用'}
-                      </span>
-                    </div>
-
-                    {activeCanaryVersion ? (
-                      <div className="mt-2 space-y-1.5">
-                        <div className="flex justify-between text-[10px] font-medium text-secondary">
-                          <span>灰度流量比例</span>
-                          <span>{canaryPercentage}%</span>
-                        </div>
-                        <div className="h-2 w-full overflow-hidden rounded-full bg-warning/20">
-                          <div
-                            className="h-full bg-warning transition-all duration-300"
-                            style={{ width: `${canaryPercentage}%` }}
-                          />
-                        </div>
-                      </div>
-                    ) : (
-                      <p className="mt-1 text-[11px] text-secondary">
-                        100% 流量走向正式版本。
-                      </p>
-                    )}
+                  <div className="flex items-center justify-between">
+                    <span className="text-secondary">灰度</span>
+                    <span className="font-medium text-foreground">
+                      {activeCanaryVersion ? `${canaryPercentage}%` : '未启用'}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-secondary">最近发布</span>
+                    <span className="font-medium text-foreground">
+                      {activeRelease?.releasedAt ? formatPromptTime(activeRelease.releasedAt) : '-'}
+                    </span>
                   </div>
                 </div>
-
-                <Button
-                  size="sm"
-                  onClick={handleOpenReleaseModal}
-                  className="mt-3.5 w-full gap-1.5"
-                >
-                  <GitBranch className="size-3.5" />
-                  配置灰度与正式发布
-                </Button>
               </div>
+              <Button
+                size="sm"
+                onClick={handleOpenReleaseModal}
+                className="mt-3.5 w-full gap-1.5"
+              >
+                <GitBranch className="size-3.5" />
+                配置灰度与正式发布
+              </Button>
+              <button
+                type="button"
+                onClick={() => setInspectorTab('history')}
+                className="mt-2 flex w-full items-center justify-center gap-1 text-xs text-primary hover:underline"
+              >
+                <RotateCcw className="size-3" />
+                回滚
+              </button>
             </div>
           )}
 
@@ -1062,4 +1039,11 @@ export default function PromptManagementPage() {
       </Dialog>
     </div>
   )
+}
+
+function formatPromptTime(value: string): string {
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return '-'
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`
 }
