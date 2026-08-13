@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { ArrowLeft, ChevronRight, Clock, Database, Download, ExternalLink, FileText, HardDrive, Info, Layers, RefreshCw, Sparkles } from 'lucide-react'
+import { ArrowLeft, ChevronRight, Clock, Download, ExternalLink, FileText, Info, RefreshCw, Sparkles } from 'lucide-react'
 import { Link, useParams } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
+import { Tabs } from '@/components/ui/tabs'
 import type { PageVO } from '@/shared/api/types'
 import { DocumentStatusBadge } from '../components/DocumentStatusBadge'
 import { FileTypeIcon } from '../components/FileTypeIcon'
@@ -11,9 +12,12 @@ import { useDocumentStatusPolling } from '../hooks/useDocumentStatusPolling'
 import { DocumentChunkBrowser } from '../components/DocumentChunkBrowser'
 
 const CHUNK_PAGE_SIZE = 20
+const SCROLL_LOAD_THRESHOLD = 120
 const EMPTY_CHUNKS: PageVO<DocumentChunk> = { records: [], total: 0, current: 1, size: CHUNK_PAGE_SIZE, pages: 0 }
 
-/** 文档分块工作区，按分块展示原型组织文档信息与右侧编辑抽屉。 */
+type DocumentView = 'overview' | 'chunks'
+
+/** 文档详情页：面包屑 + 标题行（含信息条）+ Tab + 知识块卡片网格，分块随滚动加载。 */
 export function DocumentDetailPage() {
   const { documentId: documentIdParam } = useParams()
   const documentId = parseDocumentId(documentIdParam)
@@ -28,10 +32,15 @@ export function DocumentDetailPage() {
   const [chunksError, setChunksError] = useState<string | null>(null)
   const [selectedChunk, setSelectedChunk] = useState<DocumentChunk | null>(null)
   const [submitting, setSubmitting] = useState(false)
+  const [activeView, setActiveView] = useState<DocumentView>('chunks')
   const detailControllerRef = useRef<AbortController | null>(null)
   const processControllerRef = useRef<AbortController | null>(null)
   const chunksControllerRef = useRef<AbortController | null>(null)
+  const scrollRef = useRef<HTMLElement | null>(null)
+  const scrollStateRef = useRef({ hasMore: false, loading: false })
   const currentStatus: DocumentStatus | null = processStatus?.status ?? document?.status ?? null
+  const hasMore = chunkPage < Math.max(chunks.pages, 1) && chunks.total > 0
+  scrollStateRef.current = { hasMore, loading: chunksLoading }
 
   const loadProcessStatus = useCallback(async (targetDocumentId: string | number) => {
     processControllerRef.current?.abort()
@@ -62,7 +71,7 @@ export function DocumentDetailPage() {
     }
   }, [])
 
-  const loadChunks = useCallback(async (targetDocumentId: string | number, targetPage: number) => {
+  const loadChunks = useCallback(async (targetDocumentId: string | number, targetPage: number, append: boolean) => {
     chunksControllerRef.current?.abort()
     const controller = new AbortController()
     chunksControllerRef.current = controller
@@ -70,7 +79,13 @@ export function DocumentDetailPage() {
     setChunksError(null)
     try {
       const response = await getDocumentChunks(targetDocumentId, targetPage, CHUNK_PAGE_SIZE, controller.signal)
-      if (!controller.signal.aborted) setChunks(response)
+      if (!controller.signal.aborted) {
+        setChunks((current) => {
+          if (!append) return response
+          const seen = new Set(current.records.map((item) => item.chunkId))
+          return { ...response, records: [...current.records, ...response.records.filter((item) => !seen.has(item.chunkId))] }
+        })
+      }
     } catch (error) {
       if ((error as { name?: string }).name !== 'AbortError') setChunksError(error instanceof Error ? error.message : '文本分块加载失败，请稍后重试')
     } finally {
@@ -85,9 +100,33 @@ export function DocumentDetailPage() {
     return () => { detailControllerRef.current?.abort(); processControllerRef.current?.abort(); chunksControllerRef.current?.abort() }
   }, [documentId, loadDetail, loadProcessStatus])
 
+  // 切换文档时重置分块列表与选中态
   useEffect(() => {
-    if (documentId !== null && currentStatus === 'INDEXED') void loadChunks(documentId, chunkPage)
+    setChunks(EMPTY_CHUNKS)
+    setChunkPage(1)
+    setSelectedChunk(null)
+  }, [documentId])
+
+  // 已索引后加载分块；页码递增时追加下一页
+  useEffect(() => {
+    if (documentId === null || currentStatus !== 'INDEXED') return
+    void loadChunks(documentId, chunkPage, chunkPage > 1)
   }, [chunkPage, currentStatus, documentId, loadChunks])
+
+  // 滚动接近底部时触发下一页加载
+  useEffect(() => {
+    const container = scrollRef.current
+    if (!container) return
+    const handleScroll = () => {
+      const state = scrollStateRef.current
+      if (state.loading || !state.hasMore) return
+      if (container.scrollTop + container.clientHeight >= container.scrollHeight - SCROLL_LOAD_THRESHOLD) {
+        setChunkPage((page) => page + 1)
+      }
+    }
+    container.addEventListener('scroll', handleScroll)
+    return () => container.removeEventListener('scroll', handleScroll)
+  }, [])
 
   const onPolledStatus = useCallback((value: DocumentProcessStatus) => setProcessStatus(value), [])
   const onPollingError = useCallback((error: Error) => setProcessError(error.message), [])
@@ -109,9 +148,11 @@ export function DocumentDetailPage() {
     }
   }
 
-  const handleChunkPageChange = (nextPage: number) => {
+  const handleRefresh = () => {
+    if (documentId === null || currentStatus !== 'INDEXED') return
     setSelectedChunk(null)
-    setChunkPage(nextPage)
+    setChunkPage(1)
+    void loadChunks(documentId, 1, false)
   }
 
   const handleChunkSave = (chunk: DocumentChunk, text: string) => {
@@ -120,13 +161,26 @@ export function DocumentDetailPage() {
     setSelectedChunk(updatedChunk)
   }
 
+  const handleChunkDelete = (chunk: DocumentChunk) => {
+    setChunks((current) => ({
+      ...current,
+      total: Math.max(0, current.total - 1),
+      records: current.records.filter((item) => item.chunkId !== chunk.chunkId),
+    }))
+    setSelectedChunk(null)
+  }
+
   if (documentId === null) return <InvalidDocumentAddress />
 
   const isProcessing = currentStatus !== null && isProcessingStatus(currentStatus)
 
   return (
-    <section className="min-h-full min-w-0 overflow-y-auto bg-background px-4 py-5 sm:px-6 lg:px-10">
-      {detailError && <LoadError message={detailError} onRetry={() => void loadDetail(documentId)} />}      
+    <section
+      ref={scrollRef}
+      data-testid="document-detail-scroll"
+      className="h-full min-w-0 overflow-y-auto bg-background px-4 py-5 sm:px-6 lg:px-10"
+    >
+      {detailError && <LoadError message={detailError} onRetry={() => void loadDetail(documentId)} />}
       {detailLoading && !document && (
         <div className="flex min-h-[400px] flex-col items-center justify-center gap-3 text-tertiary">
           <RefreshCw className="size-6 animate-spin text-primary" />
@@ -135,7 +189,7 @@ export function DocumentDetailPage() {
       )}
 
       {document && (
-        <div className="w-full space-y-5">
+        <div className="w-full space-y-4">
           {/* 面包屑导航 */}
           <nav aria-label="Breadcrumb" className="flex items-center gap-2 text-xs text-tertiary">
             <Link to="/knowledge-base" className="transition-colors hover:text-primary">知识库</Link>
@@ -145,33 +199,38 @@ export function DocumentDetailPage() {
             <span className="font-medium text-secondary">全部文档</span>
           </nav>
 
-          {/* 统一 Header 主 Banner 卡片 */}
-          <header className="rounded-lg border border-border bg-card p-5 space-y-4">
-            {/* 上层：标题 + 操作组 */}
+          {/* 标题行（含信息条） */}
+          <header className="rounded-md border border-border bg-card p-4">
             <div className="flex flex-wrap items-start justify-between gap-4">
-              <div className="flex min-w-0 items-center gap-4">
-                <div className="rounded-md border border-border bg-muted p-1.5">
+              <div className="flex min-w-0 items-center gap-3">
+                <span className="rounded-md border border-border bg-muted p-2">
                   <FileTypeIcon fileName={document.originalFileName} fileType={document.fileType} size="lg" />
-                </div>
-                <div className="min-w-0 space-y-1">
-                  <h1 className="truncate text-xl font-semibold text-foreground">
+                </span>
+                <div className="min-w-0">
+                  <h1 className="truncate text-lg font-semibold text-foreground">
                     {document.title || document.originalFileName || '未命名文档'}
                   </h1>
-                  <p className="flex items-center gap-1.5 text-xs text-secondary">
-                    <span className="shrink-0 font-medium text-tertiary">原始文件名</span>
-                    <span className="truncate">{document.originalFileName || '未提供原始文件名'}</span>
+                  <p className="mt-0.5 truncate text-xs text-secondary">
+                    <span className="font-medium text-tertiary">原始文件名：</span>
+                    <span>{document.originalFileName || '未提供原始文件名'}</span>
+                    {currentStatus && (
+                      <>
+                        <span className="mx-1 text-tertiary">·</span>
+                        <DocumentStatusBadge status={currentStatus} />
+                      </>
+                    )}
                   </p>
                 </div>
               </div>
 
-              {/* 动作区：返回 + 源文件预览下载 + 处理/重试按钮 */}
-              <div className="flex flex-wrap items-center gap-2.5 shrink-0">
+              {/* 动作区 */}
+              <div className="flex shrink-0 flex-wrap items-center gap-2">
                 {document.originalFileUrl && (
                   <a
                     href={document.originalFileUrl}
                     target="_blank"
                     rel="noreferrer"
-                    className="inline-flex h-8 items-center gap-1.5 rounded-md border border-border bg-muted px-3 text-xs text-secondary transition-colors hover:bg-muted/70 hover:text-primary"
+                    className="inline-flex h-8 items-center gap-1.5 rounded-md border border-border bg-card px-3 text-xs text-secondary transition-colors hover:bg-muted hover:text-foreground"
                   >
                     <Download className="size-3.5" />
                     下载源文件
@@ -183,16 +242,16 @@ export function DocumentDetailPage() {
                     href={document.parsedFileUrl}
                     target="_blank"
                     rel="noreferrer"
-                    className="inline-flex h-8 items-center gap-1.5 rounded-md border border-border bg-muted px-3 text-xs text-secondary transition-colors hover:bg-muted/70 hover:text-primary"
+                    className="inline-flex h-8 items-center gap-1.5 rounded-md border border-border bg-card px-3 text-xs text-secondary transition-colors hover:bg-muted hover:text-foreground"
                   >
                     <ExternalLink className="size-3.5" />
-                    预览 Markdown
+                    预览
                   </a>
                 )}
 
                 <Link
                   to="/knowledge-base?view=documents"
-                  className="inline-flex h-8 items-center gap-1.5 rounded-md border border-border bg-card px-3.5 text-xs text-secondary transition-colors hover:bg-muted hover:text-foreground"
+                  className="inline-flex h-8 items-center gap-1.5 rounded-md border border-border bg-card px-3 text-xs text-secondary transition-colors hover:bg-muted hover:text-foreground"
                 >
                   <ArrowLeft className="size-3.5" />
                   返回文档
@@ -212,7 +271,8 @@ export function DocumentDetailPage() {
                   <Button
                     onClick={() => void submitProcess('retry')}
                     disabled={submitting}
-                    className="h-8 rounded-md bg-danger px-3.5 text-sm font-medium text-white hover:bg-danger/90 disabled:opacity-50"
+                    variant="danger"
+                    className="h-8 rounded-md px-3.5 text-sm font-medium disabled:opacity-50"
                   >
                     {submitting ? '提交中…' : '重新处理'}
                   </Button>
@@ -220,18 +280,29 @@ export function DocumentDetailPage() {
               </div>
             </div>
 
-            {/* 文档描述字段 (description) */}
-            {document.description && (
-              <div className="flex items-center gap-2 rounded-md bg-muted border border-border px-3.5 py-2 text-xs text-secondary">
-                <Info className="size-3.5 shrink-0 text-tertiary" />
-                <span className="font-medium text-tertiary mr-1">描述:</span>
-                <span className="truncate text-secondary">{document.description}</span>
-              </div>
-            )}
+            {/* 信息条 */}
+            <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-border pt-3 text-xs text-secondary">
+              <span>
+                <b className="font-medium text-tertiary">文档类型</b> {document.fileType || '—'}
+              </span>
+              <span className="h-3 w-px bg-border" />
+              <span>
+                <b className="font-medium text-tertiary">文件大小</b> {formatFileSize(document.fileSize)}
+              </span>
+              <span className="h-3 w-px bg-border" />
+              <span>
+                <b className="font-medium text-tertiary">处理状态</b>{' '}
+                {currentStatus ? <DocumentStatusBadge status={currentStatus} /> : <span className="text-tertiary">状态未知</span>}
+              </span>
+              <span className="h-3 w-px bg-border" />
+              <span>
+                <b className="font-medium text-tertiary">文本分块</b> {chunks.total} 个
+              </span>
+            </div>
 
-            {/* 动态 Pipeline 真实进度条 (处理中状态时展现) */}
+            {/* 处理中：三段式流水线进度 */}
             {isProcessing && (
-              <div className="rounded-md border border-primary/30 bg-primary-light p-3.5 space-y-2">
+              <div className="mt-3 rounded-md border border-border bg-muted/60 p-3">
                 <div className="flex items-center justify-between text-xs font-medium text-foreground">
                   <span className="flex items-center gap-1.5">
                     <RefreshCw className="size-3.5 animate-spin text-primary" />
@@ -244,7 +315,7 @@ export function DocumentDetailPage() {
                     </span>
                   )}
                 </div>
-                <div className="grid grid-cols-3 gap-2 text-center text-[10px] font-medium">
+                <div className="mt-2 grid grid-cols-3 gap-2 text-center text-[11px] font-medium">
                   <span className={`rounded py-1.5 transition-colors ${currentStatus === 'QUEUED' || currentStatus === 'PARSING' ? 'bg-primary text-white' : 'bg-success-light text-success'}`}>
                     1. 格式解析
                   </span>
@@ -257,54 +328,21 @@ export function DocumentDetailPage() {
                 </div>
               </div>
             )}
-
-            {/* 下层：4项基本指标横栏 */}
-            <div className="grid grid-cols-2 gap-4 border-t border-border pt-4 sm:grid-cols-4">
-              <div className="flex items-center gap-3">
-                <div className="rounded-md bg-muted p-2.5 text-primary"><FileText className="size-4" /></div>
-                <div>
-                  <span className="block text-[10px] font-medium uppercase tracking-wider text-tertiary">文档类型</span>
-                  <span className="text-xs font-semibold text-foreground">{document.fileType || '—'}</span>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-3">
-                <div className="rounded-md bg-muted p-2.5 text-secondary"><HardDrive className="size-4" /></div>
-                <div>
-                  <span className="block text-[10px] font-medium uppercase tracking-wider text-tertiary">文件大小</span>
-                  <span className="text-xs font-semibold text-foreground">{formatFileSize(document.fileSize)}</span>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-3">
-                <div className="rounded-md bg-muted p-2.5 text-warning"><Database className="size-4" /></div>
-                <div>
-                  <span className="block text-[10px] font-medium uppercase tracking-wider text-tertiary">处理状态</span>
-                  <div>{currentStatus ? <DocumentStatusBadge status={currentStatus} /> : <span className="text-tertiary text-xs">状态未知</span>}</div>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-3">
-                <div className="rounded-md bg-muted p-2.5 text-success"><Layers className="size-4" /></div>
-                <div>
-                  <span className="block text-[10px] font-medium uppercase tracking-wider text-tertiary">文本分块</span>
-                  <span className="text-xs font-semibold text-foreground">{chunks.total} <span className="font-normal text-tertiary">个</span></span>
-                </div>
-              </div>
-            </div>
           </header>
 
           {/* Tab 导航 */}
-          <nav aria-label="文档视图选项" className="flex items-center gap-5 border-b border-border px-1 pt-1">
-            <span className="pb-2.5 text-sm text-tertiary">文档概览</span>
-            <span className="relative pb-2.5 text-sm font-medium text-primary after:absolute after:inset-x-0 after:bottom-0 after:h-0.5 after:rounded-full after:bg-primary">
-              文本分块
-            </span>
-          </nav>
+          <Tabs
+            items={[
+              { value: 'overview', label: '文档概览' },
+              { value: 'chunks', label: '文本分块' },
+            ]}
+            value={activeView}
+            onChange={(value) => setActiveView(value as DocumentView)}
+          />
 
           {/* 异常诊断提示 */}
           {(processStatus?.messageStatus || currentStatus === 'FAILED' || processError) && (
-            <section className="rounded-lg border border-border bg-card p-4">
+            <section className="rounded-md border border-border bg-card p-4">
               <div className="flex items-start gap-3">
                 <div className="rounded-md bg-primary-light p-2 text-primary">
                   <Sparkles className="size-4" />
@@ -324,28 +362,54 @@ export function DocumentDetailPage() {
             </section>
           )}
 
-          {/* 分块内容工作区 或 未就绪空状态 */}
-          {currentStatus !== 'INDEXED' ? (
-            <section className="flex flex-col items-center justify-center rounded-lg border border-dashed border-border bg-card px-6 py-16 text-center">
+          {/* 文档概览 */}
+          {activeView === 'overview' && (
+            <section className="rounded-md border border-border bg-card p-5">
+              {document.description ? (
+                <div className="flex items-start gap-2 text-xs text-secondary">
+                  <Info className="mt-0.5 size-3.5 shrink-0 text-tertiary" />
+                  <div className="min-w-0">
+                    <span className="mr-2 font-medium text-tertiary">描述</span>
+                    <span className="whitespace-pre-wrap text-secondary">{document.description}</span>
+                  </div>
+                </div>
+              ) : (
+                <p className="text-xs text-tertiary">暂无概览信息，可在文档处理完成后查看文本分块。</p>
+              )}
+            </section>
+          )}
+
+          {/* 文本分块工作区 或 未就绪空状态 */}
+          {activeView === 'chunks' && currentStatus !== 'INDEXED' && (
+            <section className="flex flex-col items-center justify-center rounded-md border border-dashed border-border bg-card px-6 py-16 text-center">
               <div className="rounded-md bg-primary-light p-4 text-primary">
                 <FileText className="size-8" />
               </div>
               <h2 className="mt-4 text-base font-semibold text-foreground">分块尚未就绪</h2>
               <p className="mt-1 max-w-sm text-xs text-secondary">文档解析与向量索引完成后，可在此查看并在线编辑调整文本分块。</p>
             </section>
-          ) : (
+          )}
+
+          {activeView === 'chunks' && currentStatus === 'INDEXED' && (
             <DocumentChunkBrowser
               chunks={chunks.records}
+              total={chunks.total}
               sourceFileName={document.originalFileName || document.title || '未命名文档'}
               fileDescription={document.description}
-              loading={chunksLoading}
+              fileType={document.fileType}
+              fileSize={document.fileSize}
+              originalFileUrl={document.originalFileUrl}
+              loading={chunksLoading && chunks.records.length === 0}
+              loadingMore={chunksLoading && chunks.records.length > 0 && chunkPage > 1}
+              hasMore={hasMore}
               error={chunksError}
               selectedChunk={selectedChunk}
-              pagination={<ChunkPagination page={chunks} pageNum={chunkPage} onChange={handleChunkPageChange} />}
               onSelect={setSelectedChunk}
               onClose={() => setSelectedChunk(null)}
-              onRetry={() => void loadChunks(documentId, chunkPage)}
+              onRetry={() => { if (documentId !== null) void loadChunks(documentId, chunkPage, chunkPage > 1) }}
+              onRefresh={handleRefresh}
               onSave={handleChunkSave}
+              onDelete={handleChunkDelete}
             />
           )}
         </div>
@@ -358,7 +422,7 @@ export function DocumentDetailPage() {
 function InvalidDocumentAddress() {
   return (
     <section className="flex min-h-full min-w-0 flex-1 items-center justify-center bg-background p-6">
-      <div className="max-w-md rounded-lg border border-border bg-card p-8 text-center">
+      <div className="max-w-md rounded-md border border-border bg-card p-8 text-center">
         <h1 className="text-lg font-semibold text-foreground">文档地址无效</h1>
         <p className="mt-2 text-xs text-secondary">无法检索到对应的文档记录，请核对文档 URL 地址。</p>
         <Link
@@ -375,7 +439,7 @@ function InvalidDocumentAddress() {
 /** 详情请求失败提示。 */
 function LoadError({ message, onRetry }: { message: string; onRetry: () => void }) {
   return (
-    <div className="mb-6 flex w-full flex-wrap items-center justify-between gap-3 rounded-md border border-danger-light bg-danger-light px-4 py-3 text-xs text-danger">
+    <div className="mb-4 flex w-full flex-wrap items-center justify-between gap-3 rounded-md border border-danger-light bg-danger-light px-4 py-3 text-xs text-danger">
       <span className="font-medium">{message}</span>
       <button
         type="button"
@@ -385,35 +449,6 @@ function LoadError({ message, onRetry }: { message: string; onRetry: () => void 
         <RefreshCw className="size-3.5" />
         重新加载
       </button>
-    </div>
-  )
-}
-
-/** 分块分页控件。 */
-function ChunkPagination({ page, pageNum, onChange }: { page: PageVO<DocumentChunk>; pageNum: number; onChange: (pageNum: number) => void }) {
-  const totalPages = Math.max(page.pages, 1)
-  return (
-    <div className="mt-6 flex items-center justify-between border-t border-border pt-4 text-xs text-secondary">
-      <span className="text-tertiary">共 {page.total} 个文本分块</span>
-      <div className="flex items-center gap-3">
-        <button
-          type="button"
-          disabled={pageNum <= 1}
-          onClick={() => onChange(pageNum - 1)}
-          className="rounded border border-border bg-card px-3.5 py-1.5 font-medium transition-colors hover:bg-muted disabled:cursor-not-allowed disabled:opacity-40"
-        >
-          上一页
-        </button>
-        <span className="font-medium text-secondary">第 {pageNum} / {totalPages} 页</span>
-        <button
-          type="button"
-          disabled={pageNum >= totalPages}
-          onClick={() => onChange(pageNum + 1)}
-          className="rounded border border-border bg-card px-3.5 py-1.5 font-medium transition-colors hover:bg-muted disabled:cursor-not-allowed disabled:opacity-40"
-        >
-          下一页
-        </button>
-      </div>
     </div>
   )
 }

@@ -1,4 +1,4 @@
-import { cleanup, render, screen, waitFor } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -96,7 +96,7 @@ describe('文档详情页面', () => {
     expect(await screen.findByRole('region', { name: '知识块工作区' })).toBeInTheDocument()
   })
 
-  it('切换分块页码时应清空已选分块', async () => {
+  it('滚动接近底部时应追加加载下一页分块', async () => {
     vi.mocked(getDocument).mockResolvedValue(detail('INDEXED'))
     vi.mocked(getDocumentProcessStatus).mockResolvedValue(indexedStatus)
     vi.mocked(getDocumentChunks)
@@ -107,9 +107,16 @@ describe('文档详情页面', () => {
 
     await user.click(await screen.findByRole('button', { name: '查看分块 1' }))
     expect(screen.getByRole('region', { name: '分块完整内容' })).toHaveTextContent('第一页内容')
-    await user.click(screen.getByRole('button', { name: '下一页' }))
+    await user.click(screen.getByRole('button', { name: '关闭分块内容' }))
+
+    const container = screen.getByTestId('document-detail-scroll')
+    Object.defineProperty(container, 'scrollHeight', { value: 2000, configurable: true })
+    Object.defineProperty(container, 'clientHeight', { value: 800, configurable: true })
+    Object.defineProperty(container, 'scrollTop', { value: 1600, configurable: true })
+    fireEvent.scroll(container)
 
     await waitFor(() => expect(getDocumentChunks).toHaveBeenLastCalledWith('8', 2, 20, expect.anything()))
+    expect(await screen.findByRole('button', { name: '查看分块 2' })).toBeInTheDocument()
     expect(screen.queryByRole('region', { name: '分块完整内容' })).not.toBeInTheDocument()
   })
 
