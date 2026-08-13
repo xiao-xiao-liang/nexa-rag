@@ -286,20 +286,20 @@ export default function ChatWorkspace() {
   }
 
   return (
-    <section className="flex h-full min-h-[560px] min-w-0 flex-col bg-[#fbfbfd]">
-      <header className="flex h-[68px] shrink-0 items-center justify-between border-b border-[#ebeaf0] bg-white/80 px-5 backdrop-blur sm:px-8">
-        <div><p className="text-sm font-semibold text-[#373541]">{selectedId ? conversations.find((conversation) => conversation.conversationId === selectedId)?.title || '新对话' : '新对话'}</p><p className="mt-0.5 text-xs text-[#a09eaa]">智能问答工作台</p></div>
-        <div className="flex items-center gap-4 text-xs text-[#757280]"><button type="button" className="flex items-center gap-1.5 hover:text-[#6256da]"><HelpCircle className="size-3.5" />帮助</button><button type="button" className="flex items-center gap-1.5 hover:text-[#6256da]"><Compass className="size-3.5" />我的工作区</button></div>
+    <section className="flex h-full min-h-[560px] min-w-0 flex-col bg-background">
+      <header className="flex h-11 shrink-0 items-center justify-between border-b border-border bg-card px-5">
+        <div><p className="text-sm font-semibold text-foreground">{selectedId ? conversations.find((conversation) => conversation.conversationId === selectedId)?.title || '新对话' : '新对话'}</p><p className="mt-0.5 text-xs text-tertiary">智能问答工作台</p></div>
+        <div className="flex items-center gap-4 text-xs text-secondary"><button type="button" className="flex items-center gap-1.5 hover:text-primary"><HelpCircle className="size-3.5" />帮助</button><button type="button" className="flex items-center gap-1.5 hover:text-primary"><Compass className="size-3.5" />我的工作区</button></div>
       </header>
       <div className="min-h-0 flex-1 overflow-y-auto">
-        <div className="mx-auto flex min-h-full w-full max-w-[920px] flex-col px-5 py-8 sm:px-10">
+        <div className="mx-auto flex min-h-full w-full max-w-[880px] flex-col px-5 py-6 sm:px-10">
           {messages.length === 0 && !historyLoading && !historyError && <Welcome onSuggestion={setDraft} />}
           {historyLoading && messages.length === 0 && <TimelineSkeleton />}
           {historyError && <HistoryError message={historyError} onRetry={() => selectedId && void loadConversation(selectedId)} />}
           {hasMore && <div className="mb-5 text-center"><Button variant="ghost" size="sm" onClick={() => void loadOlderMessages()}><ChevronUp className="size-4" />加载更早消息</Button></div>}
           {olderHistoryError && <HistoryError message={olderHistoryError} onRetry={() => void loadOlderMessages()} />}
           {messages.map((message, index) => <MessageBubble key={message.messageId} message={message} onRetry={() => void sendMessage(findQuestionForRetry(messages, index))} />)}
-          {streamError && <div role="status" className="mt-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{streamError}</div>}
+          {streamError && <div role="status" className="mt-4 rounded-md border border-danger-light bg-danger-light px-4 py-3 text-sm text-danger">{streamError}</div>}
         </div>
       </div>
       <Composer draft={draft} streaming={streaming} onDraftChange={setDraft} onKeyDown={onComposerKeyDown} agent={activeAgent} onSend={() => void sendMessage()} onStop={() => void stopStreaming()} />
@@ -313,34 +313,34 @@ function Welcome({ onSuggestion }: { onSuggestion: (value: string) => void }) {
     { title: '检索知识库', description: '从已有资料中查找依据', prompt: '请从知识库中检索与我的问题相关的内容，并给出依据。', icon: BookOpen },
     { title: '创建提示词', description: '沉淀可复用的工作模板', prompt: '请帮我创建一份可复用的提示词模板。', icon: Sparkles },
   ]
-  return <div className="m-auto w-full max-w-[760px] text-center"><div className="mx-auto mb-5 flex size-12 items-center justify-center rounded-2xl bg-[#eeecff] text-[#6f62e8]"><Sparkles className="size-5" /></div><h1 className="text-[28px] font-semibold tracking-[-0.04em] text-[#302e39]">你好，今天想做什么？</h1><p className="mt-3 text-sm leading-6 text-[#8c8997]">通过模型与知识库，让复杂信息转化为清晰答案。</p><div className="mt-8 grid gap-3 text-left sm:grid-cols-3">{suggestions.map(({ description, icon: Icon, prompt, title }) => <button key={title} type="button" aria-label={title} onClick={() => onSuggestion(prompt)} className="group rounded-2xl border border-[#e8e6ee] bg-white p-4 shadow-[0_1px_1px_rgba(27,25,39,0.02)] transition-all hover:-translate-y-0.5 hover:border-[#b9b1f7] hover:shadow-[0_10px_24px_rgba(96,83,200,0.09)]"><span className="mb-4 flex size-8 items-center justify-center rounded-xl bg-[#f3f1ff] text-[#7568ed]"><Icon className="size-4" /></span><p className="text-sm font-medium text-[#45424f]">{title}</p><p className="mt-1 text-xs leading-5 text-[#9895a1]">{description}</p></button>)}</div></div>
+  return <div className="m-auto w-full max-w-[760px] text-center"><div className="mx-auto mb-5 flex size-10 items-center justify-center rounded-lg bg-primary-light text-primary"><Sparkles className="size-5" /></div><h1 className="text-2xl font-semibold tracking-[-0.03em] text-foreground">你好，今天想做什么？</h1><p className="mt-3 text-sm text-secondary">通过模型与知识库，让复杂信息转化为清晰答案。</p><div className="mt-8 grid gap-3 text-left sm:grid-cols-3">{suggestions.map(({ description, icon: Icon, prompt, title }) => <button key={title} type="button" aria-label={title} onClick={() => onSuggestion(prompt)} className="group rounded-lg border border-border bg-card p-4 transition-colors hover:border-primary/60 hover:bg-muted"><span className="mb-4 flex size-8 items-center justify-center rounded-md bg-primary-light text-primary"><Icon className="size-4" /></span><p className="text-sm font-medium text-foreground">{title}</p><p className="mt-1 text-xs text-tertiary">{description}</p></button>)}</div></div>
 }
 
 function Composer({ draft, streaming, agent: _agent, onDraftChange, onKeyDown, onSend, onStop }: {
   draft: string; streaming: boolean; agent: ConversationAgentMeta; onDraftChange: (value: string) => void; onKeyDown: (event: KeyboardEvent<HTMLTextAreaElement>) => void; onSend: () => void; onStop: () => void
 }) {
-  return <div className="shrink-0 bg-[#fbfbfd] px-5 pb-5 pt-3 sm:px-10"><div className="mx-auto max-w-[920px] rounded-[22px] border border-[#dedbe8] bg-white p-2 shadow-[0_12px_30px_rgba(38,32,77,0.08)] transition-all focus-within:border-[#a89ff5] focus-within:ring-4 focus-within:ring-[#eeebff]">
-    <Textarea aria-label="消息内容" value={draft} onChange={(event) => onDraftChange(event.target.value)} onKeyDown={onKeyDown} disabled={streaming} placeholder="输入你的问题，或选择上方的快捷任务…" className="min-h-[92px] resize-none border-0 px-3 py-2 text-sm leading-6 shadow-none placeholder:text-[#aaa7b2] focus-visible:ring-0" />
-    <div className="flex items-center justify-between gap-3 px-1 pb-1"><div className="flex min-w-0 items-center gap-2"><button type="button" className="flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-xs text-[#666370] hover:bg-[#f4f2f8]"><Sparkles className="size-3.5 text-[#7166f7]" />Qwen 3</button><button type="button" className="hidden items-center gap-1.5 rounded-lg px-2 py-1.5 text-xs text-[#777481] hover:bg-[#f4f2f8] sm:flex"><BookOpen className="size-3.5" />未选择知识库</button><button type="button" aria-label="添加附件" className="flex size-7 items-center justify-center rounded-lg text-[#8f8c99] hover:bg-[#f4f2f8]"><Paperclip className="size-3.5" /></button></div>
-      {streaming ? <Button type="button" variant="outline" size="icon" aria-label="停止生成" onClick={onStop}><CircleStop className="size-4" /></Button> : <Button type="button" size="icon" aria-label="发送消息" disabled={!draft.trim()} onClick={onSend} className="size-8 rounded-xl bg-[#6f62e8] hover:bg-[#5f52d9]"><ArrowUp className="size-4" /></Button>}
+  return <div className="shrink-0 bg-background px-5 pb-4 pt-2 sm:px-10"><div className="mx-auto max-w-[880px] rounded-lg border border-border bg-card p-2 transition-all focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/30">
+    <Textarea aria-label="消息内容" value={draft} onChange={(event) => onDraftChange(event.target.value)} onKeyDown={onKeyDown} disabled={streaming} placeholder="输入你的问题，或选择上方的快捷任务…" className="min-h-[92px] resize-none border-0 px-3 py-2 text-sm leading-6 shadow-none placeholder:text-tertiary focus-visible:ring-0" />
+    <div className="flex items-center justify-between gap-3 px-1 pb-1"><div className="flex min-w-0 items-center gap-2"><button type="button" className="flex items-center gap-1.5 rounded px-2 py-1.5 text-xs text-secondary hover:bg-muted"><Sparkles className="size-3.5 text-primary" />Qwen 3</button><button type="button" className="hidden items-center gap-1.5 rounded px-2 py-1.5 text-xs text-secondary hover:bg-muted sm:flex"><BookOpen className="size-3.5" />未选择知识库</button><button type="button" aria-label="添加附件" className="flex size-7 items-center justify-center rounded text-tertiary hover:bg-muted"><Paperclip className="size-3.5" /></button></div>
+      {streaming ? <Button type="button" variant="outline" size="icon" aria-label="停止生成" onClick={onStop}><CircleStop className="size-4" /></Button> : <Button type="button" size="icon" aria-label="发送消息" disabled={!draft.trim()} onClick={onSend} className="size-7 rounded-md bg-primary hover:bg-primary/90"><ArrowUp className="size-4" /></Button>}
     </div>
-  </div><p className="mx-auto mt-2 max-w-[920px] px-2 text-[11px] text-[#aaa7b2]">Enter 发送，Shift + Enter 换行</p></div>
+  </div><p className="mx-auto mt-2 max-w-[880px] px-2 text-[11px] text-tertiary">Enter 发送，Shift + Enter 换行</p></div>
 }
 
 function MessageBubble({ message, onRetry }: { message: TimelineMessage; onRetry: () => void }) {
   const isUser = message.role === 'USER'
-  return <article className={cn('mb-6 flex gap-3', isUser && 'justify-end')}><div className={cn('max-w-[86%] rounded-2xl px-4 py-3 text-sm leading-7', isUser ? 'bg-primary text-primary-foreground' : 'border bg-card')}>
+  return <article className={cn('mb-6 flex gap-3', isUser && 'justify-end')}><div className={cn('max-w-[86%] rounded-lg px-4 py-3 text-sm leading-7', isUser ? 'bg-primary text-primary-foreground' : 'bg-muted')}>
     {!isUser && <div className="mb-1 flex items-center gap-1.5 text-xs font-medium text-primary"><Sparkles className="size-3.5" />RAG</div>}
     {isUser
       ? <p className="whitespace-pre-wrap break-words">{message.content}</p>
       : <AssistantMarkdown content={message.content || (message.status === 'GENERATING' ? '正在生成…' : '')} status={message.status} />}
-    {message.status === 'FAILED' && <div className="mt-2 flex items-center gap-2 text-xs text-red-600"><span>{message.errorMessage || '生成失败'}</span><Button variant="ghost" size="sm" onClick={onRetry}><RefreshCw className="size-3.5" />重试</Button></div>}
-    {message.status === 'CANCELLED' && <p className="mt-2 text-xs text-muted-foreground">已停止生成</p>}
+    {message.status === 'FAILED' && <div className="mt-2 flex items-center gap-2 text-xs text-danger"><span>{message.errorMessage || '生成失败'}</span><Button variant="ghost" size="sm" onClick={onRetry}><RefreshCw className="size-3.5" />重试</Button></div>}
+    {message.status === 'CANCELLED' && <p className="mt-2 text-xs text-tertiary">已停止生成</p>}
   </div></article>
 }
 
 function TimelineSkeleton() { return <div className="space-y-5"><Skeleton className="h-20 w-3/4" /><Skeleton className="ml-auto h-16 w-2/3" /><Skeleton className="h-28 w-4/5" /></div> }
-function HistoryError({ message, onRetry }: { message: string; onRetry: () => void }) { return <div role="status" className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700"><p>{message}</p><Button variant="ghost" size="sm" className="mt-2" onClick={onRetry}>重试加载历史</Button></div> }
+function HistoryError({ message, onRetry }: { message: string; onRetry: () => void }) { return <div role="status" className="mb-4 rounded-md border border-danger-light bg-danger-light px-4 py-3 text-sm text-danger"><p>{message}</p><Button variant="ghost" size="sm" className="mt-2" onClick={onRetry}>重试加载历史</Button></div> }
 function findQuestionForRetry(messages: TimelineMessage[], failedMessageIndex: number) { return messages.slice(0, failedMessageIndex).reverse().find((message) => message.role === 'USER')?.content ?? '' }
 
 function readConversationAgents(): Record<string, ConversationAgentMeta> {
