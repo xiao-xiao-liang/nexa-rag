@@ -2,12 +2,13 @@ import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/re
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { getDocument, getDocumentChunks, getDocumentProcessStatus, processDocument, retryDocument, type DocumentChunk } from '../api/document-api'
+import { getDocument, getDocumentChunks, getDocumentOverview, getDocumentProcessStatus, processDocument, retryDocument, type DocumentChunk } from '../api/document-api'
 import { DocumentDetailPage } from './DocumentDetailPage'
 
 vi.mock('../api/document-api', () => ({
   getDocument: vi.fn(),
   getDocumentChunks: vi.fn(),
+  getDocumentOverview: vi.fn(),
   getDocumentProcessStatus: vi.fn(),
   processDocument: vi.fn(),
   retryDocument: vi.fn(),
@@ -28,6 +29,31 @@ const detail = (status: 'UPLOADED' | 'FAILED' | 'INDEXED' = 'UPLOADED') => ({
 
 const indexedStatus = { documentId: 8, processId: 'p-8', status: 'INDEXED' as const, messageStatus: null, consumedTimes: 1, failureStage: null, failureReason: null }
 
+const overview = {
+  documentId: '8',
+  title: '员工手册',
+  description: '内部制度说明',
+  originalFileName: '员工手册.pdf',
+  fileType: 'PDF',
+  fileSize: 1024,
+  status: 'INDEXED' as const,
+  sourceType: 'LOCAL',
+  sourceUrl: null,
+  processConfigJson: JSON.stringify({
+    splitConfig: {
+      splitStrategy: 'PARENT_MARKDOWN',
+      chunkSize: 500,
+      chunkOverlap: 50,
+      markdown: { titleLevel: 3, stripHeaders: false, preserveCodeBlock: true, createParentForOversized: true },
+    },
+    parseConfig: { enableOcr: true, enableImageDescription: false },
+    indexConfig: { enabled: true, vectorEnabled: true, keywordEnabled: true },
+  }),
+  createTime: '2026-08-13T10:00:00',
+  updateTime: '2026-08-13T11:00:00',
+  chunkStatistics: { total: 12, indexed: 10, failed: 1, skipped: 0, pending: 1 },
+}
+
 function chunkPage(records: DocumentChunk[], current = 1, pages = 1) {
   return { records, total: records.length, current, size: 20, pages }
 }
@@ -41,6 +67,7 @@ describe('文档详情页面', () => {
     vi.mocked(getDocument).mockResolvedValue(detail())
     vi.mocked(getDocumentProcessStatus).mockResolvedValue({ documentId: 8, processId: null, status: 'UPLOADED', messageStatus: null, consumedTimes: 0, failureStage: null, failureReason: null })
     vi.mocked(getDocumentChunks).mockResolvedValue({ records: [], total: 0, current: 1, size: 20, pages: 0 })
+    vi.mocked(getDocumentOverview).mockResolvedValue(overview)
   })
 
   afterEach(() => {
@@ -85,6 +112,73 @@ describe('文档详情页面', () => {
     expect(getDocumentChunks).toHaveBeenCalledWith('8', 1, 20, expect.anything())
     expect(screen.queryByText('https://example.com/original')).not.toBeInTheDocument()
     expect(screen.queryByText('https://example.com/parsed')).not.toBeInTheDocument()
+  })
+
+  it('点击知识块卡片应打开整页右侧抽屉，关闭后收起', async () => {
+    vi.mocked(getDocument).mockResolvedValue(detail('INDEXED'))
+    vi.mocked(getDocumentProcessStatus).mockResolvedValue(indexedStatus)
+    vi.mocked(getDocumentChunks).mockResolvedValue({ records: [{ chunkId: 'c-1', documentId: 8, chunkOrder: 1, text: '第一页内容', status: 'INDEXED' }], total: 1, current: 1, size: 20, pages: 1 })
+    const user = userEvent.setup()
+    renderDetail()
+
+    expect(screen.queryByRole('region', { name: '分块完整内容' })).not.toBeInTheDocument()
+    await user.click(await screen.findByRole('button', { name: '查看分块 1' }))
+    expect(screen.getByRole('complementary', { name: '知识块详情抽屉' })).toBeInTheDocument()
+    expect(screen.getByRole('region', { name: '分块完整内容' })).toHaveTextContent('第一页内容')
+    expect(screen.getByText('来源：员工手册.pdf')).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: '关闭分块内容' }))
+    expect(screen.queryByRole('region', { name: '分块完整内容' })).not.toBeInTheDocument()
+  })
+
+  it('抽屉内编辑保存后应就地更新预览内容', async () => {
+    vi.mocked(getDocument).mockResolvedValue(detail('INDEXED'))
+    vi.mocked(getDocumentProcessStatus).mockResolvedValue(indexedStatus)
+    vi.mocked(getDocumentChunks).mockResolvedValue({ records: [{ chunkId: 'c-1', documentId: 8, chunkOrder: 1, text: '原始内容', status: 'INDEXED' }], total: 1, current: 1, size: 20, pages: 1 })
+    const user = userEvent.setup()
+    renderDetail()
+
+    await user.click(await screen.findByRole('button', { name: '查看分块 1' }))
+    await user.click(screen.getByRole('button', { name: '编辑' }))
+    const editor = screen.getByLabelText('编辑分块内容')
+    await user.clear(editor)
+    await user.type(editor, '修改后的内容')
+    await user.click(screen.getByRole('button', { name: '保存修改' }))
+
+    expect(screen.getByRole('region', { name: '分块完整内容' })).toHaveTextContent('修改后的内容')
+    expect(screen.getByText('已保存')).toBeInTheDocument()
+  })
+
+  it('文档概览应展示处理结果 KPI、配置分组与文档信息', async () => {
+    vi.mocked(getDocument).mockResolvedValue(detail('INDEXED'))
+    vi.mocked(getDocumentProcessStatus).mockResolvedValue(indexedStatus)
+    const user = userEvent.setup()
+    renderDetail()
+
+    await user.click(await screen.findByRole('button', { name: '文档概览' }))
+
+    expect(await screen.findByText('父子 Markdown')).toBeInTheDocument()
+    expect(screen.getByText('500 字符 · 重叠 50 · H3')).toBeInTheDocument()
+    expect(screen.getByText('处理结果')).toBeInTheDocument()
+    expect(screen.getByText('总分块')).toBeInTheDocument()
+    expect(screen.getByText('12')).toBeInTheDocument()
+    expect(screen.getByText('10')).toBeInTheDocument()
+    expect(screen.getByText('本地文件')).toBeInTheDocument()
+    expect(screen.getByText('2026-08-13 10:00')).toBeInTheDocument()
+    expect(screen.getByText('内部制度说明')).toBeInTheDocument()
+  })
+
+  it('概览中可查看完整处理配置 JSON', async () => {
+    vi.mocked(getDocument).mockResolvedValue(detail('INDEXED'))
+    vi.mocked(getDocumentProcessStatus).mockResolvedValue(indexedStatus)
+    const user = userEvent.setup()
+    renderDetail()
+
+    await user.click(await screen.findByRole('button', { name: '文档概览' }))
+    await user.click(await screen.findByRole('button', { name: '查看完整配置' }))
+
+    expect(screen.getByRole('dialog')).toHaveTextContent('PARENT_MARKDOWN')
+    expect(screen.getByRole('button', { name: '复制' })).toBeInTheDocument()
   })
 
   it('已索引文档应将知识块放入工作区布局', async () => {
