@@ -5,6 +5,7 @@ import com.nexarag.common.web.PageVO;
 import com.nexarag.document.model.dto.CreateDocumentRequest;
 import com.nexarag.document.model.dto.ProcessDocumentRequest;
 import com.nexarag.document.model.entity.Document;
+import com.nexarag.document.model.vo.DocumentOverviewVO;
 import com.nexarag.document.model.vo.DocumentSummaryVO;
 import com.nexarag.document.model.vo.DocumentDeleteVO;
 
@@ -29,6 +30,14 @@ public interface DocumentService extends IService<Document> {
      * @return 文档摘要分页数据
      */
     PageVO<DocumentSummaryVO> pageDocuments(long pageNum, long pageSize);
+
+    /**
+     * 查询文档诊断概览，包含基础信息、处理配置快照与片段状态统计。
+     *
+     * @param documentId 文档ID
+     * @return 文档诊断概览
+     */
+    DocumentOverviewVO getOverview(Long documentId);
 
     /**
      * 提交文档处理。

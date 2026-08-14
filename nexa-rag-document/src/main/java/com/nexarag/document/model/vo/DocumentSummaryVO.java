@@ -13,8 +13,9 @@ import java.time.LocalDateTime;
  * @param originalFileName 原始文件名
  * @param fileType         文件类型
  * @param status           文档状态
+ * @param createBy         创建人
  * @param updatedTime      更新时间
  */
 public record DocumentSummaryVO(Long documentId, String title, String originalFileName,
-                                FileType fileType, DocumentStatus status, LocalDateTime updatedTime) {
+                                FileType fileType, DocumentStatus status, String createBy, LocalDateTime updatedTime) {
 }

@@ -9,11 +9,13 @@ import com.nexarag.document.model.dto.ProcessDocumentRequest;
 import com.nexarag.document.model.dto.SplitConfigRequest;
 import com.nexarag.document.model.entity.Document;
 import com.nexarag.document.enums.DocumentStatus;
+import com.nexarag.document.enums.FileType;
 import com.nexarag.document.enums.SplitStrategy;
 import com.nexarag.common.exception.ClientException;
 import com.nexarag.common.exception.ServiceException;
 import com.nexarag.infra.enums.ExternalDocumentSourceType;
 import com.nexarag.document.model.vo.DocumentSummaryVO;
+import com.nexarag.document.model.vo.DocumentOverviewVO;
 import com.nexarag.document.service.DocumentChunkService;
 import com.nexarag.document.service.DocumentDeleteTaskService;
 import com.nexarag.infra.config.DocumentPipelineMessagingProperties;
@@ -286,6 +288,38 @@ class DocumentServiceImplTest {
         assertThat(result.getSize()).isEqualTo(20);
         assertThat(result.getRecords()).hasSize(1);
         assertThat(result.getRecords().getFirst().documentId()).isEqualTo(1L);
+    }
+
+    @Test
+    void getOverviewShouldCollectDocumentAndChunkStatistics() {
+        TestableDocumentServiceImpl documentService = new TestableDocumentServiceImpl();
+        documentService.existingDocument = Document.builder()
+                .documentId(1L)
+                .title("测试文档")
+                .description("描述")
+                .originalFileName("demo.pdf")
+                .fileType(FileType.PDF)
+                .fileSize(100L)
+                .status(DocumentStatus.INDEXED)
+                .sourceType(ExternalDocumentSourceType.LOCAL)
+                .processConfigJson("{\"splitConfig\":{\"splitStrategy\":\"PARENT_MARKDOWN\"}}")
+                .createTime(LocalDateTime.of(2026, 8, 13, 10, 0))
+                .updateTime(LocalDateTime.of(2026, 8, 13, 11, 0))
+                .build();
+        when(documentService.documentChunkService.count(any())).thenReturn(9L, 4L, 1L, 1L, 3L);
+
+        DocumentOverviewVO overview = documentService.getOverview(1L);
+
+        assertThat(overview.documentId()).isEqualTo(1L);
+        assertThat(overview.status()).isEqualTo(DocumentStatus.INDEXED);
+        assertThat(overview.sourceType()).isEqualTo(ExternalDocumentSourceType.LOCAL);
+        assertThat(overview.processConfigJson()).contains("PARENT_MARKDOWN");
+        assertThat(overview.createTime()).isEqualTo(LocalDateTime.of(2026, 8, 13, 10, 0));
+        assertThat(overview.chunkStatistics().total()).isEqualTo(9L);
+        assertThat(overview.chunkStatistics().indexed()).isEqualTo(4L);
+        assertThat(overview.chunkStatistics().failed()).isEqualTo(1L);
+        assertThat(overview.chunkStatistics().skipped()).isEqualTo(1L);
+        assertThat(overview.chunkStatistics().pending()).isEqualTo(3L);
     }
 
     private static class TestableDocumentServiceImpl extends DocumentServiceImpl {

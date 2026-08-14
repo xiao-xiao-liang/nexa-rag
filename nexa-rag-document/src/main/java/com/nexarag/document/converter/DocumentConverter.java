@@ -4,8 +4,10 @@ import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.nexarag.common.web.PageVO;
 import com.nexarag.document.model.entity.Document;
 import com.nexarag.document.model.entity.DocumentChunk;
+import com.nexarag.document.model.vo.DocumentChunkStatisticsVO;
 import com.nexarag.document.model.vo.DocumentChunkVO;
 import com.nexarag.document.model.vo.DocumentDetailVO;
+import com.nexarag.document.model.vo.DocumentOverviewVO;
 import com.nexarag.document.model.vo.DocumentProcessStatusVO;
 import com.nexarag.document.model.vo.DocumentSummaryVO;
 
@@ -25,7 +27,7 @@ public final class DocumentConverter {
      */
     public static DocumentSummaryVO toSummaryVO(Document document) {
         return new DocumentSummaryVO(document.getDocumentId(), document.getTitle(), document.getOriginalFileName(),
-                document.getFileType(), document.getStatus(), document.getUpdateTime());
+                document.getFileType(), document.getStatus(), document.getCreateBy(), document.getUpdateTime());
     }
 
     /**
@@ -39,6 +41,20 @@ public final class DocumentConverter {
                 document.getOriginalFileName(), document.getFileType(), document.getFileSize(),
                 document.getOriginalFileUrl(), document.getParsedFileUrl(), document.getStatus(),
                 document.getProcessConfigJson());
+    }
+
+    /**
+     * 转换文档诊断概览。
+     *
+     * @param document   文档实体
+     * @param statistics 片段状态统计
+     * @return 文档诊断概览响应
+     */
+    public static DocumentOverviewVO toOverviewVO(Document document, DocumentChunkStatisticsVO statistics) {
+        return new DocumentOverviewVO(document.getDocumentId(), document.getTitle(), document.getDescription(),
+                document.getOriginalFileName(), document.getFileType(), document.getFileSize(), document.getStatus(),
+                document.getSourceType(), document.getSourceUrl(), document.getProcessConfigJson(),
+                document.getCreateTime(), document.getUpdateTime(), statistics);
     }
 
     /**

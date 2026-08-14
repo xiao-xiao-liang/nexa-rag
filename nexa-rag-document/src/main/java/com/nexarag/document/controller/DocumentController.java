@@ -16,6 +16,7 @@ import com.nexarag.document.service.impl.ExternalDocumentSubmitServiceImpl;
 import com.nexarag.document.model.vo.DocumentChunkVO;
 import com.nexarag.document.model.vo.DocumentDetailVO;
 import com.nexarag.document.model.vo.DocumentDeleteVO;
+import com.nexarag.document.model.vo.DocumentOverviewVO;
 import com.nexarag.document.model.vo.DocumentProcessStatusVO;
 import com.nexarag.document.model.vo.DocumentSummaryVO;
 import com.nexarag.document.model.vo.UploadDocumentResponse;
@@ -101,6 +102,17 @@ public class DocumentController {
     @GetMapping("/{documentId}")
     public Result<DocumentDetailVO> getDocument(@PathVariable Long documentId) {
         return Results.success(DocumentConverter.toDetailVO(documentService.getRequiredDocument(documentId)));
+    }
+
+    /**
+     * 查询文档诊断概览，包含基础信息、处理配置快照与片段状态统计。
+     *
+     * @param documentId 文档ID
+     * @return 文档诊断概览
+     */
+    @GetMapping("/{documentId}/overview")
+    public Result<DocumentOverviewVO> getDocumentOverview(@PathVariable Long documentId) {
+        return Results.success(documentService.getOverview(documentId));
     }
 
     /**

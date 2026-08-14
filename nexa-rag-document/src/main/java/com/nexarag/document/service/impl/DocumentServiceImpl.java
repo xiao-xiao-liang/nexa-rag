@@ -1,6 +1,7 @@
 package com.nexarag.document.service.impl;
 
 import com.baomidou.mybatisplus.core.metadata.IPage;
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.toolkit.IdWorker;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
@@ -14,6 +15,8 @@ import com.nexarag.document.converter.DocumentConverter;
 import com.nexarag.document.model.dto.CreateDocumentRequest;
 import com.nexarag.document.model.dto.ProcessDocumentRequest;
 import com.nexarag.document.model.entity.Document;
+import com.nexarag.document.model.entity.DocumentChunk;
+import com.nexarag.document.enums.ChunkStatus;
 import com.nexarag.document.enums.DocumentStatus;
 import com.nexarag.document.enums.DocumentPipelineMessageStatus;
 import com.nexarag.document.enums.FileType;
@@ -24,6 +27,8 @@ import com.nexarag.document.service.DocumentChunkService;
 import com.nexarag.document.service.DocumentDeleteTaskService;
 import com.nexarag.document.enums.DocumentTaskStatus;
 import com.nexarag.document.model.vo.DocumentDeleteVO;
+import com.nexarag.document.model.vo.DocumentChunkStatisticsVO;
+import com.nexarag.document.model.vo.DocumentOverviewVO;
 import com.nexarag.document.model.vo.DocumentSummaryVO;
 import com.nexarag.infra.config.DocumentPipelineMessagingProperties;
 import lombok.RequiredArgsConstructor;
@@ -111,6 +116,39 @@ public class DocumentServiceImpl extends ServiceImpl<DocumentMapper, Document> i
         return this.lambdaQuery()
                 .orderByDesc(Document::getCreateTime)
                 .page(page);
+    }
+
+    @Override
+    public DocumentOverviewVO getOverview(Long documentId) {
+        // 1. 查询文档记录，不存在时抛出异常
+        Document document = getRequiredDocument(documentId);
+
+        // 2. 按状态统计文档片段数量
+        DocumentChunkStatisticsVO statistics = new DocumentChunkStatisticsVO(
+                countChunks(documentId, null),
+                countChunks(documentId, ChunkStatus.INDEXED),
+                countChunks(documentId, ChunkStatus.FAILED),
+                countChunks(documentId, ChunkStatus.SKIP_INDEX),
+                countChunks(documentId, ChunkStatus.PENDING_INDEX));
+
+        // 3. 组装诊断概览响应
+        return DocumentConverter.toOverviewVO(document, statistics);
+    }
+
+    /**
+     * 统计指定文档在给定状态下的片段数量，状态为空时统计全部片段。
+     *
+     * @param documentId 文档ID
+     * @param status     片段状态
+     * @return 片段数量
+     */
+    private long countChunks(Long documentId, ChunkStatus status) {
+        LambdaQueryWrapper<DocumentChunk> wrapper = new LambdaQueryWrapper<DocumentChunk>()
+                .eq(DocumentChunk::getDocumentId, documentId);
+        if (status != null) {
+            wrapper.eq(DocumentChunk::getStatus, status);
+        }
+        return documentChunkService.count(wrapper);
     }
 
     @Override
