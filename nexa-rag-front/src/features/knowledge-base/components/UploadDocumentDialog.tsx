@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react'
+import { useEffect, useState, type FormEvent } from 'react'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
@@ -12,6 +12,7 @@ interface UploadDocumentDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   onUploaded: (documentId: number | string) => void
+  initialDescription?: string
 }
 
 const SOURCE_OPTIONS: { value: ExternalDocumentSourceType; label: string }[] = [
@@ -21,7 +22,7 @@ const SOURCE_OPTIONS: { value: ExternalDocumentSourceType; label: string }[] = [
 ]
 
 /** 上传知识库文档的表单：用户只负责来源、上传与基础信息，处理配置由后端按文档类型自动兜底。 */
-export function UploadDocumentDialog({ open, onOpenChange, onUploaded }: UploadDocumentDialogProps) {
+export function UploadDocumentDialog({ open, onOpenChange, onUploaded, initialDescription }: UploadDocumentDialogProps) {
   const [sourceType, setSourceType] = useState<ExternalDocumentSourceType>('LOCAL')
   const [sourceUrl, setSourceUrl] = useState('')
   const [file, setFile] = useState<File | null>(null)
@@ -31,6 +32,11 @@ export function UploadDocumentDialog({ open, onOpenChange, onUploaded }: UploadD
   const [fileError, setFileError] = useState<string | null>(null)
   const [urlError, setUrlError] = useState<string | null>(null)
   const [submitError, setSubmitError] = useState<string | null>(null)
+
+  // 外部（如 AI 创建入口）传入的初始描述在弹窗打开时写入表单。
+  useEffect(() => {
+    if (open && initialDescription) setDescription(initialDescription)
+  }, [open, initialDescription])
 
   const resetForm = () => {
     setSourceType('LOCAL')

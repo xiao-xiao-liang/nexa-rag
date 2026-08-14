@@ -106,9 +106,23 @@ describe('知识库文档列表页面', () => {
     const user = userEvent.setup()
     renderList('/knowledge-base?page=2')
 
-    await user.click(await screen.findByRole('button', { name: '删除 员工手册.pdf' }))
+    await user.click(await screen.findByRole('button', { name: '更多操作' }))
+    await user.click(await screen.findByRole('menuitem', { name: '删除' }))
     await user.click(screen.getByRole('button', { name: '确认删除' }))
 
     await waitFor(() => expect(listDocuments).toHaveBeenLastCalledWith(1, 20, expect.anything()))
+  })
+
+  it('勾选文档后可批量删除', async () => {
+    vi.mocked(listDocuments).mockResolvedValue(page([documentItem(8), documentItem(9)]))
+    vi.mocked(deleteDocument).mockResolvedValue(true)
+    const user = userEvent.setup()
+    renderList()
+
+    await user.click(await screen.findByRole('checkbox', { name: '全选当前页' }))
+    await user.click(screen.getByRole('button', { name: '删除选中' }))
+    await user.click(screen.getByRole('button', { name: '确认删除' }))
+
+    await waitFor(() => expect(deleteDocument).toHaveBeenCalledTimes(2))
   })
 })

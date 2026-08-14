@@ -28,6 +28,12 @@ describe('UploadDocumentDialog', () => {
     expect(screen.queryByText('片段大小（字符）')).not.toBeInTheDocument()
   })
 
+  it('外部传入初始描述时应预填文档描述', async () => {
+    render(<UploadDocumentDialog open onOpenChange={vi.fn()} onUploaded={vi.fn()} initialDescription="AI 生成的描述" />)
+
+    expect(screen.getByLabelText('文档描述')).toHaveValue('AI 生成的描述')
+  })
+
   it('选择不支持的文件时应给出错误且禁止提交', async () => {
     const user = userEvent.setup({ applyAccept: false })
     render(<UploadDocumentDialog open onOpenChange={vi.fn()} onUploaded={vi.fn()} />)
