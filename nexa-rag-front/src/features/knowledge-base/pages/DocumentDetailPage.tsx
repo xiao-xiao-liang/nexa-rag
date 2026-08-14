@@ -3,6 +3,7 @@ import { ArrowLeft, ChevronRight, Clock, Download, ExternalLink, FileText, Info,
 import { Link, useParams } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import { Tabs } from '@/components/ui/tabs'
+import { cn } from '@/lib/utils'
 import type { PageVO } from '@/shared/api/types'
 import { DocumentStatusBadge } from '../components/DocumentStatusBadge'
 import { FileTypeIcon } from '../components/FileTypeIcon'
@@ -170,6 +171,8 @@ export function DocumentDetailPage() {
     setSelectedChunk(null)
   }
 
+  const splitStrategyLabel = parseSplitStrategyLabel(document?.processConfigJson ?? null)
+
   if (documentId === null) return <InvalidDocumentAddress />
 
   const isProcessing = currentStatus !== null && isProcessingStatus(currentStatus)
@@ -300,31 +303,35 @@ export function DocumentDetailPage() {
               </span>
             </div>
 
-            {/* 处理中：三段式流水线进度 */}
+            {/* 处理中：头部卡片内细进度条，完成后消失 */}
             {isProcessing && (
-              <div className="mt-3 rounded-md border border-border bg-muted/60 p-3">
-                <div className="flex items-center justify-between text-xs font-medium text-foreground">
+              <div className="mt-3">
+                <div className="flex items-center justify-between text-[11px] text-secondary">
                   <span className="flex items-center gap-1.5">
-                    <RefreshCw className="size-3.5 animate-spin text-primary" />
-                    文档处理流水线进行中…
+                    <RefreshCw className="size-3 animate-spin text-primary" />
+                    {pipelineStageLabel(currentStatus)}
                   </span>
                   {processStatus?.consumedTimes !== null && processStatus?.consumedTimes !== undefined && (
-                    <span className="flex items-center gap-1 font-mono text-[11px] font-normal text-primary">
+                    <span className="flex items-center gap-1 font-mono text-tertiary">
                       <Clock className="size-3" />
                       已耗时 {processStatus.consumedTimes} 秒
                     </span>
                   )}
                 </div>
-                <div className="mt-2 grid grid-cols-3 gap-2 text-center text-[11px] font-medium">
-                  <span className={`rounded py-1.5 transition-colors ${currentStatus === 'QUEUED' || currentStatus === 'PARSING' ? 'bg-primary text-white' : 'bg-success-light text-success'}`}>
-                    1. 格式解析
-                  </span>
-                  <span className={`rounded py-1.5 transition-colors ${currentStatus === 'CHUNKING' ? 'bg-primary text-white' : currentStatus === 'INDEXING' ? 'bg-success-light text-success' : 'bg-muted text-tertiary'}`}>
-                    2. 智能切分
-                  </span>
-                  <span className={`rounded py-1.5 transition-colors ${currentStatus === 'INDEXING' ? 'bg-primary text-white' : 'bg-muted text-tertiary'}`}>
-                    3. 向量索引
-                  </span>
+                <div className="mt-1.5 flex gap-1">
+                  {[0, 1, 2].map((index) => (
+                    <span
+                      key={index}
+                      className={cn(
+                        'h-1 flex-1 rounded-full transition-colors',
+                        pipelineStageIndex(currentStatus) > index
+                          ? 'bg-success'
+                          : pipelineStageIndex(currentStatus) === index
+                            ? 'bg-primary'
+                            : 'bg-muted'
+                      )}
+                    />
+                  ))}
                 </div>
               </div>
             )}
@@ -340,17 +347,14 @@ export function DocumentDetailPage() {
             onChange={(value) => setActiveView(value as DocumentView)}
           />
 
-          {/* 异常诊断提示 */}
-          {(processStatus?.messageStatus || currentStatus === 'FAILED' || processError) && (
+          {/* 异常诊断提示：仅失败或请求异常时展示 */}
+          {(currentStatus === 'FAILED' || processError) && (
             <section className="rounded-md border border-border bg-card p-4">
               <div className="flex items-start gap-3">
                 <div className="rounded-md bg-primary-light p-2 text-primary">
                   <Sparkles className="size-4" />
                 </div>
                 <div className="space-y-1.5 text-xs">
-                  {processStatus?.messageStatus && (
-                    <p className="font-medium text-secondary">任务信息：{processStatus.messageStatus}</p>
-                  )}
                   {currentStatus === 'FAILED' && (
                     <p className="rounded bg-danger-light p-2.5 font-medium text-danger">
                       失败阶段：{processStatus?.failureStage || '未知'}；失败原因：{processStatus?.failureReason || '后端未返回具体原因'}
@@ -396,9 +400,7 @@ export function DocumentDetailPage() {
               total={chunks.total}
               sourceFileName={document.originalFileName || document.title || '未命名文档'}
               fileDescription={document.description}
-              fileType={document.fileType}
-              fileSize={document.fileSize}
-              originalFileUrl={document.originalFileUrl}
+              splitStrategyLabel={splitStrategyLabel}
               loading={chunksLoading && chunks.records.length === 0}
               loadingMore={chunksLoading && chunks.records.length > 0 && chunkPage > 1}
               hasMore={hasMore}
@@ -464,4 +466,37 @@ function formatFileSize(value: number | null): string {
   if (value < 1024) return `${value} B`
   if (value < 1024 * 1024) return `${(value / 1024).toFixed(1)} KB`
   return `${(value / (1024 * 1024)).toFixed(1)} MB`
+}
+
+/** 处理流水线阶段序号：解析 0 / 切分 1 / 索引 2。 */
+function pipelineStageIndex(status: DocumentStatus): number {
+  if (status === 'CHUNKING' || status === 'CHUNKED') return 1
+  if (status === 'INDEXING') return 2
+  return 0
+}
+
+/** 处理流水线当前阶段文案。 */
+function pipelineStageLabel(status: DocumentStatus): string {
+  if (status === 'QUEUED') return '排队中，等待进入处理流水线…'
+  if (status === 'PARSING' || status === 'PARSED') return '正在解析文档…'
+  if (status === 'CHUNKING' || status === 'CHUNKED') return '正在切分文本…'
+  return '正在写入向量索引…'
+}
+
+/** 从文档处理配置快照中解析切分策略展示名。 */
+function parseSplitStrategyLabel(processConfigJson: string | null): string | null {
+  if (!processConfigJson) return null
+  try {
+    const config = JSON.parse(processConfigJson) as { splitConfig?: { splitStrategy?: string } }
+    const strategy = config?.splitConfig?.splitStrategy
+    if (!strategy) return null
+    return {
+      PARENT_MARKDOWN: '父子 Markdown',
+      BROTHER_MARKDOWN: '同级 Markdown',
+      REGEX_TEXT: '正则文本',
+      EXCEL: '表格',
+    }[strategy] ?? null
+  } catch {
+    return null
+  }
 }

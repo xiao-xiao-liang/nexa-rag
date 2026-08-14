@@ -1,20 +1,20 @@
 import { useEffect, useMemo, useState, type KeyboardEvent } from 'react'
-import { Check, ChevronDown, Eye, Layers, Link2, Pencil, RefreshCw, Search, Trash2, X } from 'lucide-react'
+import { Check, ChevronDown, Layers, Pencil, RefreshCw, Search, Trash2, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet'
+import { cn } from '@/lib/utils'
 import type { DocumentChunk } from '../api/document-api'
-import { FileTypeIcon } from './FileTypeIcon'
+
+type ChunkViewMode = 'preview' | 'raw'
 
 interface DocumentChunkBrowserProps {
   chunks: DocumentChunk[]
   total: number
   sourceFileName: string
   fileDescription: string | null
-  fileType: string | null
-  fileSize: number | null
-  originalFileUrl: string | null
+  splitStrategyLabel: string | null
   loading: boolean
   loadingMore: boolean
   hasMore: boolean
@@ -28,15 +28,13 @@ interface DocumentChunkBrowserProps {
   onDelete: (chunk: DocumentChunk) => void
 }
 
-/** 知识块工作区：三列卡片网格 + 悬浮「查看详情」+ 右侧详情抽屉，分页由外层滚动触发。 */
+/** 知识块工作区：三列卡片网格 + 预览/原文切换 + 右侧 Chunk Inspector 抽屉，分页由外层滚动触发。 */
 export function DocumentChunkBrowser({
   chunks,
   total,
   sourceFileName,
   fileDescription,
-  fileType,
-  fileSize,
-  originalFileUrl,
+  splitStrategyLabel,
   loading,
   loadingMore,
   hasMore,
@@ -50,6 +48,7 @@ export function DocumentChunkBrowser({
   onDelete,
 }: DocumentChunkBrowserProps) {
   const [query, setQuery] = useState('')
+  const [viewMode, setViewMode] = useState<ChunkViewMode>('preview')
   const [deleteTarget, setDeleteTarget] = useState<DocumentChunk | null>(null)
 
   const visibleChunks = useMemo(() => {
@@ -83,7 +82,7 @@ export function DocumentChunkBrowser({
               value={query}
               onChange={(event) => setQuery(event.target.value)}
               placeholder="搜索分块内容"
-              className="h-8 w-56 rounded-md border border-border bg-card pl-8 pr-7 text-xs text-foreground outline-none transition-colors placeholder:text-tertiary focus:border-primary focus:ring-2 focus:ring-ring/30"
+              className="h-8 w-52 rounded-md border border-border bg-card pl-8 pr-7 text-xs text-foreground outline-none transition-colors placeholder:text-tertiary focus:border-primary focus:ring-2 focus:ring-ring/30"
             />
             {query && (
               <button
@@ -96,6 +95,23 @@ export function DocumentChunkBrowser({
               </button>
             )}
           </label>
+
+          {/* 预览 / 原文切换 */}
+          <div className="flex gap-0.5 rounded-md bg-muted p-0.5" aria-label="展示模式">
+            {(['preview', 'raw'] as const).map((mode) => (
+              <button
+                key={mode}
+                type="button"
+                onClick={() => setViewMode(mode)}
+                className={cn(
+                  'h-7 rounded-sm px-2.5 text-xs transition-colors',
+                  viewMode === mode ? 'border border-border bg-card font-medium text-primary' : 'text-secondary hover:text-foreground'
+                )}
+              >
+                {mode === 'preview' ? '预览' : '原文'}
+              </button>
+            ))}
+          </div>
 
           <span className="flex h-8 items-center gap-1 rounded-md border border-border bg-card px-2.5 text-xs text-secondary">
             排序：分块序号
@@ -151,7 +167,7 @@ export function DocumentChunkBrowser({
             <ChunkCard
               key={chunk.chunkId}
               chunk={chunk}
-              sourceFileName={sourceFileName}
+              viewMode={viewMode}
               selected={selectedChunk?.chunkId === chunk.chunkId}
               onSelect={onSelect}
             />
@@ -174,21 +190,19 @@ export function DocumentChunkBrowser({
         </div>
       )}
 
-      {/* 右侧详情抽屉 */}
+      {/* 右侧 Chunk Inspector 抽屉 */}
       <Sheet open={selectedChunk !== null} onOpenChange={(open) => !open && onClose()}>
-        <SheetContent side="right" className="flex w-full flex-col gap-0 p-0 sm:max-w-[400px]">
+        <SheetContent side="right" className="flex w-full flex-col gap-0 p-0 sm:max-w-[560px]">
           <SheetHeader className="sr-only">
             <SheetTitle>知识块详情</SheetTitle>
-            <SheetDescription>查看并编辑当前知识块内容</SheetDescription>
+            <SheetDescription>查看当前知识块内容与结构信息</SheetDescription>
           </SheetHeader>
           {selectedChunk && (
             <ChunkDrawer
               chunk={selectedChunk}
               sourceFileName={sourceFileName}
-              fileType={fileType}
-              fileSize={fileSize}
-              originalFileUrl={originalFileUrl}
-              chunkTotal={total}
+              splitStrategyLabel={splitStrategyLabel}
+              viewMode={viewMode}
               onClose={onClose}
               onSave={onSave}
               onDelete={() => setDeleteTarget(selectedChunk)}
@@ -224,16 +238,20 @@ export function DocumentChunkBrowser({
 /** 单个知识块卡片。 */
 function ChunkCard({
   chunk,
-  sourceFileName,
+  viewMode,
   selected,
   onSelect,
 }: {
   chunk: DocumentChunk
-  sourceFileName: string
+  viewMode: ChunkViewMode
   selected: boolean
   onSelect: (chunk: DocumentChunk) => void
 }) {
-  const title = getChunkTitle(chunk.text, chunk.chunkOrder)
+  const heading = parseChunkHeading(chunk.text)
+  const title = viewMode === 'preview'
+    ? heading?.title ?? getFirstLine(chunk.text, chunk.chunkOrder)
+    : getFirstLine(chunk.text, chunk.chunkOrder)
+  const body = viewMode === 'preview' ? stripMarkdownHeadings(chunk.text) : chunk.text
 
   const handleKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
     if (event.key === 'Enter' || event.key === ' ') {
@@ -254,12 +272,16 @@ function ChunkCard({
         selected ? 'border-primary' : 'border-border hover:border-primary'
       }`}
     >
-      {/* 卡片头部：来源文件 + 更多操作 */}
+      {/* 卡片头部：标题 + 层级徽标 + 更多操作 */}
       <div className="flex items-center justify-between gap-2">
-        <span className="flex min-w-0 items-center gap-1.5 text-[11px] font-medium text-primary">
-          <Link2 className="size-3 shrink-0" />
-          <span className="truncate">{sourceFileName}</span>
-        </span>
+        <h3 className="line-clamp-1 min-w-0 flex-1 text-[13px] font-medium text-foreground">{title}</h3>
+        {viewMode === 'preview' && heading?.level ? (
+          <span className="flex h-4 shrink-0 items-center rounded-sm bg-primary-light px-1.5 text-[10px] font-medium text-primary">
+            H{heading.level}
+          </span>
+        ) : (
+          <span className="shrink-0" />
+        )}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <button
@@ -283,43 +305,42 @@ function ChunkCard({
         </DropdownMenu>
       </div>
 
-      {/* 标题与正文预览 */}
-      <h3 className="mt-2.5 line-clamp-1 text-[13px] font-medium text-foreground">{title}</h3>
-      <p className="mt-1 line-clamp-4 text-xs leading-relaxed text-secondary">{chunk.text}</p>
-
-      {/* 页脚元数据 */}
-      <div className="mt-auto flex items-center justify-between pt-2.5 text-[11px] text-tertiary">
-        <span>分块 {chunk.chunkOrder}</span>
-        <ChunkStatusText status={chunk.status} />
+      {/* 正文预览（渐隐 + 展开入口） */}
+      <div className="relative mt-1.5 min-h-0">
+        <p className="line-clamp-4 text-xs leading-relaxed text-secondary">{body}</p>
+        <span className="pointer-events-none absolute inset-x-0 bottom-0 h-8 bg-gradient-to-t from-card to-transparent" aria-hidden="true" />
       </div>
 
-      {/* 悬浮查看详情胶囊 */}
-      <span className="pointer-events-none absolute bottom-7 left-1/2 hidden -translate-x-1/2 items-center gap-1 whitespace-nowrap rounded-full border border-border bg-card px-2.5 py-1 text-[11px] text-foreground shadow-sm group-hover:inline-flex">
-        查看详情
-        <ChevronDown className="size-3 text-tertiary" />
-      </span>
+      {/* 页脚元数据 */}
+      <div className="mt-auto flex items-center justify-between pt-2 text-[11px] text-tertiary">
+        <span>
+          分块 {chunk.chunkOrder} · {chunk.text.length} 字
+        </span>
+        <span className="flex items-center gap-2.5">
+          <ChunkStatusText status={chunk.status} />
+          <span className="whitespace-nowrap text-primary opacity-0 transition-opacity group-hover:opacity-100">
+            展开全文 →
+          </span>
+        </span>
+      </div>
     </div>
   )
 }
 
-/** 右侧知识块详情抽屉。 */
+/** 右侧知识块 Inspector 抽屉。 */
 function ChunkDrawer({
   chunk,
   sourceFileName,
-  fileType,
-  fileSize,
-  originalFileUrl,
-  chunkTotal,
+  splitStrategyLabel,
+  viewMode,
   onClose,
   onSave,
   onDelete,
 }: {
   chunk: DocumentChunk
   sourceFileName: string
-  fileType: string | null
-  fileSize: number | null
-  originalFileUrl: string | null
-  chunkTotal: number
+  splitStrategyLabel: string | null
+  viewMode: ChunkViewMode
   onClose: () => void
   onSave: (chunk: DocumentChunk, text: string) => void
   onDelete: () => void
@@ -343,13 +364,14 @@ function ChunkDrawer({
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      {/* 抽屉头部 */}
-      <header className="flex items-start justify-between gap-3 border-b border-border px-4 py-3">
-        <div className="min-w-0 space-y-0.5">
-          <h2 className="truncate text-sm font-semibold text-foreground">{getChunkTitle(chunk.text, chunk.chunkOrder)}</h2>
-          <p className="text-[11px] text-tertiary">
-            分块 #{chunk.chunkOrder} · <ChunkStatusText status={chunk.status} />
-          </p>
+      {/* 抽屉头部：分块序号 + 状态 + 来源弱信息 */}
+      <header className="flex items-start justify-between gap-3 border-b border-border px-5 py-3.5">
+        <div className="min-w-0 space-y-1">
+          <h2 className="flex items-center gap-2 text-sm font-semibold text-foreground">
+            分块 #{chunk.chunkOrder}
+            <ChunkStatusText status={chunk.status} />
+          </h2>
+          <p className="truncate text-[11px] text-tertiary">来源：{sourceFileName}</p>
         </div>
         <button
           type="button"
@@ -362,56 +384,18 @@ function ChunkDrawer({
       </header>
 
       {/* 抽屉内容 */}
-      <section aria-label="分块完整内容" className="min-h-0 flex-1 space-y-3 overflow-y-auto px-4 py-3">
-        {/* 来源文件 */}
-        <div className="rounded-md border border-border bg-muted/60 p-2.5">
-          <div className="flex items-center justify-between text-xs font-medium text-secondary">
-            来源文件
-            <ChevronDown className="size-3.5 text-tertiary" />
-          </div>
-          <div className="mt-2.5 flex items-center gap-2.5">
-            <span className="flex size-8 shrink-0 items-center justify-center rounded-md border border-border bg-card">
-              <FileTypeIcon fileName={sourceFileName} fileType={fileType} size="md" />
-            </span>
-            <div className="min-w-0 flex-1">
-              <p className="truncate text-xs font-medium text-foreground" title={sourceFileName}>
-                {sourceFileName}
-              </p>
-              <div className="mt-1 flex flex-wrap items-center gap-1 text-[11px] text-secondary">
-                {fileType && <span className="rounded-sm bg-muted px-1.5 py-px">{fileType}</span>}
-                {fileSize !== null && <span className="rounded-sm bg-muted px-1.5 py-px">{formatFileSize(fileSize)}</span>}
-                <span className="rounded-sm bg-muted px-1.5 py-px">共 {chunkTotal} 个切片</span>
-              </div>
-            </div>
-            {originalFileUrl && (
-              <a
-                href={originalFileUrl}
-                target="_blank"
-                rel="noreferrer"
-                title="查看文件详情"
-                aria-label="查看文件详情"
-                className="flex size-7 shrink-0 items-center justify-center rounded text-tertiary transition-colors hover:bg-muted hover:text-secondary"
-              >
-                <Eye className="size-3.5" />
-              </a>
-            )}
-          </div>
-        </div>
-
-        {/* 切片内容 */}
-        <div className="rounded-md border border-border bg-muted/60 p-2.5">
-          <div className="flex items-center justify-between text-xs font-medium text-secondary">
-            切片内容
-            <ChevronDown className="size-3.5 text-tertiary" />
-          </div>
-          <div className="mt-2">
+      <section aria-label="分块完整内容" className="min-h-0 flex-1 space-y-3 overflow-y-auto px-5 py-3.5">
+        {/* 内容 */}
+        <div>
+          <div className="mb-1.5 text-xs font-medium text-secondary">内容</div>
+          <div className="rounded-md border border-border bg-muted/60 p-3">
             {editing ? (
               <div className="space-y-2">
                 <textarea
                   value={draft}
                   onChange={(event) => setDraft(event.target.value)}
                   aria-label="编辑分块内容"
-                  className="min-h-[180px] w-full resize-y rounded-md border border-input bg-card p-2.5 text-xs leading-relaxed text-foreground outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-ring/30"
+                  className="min-h-[200px] w-full resize-y rounded-md border border-input bg-card p-2.5 text-xs leading-relaxed text-foreground outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-ring/30"
                 />
                 <div className="flex justify-end gap-2">
                   <Button type="button" variant="outline" size="sm" onClick={() => setDraft(chunk.text)}>
@@ -423,14 +407,26 @@ function ChunkDrawer({
                 </div>
               </div>
             ) : (
-              <p className="whitespace-pre-wrap text-xs leading-relaxed text-secondary">{chunk.text}</p>
+              <ChunkText text={chunk.text} viewMode={viewMode} />
             )}
+          </div>
+        </div>
+
+        {/* 结构信息 */}
+        <div>
+          <div className="mb-1.5 text-xs font-medium text-secondary">结构信息</div>
+          <div className="rounded-md border border-border bg-muted/60 px-3 py-1">
+            <InfoRow label="分块序号" value={`#${chunk.chunkOrder}`} />
+            <InfoRow label="标题路径" value={deriveTitlePath(chunk.text)} />
+            <InfoRow label="字符数" value={`${chunk.text.length}`} />
+            <InfoRow label="切分方式" value={splitStrategyLabel ?? '—'} />
+            <InfoRow label="索引状态" value={chunkStatusLabel(chunk.status).label} valueClassName={chunkStatusLabel(chunk.status).className} />
           </div>
         </div>
       </section>
 
       {/* 抽屉底部操作 */}
-      <footer className="flex items-center justify-between border-t border-border px-4 py-3">
+      <footer className="flex items-center justify-between border-t border-border px-5 py-3">
         {savedSuccess ? (
           <span className="inline-flex items-center gap-1 text-xs font-medium text-success">
             <Check className="size-3.5" />
@@ -462,26 +458,80 @@ function ChunkDrawer({
   )
 }
 
+/** 结构信息行。 */
+function InfoRow({ label, value, valueClassName }: { label: string; value: string; valueClassName?: string }) {
+  return (
+    <div className="flex items-baseline gap-3 border-b border-border/60 py-2 text-xs last:border-b-0">
+      <span className="w-16 shrink-0 text-tertiary">{label}</span>
+      <span className={cn('min-w-0 break-all text-foreground', valueClassName)}>{value}</span>
+    </div>
+  )
+}
+
+/** 按预览/原文渲染知识块文本：预览隐藏 Markdown 标题符号并以粗体标题展示。 */
+function ChunkText({ text, viewMode }: { text: string; viewMode: ChunkViewMode }) {
+  if (viewMode === 'raw') {
+    return <p className="whitespace-pre-wrap font-mono text-xs leading-relaxed text-secondary">{text}</p>
+  }
+  return (
+    <div className="space-y-1 text-xs leading-relaxed text-secondary">
+      {text.split('\n').map((line, index) => {
+        const heading = parseHeadingLine(line)
+        if (!heading) {
+          return line.trim() ? <p key={index}>{line}</p> : <p key={index} className="h-2" />
+        }
+        return (
+          <p key={index} className="font-semibold text-foreground">
+            {heading.title}
+          </p>
+        )
+      })}
+    </div>
+  )
+}
+
 /** 分块状态纯色文字（已索引绿 / 失败红 / 跳过灰 / 其余蓝）。 */
 function ChunkStatusText({ status }: { status: string }) {
-  const mapped = status === 'INDEXED'
-    ? { label: '已索引', className: 'text-success' }
-    : status === 'FAILED'
-      ? { label: '处理失败', className: 'text-danger' }
-      : status === 'SKIP_INDEX'
-        ? { label: '跳过索引', className: 'text-tertiary' }
-        : { label: '处理中', className: 'text-primary' }
+  const mapped = chunkStatusLabel(status)
   return <span className={mapped.className}>{mapped.label}</span>
 }
 
-/** 取正文首个有效行作为卡片标题。 */
-function getChunkTitle(text: string, chunkOrder: number): string {
+function chunkStatusLabel(status: string): { label: string; className: string } {
+  if (status === 'INDEXED') return { label: '已索引', className: 'text-success' }
+  if (status === 'FAILED') return { label: '处理失败', className: 'text-danger' }
+  if (status === 'SKIP_INDEX') return { label: '跳过索引', className: 'text-tertiary' }
+  return { label: '处理中', className: 'text-primary' }
+}
+
+/** 解析首个标题行，返回层级与去掉 # 后的标题。 */
+function parseChunkHeading(text: string): { level: number; title: string } | null {
+  const firstLine = text.split('\n').map((line) => line.trim()).find(Boolean)
+  return firstLine ? parseHeadingLine(firstLine) : null
+}
+
+/** 解析单行 Markdown 标题（# 开头），返回去掉符号后的文本与层级。 */
+function parseHeadingLine(line: string): { level: number; title: string } | null {
+  const match = /^(#{1,6})\s+(.*)$/.exec(line.trim())
+  if (!match) return null
+  return { level: match[1].length, title: match[2].trim() }
+}
+
+/** 预览模式下去掉正文中的 Markdown 标题符号。 */
+function stripMarkdownHeadings(text: string): string {
+  return text.replace(/^#{1,6}\s*/gm, '')
+}
+
+/** 取正文首个有效行作为标题。 */
+function getFirstLine(text: string, chunkOrder: number): string {
   return text.split('\n').map((line) => line.trim()).find(Boolean) || `分块 ${chunkOrder}`
 }
 
-function formatFileSize(value: number | null): string {
-  if (value === null || value < 0) return '—'
-  if (value < 1024) return `${value} B`
-  if (value < 1024 * 1024) return `${(value / 1024).toFixed(1)} KB`
-  return `${(value / (1024 * 1024)).toFixed(1)} MB`
+/** 由文本中的标题行推导标题路径。 */
+function deriveTitlePath(text: string): string {
+  const headings = text
+    .split('\n')
+    .map((line) => parseHeadingLine(line))
+    .filter((item): item is { level: number; title: string } => item !== null)
+    .map((item) => item.title)
+  return headings.length > 0 ? headings.join(' → ') : '—'
 }
