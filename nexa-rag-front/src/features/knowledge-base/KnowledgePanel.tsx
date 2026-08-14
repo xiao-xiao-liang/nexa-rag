@@ -1,6 +1,6 @@
 import { FileUp, FolderOpen } from 'lucide-react'
 import { NavLink, useLocation } from 'react-router-dom'
-import { cn } from '@/lib/utils'
+import { SidebarNavItem } from '@/components/layout/SidebarNavItem'
 
 const items = [
   { label: '知识库概览', to: '/knowledge-base?view=overview', end: true },
@@ -21,7 +21,7 @@ function isItemActive(item: { to: string }, isActive: boolean, search: string): 
 export function KnowledgePanel() {
   const { search } = useLocation()
   return (
-    <aside aria-label="知识库导航" className="flex w-[232px] shrink-0 flex-col border-r border-border bg-card py-2">
+    <aside aria-label="知识库导航" className="flex h-full w-full shrink-0 flex-col border-r border-border bg-card py-2">
       <div className="mb-1 flex items-center justify-between px-4 py-1.5">
         <span className="text-sm font-semibold text-foreground">知识库</span>
         <FolderOpen className="size-4 text-tertiary" aria-hidden="true" />
@@ -31,37 +31,11 @@ export function KnowledgePanel() {
       </div>
       <p className="px-4 pb-1 pt-2 text-xs font-medium text-tertiary">视图</p>
       {items.slice(0, 2).map((item) => (
-        <NavLink
-          key={item.label}
-          to={item.to}
-          end={item.end}
-          className={({ isActive }) =>
-            cn(
-              'mx-2 rounded px-3 py-1.5 text-sm transition-colors',
-              isItemActive(item, isActive, search)
-                ? 'bg-primary-light font-medium text-primary'
-                : 'text-secondary hover:bg-muted hover:text-foreground',
-            )}
-        >
-          {item.label}
-        </NavLink>
+        <SidebarNavItem key={item.label} to={item.to} end={item.end} label={item.label} isActive={(isActive) => isItemActive(item, isActive, search)} />
       ))}
       <p className="px-4 pb-1 pt-3 text-xs font-medium text-tertiary">快捷筛选</p>
       {items.slice(2).map((item) => (
-        <NavLink
-          key={item.label}
-          to={item.to}
-          end={item.end}
-          className={({ isActive }) =>
-            cn(
-              'mx-2 rounded px-3 py-1.5 text-sm transition-colors',
-              isItemActive(item, isActive, search)
-                ? 'bg-primary-light font-medium text-primary'
-                : 'text-secondary hover:bg-muted hover:text-foreground',
-            )}
-        >
-          {item.label}
-        </NavLink>
+        <SidebarNavItem key={item.label} to={item.to} end={item.end} label={item.label} isActive={(isActive) => isItemActive(item, isActive, search)} />
       ))}
       <div className="flex-1" />
       <NavLink

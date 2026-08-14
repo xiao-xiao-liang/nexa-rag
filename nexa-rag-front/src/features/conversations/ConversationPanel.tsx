@@ -1,6 +1,6 @@
 import { useMemo, useState, type KeyboardEvent, type MouseEvent } from 'react'
 import {
-  Check, MoreHorizontal, PanelLeftClose, PanelLeftOpen, Pencil, Pin, PinOff, Plus, Search, Trash2, Workflow, X,
+  Check, MessagesSquare, MoreHorizontal, PanelLeftClose, PanelLeftOpen, Pencil, Pin, PinOff, Plus, Search, Trash2, Workflow, X,
 } from 'lucide-react'
 import { NavLink, useNavigate, useSearchParams } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
@@ -11,6 +11,7 @@ import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { Skeleton } from '@/components/ui/skeleton'
+import { EmptyState } from '@/components/ui/empty-state'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { useConversationNavigation } from '@/features/conversations/ConversationNavigationContext'
 import { cn } from '@/lib/utils'
@@ -143,7 +144,7 @@ export function ConversationPanel() {
   }
 
   return (
-    <aside aria-label="会话列表" className="flex w-[232px] shrink-0 flex-col border-r border-border bg-card">
+    <aside aria-label="会话列表" className="flex h-full w-full shrink-0 flex-col border-r border-border bg-card">
       {/* 头部：新建对话 + 收起 */}
       <div className="flex items-center px-3 pb-2 pt-3">
         <NavLink
@@ -215,7 +216,20 @@ export function ConversationPanel() {
         )}
 
         {!loading && !error && filteredConversations.length === 0 && (
-          <p className="px-2 py-5 text-xs text-tertiary">{search ? '没有匹配的会话' : '从一段新对话开始'}</p>
+          search ? (
+            <p className="px-2 py-5 text-center text-xs text-tertiary">没有匹配的会话</p>
+          ) : (
+            <EmptyState
+              icon={MessagesSquare}
+              title="暂无会话"
+              description="从一段新对话开始，让 AI 结合知识库回答你的问题。"
+              action={
+                <Button asChild variant="outline" size="sm" className="rounded text-xs">
+                  <NavLink to="/chat">开始新对话</NavLink>
+                </Button>
+              }
+            />
+          )
         )}
 
         {!loading && !error && filteredConversations.length > 0 && (
@@ -408,6 +422,20 @@ function ConversationListItemRow({
       )}
     >
       <span className="min-w-0 flex-1 truncate">{conversation.title || '未命名会话'}</span>
+      <button
+        type="button"
+        aria-label={isPinned ? '取消置顶' : '置顶'}
+        onClick={(event) => {
+          event.stopPropagation()
+          onTogglePin()
+        }}
+        className={cn(
+          'flex size-6 shrink-0 items-center justify-center rounded text-tertiary transition-all hover:bg-muted hover:text-primary',
+          isPinned ? 'text-primary opacity-100' : 'opacity-0 group-hover:opacity-100',
+        )}
+      >
+        <Pin className={cn('size-3', isPinned && 'fill-current')} />
+      </button>
       <span className="shrink-0 pr-6 text-[10px] text-tertiary">
         {formatConversationTime(conversation.lastMessageTime ?? conversation.updatedTime)}
       </span>

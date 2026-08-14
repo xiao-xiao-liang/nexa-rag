@@ -1,7 +1,7 @@
 import { Outlet, useLocation } from 'react-router-dom'
 import { IconRail } from '@/components/layout/IconRail'
 import { ModulePanel } from '@/components/layout/ModulePanel'
-import { TopBar } from '@/components/layout/TopBar'
+import { ResizablePanel } from '@/components/layout/ResizablePanel'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { ConversationNavigationProvider } from '@/features/conversations/ConversationNavigationContext'
 
@@ -19,10 +19,13 @@ export function AppShell() {
     <TooltipProvider delayDuration={250}>
       <ConversationNavigationProvider>
         <div className="flex h-dvh min-h-[560px] flex-col overflow-hidden bg-background text-foreground">
-          <TopBar />
           <div className="flex min-h-0 flex-1">
             <IconRail activeKey={resolveActiveKey(pathname)} />
-            <ModulePanel />
+            {resolveActiveKey(pathname) !== 'settings' && (
+              <ResizablePanel>
+                <ModulePanel />
+              </ResizablePanel>
+            )}
             <main className="relative min-w-0 flex-1">
               <Outlet />
             </main>

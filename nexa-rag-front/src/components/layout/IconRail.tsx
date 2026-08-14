@@ -36,10 +36,11 @@ export function IconRail({ activeKey }: { activeKey: string }) {
             aria-label={label}
             title={label}
             className={cn(
-              'mb-1 flex size-9 items-center justify-center rounded-md transition-colors',
+              'relative mb-1 flex size-9 items-center justify-center rounded-md transition-colors',
               isActive ? 'bg-primary-light text-primary' : 'text-tertiary hover:bg-muted hover:text-secondary',
             )}
           >
+            {isActive && <span className="absolute left-[-6px] top-1/2 h-4 w-0.5 -translate-y-1/2 rounded-full bg-primary" />}
             <Icon className="size-[18px]" />
           </NavLink>
         )

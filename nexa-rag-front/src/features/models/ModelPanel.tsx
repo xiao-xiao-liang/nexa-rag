@@ -1,7 +1,13 @@
-import { NavLink } from 'react-router-dom'
-import { cn } from '@/lib/utils'
+import { SidebarNavItem } from '@/components/layout/SidebarNavItem'
 
-const groups = [
+interface PanelGroupItem {
+  label: string
+  to: string
+  end: boolean
+  badge?: string
+}
+
+const groups: { label: string; items: PanelGroupItem[] }[] = [
   {
     label: '模型管理',
     items: [
@@ -12,30 +18,19 @@ const groups = [
   },
   {
     label: '模板',
-    items: [{ label: '提示词管理', to: '/prompts', end: true }],
+    items: [{ label: '提示词管理', to: '/prompts', end: true, badge: 'New' }],
   },
 ]
 
 /** 模型管理模块面板：分组菜单。 */
 export function ModelPanel() {
   return (
-    <aside aria-label="模型管理导航" className="flex w-[232px] shrink-0 flex-col border-r border-border bg-card py-3">
+    <aside aria-label="模型管理导航" className="flex h-full w-full shrink-0 flex-col border-r border-border bg-card py-3">
       {groups.map((group) => (
         <div key={group.label} className="mb-3 flex flex-col">
           <p className="px-4 pb-1 text-xs font-medium text-tertiary">{group.label}</p>
           {group.items.map((item) => (
-            <NavLink
-              key={item.label}
-              to={item.to}
-              end={item.end}
-              className={({ isActive }) =>
-                cn(
-                  'mx-2 rounded px-3 py-1.5 text-sm transition-colors',
-                  isActive ? 'bg-primary-light font-medium text-primary' : 'text-secondary hover:bg-muted hover:text-foreground',
-                )}
-            >
-              {item.label}
-            </NavLink>
+            <SidebarNavItem key={item.label} to={item.to} end={item.end} label={item.label} badge={item.badge} />
           ))}
         </div>
       ))}
