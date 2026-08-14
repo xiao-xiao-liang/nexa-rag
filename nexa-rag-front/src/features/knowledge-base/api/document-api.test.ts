@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   deleteDocument, getDocument, getDocumentChunks, getDocumentProcessStatus,
-  listDocuments, processDocument, retryDocument, uploadDocument,
+  getDocumentOverview, listDocuments, processDocument, retryDocument, uploadDocument,
 } from './document-api'
 
 describe('文档接口客户端', () => {
@@ -49,6 +49,15 @@ describe('文档接口客户端', () => {
     expect(fetchMock).toHaveBeenNthCalledWith(4, '/api/documents/8/process', { method: 'POST' })
     expect(fetchMock).toHaveBeenNthCalledWith(5, '/api/documents/8/retry', { method: 'POST' })
     expect(fetchMock).toHaveBeenNthCalledWith(6, '/api/documents/8', { method: 'DELETE' })
+  })
+
+  it('应使用文档标识请求诊断概览接口', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(success({ chunkStatistics: { total: 12, indexed: 10, failed: 1, skipped: 0, pending: 1 } }))
+    vi.stubGlobal('fetch', fetchMock)
+
+    await getDocumentOverview(8)
+
+    expect(fetchMock).toHaveBeenCalledWith('/api/documents/8/overview', undefined)
   })
 })
 

@@ -9,6 +9,7 @@ export interface DocumentSummary {
   originalFileName: string | null
   fileType: string | null
   status: DocumentStatus
+  createBy?: string | null
   updatedTime?: string | null
 }
 
@@ -30,6 +31,32 @@ export interface DocumentProcessStatus {
   consumedTimes: number | null
   failureStage: string | null
   failureReason: string | null
+}
+
+/** 文档片段状态统计。 */
+export interface DocumentChunkStatistics {
+  total: number
+  indexed: number
+  failed: number
+  skipped: number
+  pending: number
+}
+
+/** 文档诊断概览。 */
+export interface DocumentOverview {
+  documentId: number | string
+  title: string | null
+  description: string | null
+  originalFileName: string | null
+  fileType: string | null
+  fileSize: number | null
+  status: DocumentStatus
+  sourceType: string | null
+  sourceUrl: string | null
+  processConfigJson: string | null
+  createTime: string | null
+  updateTime: string | null
+  chunkStatistics: DocumentChunkStatistics
 }
 
 /** 与文档服务切分策略枚举保持一致。 */
@@ -161,6 +188,11 @@ export function getDocument(documentId: number | string, signal?: AbortSignal): 
 /** 查询文档处理状态。 */
 export function getDocumentProcessStatus(documentId: number | string, signal?: AbortSignal): Promise<DocumentProcessStatus> {
   return request<DocumentProcessStatus>(`/api/documents/${encodeDocumentId(documentId)}/process-status`, signal ? { signal } : undefined)
+}
+
+/** 查询文档诊断概览（基础信息、处理配置快照与片段统计）。 */
+export function getDocumentOverview(documentId: number | string, signal?: AbortSignal): Promise<DocumentOverview> {
+  return request<DocumentOverview>(`/api/documents/${encodeDocumentId(documentId)}/overview`, signal ? { signal } : undefined)
 }
 
 /** 查询文档文本分块。 */
