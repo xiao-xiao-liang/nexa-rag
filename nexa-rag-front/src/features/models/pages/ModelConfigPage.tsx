@@ -3,6 +3,7 @@ import {
   Copy, Cpu, Database, Edit3, Eye, EyeOff, Key, Link2, Loader2, Plus, RefreshCw, Search, Sparkles, Wrench,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { EmptyState } from '@/components/ui/empty-state'
 import {
   Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle,
 } from '@/components/ui/dialog'
@@ -494,9 +495,12 @@ export default function ModelConfigPage() {
                     <TableBody>
                       {currentProviderConfigs.length === 0 ? (
                         <TableRow>
-                          <TableCell colSpan={7} className="py-10 text-center text-tertiary">
-                            <Database className="mx-auto size-8 text-border" />
-                            <p className="mt-2 text-xs">数据库中暂无该供应商的已注册模型，可点击【一键接入推荐模型】或【增加自定义模型】。</p>
+                          <TableCell colSpan={7}>
+                            <EmptyState
+                              icon={Database}
+                              title="暂无已注册模型"
+                              description="数据库中暂无该供应商的已注册模型，可点击【一键接入推荐模型】或【增加自定义模型】。"
+                            />
                           </TableCell>
                         </TableRow>
                       ) : (
