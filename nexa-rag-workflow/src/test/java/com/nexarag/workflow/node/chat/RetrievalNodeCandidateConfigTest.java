@@ -4,6 +4,7 @@ import com.alibaba.cloud.ai.graph.OverAllState;
 import com.nexarag.retrieval.config.RetrievalProperties;
 import com.nexarag.retrieval.dto.req.ConversationRetrievalRequest;
 import com.nexarag.retrieval.service.ConversationRetrievalService;
+import com.nexarag.workflow.stream.ChatGenerationEventPublisher;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 
@@ -29,7 +30,7 @@ class RetrievalNodeCandidateConfigTest {
         properties.getCandidate().setCoarseScoreFloor(0D);
         when(retrievalService.retrieve(any())).thenReturn(java.util.List.of());
 
-        new RetrievalNode(retrievalService, properties).apply(new OverAllState(Map.of(
+        new RetrievalNode(retrievalService, properties, mock(ChatGenerationEventPublisher.class)).apply(new OverAllState(Map.of(
                 REWRITTEN_QUESTION, "退款规则")));
 
         ArgumentCaptor<ConversationRetrievalRequest> captor = ArgumentCaptor.forClass(ConversationRetrievalRequest.class);

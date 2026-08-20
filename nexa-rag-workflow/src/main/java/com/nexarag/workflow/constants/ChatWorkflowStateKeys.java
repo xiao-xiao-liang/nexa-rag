@@ -34,9 +34,12 @@ public final class ChatWorkflowStateKeys {
     public static final String MAX_RETRIEVAL_ROUND = "maxRetrievalRound";
     public static final String RETRIEVAL_TOP_K = "retrievalTopK";
     public static final String RETRIEVAL_VECTOR_THRESHOLD = "retrievalVectorThreshold";
+    public static final String RETRIEVAL_KNOWLEDGE_BASE_IDS = "retrievalKnowledgeBaseIds";
     public static final String RAW_RETRIEVAL_RESULTS = "rawRetrievalResults";
     public static final String MODEL_STREAM_RESULT = "modelStreamResult";
     public static final String PROMPT_EXECUTION_SNAPSHOT = "promptExecutionSnapshot";
+    public static final String GENERATION_ACCUMULATOR = "generationAccumulator";
+    public static final String TOOL_FAILURE_SUMMARIES = "toolFailureSummaries";
 
     private ChatWorkflowStateKeys() {
     }
