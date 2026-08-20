@@ -64,7 +64,7 @@ public class MilvusConfiguration {
      * @param retrievalProperties 检索运行配置
      * @return Milvus 连接参数
      */
-    static ConnectParam connectParam(RetrievalProperties retrievalProperties) {
+    public static ConnectParam connectParam(RetrievalProperties retrievalProperties) {
         RetrievalProperties.Vector vectorProperties = retrievalProperties.getVector();
         ConnectParam.Builder builder = ConnectParam.newBuilder()
                 .withHost(vectorProperties.getHost())
