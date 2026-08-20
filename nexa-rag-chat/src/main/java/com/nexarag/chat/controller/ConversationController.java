@@ -168,6 +168,8 @@ public class ConversationController {
                 .role(message.role())
                 .status(message.status())
                 .content(message.content())
+                .generationId(message.generationId())
+                .toolOperationsJson(message.toolOperationsJson())
                 .createdTime(message.createdTime())
                 .updatedTime(message.updatedTime())
                 .build();

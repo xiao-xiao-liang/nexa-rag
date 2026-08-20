@@ -45,7 +45,7 @@ class ConversationContextAdvisorTest {
         CurrentUserContext.set(new CurrentUser("864019719617777664"));
         ChatMessageVO message = new ChatMessageVO("m1", "c1", "864019719617777664", 1,
                 ChatMessageRole.USER, ChatMessageStatus.COMPLETED, "历史问题", null,
-                null, null, null, null, null, null, null, null);
+                null, null, null, null, null, null, null, null, null, null);
         when(contextService.loadForTurn("c1", "864019719617777664"))
                 .thenReturn(new ConversationContext("c1", "864019719617777664", "摘要", null,
                         List.of(message), "m1", 1L));

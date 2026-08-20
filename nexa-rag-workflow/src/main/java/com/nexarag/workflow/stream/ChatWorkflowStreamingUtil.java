@@ -9,6 +9,7 @@ import reactor.core.publisher.Flux;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.Function;
 
 import static com.nexarag.workflow.constants.ChatWorkflowStateKeys.ASSISTANT_CONTENT;
 import static com.nexarag.workflow.constants.ChatWorkflowStateKeys.COMPLETION_TOKENS;
@@ -52,6 +53,22 @@ public final class ChatWorkflowStreamingUtil {
     public static Flux<GraphResponse<StreamingOutput<ChatStreamEvent>>> toGraphStream(
             Class<?> nodeClass, OverAllState state, Flux<ChatModelStreamResponse> modelStream,
             ChatGenerationAccumulator accumulator) {
+        return toGraphStream(nodeClass, state, modelStream, accumulator, event -> event);
+    }
+
+    /**
+     * 使用指定发布器将模型流转换为 Graph 原生流输出。
+     *
+     * @param nodeClass 当前节点类型
+     * @param state Graph 当前状态
+     * @param modelStream 模型流
+     * @param accumulator 任务共享累积器
+     * @param eventPublisher 实时事件发布回调
+     * @return Graph 流输出
+     */
+    public static Flux<GraphResponse<StreamingOutput<ChatStreamEvent>>> toGraphStream(
+            Class<?> nodeClass, OverAllState state, Flux<ChatModelStreamResponse> modelStream,
+            ChatGenerationAccumulator accumulator, Function<ChatStreamEvent, ChatStreamEvent> eventPublisher) {
         AtomicBoolean terminal = new AtomicBoolean();
         String nodeName = nodeClass.getSimpleName();
 
@@ -60,12 +77,18 @@ public final class ChatWorkflowStreamingUtil {
                     accumulator.append(response);
                     if (response.errorCode() != null) {
                         terminal.set(true);
-                        return Flux.just(event(nodeName, state,
-                                        ChatStreamEvent.error(response.errorCode(), response.errorMessage())),
+                        ChatStreamEvent errorEvent = streamEvent(state,
+                                ChatStreamEvent.error(response.errorCode(), response.errorMessage()));
+                        ChatStreamEvent persistedError = eventPublisher.apply(errorEvent);
+                        return Flux.just(event(nodeName, state, persistedError),
                                 done(accumulator, "FAILED", response.errorCode(), response.errorMessage()));
                     }
                     if (response.content() != null && !response.content().isEmpty()) {
-                        return Flux.just(event(nodeName, state, ChatStreamEvent.token(response.content())));
+                        ChatStreamEvent answerDelta = streamEvent(state,
+                                new ChatStreamEvent(ChatStreamEventType.ANSWER_DELTA, response.content(), null,
+                                        null, null, null, null, null));
+                        ChatStreamEvent persistedAnswerDelta = eventPublisher.apply(answerDelta);
+                        return Flux.just(event(nodeName, state, persistedAnswerDelta));
                     }
                     if (response.finishReason() != null) {
                         terminal.set(true);
@@ -75,8 +98,10 @@ public final class ChatWorkflowStreamingUtil {
                 })
                 .onErrorResume(exception -> {
                     terminal.set(true);
-                    return Flux.just(event(nodeName, state,
-                                    ChatStreamEvent.error("MODEL_STREAM_ERROR", exception.getMessage())),
+                    ChatStreamEvent errorEvent = streamEvent(state,
+                            ChatStreamEvent.error("MODEL_STREAM_ERROR", exception.getMessage()));
+                    ChatStreamEvent persistedError = eventPublisher.apply(errorEvent);
+                    return Flux.just(event(nodeName, state, persistedError),
                             done(accumulator, "FAILED", "MODEL_STREAM_ERROR", exception.getMessage()));
                 })
                 .concatWith(Flux.defer(() -> terminal.get()
@@ -86,6 +111,13 @@ public final class ChatWorkflowStreamingUtil {
     private static GraphResponse<StreamingOutput<ChatStreamEvent>> event(
             String nodeName, OverAllState state, ChatStreamEvent event) {
         return GraphResponse.of(new StreamingOutput<>(event, nodeName, state));
+    }
+
+    private static ChatStreamEvent streamEvent(OverAllState state, ChatStreamEvent event) {
+        return new ChatStreamEvent(event.type(), event.content(), state.value("conversationId", ""),
+                state.value("traceId", ""), state.value("generationId", ""),
+                state.value("assistantMessageId", ""), event.errorCode(), event.errorMessage(),
+                event.eventVersion(), event.operations());
     }
 
     private static GraphResponse<StreamingOutput<ChatStreamEvent>> done(

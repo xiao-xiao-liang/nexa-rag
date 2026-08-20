@@ -8,6 +8,7 @@ import com.nexarag.chat.enums.ChatMessageRole;
 import com.nexarag.chat.enums.ChatMessageStatus;
 import com.nexarag.chat.id.ChatIdGenerator;
 import com.nexarag.chat.mapper.ChatMessageMapper;
+import com.nexarag.chat.service.ConversationMessageService;
 import com.nexarag.chat.service.ConversationService;
 import com.nexarag.common.web.CursorPageVO;
 import org.junit.jupiter.api.Test;
@@ -19,6 +20,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.util.List;
+import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -97,6 +99,15 @@ class ConversationMessageServiceImplTest {
                         "CANCELLED".equals(message.getStatus())
                                 && "已生成内容".equals(message.getContent())),
                 any());
+    }
+
+    @Test
+    void shouldExposeGenerationAndToolSnapshotFieldsForAssistantMessages() {
+        assertThat(Stream.of(ChatMessage.class.getDeclaredFields()).map(field -> field.getName()))
+                .contains("generationId", "toolOperationsJson");
+        assertThat(Stream.of(ConversationMessageService.class.getDeclaredMethods())
+                .map(method -> method.getName()))
+                .contains("beginGenerationTurn");
     }
 
     @Test

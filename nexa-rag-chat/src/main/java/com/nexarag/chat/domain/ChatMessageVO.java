@@ -17,6 +17,8 @@ import java.time.LocalDateTime;
  * @param content 消息正文
  * @param thinkingContent 思考内容
  * @param referencesJson 引用信息 JSON
+ * @param generationId 生成任务 ID
+ * @param toolOperationsJson 工具运行卡终态快照 JSON
  * @param promptTokens 输入 Token 数
  * @param completionTokens 输出 Token 数
  * @param totalTokens 总 Token 数
@@ -27,7 +29,8 @@ import java.time.LocalDateTime;
  */
 public record ChatMessageVO(String messageId, String conversationId, String userId, long sequence,
                             ChatMessageRole role, ChatMessageStatus status, String content,
-                            String thinkingContent, String referencesJson, Integer promptTokens,
+                            String thinkingContent, String referencesJson, String generationId,
+                            String toolOperationsJson, Integer promptTokens,
                             Integer completionTokens, Integer totalTokens, String failureCode,
                             String failureMessage, LocalDateTime createdTime, LocalDateTime updatedTime) {
 

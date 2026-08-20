@@ -83,7 +83,8 @@ class ConversationControllerTest {
         CurrentUserContext.set(new CurrentUser("u1"));
         ChatMessageVO message = new ChatMessageVO("m1", "c1", "u1", 8L,
                 ChatMessageRole.ASSISTANT, ChatMessageStatus.FAILED, "已生成内容", "思考内容",
-                "[{\"source\":\"内部\"}]", 10, 20, 30, "MODEL_ERROR", "内部失败详情",
+                "[{\"source\":\"内部\"}]", "g1", "[{\"opId\":\"g1:tool:1\"}]", 10, 20, 30,
+                "MODEL_ERROR", "内部失败详情",
                 LocalDateTime.of(2026, 7, 26, 9, 0), LocalDateTime.of(2026, 7, 26, 9, 1));
         when(messageService.pageHistory("c1", "u1", 8L, 50))
                 .thenReturn(new CursorPageVO<>(List.of(message), false, 8L));
@@ -94,11 +95,13 @@ class ConversationControllerTest {
         assertThat(response.data().getRecords()).singleElement().satisfies(item -> {
             assertThat(item.getContent()).isEqualTo("已生成内容");
             assertThat(item.getStatus()).isEqualTo(ChatMessageStatus.FAILED);
+            assertThat(item.getGenerationId()).isEqualTo("g1");
+            assertThat(item.getToolOperationsJson()).isEqualTo("[{\"opId\":\"g1:tool:1\"}]");
         });
         assertThat(ConversationMessageItemVO.class.getDeclaredFields())
                 .extracting(field -> field.getName())
                 .containsExactlyInAnyOrder("messageId", "sequence", "role", "status", "content",
-                        "createdTime", "updatedTime");
+                        "generationId", "toolOperationsJson", "createdTime", "updatedTime");
         verify(messageService).pageHistory("c1", "u1", 8L, 50);
     }
 

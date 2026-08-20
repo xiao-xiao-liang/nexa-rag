@@ -2,6 +2,11 @@ package com.nexarag.workflow.stream;
 
 import com.nexarag.model.gateway.chat.ChatModelStreamResponse;
 
+import java.util.Comparator;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+
 /**
  * Chat 生成结果累积器，线程安全地保存正文、Token 用量和结束原因。
  */
@@ -12,6 +17,7 @@ public class ChatGenerationAccumulator {
     private Integer completionTokens;
     private Integer totalTokens;
     private String finishReason;
+    private final Map<String, ChatToolOperationDTO> operations = new ConcurrentHashMap<>();
 
     /**
      * 累积一个模型流分片。
@@ -38,6 +44,26 @@ public class ChatGenerationAccumulator {
      */
     public synchronized Snapshot snapshot() {
         return new Snapshot(content.toString(), promptTokens, completionTokens, totalTokens, finishReason);
+    }
+
+    /**
+     * 覆盖保存同一工具调用的最新展示状态。
+     *
+     * @param operation 工具调用展示快照
+     */
+    public void upsertOperation(ChatToolOperationDTO operation) {
+        operations.put(operation.opId(), operation);
+    }
+
+    /**
+     * 返回按执行顺序排列的工具调用展示快照。
+     *
+     * @return 工具调用展示快照
+     */
+    public List<ChatToolOperationDTO> operationsSnapshot() {
+        return operations.values().stream()
+                .sorted(Comparator.comparingLong(ChatToolOperationDTO::sequence))
+                .toList();
     }
 
     private <T> T latest(T candidate, T current) {

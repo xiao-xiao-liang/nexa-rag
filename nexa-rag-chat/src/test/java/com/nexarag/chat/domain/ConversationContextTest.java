@@ -18,6 +18,7 @@ class ConversationContextTest {
         ChatMessageVO message = new ChatMessageVO(
                 "m1", "c1", "u1", 1L, ChatMessageRole.USER, ChatMessageStatus.COMPLETED,
                 "你好", null, null, null, null, null, null, null, null, null
+                , null, null
         );
         List<ChatMessageVO> source = new java.util.ArrayList<>(List.of(message));
 

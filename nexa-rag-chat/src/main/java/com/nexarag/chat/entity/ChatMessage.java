@@ -53,6 +53,11 @@ public class ChatMessage {
     private String status;
 
     /**
+     * 生成任务 ID。
+     */
+    private String generationId;
+
+    /**
      * 消息正文。
      */
     private String content;
@@ -66,6 +71,11 @@ public class ChatMessage {
      * 引用信息 JSON。
      */
     private String referencesJson;
+
+    /**
+     * 工具运行卡终态快照 JSON。
+     */
+    private String toolOperationsJson;
 
     /**
      * 输入 Token 数。

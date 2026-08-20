@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.nexarag.chat.cache.ConversationContextLock;
+import com.nexarag.chat.domain.ChatGenerationTurnBO;
 import com.nexarag.chat.domain.ChatMessageVO;
 import com.nexarag.chat.entity.ChatConversation;
 import com.nexarag.chat.entity.ChatMessage;
@@ -77,11 +78,61 @@ public class ConversationMessageServiceImpl extends ServiceImpl<ChatMessageMappe
         });
     }
 
+    /**
+     * 在会话锁内创建本轮用户消息和助手占位消息，避免同会话并发生成。
+     *
+     * @param conversationId 会话 ID
+     * @param userId 用户 ID
+     * @param userContent 用户问题
+     * @param generationId 生成任务 ID
+     * @return 本轮创建的两条消息
+     */
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public ChatGenerationTurnBO beginGenerationTurn(String conversationId, String userId,
+                                                     String userContent, String generationId) {
+        validateContent(userContent);
+        validateGenerationId(generationId);
+        return contextLock.execute(userId, conversationId, () -> {
+            // 1. 校验会话归属并拒绝已有的活动生成
+            ChatConversation conversation = requireConversationEntity(conversationId, userId);
+            if (hasGeneratingAssistantMessage(conversationId, userId)) {
+                throw new ClientException("当前会话已有进行中的回答，请等待完成后再发送");
+            }
+
+            // 2. 按顺序保存用户消息与助手占位消息
+            LocalDateTime now = LocalDateTime.now();
+            long userSequence = nextSequence(conversationId, userId);
+            ChatMessage userMessage = buildMessage(conversationId, userId, userSequence,
+                    ChatMessageRole.USER, ChatMessageStatus.COMPLETED, userContent, now);
+            save(userMessage);
+            ChatMessage assistantMessage = buildMessage(conversationId, userId, userSequence + 1,
+                    ChatMessageRole.ASSISTANT, ChatMessageStatus.GENERATING, null, now);
+            assistantMessage.setGenerationId(generationId);
+            save(assistantMessage);
+
+            // 3. 更新会话最新用户消息并返回本轮消息
+            conversation.setLastMessageId(userMessage.getMessageId());
+            conversation.setLastMessageTime(now);
+            updateByConversation(conversation);
+            return new ChatGenerationTurnBO(toDomain(userMessage), toDomain(assistantMessage));
+        });
+    }
+
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void completeAssistantMessage(String messageId, String content, String thinkingContent,
                                          Integer promptTokens, Integer completionTokens, Integer totalTokens,
                                          String referencesJson) {
+        completeAssistantMessage(messageId, content, thinkingContent, promptTokens, completionTokens, totalTokens,
+                referencesJson, null);
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void completeAssistantMessage(String messageId, String content, String thinkingContent,
+                                         Integer promptTokens, Integer completionTokens, Integer totalTokens,
+                                         String referencesJson, String toolOperationsJson) {
         validateContent(content);
         // 1. 组装完成状态和模型用量
         ChatMessage message = new ChatMessage();
@@ -89,6 +140,7 @@ public class ConversationMessageServiceImpl extends ServiceImpl<ChatMessageMappe
         message.setContent(content);
         message.setThinkingContent(thinkingContent);
         message.setReferencesJson(referencesJson);
+        message.setToolOperationsJson(toolOperationsJson);
         message.setPromptTokens(promptTokens);
         message.setCompletionTokens(completionTokens);
         message.setTotalTokens(totalTokens);
@@ -102,12 +154,20 @@ public class ConversationMessageServiceImpl extends ServiceImpl<ChatMessageMappe
     @Transactional(rollbackFor = Exception.class)
     public void failAssistantMessage(String messageId, String partialContent,
                                      String failureCode, String failureMessage) {
+        failAssistantMessage(messageId, partialContent, failureCode, failureMessage, null);
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void failAssistantMessage(String messageId, String partialContent,
+                                     String failureCode, String failureMessage, String toolOperationsJson) {
         // 1. 组装失败状态和已生成的部分回答
         ChatMessage message = new ChatMessage();
         message.setStatus(ChatMessageStatus.FAILED.name());
         message.setContent(partialContent);
         message.setFailureCode(failureCode);
         message.setFailureMessage(failureMessage);
+        message.setToolOperationsJson(toolOperationsJson);
 
         // 2. 仅允许生成中的消息进入失败状态
         updateGeneratingMessage(messageId, message);
@@ -116,10 +176,17 @@ public class ConversationMessageServiceImpl extends ServiceImpl<ChatMessageMappe
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void cancelAssistantMessage(String messageId, String partialContent) {
+        cancelAssistantMessage(messageId, partialContent, null);
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void cancelAssistantMessage(String messageId, String partialContent, String toolOperationsJson) {
         // 1. 组装取消状态和已生成的部分回答
         ChatMessage message = new ChatMessage();
         message.setStatus(ChatMessageStatus.CANCELLED.name());
         message.setContent(partialContent);
+        message.setToolOperationsJson(toolOperationsJson);
 
         // 2. 仅允许生成中的消息进入取消状态
         updateGeneratingMessage(messageId, message);
@@ -193,6 +260,14 @@ public class ConversationMessageServiceImpl extends ServiceImpl<ChatMessageMappe
         return latest == null || latest.getSequence() == null ? 1L : latest.getSequence() + 1L;
     }
 
+    private boolean hasGeneratingAssistantMessage(String conversationId, String userId) {
+        return baseMapper.selectCount(new LambdaQueryWrapper<ChatMessage>()
+                .eq(ChatMessage::getConversationId, conversationId)
+                .eq(ChatMessage::getUserId, userId)
+                .eq(ChatMessage::getRole, ChatMessageRole.ASSISTANT.name())
+                .eq(ChatMessage::getStatus, ChatMessageStatus.GENERATING.name())) > 0;
+    }
+
     private ChatConversation requireConversationEntity(String conversationId, String userId) {
         return conversationService.getOwnedConversation(conversationId, userId);
     }
@@ -235,7 +310,8 @@ public class ConversationMessageServiceImpl extends ServiceImpl<ChatMessageMappe
         return new ChatMessageVO(entity.getMessageId(), entity.getConversationId(), entity.getUserId(),
                 entity.getSequence(), ChatMessageRole.valueOf(entity.getRole()),
                 ChatMessageStatus.valueOf(entity.getStatus()), entity.getContent(), entity.getThinkingContent(),
-                entity.getReferencesJson(), entity.getPromptTokens(), entity.getCompletionTokens(),
+                entity.getReferencesJson(), entity.getGenerationId(), entity.getToolOperationsJson(),
+                entity.getPromptTokens(), entity.getCompletionTokens(),
                 entity.getTotalTokens(), entity.getFailureCode(), entity.getFailureMessage(),
                 entity.getCreateTime(), entity.getUpdateTime());
     }
@@ -243,6 +319,12 @@ public class ConversationMessageServiceImpl extends ServiceImpl<ChatMessageMappe
     private void validateContent(String content) {
         if (content == null || content.isBlank()) {
             throw new ClientException("消息内容不能为空");
+        }
+    }
+
+    private void validateGenerationId(String generationId) {
+        if (generationId == null || generationId.isBlank()) {
+            throw new ClientException("生成任务ID不能为空");
         }
     }
 }

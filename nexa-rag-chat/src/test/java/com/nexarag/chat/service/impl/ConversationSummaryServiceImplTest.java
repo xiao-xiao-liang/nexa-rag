@@ -83,7 +83,7 @@ class ConversationSummaryServiceImplTest {
             messages.add(new ChatMessageVO("m" + i, "c1", "u1", i,
                     i % 2 == 1 ? ChatMessageRole.USER : ChatMessageRole.ASSISTANT,
                     ChatMessageStatus.COMPLETED, "消息" + i, null, null,
-                    null, null, null, null, null, LocalDateTime.now(), LocalDateTime.now()));
+                    null, null, null, null, null, null, null, LocalDateTime.now(), LocalDateTime.now()));
         }
         when(messageService.listHistory("c1", "u1", 1000)).thenReturn(messages);
         when(chatIdGenerator.nextId()).thenReturn("s1");

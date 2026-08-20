@@ -33,6 +33,12 @@ public class ConversationMessageItemVO {
     /** 消息正文。 */
     private String content;
 
+    /** 生成任务 ID。 */
+    private String generationId;
+
+    /** 工具运行卡终态快照 JSON。 */
+    private String toolOperationsJson;
+
     /** 创建时间。 */
     private LocalDateTime createdTime;
 

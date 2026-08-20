@@ -6,6 +6,8 @@ import com.nexarag.chat.service.ConversationContextService;
 import com.nexarag.chat.service.ConversationMessageService;
 import com.nexarag.chat.service.ConversationSummaryService;
 import com.nexarag.workflow.node.chat.AssistantMessagePersistenceNode;
+import com.nexarag.workflow.stream.ChatGenerationEventPublisher;
+import com.nexarag.workflow.stream.ChatGenerationTaskManager;
 import org.junit.jupiter.api.Test;
 
 import java.util.Map;
@@ -29,8 +31,10 @@ class ChatWorkflowIntegrationTest {
         ConversationMessageService messageService = mock(ConversationMessageService.class);
         ConversationContextService contextService = mock(ConversationContextService.class);
         ConversationSummaryService summaryService = mock(ConversationSummaryService.class);
+        ChatGenerationEventPublisher eventPublisher = mock(ChatGenerationEventPublisher.class);
+        ChatGenerationTaskManager taskManager = mock(ChatGenerationTaskManager.class);
         AssistantMessagePersistenceNode node = new AssistantMessagePersistenceNode(
-                messageService, contextService, summaryService);
+                messageService, contextService, summaryService, eventPublisher, taskManager);
         GraphResponse<?> streamResult = GraphResponse.done(Map.of(
                 STREAM_STATUS, "COMPLETED", ASSISTANT_CONTENT, "完整回答"));
         OverAllState state = new OverAllState(Map.of(
@@ -42,7 +46,7 @@ class ChatWorkflowIntegrationTest {
         node.apply(state);
 
         verify(messageService).completeAssistantMessage("m1", "完整回答", null,
-                null, null, null, null);
+                null, null, null, null, null);
         verify(contextService).rebuild("c1", "u1");
         verify(summaryService).scheduleIfNecessary("c1", "u1");
     }

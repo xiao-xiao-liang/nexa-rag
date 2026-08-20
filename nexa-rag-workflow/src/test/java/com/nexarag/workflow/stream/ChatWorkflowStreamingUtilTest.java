@@ -69,7 +69,7 @@ class ChatWorkflowStreamingUtilTest {
 
     private void assertToken(GraphResponse<StreamingOutput<ChatStreamEvent>> response, String content) {
         ChatStreamEvent event = response.getOutput().join().getOriginData();
-        assertThat(event.type()).isEqualTo(ChatStreamEventType.TOKEN);
+        assertThat(event.type()).isEqualTo(ChatStreamEventType.ANSWER_DELTA);
         assertThat(event.content()).isEqualTo(content);
     }
 }

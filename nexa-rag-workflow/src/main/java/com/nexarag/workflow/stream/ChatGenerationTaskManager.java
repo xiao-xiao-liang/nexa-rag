@@ -106,6 +106,15 @@ public class ChatGenerationTaskManager {
         }
     }
 
+    /**
+     * 移除已进入终态的本地生成任务。
+     *
+     * @param generationId 生成任务 ID
+     */
+    public void complete(String generationId) {
+        tasks.remove(generationId);
+    }
+
     private boolean cancelTask(GenerationTask task) {
         if (!task.cancelled.compareAndSet(false, true)) {
             return false;
