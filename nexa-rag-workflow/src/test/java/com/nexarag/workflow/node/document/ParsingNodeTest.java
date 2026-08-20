@@ -66,8 +66,8 @@ class ParsingNodeTest {
         assertThat(document.getStatus()).isEqualTo(DocumentStatus.PARSED);
         assertThat(document.getParsedObjectName()).isEqualTo("parsed/1001/demo.md");
         assertThat(document.getParsedFileUrl()).isEqualTo("http://127.0.0.1/parsed/1001/demo.md");
-        assertThat(objectMapper.readTree(document.getParsedMetadataJson()))
-                .at("/structureArtifacts/0/objectKey")
+        assertThat(objectMapper.readTree(document.getParsedMetadataJson())
+                .at("/structureArtifacts/0/objectKey"))
                 .hasToString("\"parsed/1001/structure/mineru-middle.json\"");
         assertThat(result).containsEntry(ROUTE_TARGET, CHUNKING_NODE);
         verify(parseService).parse(argThat(request -> Boolean.TRUE.equals(request.enableOcr())
