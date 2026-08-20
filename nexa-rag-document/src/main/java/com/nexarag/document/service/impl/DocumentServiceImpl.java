@@ -58,6 +58,11 @@ public class DocumentServiceImpl extends ServiceImpl<DocumentMapper, Document> i
 
     @Override
     public Document createDocument(CreateDocumentRequest request) {
+        return createDocument(null, request);
+    }
+
+    @Override
+    public Document createDocument(Long knowledgeBaseId, CreateDocumentRequest request) {
         FileType fileType = FileType.fromFileName(request.originalFileName());
         if (fileType == FileType.UNKNOWN) {
             throw new ClientException("不支持的文档类型，fileName=" + request.originalFileName(),
@@ -67,6 +72,7 @@ public class DocumentServiceImpl extends ServiceImpl<DocumentMapper, Document> i
         // 1. 构建文档实体，初始化处理和重试状态
         Document document = Document.builder()
                 .documentId(IdWorker.getId())
+                .knowledgeBaseId(knowledgeBaseId)
                 .title(request.title())
                 .description(request.description())
                 .originalFileName(request.originalFileName())
@@ -96,6 +102,24 @@ public class DocumentServiceImpl extends ServiceImpl<DocumentMapper, Document> i
 
         // 1. 使用分页对象限制单次查询规模
         IPage<Document> page = queryDocumentPage(safePageNum, safePageSize);
+
+        // 2. 转换为文档摘要分页响应
+        List<DocumentSummaryVO> records = page.getRecords().stream()
+                .map(DocumentConverter::toSummaryVO)
+                .toList();
+        return new PageVO<>(records, page.getTotal(), page.getCurrent(), page.getSize(), page.getPages());
+    }
+
+    @Override
+    public PageVO<DocumentSummaryVO> pageDocuments(Long knowledgeBaseId, long pageNum, long pageSize) {
+        long safePageNum = pageNum <= 0 ? 1 : pageNum;
+        long safePageSize = normalizePageSize(pageSize);
+
+        // 1. 仅查询指定知识库内的文档，避免跨知识库混合展示
+        IPage<Document> page = this.lambdaQuery()
+                .eq(Document::getKnowledgeBaseId, knowledgeBaseId)
+                .orderByDesc(Document::getCreateTime)
+                .page(Page.of(safePageNum, safePageSize));
 
         // 2. 转换为文档摘要分页响应
         List<DocumentSummaryVO> records = page.getRecords().stream()
@@ -184,7 +208,7 @@ public class DocumentServiceImpl extends ServiceImpl<DocumentMapper, Document> i
             throw new ClientException("文档状态已变化，请刷新后重试，文档ID" + documentId, DocumentErrorCode.DOCUMENT_STATUS_INVALID);
         }
         log.info("文档提交处理成功，文档ID：{}，原状态：{} -> 当前状态：{}", documentId, oldStatus, updatedDocument.getStatus());
-        return document;
+        return updatedDocument;
     }
 
     @Override

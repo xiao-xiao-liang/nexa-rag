@@ -13,11 +13,12 @@ public interface DocumentPipelineSubmitService {
     /**
      * 创建文档并提交处理流水线。
      *
+     * @param knowledgeBaseId 知识库ID
      * @param createRequest  文档创建请求
      * @param processRequest 文档处理请求
      * @return 已进入排队状态的文档
      */
-    Document createAndSubmit(CreateDocumentRequest createRequest, ProcessDocumentRequest processRequest);
+    Document createAndSubmit(Long knowledgeBaseId, CreateDocumentRequest createRequest, ProcessDocumentRequest processRequest);
 
     /**
      * 提交已有文档处理。

@@ -42,9 +42,10 @@ public class DocumentPipelineSubmitServiceImpl implements DocumentPipelineSubmit
 
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public Document createAndSubmit(CreateDocumentRequest createRequest, ProcessDocumentRequest processRequest) {
+    public Document createAndSubmit(Long knowledgeBaseId, CreateDocumentRequest createRequest,
+                                    ProcessDocumentRequest processRequest) {
         // 1. 创建文档记录
-        Document document = documentService.createDocument(createRequest);
+        Document document = documentService.createDocument(knowledgeBaseId, createRequest);
 
         // 2. 生成处理批次并将文档推进到排队状态
         return submit(document.getDocumentId(), processRequest, false);

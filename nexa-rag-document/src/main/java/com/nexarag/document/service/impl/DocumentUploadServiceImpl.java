@@ -43,7 +43,7 @@ public class DocumentUploadServiceImpl implements DocumentUploadService {
     private final DocumentUploadRetryWaiter retryWaiter;
 
     @Override
-    public UploadDocumentResponse upload(MultipartFile file, UploadDocumentRequest request) {
+    public UploadDocumentResponse upload(Long knowledgeBaseId, MultipartFile file, UploadDocumentRequest request) {
         // 1. 校验上传文件，避免无效文件进入对象存储
         validateFile(file);
         UploadDocumentRequest safeRequest = request == null
@@ -58,7 +58,7 @@ public class DocumentUploadServiceImpl implements DocumentUploadService {
         try {
             ProcessDocumentRequest processRequest = processConfigDefaults.merge(
                     FileType.fromFileName(originalFileName), safeRequest);
-            Document document = pipelineSubmitService.createAndSubmit(
+            Document document = pipelineSubmitService.createAndSubmit(knowledgeBaseId,
                     buildCreateDocumentRequest(safeRequest, originalFileName, storedFile), processRequest);
             log.info("文档上传并提交处理成功，documentId={}，processId={}，status={}",
                     document.getDocumentId(), document.getProcessId(), document.getStatus());

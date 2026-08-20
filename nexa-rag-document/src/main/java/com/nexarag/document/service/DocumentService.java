@@ -23,6 +23,15 @@ public interface DocumentService extends IService<Document> {
     Document createDocument(CreateDocumentRequest request);
 
     /**
+     * 在指定知识库中创建文档记录。
+     *
+     * @param knowledgeBaseId 知识库ID
+     * @param request 文档创建请求
+     * @return 文档实体
+     */
+    Document createDocument(Long knowledgeBaseId, CreateDocumentRequest request);
+
+    /**
      * 分页查询文档摘要列表。
      *
      * @param pageNum  页码
@@ -30,6 +39,16 @@ public interface DocumentService extends IService<Document> {
      * @return 文档摘要分页数据
      */
     PageVO<DocumentSummaryVO> pageDocuments(long pageNum, long pageSize);
+
+    /**
+     * 分页查询指定知识库内的文档摘要。
+     *
+     * @param knowledgeBaseId 知识库ID
+     * @param pageNum 页码
+     * @param pageSize 每页数量
+     * @return 文档摘要分页数据
+     */
+    PageVO<DocumentSummaryVO> pageDocuments(Long knowledgeBaseId, long pageNum, long pageSize);
 
     /**
      * 查询文档诊断概览，包含基础信息、处理配置快照与片段状态统计。

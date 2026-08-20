@@ -46,10 +46,10 @@ class DocumentUploadServiceImplTest {
             }
             return storedFile();
         });
-        when(submitService.createAndSubmit(any(), any())).thenReturn(queuedDocument());
+        when(submitService.createAndSubmit(any(), any(), any())).thenReturn(queuedDocument());
 
         UploadDocumentResponse response = service(storageService, submitService, waiter)
-                .upload(file(), new UploadDocumentRequest(null, "描述", null, null, null));
+                .upload(10L, file(), new UploadDocumentRequest(null, "描述", null, null, null));
 
         assertThat(attempts).hasValue(3);
         verify(waiter).await(200L);
@@ -67,10 +67,10 @@ class DocumentUploadServiceImplTest {
                 .thenThrow(new ServiceException("模拟对象存储异常"));
 
         assertThatThrownBy(() -> service(storageService, submitService, mock(DocumentUploadRetryWaiter.class))
-                .upload(file(), null))
+                .upload(10L, file(), null))
                 .isInstanceOf(ServiceException.class)
                 .hasMessageContaining("重试耗尽");
-        verify(submitService, never()).createAndSubmit(any(), any());
+        verify(submitService, never()).createAndSubmit(any(), any(), any());
     }
 
     @Test
@@ -79,10 +79,10 @@ class DocumentUploadServiceImplTest {
         DocumentPipelineSubmitService submitService = mock(DocumentPipelineSubmitService.class);
         ServiceException failure = new ServiceException("模拟事务失败");
         when(storageService.save(any(), any(InputStream.class), any(Long.class))).thenReturn(storedFile());
-        when(submitService.createAndSubmit(any(), any())).thenThrow(failure);
+        when(submitService.createAndSubmit(any(), any(), any())).thenThrow(failure);
 
         assertThatThrownBy(() -> service(storageService, submitService, mock(DocumentUploadRetryWaiter.class))
-                .upload(file(), null)).isSameAs(failure);
+                .upload(10L, file(), null)).isSameAs(failure);
         verify(storageService).delete("original/demo.pdf");
     }
 
@@ -92,7 +92,7 @@ class DocumentUploadServiceImplTest {
         DocumentPipelineSubmitService submitService = mock(DocumentPipelineSubmitService.class);
 
         assertThatThrownBy(() -> service(storageService, submitService, mock(DocumentUploadRetryWaiter.class))
-                .upload(new MockMultipartFile("file", "demo.exe", "application/octet-stream", new byte[]{1}), null))
+                .upload(10L, new MockMultipartFile("file", "demo.exe", "application/octet-stream", new byte[]{1}), null))
                 .isInstanceOf(ClientException.class)
                 .hasMessageContaining("不支持的文档类型");
         verify(storageService, never()).save(any(), any(), any(Long.class));

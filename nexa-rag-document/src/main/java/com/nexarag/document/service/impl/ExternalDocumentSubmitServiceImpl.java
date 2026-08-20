@@ -26,7 +26,14 @@ public class ExternalDocumentSubmitServiceImpl {
     private final DocumentPipelineSubmitService documentPipelineSubmitService;
     private final ProcessConfigDefaults processConfigDefaults;
 
-    public UploadDocumentResponse submit(ExternalDocumentSubmitDTO request) {
+    /**
+     * 在指定知识库中受理外部文档。
+     *
+     * @param knowledgeBaseId 知识库ID
+     * @param request 外部文档请求
+     * @return 受理结果
+     */
+    public UploadDocumentResponse submit(Long knowledgeBaseId, ExternalDocumentSubmitDTO request) {
         // 1. 校验来源类型和 URL，并仅提取临时定位信息
         if (request.sourceType() == ExternalDocumentSourceType.LOCAL) {
             throw new ClientException("本地文件请使用上传接口", DocumentErrorCode.DOCUMENT_UPLOAD_FILE_INVALID);
@@ -36,7 +43,7 @@ public class ExternalDocumentSubmitServiceImpl {
         // 2. 创建外部来源文档并通过既有事务写入 Outbox
         String title = request.title() == null || request.title().isBlank()
                 ? DEFAULT_EXTERNAL_DOCUMENT_TITLE : request.title();
-        var document = documentPipelineSubmitService.createAndSubmit(
+        var document = documentPipelineSubmitService.createAndSubmit(knowledgeBaseId,
                 com.nexarag.document.model.dto.CreateDocumentRequest.external(title, request.description(),
                         "external.md", request.sourceType(), request.sourceUrl()),
                 processConfigDefaults.merge(FileType.MARKDOWN, new UploadDocumentRequest(null, null,

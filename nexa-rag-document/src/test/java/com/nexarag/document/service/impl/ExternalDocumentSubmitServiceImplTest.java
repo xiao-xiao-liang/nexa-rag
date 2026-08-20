@@ -23,15 +23,15 @@ class ExternalDocumentSubmitServiceImplTest {
         DocumentPipelineSubmitService pipelineService = mock(DocumentPipelineSubmitService.class);
         when(sourceService.validateAndExtractDocumentId(ExternalDocumentSourceType.YUQUE, "https://www.yuque.com/a/b"))
                 .thenReturn("b");
-        when(pipelineService.createAndSubmit(any(), any())).thenReturn(Document.builder()
+        when(pipelineService.createAndSubmit(any(), any(), any())).thenReturn(Document.builder()
                 .documentId(1L).processId("process-1").status(DocumentStatus.QUEUED).build());
 
         var result = new ExternalDocumentSubmitServiceImpl(sourceService, pipelineService, new com.nexarag.document.service.ProcessConfigDefaults())
-                .submit(new ExternalDocumentSubmitDTO(ExternalDocumentSourceType.YUQUE, "标题", null,
+                .submit(10L, new ExternalDocumentSubmitDTO(ExternalDocumentSourceType.YUQUE, "标题", null,
                         "https://www.yuque.com/a/b", null, null, null));
 
         assertThat(result.documentId()).isEqualTo(1L);
         verify(sourceService).validateAndExtractDocumentId(ExternalDocumentSourceType.YUQUE, "https://www.yuque.com/a/b");
-        verify(pipelineService).createAndSubmit(any(), any());
+        verify(pipelineService).createAndSubmit(any(), any(), any());
     }
 }

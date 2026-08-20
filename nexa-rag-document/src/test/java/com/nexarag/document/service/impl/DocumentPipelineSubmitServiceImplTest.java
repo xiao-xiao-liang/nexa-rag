@@ -89,15 +89,15 @@ class DocumentPipelineSubmitServiceImplTest {
         CreateDocumentRequest createRequest = new CreateDocumentRequest(
                 "测试", null, "demo.pdf", "original/demo.pdf", "http://demo", 1L);
         ProcessDocumentRequest processRequest = new ProcessDocumentRequest(null, null, null);
-        when(documentService.createDocument(createRequest)).thenReturn(Document.builder().documentId(1L).build());
+        when(documentService.createDocument(10L, createRequest)).thenReturn(Document.builder().documentId(1L).build());
         when(documentService.submitProcess(org.mockito.ArgumentMatchers.eq(1L),
                 org.mockito.ArgumentMatchers.eq(processRequest), anyString()))
                 .thenAnswer(invocation -> queuedDocument(invocation.getArgument(2)));
 
-        Document result = submitService.createAndSubmit(createRequest, processRequest);
+        Document result = submitService.createAndSubmit(10L, createRequest, processRequest);
 
         assertThat(result.getProcessId()).isNotBlank();
-        verify(documentService).createDocument(createRequest);
+        verify(documentService).createDocument(10L, createRequest);
         verify(outboxService).save(org.mockito.ArgumentMatchers.any());
     }
 

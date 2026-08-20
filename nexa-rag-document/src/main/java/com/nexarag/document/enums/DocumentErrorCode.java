@@ -42,7 +42,19 @@ public enum DocumentErrorCode implements IErrorCode {
     /**
      * Markdown 标题结构无法用于结构化切分。
      */
-    DOCUMENT_MARKDOWN_STRUCTURE_INVALID("D000007", "Markdown标题结构不可用");
+    DOCUMENT_MARKDOWN_STRUCTURE_INVALID("D000007", "Markdown标题结构不可用"),
+
+    /** 知识库不存在。 */
+    KNOWLEDGE_BASE_NOT_FOUND("D000008", "知识库不存在"),
+
+    /** 知识库名称冲突。 */
+    KNOWLEDGE_BASE_NAME_CONFLICT("D000009", "知识库名称已存在"),
+
+    /** 默认知识库受保护。 */
+    DEFAULT_KNOWLEDGE_BASE_PROTECTED("D000010", "默认知识库不可重命名或删除"),
+
+    /** 知识库仍包含文档。 */
+    KNOWLEDGE_BASE_NOT_EMPTY("D000011", "知识库不为空");
 
     private final String code;
     private final String message;

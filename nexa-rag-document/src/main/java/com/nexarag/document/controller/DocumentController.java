@@ -12,6 +12,7 @@ import com.nexarag.document.service.DocumentChunkService;
 import com.nexarag.document.service.DocumentPipelineSubmitService;
 import com.nexarag.document.service.DocumentService;
 import com.nexarag.document.service.DocumentUploadService;
+import com.nexarag.document.service.KnowledgeBaseService;
 import com.nexarag.document.service.impl.ExternalDocumentSubmitServiceImpl;
 import com.nexarag.document.model.vo.DocumentChunkVO;
 import com.nexarag.document.model.vo.DocumentDetailVO;
@@ -38,7 +39,7 @@ import org.springframework.web.multipart.MultipartFile;
  * 文档接口控制器，负责接收文档相关 REST 请求并返回统一响应。
  */
 @RestController
-@RequestMapping("/api/documents")
+@RequestMapping("/api/knowledge-bases/{knowledgeBaseId}/documents")
 @RequiredArgsConstructor
 public class DocumentController {
 
@@ -47,6 +48,7 @@ public class DocumentController {
     private final DocumentUploadService documentUploadService;
     private final DocumentPipelineSubmitService documentPipelineSubmitService;
     private final ExternalDocumentSubmitServiceImpl externalDocumentSubmitService;
+    private final KnowledgeBaseService knowledgeBaseService;
 
     /**
      * 创建文档记录。
@@ -55,8 +57,10 @@ public class DocumentController {
      * @return 文档详情响应
      */
     @PostMapping
-    public Result<DocumentDetailVO> createDocument(@Valid @RequestBody CreateDocumentRequest request) {
-        return Results.success(DocumentConverter.toDetailVO(documentService.createDocument(request)));
+    public Result<DocumentDetailVO> createDocument(@PathVariable Long knowledgeBaseId,
+                                                    @Valid @RequestBody CreateDocumentRequest request) {
+        knowledgeBaseService.getRequiredKnowledgeBase(knowledgeBaseId);
+        return Results.success(DocumentConverter.toDetailVO(documentService.createDocument(knowledgeBaseId, request)));
     }
 
     /**
@@ -67,16 +71,20 @@ public class DocumentController {
      * @return 上传文档响应
      */
     @PostMapping(value = "/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    public Result<UploadDocumentResponse> uploadDocument(@RequestPart("file") MultipartFile file,
+    public Result<UploadDocumentResponse> uploadDocument(@PathVariable Long knowledgeBaseId,
+                                                         @RequestPart("file") MultipartFile file,
                                                          @Valid @RequestPart(value = "request", required = false)
                                                          UploadDocumentRequest request) {
-        return Results.success(documentUploadService.upload(file, request));
+        knowledgeBaseService.getRequiredKnowledgeBase(knowledgeBaseId);
+        return Results.success(documentUploadService.upload(knowledgeBaseId, file, request));
     }
 
     /** 受理飞书或语雀单篇文档，并异步提交处理。 */
     @PostMapping("/external")
-    public Result<UploadDocumentResponse> submitExternalDocument(@Valid @RequestBody ExternalDocumentSubmitDTO request) {
-        return Results.success(externalDocumentSubmitService.submit(request));
+    public Result<UploadDocumentResponse> submitExternalDocument(@PathVariable Long knowledgeBaseId,
+                                                                  @Valid @RequestBody ExternalDocumentSubmitDTO request) {
+        knowledgeBaseService.getRequiredKnowledgeBase(knowledgeBaseId);
+        return Results.success(externalDocumentSubmitService.submit(knowledgeBaseId, request));
     }
 
     /**
@@ -87,10 +95,11 @@ public class DocumentController {
      * @return 文档分页列表
      */
     @GetMapping
-    public Result<PageVO<DocumentSummaryVO>> listDocuments(
+    public Result<PageVO<DocumentSummaryVO>> listDocuments(@PathVariable Long knowledgeBaseId,
             @RequestParam(defaultValue = "1") long pageNum,
             @RequestParam(defaultValue = "20") long pageSize) {
-        return Results.success(documentService.pageDocuments(pageNum, pageSize));
+        knowledgeBaseService.getRequiredKnowledgeBase(knowledgeBaseId);
+        return Results.success(documentService.pageDocuments(knowledgeBaseId, pageNum, pageSize));
     }
 
     /**
@@ -100,8 +109,9 @@ public class DocumentController {
      * @return 文档详情响应
      */
     @GetMapping("/{documentId}")
-    public Result<DocumentDetailVO> getDocument(@PathVariable Long documentId) {
-        return Results.success(DocumentConverter.toDetailVO(documentService.getRequiredDocument(documentId)));
+    public Result<DocumentDetailVO> getDocument(@PathVariable Long knowledgeBaseId, @PathVariable Long documentId) {
+        return Results.success(DocumentConverter.toDetailVO(
+                knowledgeBaseService.getRequiredDocument(knowledgeBaseId, documentId)));
     }
 
     /**
@@ -111,7 +121,8 @@ public class DocumentController {
      * @return 文档诊断概览
      */
     @GetMapping("/{documentId}/overview")
-    public Result<DocumentOverviewVO> getDocumentOverview(@PathVariable Long documentId) {
+    public Result<DocumentOverviewVO> getDocumentOverview(@PathVariable Long knowledgeBaseId, @PathVariable Long documentId) {
+        knowledgeBaseService.getRequiredDocument(knowledgeBaseId, documentId);
         return Results.success(documentService.getOverview(documentId));
     }
 
@@ -122,7 +133,8 @@ public class DocumentController {
      * @return 删除结果
      */
     @DeleteMapping("/{documentId}")
-    public Result<DocumentDeleteVO> deleteDocument(@PathVariable Long documentId) {
+    public Result<DocumentDeleteVO> deleteDocument(@PathVariable Long knowledgeBaseId, @PathVariable Long documentId) {
+        knowledgeBaseService.getRequiredDocument(knowledgeBaseId, documentId);
         return Results.success(documentService.deleteDocument(documentId));
     }
 
@@ -134,8 +146,9 @@ public class DocumentController {
      * @return 文档处理状态响应
      */
     @PostMapping("/{documentId}/process")
-    public Result<DocumentProcessStatusVO> processDocument(@PathVariable Long documentId,
+    public Result<DocumentProcessStatusVO> processDocument(@PathVariable Long knowledgeBaseId, @PathVariable Long documentId,
                                                            @Valid @RequestBody(required = false) ProcessDocumentRequest request) {
+        knowledgeBaseService.getRequiredDocument(knowledgeBaseId, documentId);
         return Results.success(documentPipelineSubmitService.submitProcess(documentId, request));
     }
 
@@ -146,7 +159,8 @@ public class DocumentController {
      * @return 文档处理状态响应
      */
     @PostMapping("/{documentId}/retry")
-    public Result<DocumentProcessStatusVO> retryDocument(@PathVariable Long documentId) {
+    public Result<DocumentProcessStatusVO> retryDocument(@PathVariable Long knowledgeBaseId, @PathVariable Long documentId) {
+        knowledgeBaseService.getRequiredDocument(knowledgeBaseId, documentId);
         return Results.success(documentPipelineSubmitService.retryProcess(documentId));
     }
 
@@ -157,9 +171,9 @@ public class DocumentController {
      * @return 文档处理状态响应
      */
     @GetMapping("/{documentId}/process-status")
-    public Result<DocumentProcessStatusVO> getProcessStatus(@PathVariable Long documentId) {
+    public Result<DocumentProcessStatusVO> getProcessStatus(@PathVariable Long knowledgeBaseId, @PathVariable Long documentId) {
         return Results.success(DocumentConverter.toProcessStatusVO(
-                documentService.getRequiredDocument(documentId)));
+                knowledgeBaseService.getRequiredDocument(knowledgeBaseId, documentId)));
     }
 
     /**
@@ -172,9 +186,11 @@ public class DocumentController {
      */
     @GetMapping("/{documentId}/chunks")
     public Result<PageVO<DocumentChunkVO>> listChunks(
+            @PathVariable Long knowledgeBaseId,
             @PathVariable Long documentId,
             @RequestParam(defaultValue = "1") long pageNum,
             @RequestParam(defaultValue = "20") long pageSize) {
+        knowledgeBaseService.getRequiredDocument(knowledgeBaseId, documentId);
         return Results.success(DocumentConverter.toChunkPageVO(
                 documentChunkService.pageByDocumentId(documentId, pageNum, pageSize)));
     }
