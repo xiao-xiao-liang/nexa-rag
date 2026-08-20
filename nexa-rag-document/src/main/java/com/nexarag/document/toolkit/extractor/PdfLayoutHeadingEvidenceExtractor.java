@@ -56,7 +56,7 @@ public class PdfLayoutHeadingEvidenceExtractor {
                         titles.add(title);
                     }
                 } else if (parser.currentToken().isScalarValue() && !objects.isEmpty()) {
-                    objects.peek().accept(parser.getValueAsString(), parser.getValueAsDouble(), parser.getValueAsInt());
+                    objects.peek().accept(parser);
                 }
             }
         }
@@ -80,15 +80,17 @@ public class PdfLayoutHeadingEvidenceExtractor {
         private Double fontSize;
         private Integer pageNumber;
 
-        private void accept(String stringValue, double numberValue, int integerValue) {
+        private void accept(JsonParser parser) throws IOException {
             if ("type".equals(fieldName)) {
-                type = stringValue;
+                type = parser.getValueAsString();
             } else if ("text".equals(fieldName) || "content".equals(fieldName)) {
-                text = stringValue;
-            } else if ("font_size".equals(fieldName) || "font_size_avg".equals(fieldName)) {
-                fontSize = numberValue;
-            } else if ("page_idx".equals(fieldName) || "page_no".equals(fieldName)) {
-                pageNumber = integerValue + 1;
+                text = parser.getValueAsString();
+            } else if (parser.currentToken().isNumeric()) {
+                if ("font_size".equals(fieldName) || "font_size_avg".equals(fieldName)) {
+                    fontSize = parser.getDoubleValue();
+                } else if ("page_idx".equals(fieldName) || "page_no".equals(fieldName)) {
+                    pageNumber = parser.getIntValue() + 1;
+                }
             }
         }
 

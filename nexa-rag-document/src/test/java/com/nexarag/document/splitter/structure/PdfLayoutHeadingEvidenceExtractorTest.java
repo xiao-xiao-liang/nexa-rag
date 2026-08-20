@@ -31,4 +31,22 @@ class PdfLayoutHeadingEvidenceExtractorTest {
                         org.assertj.core.groups.Tuple.tuple("背景", 2, HeadingEvidenceSource.PDF_LAYOUT, 1),
                         org.assertj.core.groups.Tuple.tuple("第二章", 1, HeadingEvidenceSource.PDF_LAYOUT, 2));
     }
+
+    @Test
+    void extractShouldIgnoreLongHtmlOfNonTitleBlock() throws Exception {
+        String longHtml = "x".repeat(1_001);
+        String middleJson = """
+                {"blocks":[
+                  {"type":"table","html":"%s"},
+                  {"type":"title","text":"第一章","font_size":20,"page_idx":0}
+                ]}
+                """.formatted(longHtml);
+
+        assertThat(new PdfLayoutHeadingEvidenceExtractor().extract(
+                new ByteArrayInputStream(middleJson.getBytes(StandardCharsets.UTF_8))))
+                .extracting(evidence -> evidence.title(), evidence -> evidence.declaredLevel(),
+                        evidence -> evidence.source(), evidence -> evidence.pageNumber())
+                .containsExactly(org.assertj.core.groups.Tuple.tuple("第一章", 1,
+                        HeadingEvidenceSource.PDF_LAYOUT, 1));
+    }
 }
