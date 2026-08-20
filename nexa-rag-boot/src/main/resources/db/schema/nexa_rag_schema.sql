@@ -85,8 +85,30 @@ CREATE TABLE IF NOT EXISTS model_call_log (
     KEY idx_model_call_log_create_time (create_time)
 ) COMMENT='模型调用日志';
 
+CREATE TABLE IF NOT EXISTS knowledge_base (
+    knowledge_base_id BIGINT NOT NULL COMMENT '知识库ID',
+    tenant_id VARCHAR(64) NOT NULL COMMENT '租户ID',
+    name VARCHAR(128) NOT NULL COMMENT '知识库名称',
+    active_name_key VARCHAR(128) NULL COMMENT '有效名称规范键',
+    description VARCHAR(1024) NULL COMMENT '知识库描述',
+    is_default TINYINT NOT NULL DEFAULT 0 COMMENT '是否默认知识库：0否，1是',
+    default_tenant_key VARCHAR(64) NULL COMMENT '默认库租户唯一键',
+    create_time DATETIME NOT NULL COMMENT '创建时间',
+    update_time DATETIME NOT NULL COMMENT '更新时间',
+    create_by VARCHAR(64) NULL COMMENT '创建人',
+    update_by VARCHAR(64) NULL COMMENT '更新人',
+    del_flag TINYINT NOT NULL DEFAULT 0 COMMENT '删除标记：0未删除，1已删除',
+    delete_time DATETIME NULL COMMENT '删除时间',
+    version INT NOT NULL DEFAULT 0 COMMENT '版本号',
+    PRIMARY KEY (knowledge_base_id),
+    UNIQUE KEY uk_knowledge_base_tenant_active_name (tenant_id, active_name_key),
+    UNIQUE KEY uk_knowledge_base_default_tenant (default_tenant_key),
+    KEY idx_knowledge_base_tenant_update (tenant_id, del_flag, update_time)
+) COMMENT='知识库表';
+
 CREATE TABLE IF NOT EXISTS document (
     document_id BIGINT NOT NULL COMMENT '文档ID',
+    knowledge_base_id BIGINT NOT NULL COMMENT '所属知识库ID',
     title VARCHAR(256) NOT NULL COMMENT '文档标题',
     description VARCHAR(1024) NULL COMMENT '文档描述',
     original_file_name VARCHAR(512) NOT NULL COMMENT '原始文件名',
@@ -129,7 +151,8 @@ CREATE TABLE IF NOT EXISTS document (
     KEY idx_document_status (status),
     KEY idx_document_create_time (create_time),
     KEY idx_document_del_flag (del_flag),
-    KEY idx_document_source_type (source_type)
+    KEY idx_document_source_type (source_type),
+    KEY idx_document_knowledge_base_status (knowledge_base_id, del_flag, status)
 ) COMMENT='文档表';
 
 CREATE TABLE IF NOT EXISTS document_task_outbox (
@@ -347,9 +370,11 @@ CREATE TABLE IF NOT EXISTS chat_message (
     sequence BIGINT NOT NULL COMMENT '会话内消息序号',
     role VARCHAR(32) NOT NULL COMMENT '消息角色',
     status VARCHAR(32) NOT NULL COMMENT '消息状态',
+    generation_id VARCHAR(64) NULL COMMENT '生成任务ID',
     content MEDIUMTEXT NULL COMMENT '消息正文',
     thinking_content MEDIUMTEXT NULL COMMENT '思考内容',
     references_json TEXT NULL COMMENT '引用信息JSON',
+    tool_operations_json MEDIUMTEXT NULL COMMENT '工具运行卡终态快照JSON',
     prompt_tokens INT NULL COMMENT '输入Token数',
     completion_tokens INT NULL COMMENT '输出Token数',
     total_tokens INT NULL COMMENT '总Token数',
@@ -362,7 +387,8 @@ CREATE TABLE IF NOT EXISTS chat_message (
     UNIQUE KEY uk_chat_message_conversation_sequence (conversation_id, sequence),
     KEY idx_chat_message_conversation_sequence (conversation_id, sequence),
     KEY idx_chat_message_conversation_status_sequence (conversation_id, status, sequence),
-    KEY idx_chat_message_user_conversation_sequence (user_id, conversation_id, sequence)
+    KEY idx_chat_message_user_conversation_sequence (user_id, conversation_id, sequence),
+    KEY idx_chat_message_generation_id (generation_id)
 ) COMMENT='聊天消息';
 
 CREATE TABLE IF NOT EXISTS chat_conversation_summary (
