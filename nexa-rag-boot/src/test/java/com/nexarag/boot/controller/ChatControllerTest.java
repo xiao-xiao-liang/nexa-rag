@@ -10,7 +10,10 @@ import com.nexarag.common.trace.TraceIdContext;
 import com.nexarag.common.exception.ServiceException;
 import com.nexarag.workflow.service.WorkflowService;
 import com.nexarag.workflow.stream.ChatGenerationTaskManager;
+import com.nexarag.workflow.stream.ChatGenerationEventPublisher;
 import com.nexarag.workflow.stream.ChatStreamEvent;
+import com.nexarag.workflow.stream.ChatStreamResumeService;
+import com.nexarag.document.service.KnowledgeBaseService;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -18,6 +21,7 @@ import reactor.core.publisher.Flux;
 import reactor.test.StepVerifier;
 
 import java.util.Map;
+import java.util.Set;
 
 import static com.nexarag.workflow.constants.ChatWorkflowStateKeys.USER_ID;
 import static com.nexarag.workflow.constants.ChatWorkflowStateKeys.TRACE_ID;
@@ -43,18 +47,23 @@ class ChatControllerTest {
     void streamShouldUseCurrentUserAndReturnTokenEvent() {
         WorkflowService workflowService = mock(WorkflowService.class);
         ChatIdGenerator idGenerator = mock(ChatIdGenerator.class);
+        ChatGenerationEventPublisher eventPublisher = mock(ChatGenerationEventPublisher.class);
+        ChatStreamResumeService resumeService = mock(ChatStreamResumeService.class);
+        KnowledgeBaseService knowledgeBaseService = mock(KnowledgeBaseService.class);
         when(idGenerator.nextId()).thenReturn("g1");
+        when(knowledgeBaseService.validateRequestedKnowledgeBases(java.util.List.of())).thenReturn(Set.of());
+        when(eventPublisher.open("g1")).thenReturn(Flux.empty());
         StreamingOutput<ChatStreamEvent> output = new StreamingOutput<>(
                 ChatStreamEvent.token("你"), "answer", new OverAllState(Map.of()));
         when(workflowService.stream(eq("chat-conversation"), any())).thenReturn(Flux.just(GraphResponse.of(output)));
         ChatController controller = new ChatController(
-                workflowService, mock(ChatGenerationTaskManager.class), idGenerator);
+                workflowService, mock(ChatGenerationTaskManager.class), eventPublisher, resumeService,
+                idGenerator, knowledgeBaseService);
         CurrentUserContext.set(new CurrentUser("u1"));
         TraceIdContext.setTraceId("trace-001");
 
         StepVerifier.create(controller.stream(new ChatStreamRequest(null, "你好")))
                 .assertNext(event -> assertThat(event.data().type().name()).isEqualTo("TOKEN"))
-                .assertNext(event -> assertThat(event.data().type().name()).isEqualTo("COMPLETE"))
                 .verifyComplete();
 
         @SuppressWarnings("unchecked")
@@ -69,11 +78,16 @@ class ChatControllerTest {
     void streamShouldReturnErrorEventWhenWorkflowCannotBeStarted() {
         WorkflowService workflowService = mock(WorkflowService.class);
         ChatIdGenerator idGenerator = mock(ChatIdGenerator.class);
+        ChatGenerationEventPublisher eventPublisher = mock(ChatGenerationEventPublisher.class);
+        ChatStreamResumeService resumeService = mock(ChatStreamResumeService.class);
+        KnowledgeBaseService knowledgeBaseService = mock(KnowledgeBaseService.class);
         when(idGenerator.nextId()).thenReturn("g1");
+        when(knowledgeBaseService.validateRequestedKnowledgeBases(java.util.List.of())).thenReturn(Set.of());
         when(workflowService.stream(eq("chat-conversation"), any()))
                 .thenThrow(new ServiceException("未找到流式工作流图"));
         ChatController controller = new ChatController(
-                workflowService, mock(ChatGenerationTaskManager.class), idGenerator);
+                workflowService, mock(ChatGenerationTaskManager.class), eventPublisher, resumeService,
+                idGenerator, knowledgeBaseService);
         CurrentUserContext.set(new CurrentUser("u1"));
 
         StepVerifier.create(controller.stream(new ChatStreamRequest(null, "你好")))

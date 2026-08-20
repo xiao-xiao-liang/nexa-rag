@@ -8,8 +8,11 @@ import com.nexarag.common.trace.TraceIdContext;
 import com.nexarag.workflow.request.ChatWorkflowRequest;
 import com.nexarag.workflow.service.WorkflowService;
 import com.nexarag.workflow.stream.ChatGenerationTaskManager;
+import com.nexarag.workflow.stream.ChatGenerationEventPublisher;
 import com.nexarag.workflow.stream.ChatStreamEvent;
 import com.nexarag.workflow.stream.ChatStreamEventType;
+import com.nexarag.workflow.stream.ChatStreamResumeService;
+import com.nexarag.document.service.KnowledgeBaseService;
 import com.alibaba.cloud.ai.graph.NodeOutput;
 import com.alibaba.cloud.ai.graph.streaming.StreamingOutput;
 import lombok.RequiredArgsConstructor;
@@ -19,12 +22,14 @@ import org.springframework.http.codec.ServerSentEvent;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import reactor.core.publisher.Flux;
 
-import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.List;
 
 import static com.nexarag.workflow.constants.ChatWorkflowGraphConstants.CHAT_CONVERSATION_GRAPH_NAME;
 
@@ -39,7 +44,10 @@ public class ChatController {
 
     private final WorkflowService workflowService;
     private final ChatGenerationTaskManager taskManager;
+    private final ChatGenerationEventPublisher eventPublisher;
+    private final ChatStreamResumeService resumeService;
     private final ChatIdGenerator idGenerator;
+    private final KnowledgeBaseService knowledgeBaseService;
 
     /**
      * 发起流式对话。
@@ -57,13 +65,14 @@ public class ChatController {
         String generationId = idGenerator.nextId();
         String traceId = TraceIdContext.getTraceId();
         log.debug("用户原始问题：{}", request.content());
+        List<Long> knowledgeBaseIds = List.copyOf(knowledgeBaseService.validateRequestedKnowledgeBases(request.knowledgeBaseIds()));
         ChatWorkflowRequest workflowRequest = new ChatWorkflowRequest(
-                userId, request.conversationId(), request.content(), generationId, traceId);
+                userId, request.conversationId(), request.content(), generationId, traceId, knowledgeBaseIds);
 
-        // 2. 将 Graph 流式输出映射为 SSE 协议
+        // 2. 先打开本实例事件订阅，再驱动 Graph 执行，避免丢失首个工具快照
         return Flux.defer(() -> {
-                    AtomicBoolean metaSent = new AtomicBoolean();
-                    Flux<ServerSentEvent<ChatStreamEvent>> events = workflowService
+                    Flux<ChatStreamEvent> realtimeEvents = eventPublisher.open(generationId);
+                    Flux<ChatStreamEvent> legacyGraphEvents = workflowService
                             .stream(CHAT_CONVERSATION_GRAPH_NAME, workflowRequest.toInitialState())
                             .handle((response, sink) -> {
                                 if (response.getOutput() == null || response.getOutput().isCompletedExceptionally()) {
@@ -72,22 +81,42 @@ public class ChatController {
                                 Object graphOutput = response.getOutput().join();
                                 if (graphOutput instanceof StreamingOutput<?> streamingOutput
                                         && streamingOutput.getOriginData() instanceof ChatStreamEvent event) {
-                                    sink.next(toSse(event));
-                                } else if (graphOutput instanceof NodeOutput nodeOutput
-                                        && "conversationValidation".equals(nodeOutput.node())
-                                        && metaSent.compareAndSet(false, true)) {
-                                    String conversationId = nodeOutput.state().value("conversationId", "");
-                                    sink.next(toSse(new ChatStreamEvent(ChatStreamEventType.META, null,
-                                            conversationId, traceId, generationId, null, null, null)));
+                                    if (event.eventVersion() <= 0) {
+                                        sink.next(enrichLegacyEvent(event, request.conversationId(), traceId,
+                                                generationId));
+                                    }
                                 }
                             });
-                    ChatStreamEvent complete = new ChatStreamEvent(ChatStreamEventType.COMPLETE, null,
-                            request.conversationId(), traceId, generationId, null, null, null);
-                    return events.concatWithValues(toSse(complete));
+                    return Flux.merge(realtimeEvents, legacyGraphEvents).map(this::toSse);
                 })
                 .onErrorResume(AbstractException.class, exception -> Flux.just(
-                        toSse(ChatStreamEvent.error(exception.getErrorCode(), exception.getErrorMessage()))))
-                .doOnCancel(() -> taskManager.cancel(generationId, userId));
+                        toSse(new ChatStreamEvent(ChatStreamEventType.ERROR, null, request.conversationId(), traceId,
+                                generationId, null, exception.getErrorCode(), exception.getErrorMessage()))));
+    }
+
+    /**
+     * 恢复断线前正在进行的回答，并连接本实例后续的实时事件。
+     *
+     * @param generationId 生成任务 ID
+     * @param afterVersion 客户端已接收的最大事件版本
+     * @return SSE 事件流
+     */
+    @GetMapping(value = "/generations/{generationId}/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    public Flux<ServerSentEvent<ChatStreamEvent>> resume(@PathVariable String generationId,
+                                                          @RequestParam(defaultValue = "0") long afterVersion) {
+        String userId = CurrentUserContext.getRequired().userId();
+        return Flux.defer(() -> {
+            // 1. 先创建本实例订阅，再读取 Redis 重放事件
+            Flux<ChatStreamEvent> realtimeEvents = eventPublisher.open(generationId);
+            List<ChatStreamEvent> replayEvents = resumeService.resume(generationId, userId, afterVersion);
+            replayEvents.forEach(event -> eventPublisher.markDelivered(generationId, event.eventVersion()));
+
+            // 2. 已有终态事件时只返回重放；否则连接后续实时事件
+            Flux<ChatStreamEvent> replayFlux = Flux.fromIterable(replayEvents);
+            boolean terminal = replayEvents.stream().anyMatch(this::isTerminal);
+            return terminal ? replayFlux.map(this::toSse)
+                    : Flux.concat(replayFlux, realtimeEvents).map(this::toSse);
+        });
     }
 
     /**
@@ -104,8 +133,23 @@ public class ChatController {
     }
 
     private ServerSentEvent<ChatStreamEvent> toSse(ChatStreamEvent event) {
-        return ServerSentEvent.<ChatStreamEvent>builder(event)
-                .event(event.type().name())
-                .build();
+        ServerSentEvent.Builder<ChatStreamEvent> builder = ServerSentEvent.<ChatStreamEvent>builder(event)
+                .event(event.type().name());
+        if (event.eventVersion() > 0) {
+            builder.id(String.valueOf(event.eventVersion()));
+        }
+        return builder.build();
+    }
+
+    private ChatStreamEvent enrichLegacyEvent(ChatStreamEvent event, String conversationId, String traceId,
+                                               String generationId) {
+        return new ChatStreamEvent(event.type(), event.content(), conversationId, traceId, generationId,
+                event.messageId(), event.errorCode(), event.errorMessage(), event.eventVersion(), event.operations());
+    }
+
+    private boolean isTerminal(ChatStreamEvent event) {
+        return event.type() == ChatStreamEventType.COMPLETE
+                || event.type() == ChatStreamEventType.CANCELLED
+                || event.type() == ChatStreamEventType.ERROR;
     }
 }
