@@ -31,9 +31,9 @@ class MarkdownParentDocumentSplitterTest {
         MarkdownSectionStructureBuilder structureBuilder =
                 new MarkdownSectionStructureBuilder(
                         new MarkdownHeadingScanner(new DocumentSectionIdGenerator()),
+                        new MarkdownSafeWindowSplitter(textWindowSplitter),
                         new DocumentChunkIdGenerator(),
-                        null,
-                        new MarkdownSafeWindowSplitter(textWindowSplitter)
+                        null
                 );
 
         splitter = new MarkdownParentDocumentSplitter(structureBuilder);
@@ -150,7 +150,7 @@ class MarkdownParentDocumentSplitterTest {
     }
 
     @Test
-    void splitShouldFallbackToUnstructuredChunksWhenHeadingTreeIsInvalid() {
+    void splitShouldNormalizeSkippedHeadingLevel() {
         DocumentSplitContext context = new DocumentSplitContext(1L, "测试", "demo.md", FileType.MARKDOWN,
                 "original/demo.md", null, "parsed/demo.md", null, "text/markdown", "# 一级\n### 三级\n正文", null,
                 new SplitConfigRequest(SplitStrategy.PARENT_MARKDOWN, 100, 0,
@@ -158,12 +158,12 @@ class MarkdownParentDocumentSplitterTest {
 
         DocumentSplitResult splitResult = splitter.split(context);
 
-        assertThat(splitResult.structured()).isFalse();
-        assertThat(splitResult.sections()).isEmpty();
-        assertThat(splitResult.chunks()).allSatisfy(draft -> {
-            assertThat(draft.sectionId()).isNull();
-            assertThat(draft.indexContent()).isEqualTo(draft.text());
-        });
+        assertThat(splitResult.structured()).isTrue();
+        assertThat(splitResult.sections()).hasSize(2);
+        assertThat(splitResult.sections().getFirst().headingLevel()).isEqualTo(1);
+        assertThat(splitResult.sections().get(1).headingLevel()).isEqualTo(2);
+        assertThat(splitResult.sections().get(1).parentSectionId())
+                .isEqualTo(splitResult.sections().getFirst().sectionId());
     }
 
     @Test

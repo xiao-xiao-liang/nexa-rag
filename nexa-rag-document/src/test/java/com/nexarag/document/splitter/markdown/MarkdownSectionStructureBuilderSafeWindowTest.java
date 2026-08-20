@@ -32,7 +32,7 @@ class MarkdownSectionStructureBuilderSafeWindowTest {
         TextWindowSplitter textWindowSplitter = new TextWindowSplitter();
         MarkdownSectionStructureBuilder builder = new MarkdownSectionStructureBuilder(
                 new MarkdownHeadingScanner(new DocumentSectionIdGenerator()),
-                new DocumentChunkIdGenerator(), null, new MarkdownSafeWindowSplitter(textWindowSplitter));
+                new MarkdownSafeWindowSplitter(textWindowSplitter), new DocumentChunkIdGenerator(), null);
 
         DocumentSplitResult splitResult = builder.build(context, SplitStrategy.PARENT_MARKDOWN);
         List<ChunkDraft> children = splitResult.chunks().stream().filter(draft -> !draft.skipIndex()).toList();
