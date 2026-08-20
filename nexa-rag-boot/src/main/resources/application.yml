@@ -110,9 +110,9 @@ nexa:
   # 文件存储配置，用于控制文档原始文件和解析产物的存取位置。
   storage:
     type: MINIO # 存储类型，可选值：MINIO、RUSTFS、OSS、QINIU、LOCAL。
-    endpoint: http://127.0.0.1:9000 # 对象存储服务地址。
-    access-key: liang  # 对象存储访问密钥。
-    secret-key: liang123 # 对象存储访问密钥密码。
+    endpoint: http://192.168.0.134:9000 # http://127.0.0.1:9000 # 对象存储服务地址。
+    access-key:  # liang  # 对象存储访问密钥。
+    secret-key:  # liang123 # 对象存储访问密钥密码。
     bucket: nexa-rag # 文档对象存储桶名称。
     create-bucket: true # 存储桶不存在时是否自动创建，可选值：true、false。
 
