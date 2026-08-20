@@ -15,7 +15,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class DocumentPipelineSchemaContractTest {
 
     private static final String MIGRATION_PATH =
-            "nexa-rag-boot/src/main/resources/db/migration/V11__add_document_pipeline_messaging.sql";
+            "nexa-rag-boot/src/main/resources/db/migration/V17__evolve_document_task_outbox.sql";
     private static final String SCHEMA_PATH =
             "nexa-rag-boot/src/main/resources/db/schema/nexa_rag_schema.sql";
 
@@ -25,12 +25,11 @@ class DocumentPipelineSchemaContractTest {
         String migrationSql = readRepositoryFile(MIGRATION_PATH);
         String schemaSql = readRepositoryFile(SCHEMA_PATH);
 
-        // 2. 验证两个文件均包含文档消息字段和中文注释
-        assertDocumentMessagingColumns(migrationSql);
+        // 2. 验证完整结构包含当前文档消息字段
         assertDocumentMessagingColumns(schemaSql);
 
-        // 3. 验证两个文件均包含Outbox表及关键索引
-        assertOutboxSchema(migrationSql);
+        // 3. 验证迁移与完整结构均反映当前任务型 Outbox 模型
+        assertTaskOutboxMigration(migrationSql);
         assertOutboxSchema(schemaSql);
     }
 
@@ -63,10 +62,12 @@ class DocumentPipelineSchemaContractTest {
     }
 
     private static void assertOutboxSchema(String sql) {
-        assertTrue(sql.contains("CREATE TABLE IF NOT EXISTS document_pipeline_outbox ("));
+        assertTrue(sql.contains("CREATE TABLE IF NOT EXISTS document_task_outbox ("));
         assertTrue(sql.contains("outbox_id BIGINT NOT NULL COMMENT 'Outbox记录ID'"));
         assertTrue(sql.contains("document_id BIGINT NOT NULL COMMENT '文档ID'"));
-        assertTrue(sql.contains("process_id VARCHAR(64) NOT NULL COMMENT '文档处理流水号'"));
+        assertTrue(sql.contains("operation_id VARCHAR(64) NULL COMMENT '任务操作版本ID'"));
+        assertTrue(sql.contains("task_type VARCHAR(64) NOT NULL COMMENT '任务类型'"));
+        assertTrue(sql.contains("task_status VARCHAR(32) NOT NULL COMMENT '任务最终状态'"));
         assertTrue(sql.contains("message_key VARCHAR(128) NOT NULL COMMENT '消息唯一键'"));
         assertTrue(sql.contains("topic VARCHAR(128) NOT NULL COMMENT '消息主题'"));
         assertTrue(sql.contains("message_body TEXT NOT NULL COMMENT '消息内容'"));
@@ -76,15 +77,22 @@ class DocumentPipelineSchemaContractTest {
         assertTrue(sql.contains("lock_owner VARCHAR(128) NULL COMMENT '锁持有者'"));
         assertTrue(sql.contains("lock_time DATETIME NULL COMMENT '加锁时间'"));
         assertTrue(sql.contains("published_time DATETIME NULL COMMENT '发布时间'"));
-        assertTrue(sql.contains("failure_reason VARCHAR(1024) NULL COMMENT '失败原因'"));
+        assertTrue(sql.contains("publish_failure_reason VARCHAR(1024) NULL COMMENT '消息发布失败原因'"));
         assertTrue(sql.contains("create_time DATETIME NOT NULL COMMENT '创建时间'"));
         assertTrue(sql.contains("update_time DATETIME NOT NULL COMMENT '更新时间'"));
         assertTrue(sql.contains("-- 主键：Outbox记录ID\n    PRIMARY KEY (outbox_id)"));
         assertTrue(sql.contains("-- 唯一索引：保证消息唯一键不重复\n"
-                + "    UNIQUE KEY uk_document_pipeline_outbox_message_key (message_key)"));
+                + "    UNIQUE KEY uk_document_task_outbox_message_key (message_key)"));
         assertTrue(sql.contains("-- 任务索引：按发布状态和下次重试时间扫描待发布任务\n"
-                + "    KEY idx_document_pipeline_outbox_publish_task (publish_status, next_retry_time)"));
-        assertTrue(sql.contains("UNIQUE KEY uk_document_pipeline_outbox_message_key (message_key)"));
-        assertTrue(sql.contains("COMMENT='文档流水线消息Outbox表'"));
+                + "    KEY idx_document_task_outbox_publish_task (publish_status, next_retry_time)"));
+        assertTrue(sql.contains("UNIQUE KEY uk_document_task_outbox_message_key (message_key)"));
+        assertTrue(sql.contains("COMMENT='文档任务消息Outbox表'"));
+    }
+
+    private static void assertTaskOutboxMigration(String sql) {
+        assertTrue(sql.contains("RENAME TABLE document_pipeline_outbox TO document_task_outbox;"));
+        assertTrue(sql.contains("CHANGE COLUMN process_id operation_id VARCHAR(64) NULL COMMENT '任务操作版本ID'"));
+        assertTrue(sql.contains("ADD COLUMN task_type VARCHAR(64) NOT NULL DEFAULT 'PROCESS_DOCUMENT'"));
+        assertTrue(sql.contains("ADD KEY idx_document_task_outbox_status (task_type, task_status, update_time)"));
     }
 }

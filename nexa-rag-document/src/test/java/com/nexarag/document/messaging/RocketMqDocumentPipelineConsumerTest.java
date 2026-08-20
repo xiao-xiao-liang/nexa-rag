@@ -4,6 +4,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nexarag.common.exception.ClientException;
 import com.nexarag.document.messaging.consumer.RocketMqDocumentPipelineConsumer;
 import com.nexarag.document.service.DocumentService;
+import com.nexarag.document.model.entity.Document;
+import com.nexarag.document.enums.DocumentStatus;
 import com.nexarag.document.service.impl.DocumentProcessFailureService;
 import com.nexarag.infra.messaging.document.DocumentPipelineMessageHandler;
 import com.nexarag.infra.config.DocumentPipelineMessagingProperties;
@@ -64,7 +66,7 @@ class RocketMqDocumentPipelineConsumerTest {
 
         assertThatThrownBy(() -> fixture.consumer.onMessage(messageExt(fixture.objectMapper, 0)))
                 .isSameAs(failure);
-        verify(fixture.failureService).recordFailure(1L, "PIPELINE", "临时网络异常", failure.toString());
+        verify(fixture.failureService).recordFailure(1L, "PARSING", "临时网络异常", failure.toString());
     }
 
     @Test
@@ -91,6 +93,10 @@ class RocketMqDocumentPipelineConsumerTest {
         RocketMQTemplate rocketMQTemplate = mock(RocketMQTemplate.class);
         DocumentProcessFailureService failureService = mock(DocumentProcessFailureService.class);
         DocumentPipelineMessagingProperties properties = new DocumentPipelineMessagingProperties();
+        when(documentService.getRequiredDocument(1L)).thenReturn(Document.builder()
+                .documentId(1L)
+                .status(DocumentStatus.PARSING)
+                .build());
         RocketMqDocumentPipelineConsumer consumer = new RocketMqDocumentPipelineConsumer(
                 objectMapper, documentService, messageHandler, rocketMQTemplate, properties, failureService);
         return new Fixture(objectMapper, documentService, messageHandler, rocketMQTemplate, properties, failureService, consumer);
