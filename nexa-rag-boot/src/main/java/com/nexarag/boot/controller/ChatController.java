@@ -30,6 +30,7 @@ import org.springframework.web.bind.annotation.RestController;
 import reactor.core.publisher.Flux;
 
 import java.util.List;
+import java.util.concurrent.atomic.AtomicLong;
 
 import static com.nexarag.workflow.constants.ChatWorkflowGraphConstants.CHAT_CONVERSATION_GRAPH_NAME;
 
@@ -114,8 +115,11 @@ public class ChatController {
             // 2. 已有终态事件时只返回重放；否则连接后续实时事件
             Flux<ChatStreamEvent> replayFlux = Flux.fromIterable(replayEvents);
             boolean terminal = replayEvents.stream().anyMatch(this::isTerminal);
-            return terminal ? replayFlux.map(this::toSse)
-                    : Flux.concat(replayFlux, realtimeEvents).map(this::toSse);
+            AtomicLong lastDeliveredVersion = new AtomicLong(Math.max(afterVersion, 0L));
+            Flux<ChatStreamEvent> events = terminal ? replayFlux : Flux.concat(replayFlux, realtimeEvents);
+            return events
+                    .filter(event -> shouldDeliverEvent(event, lastDeliveredVersion))
+                    .map(this::toSse);
         });
     }
 
@@ -151,5 +155,27 @@ public class ChatController {
         return event.type() == ChatStreamEventType.COMPLETE
                 || event.type() == ChatStreamEventType.CANCELLED
                 || event.type() == ChatStreamEventType.ERROR;
+    }
+
+    /**
+     * 按事件版本过滤重放窗口与本地 sink 中重复的事件。
+     *
+     * @param event 待发送事件
+     * @param lastDeliveredVersion 当前连接已发送的最大版本
+     * @return true 表示当前连接应继续发送该事件
+     */
+    private boolean shouldDeliverEvent(ChatStreamEvent event, AtomicLong lastDeliveredVersion) {
+        if (event.eventVersion() <= 0) {
+            return true;
+        }
+        while (true) {
+            long previousVersion = lastDeliveredVersion.get();
+            if (event.eventVersion() <= previousVersion) {
+                return false;
+            }
+            if (lastDeliveredVersion.compareAndSet(previousVersion, event.eventVersion())) {
+                return true;
+            }
+        }
     }
 }
