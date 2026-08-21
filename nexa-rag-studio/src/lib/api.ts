@@ -147,11 +147,7 @@ export const chatApi = {
   },
 
   async cancelGeneration(generationId: string): Promise<void> {
-    try {
-      await fetchJson(`/chat/generations/${generationId}`, { method: "DELETE" });
-    } catch (err) {
-      console.warn(`Cancel generation ${generationId} failed:`, err);
-    }
+    await fetchJson(`/chat/generations/${generationId}`, { method: "DELETE" });
   },
 
   /** 恢复指定生成任务中断后的 SSE 事件。 */
@@ -287,34 +283,9 @@ export const chatApi = {
 // ============================================================================
 export const knowledgeBaseApi = {
   async listKnowledgeBases(pageNum = 1, pageSize = 20): Promise<PageVO<KnowledgeBaseSummaryVO>> {
-    try {
-      return await fetchJson<PageVO<KnowledgeBaseSummaryVO>>(
-        `/knowledge-bases?pageNum=${pageNum}&pageSize=${pageSize}`
-      );
-    } catch {
-      return {
-        total: 1,
-        pageNum,
-        pageSize,
-        records: [
-          {
-            knowledgeBaseId: 1,
-            name: "默认知识库",
-            description: "系统内置知识库，包含全量默认同步与解析文档",
-            isDefault: 1,
-            statistics: {
-              totalCount: 0,
-              pendingCount: 0,
-              processingCount: 0,
-              indexedCount: 0,
-              failedCount: 0,
-            },
-            createTime: new Date().toISOString(),
-            updatedTime: new Date().toISOString(),
-          },
-        ],
-      };
-    }
+    return await fetchJson<PageVO<KnowledgeBaseSummaryVO>>(
+      `/knowledge-bases?pageNum=${pageNum}&pageSize=${pageSize}`
+    );
   },
 
   async getKnowledgeBase(knowledgeBaseId: number | string): Promise<KnowledgeBaseDetailVO> {
@@ -356,47 +327,27 @@ export const documentApi = {
     pageSize = 20,
     knowledgeBaseId: number | string = DEFAULT_KNOWLEDGE_BASE_ID
   ): Promise<PageVO<DocumentSummaryVO>> {
-    try {
-      return await fetchJson<PageVO<DocumentSummaryVO>>(
-        `/knowledge-bases/${knowledgeBaseId}/documents?pageNum=${pageNum}&pageSize=${pageSize}`
-      );
-    } catch (err) {
-      console.warn("Failed to fetch documents from backend:", err);
-      return {
-        total: 0,
-        pageNum,
-        pageSize,
-        records: [],
-      };
-    }
+    return await fetchJson<PageVO<DocumentSummaryVO>>(
+      `/knowledge-bases/${knowledgeBaseId}/documents?pageNum=${pageNum}&pageSize=${pageSize}`
+    );
   },
 
   async getDocument(
     documentId: number | string,
     knowledgeBaseId: number | string = DEFAULT_KNOWLEDGE_BASE_ID
   ): Promise<DocumentDetailVO | null> {
-    try {
-      return await fetchJson<DocumentDetailVO>(
-        `/knowledge-bases/${knowledgeBaseId}/documents/${documentId}`
-      );
-    } catch (err) {
-      console.warn(`Failed to fetch document ${documentId}:`, err);
-      return null;
-    }
+    return await fetchJson<DocumentDetailVO>(
+      `/knowledge-bases/${knowledgeBaseId}/documents/${documentId}`
+    );
   },
 
   async getOverview(
     documentId: number | string,
     knowledgeBaseId: number | string = DEFAULT_KNOWLEDGE_BASE_ID
   ): Promise<DocumentOverviewVO | null> {
-    try {
-      return await fetchJson<DocumentOverviewVO>(
-        `/knowledge-bases/${knowledgeBaseId}/documents/${documentId}/overview`
-      );
-    } catch (err) {
-      console.warn(`Failed to fetch document overview for ${documentId}:`, err);
-      return null;
-    }
+    return await fetchJson<DocumentOverviewVO>(
+      `/knowledge-bases/${knowledgeBaseId}/documents/${documentId}/overview`
+    );
   },
 
   async listChunks(
@@ -405,19 +356,9 @@ export const documentApi = {
     pageSize = 20,
     knowledgeBaseId: number | string = DEFAULT_KNOWLEDGE_BASE_ID
   ): Promise<PageVO<DocumentChunkVO>> {
-    try {
-      return await fetchJson<PageVO<DocumentChunkVO>>(
-        `/knowledge-bases/${knowledgeBaseId}/documents/${documentId}/chunks?pageNum=${pageNum}&pageSize=${pageSize}`
-      );
-    } catch (err) {
-      console.warn(`Failed to fetch document chunks for ${documentId}:`, err);
-      return {
-        total: 0,
-        pageNum,
-        pageSize,
-        records: [],
-      };
-    }
+    return await fetchJson<PageVO<DocumentChunkVO>>(
+      `/knowledge-bases/${knowledgeBaseId}/documents/${documentId}/chunks?pageNum=${pageNum}&pageSize=${pageSize}`
+    );
   },
 
   async uploadDocument(
@@ -494,14 +435,9 @@ export const documentApi = {
     documentId: number | string,
     knowledgeBaseId: number | string = DEFAULT_KNOWLEDGE_BASE_ID
   ): Promise<DocumentProcessStatusVO | null> {
-    try {
-      return await fetchJson<DocumentProcessStatusVO>(
-        `/knowledge-bases/${knowledgeBaseId}/documents/${documentId}/process-status`
-      );
-    } catch (err) {
-      console.warn(`Failed to fetch process status for document ${documentId}:`, err);
-      return null;
-    }
+    return await fetchJson<DocumentProcessStatusVO>(
+      `/knowledge-bases/${knowledgeBaseId}/documents/${documentId}/process-status`
+    );
   },
 
   async deleteDocumentIndex(documentId: number | string): Promise<DocumentIndexCleanupResult> {
@@ -509,21 +445,11 @@ export const documentApi = {
   },
 
   async getTask(outboxId: number | string): Promise<DocumentTaskVO | null> {
-    try {
-      return await fetchJson<DocumentTaskVO>(`/document-tasks/${outboxId}`);
-    } catch (err) {
-      console.warn(`Failed to fetch document task for ${outboxId}:`, err);
-      return null;
-    }
+    return await fetchJson<DocumentTaskVO>(`/document-tasks/${outboxId}`);
   },
 
   async retryTask(outboxId: number | string): Promise<DocumentTaskVO | null> {
-    try {
-      return await fetchJson<DocumentTaskVO>(`/document-tasks/${outboxId}/retry`, { method: "POST" });
-    } catch (err) {
-      console.warn(`Failed to retry document task for ${outboxId}:`, err);
-      return null;
-    }
+    return await fetchJson<DocumentTaskVO>(`/document-tasks/${outboxId}/retry`, { method: "POST" });
   },
 };
 
@@ -532,62 +458,11 @@ export const documentApi = {
 // ============================================================================
 export const modelApi = {
   async listProviders(): Promise<ModelProviderCatalogResponse[]> {
-    try {
-      return await fetchJson<ModelProviderCatalogResponse[]>("/model/providers");
-    } catch {
-      return [
-        { providerCode: "OPENAI", providerName: "OpenAI", recommendedModels: ["gpt-4o", "gpt-4o-mini", "text-embedding-3-small"] },
-        { providerCode: "ANTHROPIC", providerName: "Anthropic Claude", recommendedModels: ["claude-3-5-sonnet", "claude-3-haiku"] },
-        { providerCode: "ALIBABA", providerName: "Alibaba Qwen (通义千问)", recommendedModels: ["qwen-max", "qwen-plus", "qwen-turbo"] },
-        { providerCode: "DEEPSEEK", providerName: "DeepSeek AI", recommendedModels: ["deepseek-chat", "deepseek-reasoner"] },
-        { providerCode: "LOCAL", providerName: "Ollama Local Engine", recommendedModels: ["llama3.3", "qwen2.5-coder"] },
-      ];
-    }
+    return await fetchJson<ModelProviderCatalogResponse[]>("/model/providers");
   },
 
   async listConfigs(): Promise<ModelConfigResponse[]> {
-    try {
-      return await fetchJson<ModelConfigResponse[]>("/model/configs");
-    } catch {
-      return [
-        {
-          configId: 1,
-          providerCode: "DEEPSEEK",
-          configName: "DeepSeek V3 主配置",
-          baseUrl: "https://api.deepseek.com/v1",
-          apiKeyMasked: "sk-ds-****8f92",
-          modelType: "CHAT",
-          modelName: "deepseek-chat",
-          status: "ACTIVE",
-          createdTime: new Date(Date.now() - 864000000).toISOString(),
-          updatedTime: new Date().toISOString(),
-        },
-        {
-          configId: 2,
-          providerCode: "ALIBABA",
-          configName: "Qwen Max 备用配置",
-          baseUrl: "https://dashscope.aliyuncs.com/compatible-mode/v1",
-          apiKeyMasked: "sk-qw-****12a4",
-          modelType: "CHAT",
-          modelName: "qwen-max",
-          status: "ACTIVE",
-          createdTime: new Date(Date.now() - 432000000).toISOString(),
-          updatedTime: new Date().toISOString(),
-        },
-        {
-          configId: 3,
-          providerCode: "OPENAI",
-          configName: "OpenAI Embedding 3 向量配置",
-          baseUrl: "https://api.openai.com/v1",
-          apiKeyMasked: "sk-proj-****99cc",
-          modelType: "EMBEDDING",
-          modelName: "text-embedding-3-small",
-          status: "ACTIVE",
-          createdTime: new Date(Date.now() - 216000000).toISOString(),
-          updatedTime: new Date().toISOString(),
-        },
-      ];
-    }
+    return await fetchJson<ModelConfigResponse[]>("/model/configs");
   },
 
   async getConfig(configId: number): Promise<ModelConfigResponse> {
@@ -637,106 +512,34 @@ export const modelApi = {
   },
 
   async testConfig(configId: number): Promise<ModelConnectionTestResponse> {
-    try {
-      return await fetchJson<ModelConnectionTestResponse>(`/model/configs/${configId}/test`, { method: "POST" });
-    } catch {
-      return {
-        success: true,
-        latencyMs: 142,
-        testedAt: new Date().toISOString(),
-      };
-    }
+    return await fetchJson<ModelConnectionTestResponse>(`/model/configs/${configId}/test`, { method: "POST" });
   },
 
   async listRoutes(): Promise<ModelRouteResponse[]> {
-    try {
-      return await fetchJson<ModelRouteResponse[]>("/model/routes");
-    } catch {
-      return [
-        {
-          routeId: 10,
-          routeKey: "default-chat-route",
-          routeName: "默认通用 Chat 对话路由",
-          modelType: "CHAT",
-          candidateCount: 2,
-          description: "优先路由至 DeepSeek-V3，失败自动降级至 Qwen-Max",
-          createdTime: new Date(Date.now() - 864000000).toISOString(),
-          updatedTime: new Date().toISOString(),
-        },
-        {
-          routeId: 11,
-          routeKey: "fast-embedding-route",
-          routeName: "文档向量化统一 Embedding 路由",
-          modelType: "EMBEDDING",
-          candidateCount: 1,
-          description: "文本嵌入默认入口",
-          createdTime: new Date(Date.now() - 500000000).toISOString(),
-          updatedTime: new Date().toISOString(),
-        },
-      ];
-    }
+    return await fetchJson<ModelRouteResponse[]>("/model/routes");
   },
 
   async testRoute(routeId: number): Promise<ModelConnectionTestResponse> {
-    try {
-      return await fetchJson<ModelConnectionTestResponse>(`/model/routes/${routeId}/test`, { method: "POST" });
-    } catch {
-      return {
-        success: true,
-        latencyMs: 188,
-        testedAt: new Date().toISOString(),
-      };
-    }
+    return await fetchJson<ModelConnectionTestResponse>(`/model/routes/${routeId}/test`, { method: "POST" });
   },
 
   async getRegistrySnapshot(): Promise<ModelRegistrySnapshotResponse> {
-    try {
-      return await fetchJson<ModelRegistrySnapshotResponse>("/model/registry/snapshot");
-    } catch {
-      return {
-        versionNo: 42,
-        configCount: 3,
-        routeCount: 2,
-        routeConfigCount: 3,
-        governanceConfigCount: 2,
-      };
-    }
+    return await fetchJson<ModelRegistrySnapshotResponse>("/model/registry/snapshot");
   },
 
   async refreshRegistry(): Promise<boolean> {
-    try {
-      return await fetchJson<boolean>("/model/registry/refresh", { method: "POST" });
-    } catch {
-      return true;
-    }
+    return await fetchJson<boolean>("/model/registry/refresh", { method: "POST" });
   },
 
   async listGovernanceConfigs(): Promise<ModelGovernanceConfigResponse[]> {
-    try {
-      return await fetchJson<ModelGovernanceConfigResponse[]>("/model/governance-configs");
-    } catch {
-      return [
-        {
-          governanceId: 1,
-          targetType: "GLOBAL",
-          targetKey: "GLOBAL_DEFAULT",
-          maxTokensPerReq: 4096,
-          rateLimitQps: 50,
-          timeoutMs: 30000,
-          fallbackEnabled: true,
-        },
-        {
-          governanceId: 2,
-          targetType: "ROUTE",
-          targetKey: "default-chat-route",
-          maxTokensPerReq: 8192,
-          rateLimitQps: 20,
-          timeoutMs: 45000,
-          fallbackEnabled: true,
-          fallbackRouteKey: "qwen-max-fallback",
-        },
-      ];
-    }
+    return await fetchJson<ModelGovernanceConfigResponse[]>("/model/governance-configs");
+  },
+
+  async debugChat(routeKey: string, content: string): Promise<{ content: string }> {
+    return await fetchJson<{ content: string }>("/model/chat", {
+      method: "POST",
+      body: JSON.stringify({ routeKey, messages: [{ role: "USER", content }] }),
+    });
   },
 };
 
@@ -753,60 +556,38 @@ export const promptApi = {
   },
 
   async previewPrompt(promptCode: string, content: string): Promise<string> {
-    try {
-      const res = await fetchJson<{ content: string }>(`/model/prompts/${promptCode}/preview`, {
-        method: "POST",
-        body: JSON.stringify({ content }),
-      });
-      return res.content;
-    } catch {
-      return content.replace("{{context}}", "[测试知识库文档切片 1: Nexa-RAG 采用 ModelGateway 统一调度 LLM]")
-                    .replace("{{user_query}}", "系统如何保障高可用？")
-                    .replace("{{document_text}}", "[样本文档正文...]");
-    }
+    const res = await fetchJson<{ content: string }>(`/model/prompts/${promptCode}/preview`, {
+      method: "POST",
+      body: JSON.stringify({ content }),
+    });
+    return res.content;
   },
 
   async submitPrompt(promptCode: string, content: string): Promise<PromptReleaseResponse> {
-    try {
-      return await fetchJson<PromptReleaseResponse>(`/model/prompts/${promptCode}/submit`, {
-        method: "POST",
-        body: JSON.stringify({ content }),
-      });
-    } catch {
-      return { versionId: Date.now(), releaseId: Date.now() + 1, releaseRevision: 3 };
-    }
+    return await fetchJson<PromptReleaseResponse>(`/model/prompts/${promptCode}/submit`, {
+      method: "POST",
+      body: JSON.stringify({ content }),
+    });
   },
 
   async releasePrompt(promptCode: string, stableVersionId: number, canaryVersionId?: number, canaryPercentage?: number): Promise<PromptReleaseResponse> {
-    try {
-      return await fetchJson<PromptReleaseResponse>(`/model/prompts/${promptCode}/release`, {
-        method: "POST",
-        body: JSON.stringify({ stableVersionId, canaryVersionId, canaryPercentage }),
-      });
-    } catch {
-      return { versionId: stableVersionId, releaseId: Date.now(), releaseRevision: 4 };
-    }
+    return await fetchJson<PromptReleaseResponse>(`/model/prompts/${promptCode}/release`, {
+      method: "POST",
+      body: JSON.stringify({ stableVersionId, canaryVersionId, canaryPercentage }),
+    });
   },
 
   async rollbackPrompt(promptCode: string, targetVersionId: number): Promise<PromptReleaseResponse> {
-    try {
-      return await fetchJson<PromptReleaseResponse>(`/model/prompts/${promptCode}/rollback`, {
-        method: "POST",
-        body: JSON.stringify({ targetVersionId }),
-      });
-    } catch {
-      return { versionId: targetVersionId, releaseId: Date.now(), releaseRevision: 5 };
-    }
+    return await fetchJson<PromptReleaseResponse>(`/model/prompts/${promptCode}/rollback`, {
+      method: "POST",
+      body: JSON.stringify({ targetVersionId }),
+    });
   },
 
   async updatePrompt(promptCode: string, data: { name?: string; variableSchema?: string; enabled?: boolean }): Promise<PromptResponse> {
-    try {
-      return await fetchJson<PromptResponse>(`/model/prompts/${promptCode}`, {
-        method: "PUT",
-        body: JSON.stringify(data),
-      });
-    } catch {
-      return { promptCode, enabled: data.enabled ?? true };
-    }
+    return await fetchJson<PromptResponse>(`/model/prompts/${promptCode}`, {
+      method: "PUT",
+      body: JSON.stringify(data),
+    });
   },
 };

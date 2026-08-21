@@ -52,13 +52,9 @@ export const DocumentPage: React.FC = () => {
     try {
       const kb = await knowledgeBaseApi.getKnowledgeBase(knowledgeBaseId);
       setKnowledgeBase(kb);
-    } catch {
-      setKnowledgeBase({
-        knowledgeBaseId,
-        name: knowledgeBaseId === 1 ? "默认知识库" : `知识库 #${knowledgeBaseId}`,
-        description: "系统内置知识库，统一管理智能检索增强与问答文档资产",
-        isDefault: knowledgeBaseId === 1 ? 1 : 0,
-      });
+    } catch (err) {
+      console.warn("加载知识库详情失败:", err);
+      setKnowledgeBase(null);
     }
   };
 

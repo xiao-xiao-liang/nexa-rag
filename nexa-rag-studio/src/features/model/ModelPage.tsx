@@ -196,12 +196,14 @@ export const ModelPage: React.FC = () => {
     if (!debugPrompt.trim()) return;
     setDebugging(true);
     setDebugResponse("正在通过统一网关路由调用模型...");
-    setTimeout(() => {
-      setDebugResponse(
-        `[网关应答]: 您好！我是通过 Nexa-RAG 统一网关动态路由调度的模型服务。\n\n[指标]: 命中路由 [${debugRouteKey}] · 消耗 Tokens: 128 · 耗时: 165ms`
-      );
+    try {
+      const response = await modelApi.debugChat(debugRouteKey, debugPrompt);
+      setDebugResponse(response.content || "模型未返回内容");
+    } catch (err: any) {
+      setDebugResponse(`调用失败：${err.message || "模型网关无响应"}`);
+    } finally {
       setDebugging(false);
-    }, 600);
+    }
   };
 
   // 统计指标
