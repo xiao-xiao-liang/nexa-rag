@@ -40,12 +40,13 @@ public class ConversationRetrievalServiceImpl implements ConversationRetrievalSe
         // 3. 合并并按文档归属过滤三类召回结果，防止跨租户或跨选定知识库泄露
         List<RetrievalChunk> result = new ArrayList<>();
         for (CompletableFuture<List<RetrievalChunk>> future : futures) {
-            result.addAll(future.join().stream()
-                    .filter(chunk -> knowledgeBaseService.isDocumentInCurrentTenantScope(
-                            chunk.documentId(), knowledgeBaseIds))
-                    .toList());
+            result.addAll(future.join());
         }
-        return result;
+        Set<Long> accessibleDocumentIds = knowledgeBaseService.filterDocumentIdsInCurrentTenantScope(
+                result.stream().map(RetrievalChunk::documentId).toList(), knowledgeBaseIds);
+        return result.stream()
+                .filter(chunk -> accessibleDocumentIds.contains(chunk.documentId()))
+                .toList();
     }
 
     private List<RetrievalChunk> retrieveSafely(ConversationRetriever retriever,

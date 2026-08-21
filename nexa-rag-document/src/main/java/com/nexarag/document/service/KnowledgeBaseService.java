@@ -29,9 +29,25 @@ public interface KnowledgeBaseService extends IService<KnowledgeBaseDO> {
 
     KnowledgeBaseDO getRequiredKnowledgeBase(Long knowledgeBaseId);
 
+    /**
+     * 锁定当前租户内仍有效的知识库，确保文档创建不会与删除操作并发交错。
+     *
+     * @param knowledgeBaseId 知识库ID
+     */
+    void lockRequiredActiveKnowledgeBase(Long knowledgeBaseId);
+
     Document getRequiredDocument(Long knowledgeBaseId, Long documentId);
 
     Set<Long> validateRequestedKnowledgeBases(Collection<Long> knowledgeBaseIds);
 
     boolean isDocumentInCurrentTenantScope(Long documentId, Set<Long> knowledgeBaseIds);
+
+    /**
+     * 批量过滤当前租户和指定知识库范围内可访问的文档ID。
+     *
+     * @param documentIds 待校验的文档ID集合
+     * @param knowledgeBaseIds 已校验的知识库范围；为空表示当前租户全部知识库
+     * @return 可访问的文档ID集合
+     */
+    Set<Long> filterDocumentIdsInCurrentTenantScope(Collection<Long> documentIds, Set<Long> knowledgeBaseIds);
 }

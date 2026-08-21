@@ -43,9 +43,12 @@ public class SectionExpansionNode implements NodeAction {
         List<RetrievalChunk> initialChunks = state.value(FUSED_RETRIEVAL_RESULTS, List.of());
         Set<Long> knowledgeBaseIds = knowledgeBaseService.validateRequestedKnowledgeBases(
                 state.value(RETRIEVAL_KNOWLEDGE_BASE_IDS, List.of()));
-        List<RetrievalChunk> expandedChunks = sectionExpansionRetriever.retrieve(state.value(REWRITTEN_QUESTION, ""))
-                .stream()
-                .filter(chunk -> knowledgeBaseService.isDocumentInCurrentTenantScope(chunk.documentId(), knowledgeBaseIds))
+        List<RetrievalChunk> candidateExpandedChunks = sectionExpansionRetriever.retrieve(
+                state.value(REWRITTEN_QUESTION, ""));
+        Set<Long> accessibleDocumentIds = knowledgeBaseService.filterDocumentIdsInCurrentTenantScope(
+                candidateExpandedChunks.stream().map(RetrievalChunk::documentId).toList(), knowledgeBaseIds);
+        List<RetrievalChunk> expandedChunks = candidateExpandedChunks.stream()
+                .filter(chunk -> accessibleDocumentIds.contains(chunk.documentId()))
                 .toList();
 
         // 2. 将补充的原始正文优先送入重排序，同时按片段ID去重

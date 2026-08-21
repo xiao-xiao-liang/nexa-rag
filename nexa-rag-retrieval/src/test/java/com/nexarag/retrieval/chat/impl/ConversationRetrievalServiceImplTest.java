@@ -39,7 +39,8 @@ class ConversationRetrievalServiceImplTest {
         when(milvusRetriever.retrieve(request)).thenThrow(new IllegalStateException("Milvus不可用"));
         when(bm25Retriever.retrieve(request)).thenReturn(List.of(keywordChunk));
         when(knowledgeBaseService.validateRequestedKnowledgeBases(List.of())).thenReturn(Set.of());
-        when(knowledgeBaseService.isDocumentInCurrentTenantScope(1L, Set.of())).thenReturn(true);
+        when(knowledgeBaseService.filterDocumentIdsInCurrentTenantScope(List.of(1L), Set.of()))
+                .thenReturn(Set.of(1L));
 
         ConversationRetrievalServiceImpl retrievalService = new ConversationRetrievalServiceImpl(
                 List.of(milvusRetriever, bm25Retriever), knowledgeBaseService);

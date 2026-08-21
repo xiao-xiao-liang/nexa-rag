@@ -30,8 +30,10 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 /**
@@ -102,10 +104,16 @@ public class KnowledgeBaseServiceImpl extends ServiceImpl<KnowledgeBaseMapper, K
                         .eq(KnowledgeBaseDO::getTenantId, tenantId)
                         .orderByDesc(KnowledgeBaseDO::getUpdateTime));
 
-        // 2. 组装包含文档处理状态统计的摘要结果
+        // 2. 批量统计当前页知识库中的文档状态，避免逐库查询。
+        Map<Long, KnowledgeBaseStatisticsVO> statisticsByKnowledgeBaseId = calculateStatistics(page.getRecords()
+                .stream()
+                .map(KnowledgeBaseDO::getKnowledgeBaseId)
+                .toList());
+
+        // 3. 组装包含文档处理状态统计的摘要结果
         List<KnowledgeBaseSummaryVO> records = page.getRecords().stream()
                 .map(knowledgeBase -> KnowledgeBaseConverter.toSummaryVO(knowledgeBase,
-                        calculateStatistics(knowledgeBase.getKnowledgeBaseId())))
+                        statisticsByKnowledgeBaseId.getOrDefault(knowledgeBase.getKnowledgeBaseId(), emptyStatistics())))
                 .toList();
         return new PageVO<>(records, page.getTotal(), page.getCurrent(), page.getSize(), page.getPages());
     }
@@ -164,7 +172,8 @@ public class KnowledgeBaseServiceImpl extends ServiceImpl<KnowledgeBaseMapper, K
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void delete(Long knowledgeBaseId) {
-        KnowledgeBaseDO knowledgeBase = getRequiredKnowledgeBase(knowledgeBaseId);
+        // 1. 锁定知识库记录，和文档创建操作串行化。
+        KnowledgeBaseDO knowledgeBase = getRequiredActiveKnowledgeBaseForUpdate(knowledgeBaseId);
         if (isDefaultKnowledgeBase(knowledgeBase)) {
             throw new ClientException("默认知识库不可删除，knowledgeBaseId=" + knowledgeBaseId,
                     DocumentErrorCode.DEFAULT_KNOWLEDGE_BASE_PROTECTED);
@@ -174,15 +183,20 @@ public class KnowledgeBaseServiceImpl extends ServiceImpl<KnowledgeBaseMapper, K
                     DocumentErrorCode.KNOWLEDGE_BASE_NOT_EMPTY);
         }
 
-        // 1. 逻辑删除并释放活跃名称唯一键，允许后续创建同名知识库
+        // 2. 逻辑删除并释放活跃名称唯一键，允许后续创建同名知识库。
         LocalDateTime now = LocalDateTime.now();
-        knowledgeBaseMapper.update(null, new LambdaUpdateWrapper<KnowledgeBaseDO>()
+        int updated = knowledgeBaseMapper.update(null, new LambdaUpdateWrapper<KnowledgeBaseDO>()
                 .eq(KnowledgeBaseDO::getKnowledgeBaseId, knowledgeBaseId)
                 .eq(KnowledgeBaseDO::getTenantId, knowledgeBase.getTenantId())
+                .eq(KnowledgeBaseDO::getDelFlag, 0)
                 .set(KnowledgeBaseDO::getActiveNameKey, null)
                 .set(KnowledgeBaseDO::getDefaultTenantKey, null)
                 .set(KnowledgeBaseDO::getDelFlag, 1)
                 .set(KnowledgeBaseDO::getDeleteTime, now));
+        if (updated != 1) {
+            throw new ClientException("知识库状态已变化，请重试，knowledgeBaseId=" + knowledgeBaseId,
+                    DocumentErrorCode.KNOWLEDGE_BASE_NOT_FOUND);
+        }
         log.info("删除空知识库成功，tenantId={}，knowledgeBaseId={}", knowledgeBase.getTenantId(), knowledgeBaseId);
     }
 
@@ -203,6 +217,17 @@ public class KnowledgeBaseServiceImpl extends ServiceImpl<KnowledgeBaseMapper, K
                     DocumentErrorCode.KNOWLEDGE_BASE_NOT_FOUND);
         }
         return knowledgeBase;
+    }
+
+    /**
+     * 锁定当前租户内仍有效的知识库，防止文档创建与删除操作交错。
+     *
+     * @param knowledgeBaseId 知识库ID
+     */
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void lockRequiredActiveKnowledgeBase(Long knowledgeBaseId) {
+        getRequiredActiveKnowledgeBaseForUpdate(knowledgeBaseId);
     }
 
     /**
@@ -259,19 +284,61 @@ public class KnowledgeBaseServiceImpl extends ServiceImpl<KnowledgeBaseMapper, K
      */
     @Override
     public boolean isDocumentInCurrentTenantScope(Long documentId, Set<Long> knowledgeBaseIds) {
-        Document document = documentMapper.selectOne(new LambdaQueryWrapper<Document>()
-                .eq(Document::getDocumentId, documentId));
-        if (document == null || document.getKnowledgeBaseId() == null) {
+        if (documentId == null) {
             return false;
         }
-        if (knowledgeBaseIds != null && !knowledgeBaseIds.isEmpty()
-                && !knowledgeBaseIds.contains(document.getKnowledgeBaseId())) {
-            return false;
+        return filterDocumentIdsInCurrentTenantScope(List.of(documentId), knowledgeBaseIds).contains(documentId);
+    }
+
+    /**
+     * 批量校验文档与当前租户知识库的归属关系，避免召回结果逐条触发数据库查询。
+     *
+     * @param documentIds 待校验的文档ID集合
+     * @param knowledgeBaseIds 已校验的知识库范围；为空表示当前租户全部知识库
+     * @return 当前请求可访问的文档ID集合
+     */
+    @Override
+    public Set<Long> filterDocumentIdsInCurrentTenantScope(Collection<Long> documentIds,
+                                                            Set<Long> knowledgeBaseIds) {
+        if (documentIds == null || documentIds.isEmpty()) {
+            return Set.of();
         }
-        Long count = knowledgeBaseMapper.selectCount(new LambdaQueryWrapper<KnowledgeBaseDO>()
-                .eq(KnowledgeBaseDO::getKnowledgeBaseId, document.getKnowledgeBaseId())
-                .eq(KnowledgeBaseDO::getTenantId, currentTenantProvider.getRequiredTenantId()));
-        return count != null && count > 0;
+        Set<Long> distinctDocumentIds = new LinkedHashSet<>(documentIds);
+        distinctDocumentIds.remove(null);
+        if (distinctDocumentIds.isEmpty()) {
+            return Set.of();
+        }
+
+        // 1. 批量查询召回文档的知识库归属。
+        List<Document> documents = documentMapper.selectList(new LambdaQueryWrapper<Document>()
+                .in(Document::getDocumentId, distinctDocumentIds));
+        Set<Long> documentKnowledgeBaseIds = documents.stream()
+                .map(Document::getKnowledgeBaseId)
+                .filter(java.util.Objects::nonNull)
+                .filter(knowledgeBaseId -> knowledgeBaseIds == null || knowledgeBaseIds.isEmpty()
+                        || knowledgeBaseIds.contains(knowledgeBaseId))
+                .collect(java.util.stream.Collectors.toSet());
+        if (documentKnowledgeBaseIds.isEmpty()) {
+            return Set.of();
+        }
+
+        // 2. 批量确认知识库均属于当前租户且未被逻辑删除。
+        String tenantId = currentTenantProvider.getRequiredTenantId();
+        Set<Long> activeKnowledgeBaseIds = knowledgeBaseMapper.selectList(new LambdaQueryWrapper<KnowledgeBaseDO>()
+                        .eq(KnowledgeBaseDO::getTenantId, tenantId)
+                        .in(KnowledgeBaseDO::getKnowledgeBaseId, documentKnowledgeBaseIds))
+                .stream()
+                .map(KnowledgeBaseDO::getKnowledgeBaseId)
+                .collect(java.util.stream.Collectors.toSet());
+
+        // 3. 返回同时满足文档归属、指定范围和租户范围的文档ID。
+        return documents.stream()
+                .filter(document -> document.getKnowledgeBaseId() != null)
+                .filter(document -> activeKnowledgeBaseIds.contains(document.getKnowledgeBaseId()))
+                .filter(document -> knowledgeBaseIds == null || knowledgeBaseIds.isEmpty()
+                        || knowledgeBaseIds.contains(document.getKnowledgeBaseId()))
+                .map(Document::getDocumentId)
+                .collect(java.util.stream.Collectors.toUnmodifiableSet());
     }
 
     private void ensureNameAvailable(String tenantId, String name, Long excludedKnowledgeBaseId) {
@@ -287,25 +354,44 @@ public class KnowledgeBaseServiceImpl extends ServiceImpl<KnowledgeBaseMapper, K
     }
 
     private KnowledgeBaseStatisticsVO calculateStatistics(Long knowledgeBaseId) {
-        long totalCount = 0;
-        long pendingCount = 0;
-        long processingCount = 0;
-        long indexedCount = 0;
-        long failedCount = 0;
+        return calculateStatistics(List.of(knowledgeBaseId)).getOrDefault(knowledgeBaseId, emptyStatistics());
+    }
+
+    private Map<Long, KnowledgeBaseStatisticsVO> calculateStatistics(Collection<Long> knowledgeBaseIds) {
+        if (knowledgeBaseIds == null || knowledgeBaseIds.isEmpty()) {
+            return Map.of();
+        }
+        Map<Long, long[]> countersByKnowledgeBaseId = new HashMap<>();
         for (Document document : documentMapper.selectList(new LambdaQueryWrapper<Document>()
-                .eq(Document::getKnowledgeBaseId, knowledgeBaseId))) {
-            totalCount++;
+                .in(Document::getKnowledgeBaseId, knowledgeBaseIds))) {
+            long[] counters = countersByKnowledgeBaseId.computeIfAbsent(document.getKnowledgeBaseId(),
+                    ignored -> new long[5]);
+            counters[0]++;
             switch (document.getStatus()) {
-                case UPLOADED -> pendingCount++;
-                case QUEUED, PARSING, PARSED, CHUNKING, CHUNKED, INDEXING -> processingCount++;
-                case INDEXED -> indexedCount++;
-                case FAILED -> failedCount++;
+                case UPLOADED -> counters[1]++;
+                case QUEUED, PARSING, PARSED, CHUNKING, CHUNKED, INDEXING -> counters[2]++;
+                case INDEXED -> counters[3]++;
+                case FAILED -> counters[4]++;
                 case null -> {
                     // 历史脏数据仅计入总数，避免影响知识库列表可用性。
                 }
             }
         }
-        return new KnowledgeBaseStatisticsVO(totalCount, pendingCount, processingCount, indexedCount, failedCount);
+        Map<Long, KnowledgeBaseStatisticsVO> statisticsByKnowledgeBaseId = new HashMap<>();
+        countersByKnowledgeBaseId.forEach((knowledgeBaseId, counters) -> statisticsByKnowledgeBaseId.put(
+                knowledgeBaseId, new KnowledgeBaseStatisticsVO(counters[0], counters[1], counters[2], counters[3],
+                        counters[4])));
+        return statisticsByKnowledgeBaseId;
+    }
+
+    private KnowledgeBaseDO getRequiredActiveKnowledgeBaseForUpdate(Long knowledgeBaseId) {
+        String tenantId = currentTenantProvider.getRequiredTenantId();
+        KnowledgeBaseDO knowledgeBase = knowledgeBaseMapper.selectActiveByIdForUpdate(knowledgeBaseId, tenantId);
+        if (knowledgeBase == null) {
+            throw new ClientException("知识库不存在或不属于当前租户，knowledgeBaseId=" + knowledgeBaseId,
+                    DocumentErrorCode.KNOWLEDGE_BASE_NOT_FOUND);
+        }
+        return knowledgeBase;
     }
 
     private long countDocuments(Long knowledgeBaseId) {

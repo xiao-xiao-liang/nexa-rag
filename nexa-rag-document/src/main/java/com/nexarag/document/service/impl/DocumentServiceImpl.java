@@ -25,6 +25,7 @@ import com.nexarag.document.mapper.DocumentMapper;
 import com.nexarag.document.service.DocumentService;
 import com.nexarag.document.service.DocumentChunkService;
 import com.nexarag.document.service.DocumentDeleteTaskService;
+import com.nexarag.document.service.KnowledgeBaseService;
 import com.nexarag.document.enums.DocumentTaskStatus;
 import com.nexarag.document.model.vo.DocumentDeleteVO;
 import com.nexarag.document.model.vo.DocumentChunkStatisticsVO;
@@ -55,6 +56,7 @@ public class DocumentServiceImpl extends ServiceImpl<DocumentMapper, Document> i
     private final DocumentPipelineMessagingProperties messagingProperties;
     private final DocumentChunkService documentChunkService;
     private final DocumentDeleteTaskService deleteTaskService;
+    private final KnowledgeBaseService knowledgeBaseService;
 
     @Override
     public Document createDocument(CreateDocumentRequest request) {
@@ -62,14 +64,19 @@ public class DocumentServiceImpl extends ServiceImpl<DocumentMapper, Document> i
     }
 
     @Override
+    @Transactional(rollbackFor = Exception.class)
     public Document createDocument(Long knowledgeBaseId, CreateDocumentRequest request) {
+        if (knowledgeBaseId != null) {
+            // 1. 锁定有效知识库，避免与删除操作并发写入孤立文档。
+            knowledgeBaseService.lockRequiredActiveKnowledgeBase(knowledgeBaseId);
+        }
         FileType fileType = FileType.fromFileName(request.originalFileName());
         if (fileType == FileType.UNKNOWN) {
             throw new ClientException("不支持的文档类型，fileName=" + request.originalFileName(),
                     DocumentErrorCode.DOCUMENT_FILE_TYPE_UNSUPPORTED);
         }
 
-        // 1. 构建文档实体，初始化处理和重试状态
+        // 2. 构建文档实体，初始化处理和重试状态
         Document document = Document.builder()
                 .documentId(IdWorker.getId())
                 .knowledgeBaseId(knowledgeBaseId)
@@ -88,7 +95,7 @@ public class DocumentServiceImpl extends ServiceImpl<DocumentMapper, Document> i
                 .cleanupRetryCount(0)
                 .build();
 
-        // 2. 保存文档记录
+        // 3. 保存文档记录
         this.save(document);
         log.info("创建文档记录成功，documentId={}，fileType={}，status={}",
                 document.getDocumentId(), document.getFileType(), document.getStatus());
