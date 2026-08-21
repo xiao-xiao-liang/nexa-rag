@@ -46,6 +46,14 @@ public interface ModelConfigService extends IService<ModelConfig> {
     List<ModelConfigResponse> listConfigResponses();
 
     /**
+     * 查询模型配置的原始未脱敏 API Key。
+     *
+     * @param configId 模型配置ID
+     * @return API Key 明文
+     */
+    String getRawApiKey(Long configId);
+
+    /**
      * 删除模型配置。
      *
      * @param configId 模型配置ID

@@ -132,6 +132,13 @@ public class ModelConfigServiceImpl extends ServiceImpl<ModelConfigMapper, Model
     }
 
     @Override
+    public String getRawApiKey(Long configId) {
+        // 1. 获取模型配置并解密 API Key
+        ModelConfig config = getRequiredConfig(configId);
+        return secretEncryptor.decrypt(config.getApiKeyCipher());
+    }
+
+    @Override
     public List<ModelConfigResponse> listConfigResponses() {
         // 1. 查询未逻辑删除的模型配置并转换为脱敏响应
         return this.lambdaQuery()

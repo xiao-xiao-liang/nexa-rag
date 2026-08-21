@@ -240,6 +240,20 @@ class ModelConfigServiceImplTest {
                 .hasMessageContaining("请先从路由中移除该模型配置");
     }
 
+    @Test
+    void getRawApiKeyShouldDecryptStoredCipher() {
+        TestableModelConfigServiceImpl service = new TestableModelConfigServiceImpl();
+        String cipher = service.encryptor.encrypt("sk-plain-text-key-12345");
+        service.existingConfig = ModelConfig.builder()
+                .configId(101L)
+                .apiKeyCipher(cipher)
+                .build();
+
+        String rawApiKey = service.getRawApiKey(101L);
+
+        assertThat(rawApiKey).isEqualTo("sk-plain-text-key-12345");
+    }
+
     private static class TestableModelConfigServiceImpl extends ModelConfigServiceImpl {
 
         private final ModelSecretEncryptor encryptor = new ModelSecretEncryptor("0123456789abcdef0123456789abcdef");

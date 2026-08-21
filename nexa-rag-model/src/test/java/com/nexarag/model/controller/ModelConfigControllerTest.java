@@ -70,6 +70,16 @@ class ModelConfigControllerTest {
     }
 
     @Test
+    void getRawApiKeyShouldReturnRawKey() throws Exception {
+        when(modelConfigService.getRawApiKey(1L)).thenReturn("sk-raw-secret-key-123456");
+
+        mockMvc.perform(get("/api/model/configs/{configId}/raw-key", 1L))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("0"))
+                .andExpect(jsonPath("$.data").value("sk-raw-secret-key-123456"));
+    }
+
+    @Test
     void createConfigShouldReturnCreatedConfigResponse() throws Exception {
         ModelConfig config = ModelConfig.builder()
                 .configId(1L)

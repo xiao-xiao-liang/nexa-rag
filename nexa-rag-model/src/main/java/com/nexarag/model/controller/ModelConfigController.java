@@ -62,6 +62,18 @@ public class ModelConfigController {
     }
 
     /**
+     * 查询未加掩码的模型原始 API Key。
+     *
+     * @param configId 模型配置ID
+     * @return 原始 API Key 明文
+     */
+    @GetMapping("/{configId}/raw-key")
+    public Result<String> getRawApiKey(@PathVariable Long configId) {
+        // 1. 查询未脱敏模型原始 API Key
+        return Results.success(modelConfigService.getRawApiKey(configId));
+    }
+
+    /**
      * 创建模型配置。
      *
      * @param request 创建请求
