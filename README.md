@@ -46,7 +46,8 @@ npm run dev
 前端会调用以下已实现接口：
 
 - `GET /api/conversations`：查询当前用户的会话列表。
-- `GET /api/conversations/{conversationId}/messages`：按游标查询指定会话的历史消息。
+- `GET /api/conversations/{conversationId}/messages`：按序号游标查询指定会话的历史消息，首次默认返回最新 20 条；滚动到顶部时使用 `beforeSequence` 继续读取更早记录。
+- `DELETE /api/conversations/{conversationId}`：逻辑删除会话及其消息；存在生成中回答的会话会被拒绝删除。
 - `POST /api/chat/stream`：以 SSE 流式发送 RAG 对话。
 - `DELETE /api/chat/generations/{generationId}`：取消正在生成的回答。
 - `GET /api/documents`：按页查询知识库文档。
@@ -54,6 +55,7 @@ npm run dev
 - `GET /api/documents/{documentId}`：查询文档详情及处理状态。
 
 当前流式消息仅展示文本和生成状态。RAG 检索引用的 SSE 事件与历史引用数据契约尚未补齐，因此前端暂不展示引用来源。
+
 
 ### 前端验证
 
