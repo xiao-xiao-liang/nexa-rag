@@ -8,6 +8,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 /**
  * 面向历史消息的安全消息投影。
@@ -38,6 +39,9 @@ public class ConversationMessageItemVO {
 
     /** 工具运行卡终态快照 JSON。 */
     private String toolOperationsJson;
+
+    /** 消息内引用公开摘要。 */
+    private List<ChatCitationSummaryVO> citations;
 
     /** 创建时间。 */
     private LocalDateTime createdTime;
