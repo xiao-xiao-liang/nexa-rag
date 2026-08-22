@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
+import { useParams, useNavigate } from "react-router-dom";
 import { chatApi } from "../../lib/api";
 import { ChatMessageVO, ChatConversationVO, ChatStreamEvent, ChatToolOperation } from "../../types";
 import {
@@ -10,11 +11,16 @@ import {
 } from "../../components/chat";
 import { FEISHU_FONT_FAMILY } from "../../components/ui/feishu-table";
 import { Sparkles, Table2, FileText, Globe } from "lucide-react";
+import { emptyHistoryCache, getHistoryEntry, prependHistoryPage, putHistoryPage, removeHistoryEntry, touchHistoryEntry } from "./chat-history-cache";
 
 export const ChatPage: React.FC = () => {
+  const { conversationId: urlConversationId } = useParams<{ conversationId?: string }>();
+  const navigate = useNavigate();
+
+  // 当前激活的会话 ID 直接绑定到路由参数 (若未传参数则为 null 表示新建会话状态)
+  const activeConversationId = urlConversationId || null;
+
   const [conversations, setConversations] = useState<ChatConversationVO[]>([]);
-  // 默认不选中任何历史会话 (null 表示新建会话状态)
-  const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
   const [messages, setMessages] = useState<ChatMessageVO[]>([]);
   const [inputContent, setInputContent] = useState("");
   const [isGenerating, setIsGenerating] = useState(false);
@@ -23,6 +29,7 @@ export const ChatPage: React.FC = () => {
   const [elapsedSeconds, setElapsedSeconds] = useState(1);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
+  const [isLoadingOlderHistory, setIsLoadingOlderHistory] = useState(false);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
@@ -30,8 +37,17 @@ export const ChatPage: React.FC = () => {
   const currentGenerationIdRef = useRef<string | null>(null);
   const lastEventVersionRef = useRef(0);
   const terminalRef = useRef(false);
+  const activeConversationIdRef = useRef<string | null>(activeConversationId);
+  const generationConversationIdRef = useRef<string | null>(null);
   // 新会话的 META 事件会紧随用户消息写入到达；避免此时的历史占位消息覆盖本地流式消息。
   const skipNextHistoryLoadRef = useRef(false);
+  const historyCacheRef = useRef(emptyHistoryCache());
+
+  useEffect(() => {
+    activeConversationIdRef.current = activeConversationId;
+    setIsLoadingHistory(false);
+    setIsLoadingOlderHistory(false);
+  }, [activeConversationId]);
 
   const parseToolOperations = (toolOperationsJson?: string): ChatToolOperation[] => {
     if (!toolOperationsJson) return [];
@@ -42,6 +58,39 @@ export const ChatPage: React.FC = () => {
       return [];
     }
   };
+
+  const updateHistoryCacheMessages = (conversationId: string, nextMessages: ChatMessageVO[]) => {
+    const existing = getHistoryEntry(historyCacheRef.current, conversationId);
+    historyCacheRef.current = putHistoryPage(
+      historyCacheRef.current,
+      conversationId,
+      nextMessages,
+      existing?.hasMore ?? false,
+      existing?.nextBeforeSequence
+    );
+  };
+
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const messageListRef = useRef<HTMLDivElement>(null);
+  const shouldAutoScrollRef = useRef(true);
+  const isSwitchingConversationRef = useRef(false);
+  const switchingConversationTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  // 平滑或瞬间滚动到底部锚点
+  const scrollToBottom = useCallback((smooth = true) => {
+    const container = scrollContainerRef.current;
+    if (container) {
+      container.scrollTo({
+        top: container.scrollHeight,
+        behavior: smooth ? "smooth" : "auto",
+      });
+    } else if (messagesEndRef.current) {
+      messagesEndRef.current.scrollIntoView({
+        behavior: smooth ? "smooth" : "auto",
+        block: "end",
+      });
+    }
+  }, []);
 
   // 1. 初始化拉取会话列表 (保持默认新建会话视图，不自动激活首个会话)
   const loadConversations = useCallback(async () => {
@@ -61,27 +110,83 @@ export const ChatPage: React.FC = () => {
 
   // 2. 切换当前会话时，拉取该会话下的历史消息 (如果为 null 则重置为空)
   const loadHistory = useCallback(async (convId: string) => {
+    const cached = getHistoryEntry(historyCacheRef.current, convId);
+    if (cached) {
+      historyCacheRef.current = touchHistoryEntry(historyCacheRef.current, convId);
+      setMessages(cached.messages);
+      setIsLoadingHistory(false);
+      return;
+    }
     setIsLoadingHistory(true);
     try {
-      const res = await chatApi.getHistory(convId);
-      if (res && res.records) {
-        setMessages(res.records.map((message) => ({
+      const page = await chatApi.getHistory(convId, undefined, 20);
+      if (page.records) {
+        const normalized = page.records.map((message) => ({
           ...message,
           content: message.content ?? "",
           operations: parseToolOperations(message.toolOperationsJson),
-        })));
+        }));
+        historyCacheRef.current = putHistoryPage(
+          historyCacheRef.current, convId, normalized, page.hasMore, page.nextBeforeSequence
+        );
+        if (activeConversationIdRef.current !== convId) return;
+        setMessages(normalized);
       } else {
+        if (activeConversationIdRef.current !== convId) return;
         setMessages([]);
       }
     } catch (err) {
       console.warn(`拉取会话 ${convId} 历史消息失败:`, err);
+      if (activeConversationIdRef.current !== convId) return;
       setMessages([]);
     } finally {
-      setIsLoadingHistory(false);
+      if (activeConversationIdRef.current === convId) {
+        setIsLoadingHistory(false);
+      }
     }
   }, []);
 
+  const loadOlderHistory = useCallback(async () => {
+    if (!activeConversationId || isLoadingOlderHistory || isSwitchingConversationRef.current) return;
+    const entry = getHistoryEntry(historyCacheRef.current, activeConversationId);
+    if (!entry?.hasMore || !entry.nextBeforeSequence) return;
+    const container = scrollContainerRef.current;
+    const previousHeight = container?.scrollHeight ?? 0;
+    setIsLoadingOlderHistory(true);
+    try {
+      const page = await chatApi.getHistory(activeConversationId, entry.nextBeforeSequence, 20);
+      const normalized = page.records.map((message) => ({
+        ...message,
+        content: message.content ?? "",
+        operations: parseToolOperations(message.toolOperationsJson),
+      }));
+      historyCacheRef.current = prependHistoryPage(
+        historyCacheRef.current, activeConversationId, normalized, page.hasMore, page.nextBeforeSequence
+      );
+      if (activeConversationIdRef.current !== activeConversationId) return;
+      setMessages(getHistoryEntry(historyCacheRef.current, activeConversationId)?.messages ?? []);
+      requestAnimationFrame(() => {
+        if (container) container.scrollTop += container.scrollHeight - previousHeight;
+      });
+    } catch (err) {
+      console.warn(`拉取会话 ${activeConversationId} 更早历史失败:`, err);
+    } finally {
+      if (activeConversationIdRef.current === activeConversationId) {
+        setIsLoadingOlderHistory(false);
+      }
+    }
+  }, [activeConversationId, isLoadingOlderHistory]);
+
   useEffect(() => {
+    isSwitchingConversationRef.current = true;
+    shouldAutoScrollRef.current = true;
+    if (switchingConversationTimerRef.current) {
+      clearTimeout(switchingConversationTimerRef.current);
+    }
+    switchingConversationTimerRef.current = setTimeout(() => {
+      isSwitchingConversationRef.current = false;
+    }, 2000);
+
     if (activeConversationId) {
       if (skipNextHistoryLoadRef.current) {
         skipNextHistoryLoadRef.current = false;
@@ -93,12 +198,59 @@ export const ChatPage: React.FC = () => {
     }
   }, [activeConversationId, loadHistory]);
 
-  // 3. 滚动到底部锚点
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages, isGenerating]);
+  // 3. 监听用户手动滚动行为 (若向上回溯查看历史则不强行吸底)
+  const handleScroll = () => {
+    const container = scrollContainerRef.current;
+    if (!container) return;
 
-  // 4. 计时器
+    // 若处于刚切入会话的动画保护期内，不因过渡阶段的临时位置将 shouldAutoScroll 误置为 false
+    if (isSwitchingConversationRef.current) {
+      return;
+    }
+
+    const isNearBottom =
+      container.scrollHeight - container.scrollTop - container.clientHeight <= 140;
+    shouldAutoScrollRef.current = isNearBottom;
+
+    if (container.scrollTop <= 32 && !isSwitchingConversationRef.current) {
+      void loadOlderHistory();
+    }
+  };
+
+  // 用户主动滚轮/触摸事件：如果主动往上翻，立即解除保护并停止自动吸底
+  const handleUserScrollInteraction = (e: React.WheelEvent | React.TouchEvent) => {
+    if ("deltaY" in e && e.deltaY < 0) {
+      isSwitchingConversationRef.current = false;
+      shouldAutoScrollRef.current = false;
+    }
+  };
+
+  // 4. 监听消息列表尺寸动态变化 (图片异步加载撑开高度、代码高亮、卡片展开时自动平滑触底纠偏)
+  useEffect(() => {
+    const targetElement = messageListRef.current;
+    if (!targetElement) return;
+
+    const resizeObserver = new ResizeObserver(() => {
+      if (shouldAutoScrollRef.current || isGenerating || isSwitchingConversationRef.current) {
+        scrollToBottom(true);
+      }
+    });
+
+    resizeObserver.observe(targetElement);
+
+    return () => {
+      resizeObserver.disconnect();
+    };
+  }, [scrollToBottom, isGenerating]);
+
+  // 5. 消息内容或生成状态变化时触发触底
+  useEffect(() => {
+    if (shouldAutoScrollRef.current || isGenerating || isSwitchingConversationRef.current) {
+      scrollToBottom(true);
+    }
+  }, [messages, isGenerating, scrollToBottom]);
+
+  // 6. 计时器
   useEffect(() => {
     if (isGenerating) {
       setElapsedSeconds(1);
@@ -113,13 +265,21 @@ export const ChatPage: React.FC = () => {
     };
   }, [isGenerating]);
 
-  // 5. 点击新建会话：重置为新建会话状态
+  // 5. 点击新建会话：重置为新建会话状态并跳转到 /chat
   const handleNewConversation = () => {
-    setActiveConversationId(null);
+    if (activeConversationId) {
+      navigate("/chat");
+    }
     setMessages([]);
     setInputContent("");
     setIsGenerating(false);
     setGenerationId(null);
+  };
+
+  // 选中已有会话：跳转到 /chat/{conversationId}
+  const handleSelectConversation = (conversationId: string) => {
+    if (conversationId === activeConversationId) return;
+    navigate(`/chat/${conversationId}`);
   };
 
   // 6. 重命名会话 (对接 PUT /api/conversations/{id})
@@ -141,7 +301,7 @@ export const ChatPage: React.FC = () => {
       const updated = conversations.filter((c) => c.conversationId !== conversationId);
       setConversations(updated);
 
-      // 若删除当前活动会话，平滑重置为新建会话视图
+      // 若删除当前活动会话，平滑重置为新建会话视图并返回 /chat
       if (activeConversationId === conversationId) {
         handleNewConversation();
       }
@@ -182,6 +342,7 @@ export const ChatPage: React.FC = () => {
 
     const controller = new AbortController();
     abortControllerRef.current = controller;
+    generationConversationIdRef.current = activeConversationId;
     terminalRef.current = false;
     lastEventVersionRef.current = 0;
 
@@ -194,6 +355,9 @@ export const ChatPage: React.FC = () => {
       const targetMessageId = event.messageId || assistantMsgId;
 
       if (event.type === "META") {
+        if (event.conversationId) {
+          generationConversationIdRef.current = event.conversationId;
+        }
         if (event.generationId) {
           currentGenerationIdRef.current = event.generationId;
           setGenerationId(event.generationId);
@@ -203,7 +367,7 @@ export const ChatPage: React.FC = () => {
           : message));
         if (event.conversationId && event.conversationId !== activeConversationId) {
           skipNextHistoryLoadRef.current = true;
-          setActiveConversationId(event.conversationId);
+          navigate(`/chat/${event.conversationId}`, { replace: true });
           loadConversations();
         }
         return;
@@ -226,9 +390,18 @@ export const ChatPage: React.FC = () => {
       if (event.type === "COMPLETE" || event.type === "CANCELLED" || event.type === "ERROR") {
         terminalRef.current = true;
         const status = event.type === "COMPLETE" ? "COMPLETED" : event.type;
-        setMessages((prev) => prev.map((message) => message.messageId === targetMessageId
-          ? { ...message, status, operations: event.operations || message.operations, connectionState: undefined }
-          : message));
+        setMessages((prev) => {
+          const nextMessages = prev.map((message) => message.messageId === targetMessageId
+            ? { ...message, status, operations: event.operations || message.operations, connectionState: undefined }
+            : message);
+          const conversationId = generationConversationIdRef.current;
+          if (conversationId && conversationId === activeConversationIdRef.current) {
+            updateHistoryCacheMessages(conversationId, nextMessages);
+          } else if (conversationId) {
+            historyCacheRef.current = removeHistoryEntry(historyCacheRef.current, conversationId);
+          }
+          return nextMessages;
+        });
         setIsGenerating(false);
         currentGenerationIdRef.current = null;
         setGenerationId(null);
@@ -286,9 +459,16 @@ export const ChatPage: React.FC = () => {
     setIsGenerating(false);
     currentGenerationIdRef.current = null;
     setGenerationId(null);
-    setMessages((prev) =>
-      prev.map((m) => (m.status === "GENERATING" ? { ...m, status: "CANCELLED" } : m))
-    );
+    setMessages((prev) => {
+      const nextMessages = prev.map((m) => (m.status === "GENERATING" ? { ...m, status: "CANCELLED" } : m));
+      const conversationId = generationConversationIdRef.current;
+      if (conversationId && conversationId === activeConversationIdRef.current) {
+        updateHistoryCacheMessages(conversationId, nextMessages);
+      } else if (conversationId) {
+        historyCacheRef.current = removeHistoryEntry(historyCacheRef.current, conversationId);
+      }
+      return nextMessages;
+    });
   };
 
   const handleCopy = (msgId: string, text: string) => {
@@ -309,10 +489,11 @@ export const ChatPage: React.FC = () => {
       <ConversationSidebar
         conversations={conversations}
         activeId={activeConversationId}
-        onSelect={(id) => setActiveConversationId(id)}
+        onSelect={handleSelectConversation}
         onNew={handleNewConversation}
         onRename={handleRenameConversation}
         onDelete={handleDeleteConversation}
+        isDeleteDisabled={isGenerating}
         isCollapsed={isSidebarCollapsed}
         onToggleCollapse={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
       />
@@ -327,7 +508,13 @@ export const ChatPage: React.FC = () => {
         />
 
         {/* 消息视口流 */}
-        <div className="flex-1 overflow-y-auto px-6 pt-4 pb-12 bg-white standard-scrollbar">
+        <div
+          ref={scrollContainerRef}
+          onScroll={handleScroll}
+          onWheel={handleUserScrollInteraction}
+          onTouchMove={handleUserScrollInteraction}
+          className="flex-1 overflow-y-auto px-6 pt-4 pb-3 bg-white standard-scrollbar"
+        >
           {isLoadingHistory ? (
             <div className="flex items-center justify-center h-48 text-[13px] text-[#8F959E]">
               正在加载历史对话...
@@ -412,7 +599,7 @@ export const ChatPage: React.FC = () => {
             </div>
           ) : (
             /* 1:1 飞书官方消息流 */
-            <div className="max-w-[760px] mx-auto space-y-7">
+            <div ref={messageListRef} className="max-w-[760px] mx-auto space-y-7">
               {messages.map((msg, index) => (
                 <ChatMessageItem
                   key={msg.messageId || index}

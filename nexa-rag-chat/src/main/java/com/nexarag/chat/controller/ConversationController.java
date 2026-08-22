@@ -122,7 +122,7 @@ public class ConversationController {
     @GetMapping("/{conversationId}/messages")
     public Result<ConversationHistoryPageVO> history(@PathVariable String conversationId,
                                                       @RequestParam(required = false) Long beforeSequence,
-                                                      @RequestParam(defaultValue = "50") int size) {
+                                                      @RequestParam(defaultValue = "20") int size) {
         // 1. 校验游标和分页参数，避免服务层静默归一化
         validateHistoryPageParameters(beforeSequence, size);
 

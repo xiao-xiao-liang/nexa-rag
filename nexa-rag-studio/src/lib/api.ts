@@ -141,7 +141,7 @@ export const chatApi = {
     await fetchJson(`/conversations/${conversationId}`, { method: "DELETE" });
   },
 
-  async getHistory(conversationId: string, beforeSequence?: number, size = 50): Promise<ConversationHistoryPageVO> {
+  async getHistory(conversationId: string, beforeSequence?: number, size = 20): Promise<ConversationHistoryPageVO> {
     const url = `/conversations/${conversationId}/messages?size=${size}${beforeSequence ? `&beforeSequence=${beforeSequence}` : ""}`;
     return await fetchJson<ConversationHistoryPageVO>(url);
   },

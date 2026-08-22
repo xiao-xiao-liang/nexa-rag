@@ -18,6 +18,7 @@ export const AppRouter: React.FC = () => {
           <Route path="/" element={<Navigate to="/home" replace />} />
           <Route path="/home" element={<HomePage />} />
           <Route path="/chat" element={<ChatPage />} />
+          <Route path="/chat/:conversationId" element={<ChatPage />} />
           <Route path="/knowledge-base" element={<KnowledgeBaseManagePage />} />
           <Route path="/knowledge-base/:knowledgeBaseId" element={<DocumentPage />} />
           <Route path="/knowledge-base/:knowledgeBaseId/documents/:documentId" element={<DocumentDetailPage />} />

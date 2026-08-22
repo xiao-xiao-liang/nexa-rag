@@ -19,6 +19,7 @@ export interface ConversationSidebarProps {
   onNew: () => void;
   onRename: (conversationId: string, newTitle: string) => Promise<void>;
   onDelete: (conversationId: string) => Promise<void>;
+  isDeleteDisabled?: boolean;
   isCollapsed: boolean;
   onToggleCollapse: () => void;
 }
@@ -75,6 +76,7 @@ export const ConversationSidebar: React.FC<ConversationSidebarProps> = ({
   onNew,
   onRename,
   onDelete,
+  isDeleteDisabled = false,
   isCollapsed,
   onToggleCollapse,
 }) => {
@@ -364,15 +366,17 @@ export const ConversationSidebar: React.FC<ConversationSidebarProps> = ({
                             <div className="h-[1px] bg-[#EFF0F1] my-1" />
                             <button
                               type="button"
+                              disabled={isDeleteDisabled && isActive}
                               onClick={(e) => {
+                                if (isDeleteDisabled && isActive) return;
                                 e.stopPropagation();
                                 setDeletingId(conv.conversationId);
                                 setMenuOpenId(null);
                               }}
-                              className="w-full px-3 py-1.5 text-left text-[12px] text-[#F53F3F] hover:bg-[#FFF2F0] flex items-center gap-2 transition-colors cursor-pointer"
+                              className="w-full px-3 py-1.5 text-left text-[12px] text-[#F53F3F] hover:bg-[#FFF2F0] disabled:text-[#BBBFC4] disabled:hover:bg-transparent disabled:cursor-not-allowed flex items-center gap-2 transition-colors cursor-pointer"
                             >
                               <Trash2 className="w-3 h-3 text-[#F53F3F]" />
-                              <span>删除会话</span>
+                              <span>{isDeleteDisabled && isActive ? "正在生成，暂不能删除" : "删除会话"}</span>
                             </button>
                           </div>
                         </>

@@ -32,7 +32,10 @@ interface NavItemProps {
 const NavItem: React.FC<NavItemProps> = ({ to, label, icon: Icon, isSubItem, onClick }) => {
   const location = useLocation();
   const currentPath = location.pathname;
-  const isActive = currentPath === to || (to === "/home" && currentPath === "/");
+  const isActive =
+    currentPath === to ||
+    (to === "/home" && currentPath === "/") ||
+    (to !== "/home" && currentPath.startsWith(to + "/"));
 
   return (
     <Link
@@ -291,7 +294,7 @@ export const AppShell: React.FC<AppShellProps> = ({ children }) => {
         <main
           className={cn(
             "flex-1 bg-white",
-            location.pathname === "/chat" ? "p-0 overflow-hidden flex flex-col" : "overflow-auto p-5"
+            location.pathname.startsWith("/chat") ? "p-0 overflow-hidden flex flex-col" : "overflow-auto p-5"
           )}
         >
           {children}
