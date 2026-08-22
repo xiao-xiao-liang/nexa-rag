@@ -372,21 +372,37 @@
   color: var(--text-link-normal, #1456F0) !important;
 }
 
-/* 15. 图片 */
+/* 15. 图片与 1:1 错误态卡片 */
 .base-chatbot-maker-md-comp-image {
-  display: inline-block;
-  margin: 4px 0;
+  display: block;
+  margin: 8px 0;
+  max-width: 100%;
 }
 
 .base-chatbot-maker-md-comp-image img {
-  border: 0.5px solid var(--line-divider-default, rgba(31, 35, 41, 0.15));
-  border-radius: 4px;
+  border: 0.5px solid var(--line-border-card, #DEE0E3);
+  border-radius: 6px;
   height: auto;
-  max-height: 140px;
+  max-height: 400px;
   max-width: 100%;
-  min-height: 60px;
-  min-width: 60px;
-  object-fit: cover;
+  object-fit: contain;
+  background-color: #FFFFFF;
+}
+
+.base-chatbot-maker-md-root .base-chatbot-maker-md-comp-image__error {
+  align-items: center;
+  background: var(--N900-5, rgba(31, 35, 41, 0.05));
+  border: 0.5px solid var(--N900-10, rgba(31, 35, 41, 0.1));
+  border-radius: 6px;
+  display: flex;
+  height: 140px;
+  justify-content: center;
+  width: 160px;
+}
+
+.base-chatbot-maker-md-root .base-chatbot-maker-md-comp-image__error .universe-icon {
+  color: var(--icon-disabled, #BBBFC4);
+  font-size: 32px;
 }
 
 /* 16. 生成打字光标 */

@@ -10,6 +10,7 @@ import {
   FeishuTd,
 } from "./FeishuMarkdownTable";
 import { FeishuCodeBlock } from "./FeishuMarkdownCodeBlock";
+import { FeishuMarkdownImage } from "./FeishuMarkdownImage";
 import { parseFeishuMessageContent } from "./utils";
 
 export interface FeishuMarkdownProps {
@@ -125,11 +126,9 @@ export const FeishuMarkdown: React.FC<FeishuMarkdownProps> = ({
         </a>
       ),
 
-      // 图片
-      img: ({ src, alt }) => (
-        <div className="base-chatbot-maker-md-comp-image">
-          <img src={src} alt={alt || ""} loading="lazy" />
-        </div>
+      // 图片 (支持骨架屏、1:1 飞书错误态、自适应尺寸与全屏放大灯箱)
+      img: ({ src, alt, className: imgClass }) => (
+        <FeishuMarkdownImage src={src} alt={alt} className={imgClass} />
       ),
 
       // 代码（行内代码与代码块）

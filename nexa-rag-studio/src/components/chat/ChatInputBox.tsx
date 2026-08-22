@@ -1,7 +1,8 @@
-import React, { useRef, useEffect } from "react";
+import React, { useRef, useState, useEffect, useLayoutEffect, useCallback } from "react";
 import { Plus, AtSign, Mic, Square } from "lucide-react";
 import { FeishuTooltip } from "../ui/tooltip";
 import { SendFilledIcon } from "./FeishuChatIcons";
+import { cn } from "../../lib/utils";
 
 export interface ChatInputBoxProps {
   value: string;
@@ -14,7 +15,7 @@ export interface ChatInputBoxProps {
   onVoiceInput?: () => void;
 }
 
-/** 1:1 飞书 Floating Omnibox 输入框 (支持 @实体、+附件、快捷键与生成控制) */
+/** 1:1 飞书 Floating Omnibox 输入框 (支持内容自适应撑起、2s自动隐藏滚动条、@实体、+附件、快捷键与生成控制) */
 export const ChatInputBox: React.FC<ChatInputBoxProps> = ({
   value,
   onChange,
@@ -26,12 +27,67 @@ export const ChatInputBox: React.FC<ChatInputBoxProps> = ({
   onVoiceInput,
 }) => {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const [isScrollbarVisible, setIsScrollbarVisible] = useState(false);
+  const hideTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  // 显现滚动条并在 1s 静止或移出后自动淡出消失
+  const showScrollbarWithTimer = useCallback(() => {
+    const textarea = textareaRef.current;
+    if (!textarea) return;
+
+    if (textarea.scrollHeight > textarea.clientHeight) {
+      setIsScrollbarVisible(true);
+      if (hideTimerRef.current) {
+        clearTimeout(hideTimerRef.current);
+      }
+      hideTimerRef.current = setTimeout(() => {
+        setIsScrollbarVisible(false);
+      }, 1000);
+    } else {
+      setIsScrollbarVisible(false);
+    }
+  }, []);
+
+  const handleMouseLeave = () => {
+    if (hideTimerRef.current) {
+      clearTimeout(hideTimerRef.current);
+    }
+    hideTimerRef.current = setTimeout(() => {
+      setIsScrollbarVisible(false);
+    }, 1000);
+  };
+
+  // 1:1 飞书文本框自适应撑起 (最小 44px 约 2 行，最大 240px 约 10 行，超出后呈现精细滚动条)
+  const adjustHeight = useCallback(() => {
+    const textarea = textareaRef.current;
+    if (!textarea) return;
+    textarea.style.height = "auto";
+    const minHeight = 44;
+    const maxHeight = 240;
+    const scrollHeight = textarea.scrollHeight;
+    const targetHeight = Math.min(Math.max(scrollHeight, minHeight), maxHeight);
+    textarea.style.height = `${targetHeight}px`;
+    textarea.style.overflowY = scrollHeight > maxHeight ? "auto" : "hidden";
+  }, []);
+
+  useLayoutEffect(() => {
+    adjustHeight();
+    showScrollbarWithTimer();
+  }, [value, adjustHeight, showScrollbarWithTimer]);
 
   useEffect(() => {
     if (!isGenerating && textareaRef.current) {
       textareaRef.current.focus();
     }
   }, [isGenerating]);
+
+  useEffect(() => {
+    return () => {
+      if (hideTimerRef.current) {
+        clearTimeout(hideTimerRef.current);
+      }
+    };
+  }, []);
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === "Enter" && !e.shiftKey) {
@@ -64,17 +120,27 @@ export const ChatInputBox: React.FC<ChatInputBoxProps> = ({
   };
 
   return (
-    <div className="px-7 pb-5 pt-0 shrink-0 bg-white select-none">
-      <div className="max-w-[760px] mx-auto rounded-[18px] border border-[#DEE0E3] bg-white p-3.5 transition-all focus-within:border-[#3370FF] shadow-[0_2px_12px_rgba(0,0,0,0.03)]">
+    <div className="px-7 pb-4 pt-0 shrink-0 bg-white select-none">
+      <div
+        onMouseMove={showScrollbarWithTimer}
+        onMouseLeave={handleMouseLeave}
+        className="max-w-[760px] mx-auto rounded-[18px] border border-[#DEE0E3] bg-white p-3.5 transition-all focus-within:border-[#3370FF] shadow-[0_2px_12px_rgba(0,0,0,0.03)]"
+      >
         <textarea
           ref={textareaRef}
           rows={2}
           value={value}
           onChange={(e) => onChange(e.target.value)}
           onKeyDown={handleKeyDown}
+          onScroll={showScrollbarWithTimer}
+          onFocus={showScrollbarWithTimer}
           placeholder={placeholder}
           disabled={isGenerating}
-          className="w-full resize-none bg-transparent text-[14px] leading-[22px] text-[#1F2329] outline-none placeholder:text-[#8F959E]"
+          style={{ minHeight: "44px" }}
+          className={cn(
+            "w-full resize-none bg-transparent text-[14px] leading-[22px] text-[#1F2329] outline-none placeholder:text-[#8F959E] feishu-chat-textarea transition-all",
+            !isScrollbarVisible && "scrollbar-hidden"
+          )}
         />
 
         <div className="flex items-center justify-between pt-2 mt-1">

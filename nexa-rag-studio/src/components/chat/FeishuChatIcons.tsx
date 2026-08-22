@@ -21,7 +21,6 @@ export const BaseAgentChatbotOutlinedIcon: React.FC<{ className?: string }> = ({
     />
   </svg>
 );
-
 /** 1:1 飞书官方 DownBoldOutlined 矢量小倒三角 (12px) */
 export const DownBoldOutlinedIcon: React.FC<{ className?: string }> = ({
   className = "w-3 h-3",
@@ -124,6 +123,136 @@ export const SendFilledIcon: React.FC<{ className?: string }> = ({
     <path
       d="M21.696 13.354a1.541 1.541 0 0 0 0-2.707L3.762.937a1.515 1.515 0 0 0-1.512.03c-.469.28-.75.774-.75 1.323l1.979 7.728 8.413 1.232c.482 0 .871.335.871.75s-.39.75-.871.75a1932.6 1932.6 0 0 1-8.41 1.223L1.5 21.71c0 .548.281 1.043.75 1.324.469.279 1.034.29 1.512.03l17.934-9.71Z"
       fill="currentColor"
+    />
+  </svg>
+);
+
+/** 1:1 飞书多维表格 A✨ 文本字段图标 (Universe Design) */
+export const FieldTextAiIcon: React.FC<{ className?: string }> = ({
+  className = "w-3.5 h-3.5",
+}) => (
+  <svg
+    className={className}
+    viewBox="0 0 24 24"
+    fill="none"
+    xmlns="http://www.w3.org/2000/svg"
+    data-icon="FieldTextAiOutlined"
+  >
+    <path
+      d="M4 19L8.5 7L13 19M5.8 15h5.4"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+    <path
+      d="M19 4L20 7L23 8L20 9L19 12L18 9L15 8L18 7L19 4Z"
+      fill="currentColor"
+    />
+  </svg>
+);
+
+/** 1:1 飞书多维表格 🕒 时钟/日期字段图标 (Universe Design) */
+export const FieldDateClockIcon: React.FC<{ className?: string }> = ({
+  className = "w-3.5 h-3.5",
+}) => (
+  <svg
+    className={className}
+    viewBox="0 0 24 24"
+    fill="none"
+    xmlns="http://www.w3.org/2000/svg"
+    data-icon="FieldDateClockOutlined"
+  >
+    <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="2" />
+    <path
+      d="M12 7V12L15 15"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+    />
+  </svg>
+);
+
+/** 1:1 飞书多维表格 📎 附件字段图标 (Universe Design) */
+export const FieldAttachmentPaperclipIcon: React.FC<{ className?: string }> = ({
+  className = "w-3.5 h-3.5",
+}) => (
+  <svg
+    className={className}
+    viewBox="0 0 24 24"
+    fill="none"
+    xmlns="http://www.w3.org/2000/svg"
+    data-icon="FieldAttachmentOutlined"
+  >
+    <path
+      d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+  </svg>
+);
+
+/** 1:1 飞书多维表格 ≡: 单选/选项字段图标 (Universe Design) */
+export const FieldSingleSelectLinesIcon: React.FC<{ className?: string }> = ({
+  className = "w-3.5 h-3.5",
+}) => (
+  <svg
+    className={className}
+    viewBox="0 0 24 24"
+    fill="none"
+    xmlns="http://www.w3.org/2000/svg"
+    data-icon="FieldSingleSelectOutlined"
+  >
+    <circle cx="4" cy="6" r="1.5" fill="currentColor" />
+    <line x1="8" y1="6" x2="21" y2="6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+    <circle cx="4" cy="12" r="1.5" fill="currentColor" />
+    <line x1="8" y1="12" x2="21" y2="12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+    <circle cx="4" cy="18" r="1.5" fill="currentColor" />
+    <line x1="8" y1="18" x2="21" y2="18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+  </svg>
+);
+
+/** 1:1 飞书多维表格 # 数字字段图标 (Universe Design) */
+export const FieldNumberPoundIcon: React.FC<{ className?: string }> = ({
+  className = "w-3.5 h-3.5",
+}) => (
+  <svg
+    className={className}
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    data-icon="FieldNumberOutlined"
+  >
+    <line x1="4" y1="9" x2="20" y2="9" />
+    <line x1="4" y1="15" x2="20" y2="15" />
+    <line x1="10" y1="3" x2="8" y2="21" />
+    <line x1="16" y1="3" x2="14" y2="21" />
+  </svg>
+);
+
+/** 1:1 飞书多维表格 ☑ 复选框字段图标 (Universe Design) */
+export const FieldCheckboxCheckedIcon: React.FC<{ className?: string }> = ({
+  className = "w-3.5 h-3.5",
+}) => (
+  <svg
+    className={className}
+    viewBox="0 0 24 24"
+    fill="none"
+    xmlns="http://www.w3.org/2000/svg"
+    data-icon="FieldCheckboxOutlined"
+  >
+    <rect x="3" y="3" width="18" height="18" rx="3" stroke="currentColor" strokeWidth="2" />
+    <path
+      d="M7 12L10.5 15.5L17 9"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
     />
   </svg>
 );

@@ -23,7 +23,6 @@
   --color-feishu-purple: #8d55ed;
   --color-feishu-purple-bg: #f2e9fe;
 }
-
 @layer base {
   :root {
     --background: 0 0% 100%;
@@ -186,6 +185,38 @@ body {
   background: rgba(31, 35, 41, 0.3);
 }
 
+/* 1:1 飞书输入框自适应撑起与 2s 自动淡出精细滚动条 */
+.feishu-chat-textarea {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(31, 35, 41, 0.25) transparent;
+}
+
+.feishu-chat-textarea::-webkit-scrollbar {
+  width: 5px;
+}
+
+.feishu-chat-textarea::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.feishu-chat-textarea::-webkit-scrollbar-thumb {
+  background: rgba(31, 35, 41, 0.25);
+  border-radius: 9999px;
+  transition: background-color 0.25s ease;
+}
+
+.feishu-chat-textarea::-webkit-scrollbar-thumb:hover {
+  background: rgba(31, 35, 41, 0.4);
+}
+
+.feishu-chat-textarea.scrollbar-hidden {
+  scrollbar-color: transparent transparent !important;
+}
+
+.feishu-chat-textarea.scrollbar-hidden::-webkit-scrollbar-thumb {
+  background: transparent !important;
+}
+
 /* 飞书官方 Tooltip 1:1 物理级弹性与淡入淡出动效 */
 @keyframes feishuTooltipInBottom {
   0% {
@@ -292,36 +323,42 @@ body {
   will-change: background-position;
 }
 
-/* 1:1 飞书官方 滚动流式骨架屏 (Skeleton Screen Stream) 规范 */
+/* 1:1 飞书官方 丝滑流式滚动骨架屏 (Skeleton Screen Stream) 规范 */
 @keyframes bt-comp-web-skeleton-screen-scroll {
   0% {
-    transform: translateY(0);
+    transform: translate3d(0, 0, 0);
   }
-  to {
-    transform: translateY(-463px);
+  100% {
+    transform: translate3d(0, -50%, 0);
   }
 }
 
 .bt-comp-web-skeleton-screen {
-  align-items: center;
-  animation: bt-comp-web-skeleton-screen-scroll 2.5s cubic-bezier(0.5, 0, 0.26, 1) infinite;
+  animation: bt-comp-web-skeleton-screen-scroll 10s linear infinite;
   display: flex;
   flex-direction: column;
-  gap: 15px;
-  height: 914px;
   max-width: 628px;
-  padding: 16px 0 0 1px;
   width: 100%;
+  will-change: transform;
 }
 
 .bt-comp-web-skeleton-screen--paused {
   animation-play-state: paused;
 }
 
+.bt-comp-web-skeleton-screen__group {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding-bottom: 14px;
+  flex-shrink: 0;
+  width: 100%;
+}
+
 .bt-comp-web-skeleton-screen__row {
   align-items: center;
   display: flex;
-  gap: 10px;
+  gap: 12px;
   width: 100%;
 }
 
@@ -329,24 +366,20 @@ body {
   align-items: flex-start;
 }
 
-.bt-comp-web-skeleton-screen__row:first-child {
-  margin-top: 0 !important;
-}
-
 .bt-comp-web-skeleton-screen__icon {
   flex-shrink: 0;
-  margin-left: -1px;
   color: var(--color-feishu-text-muted, #8f959e);
-  font-size: 12px;
-  width: 18px;
+  width: 16px;
+  height: 16px;
   display: flex;
   align-items: center;
-  justify-content: flex-start;
+  justify-content: center;
   user-select: none;
 }
 
 .bt-comp-web-skeleton-screen__block {
-  background-color: #f2f3f5;
-  border-radius: 4px;
+  background-color: #f5f6f7;
+  border-radius: 9999px;
   flex-shrink: 0;
+  height: 14px;
 }
