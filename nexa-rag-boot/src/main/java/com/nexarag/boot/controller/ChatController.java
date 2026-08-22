@@ -2,6 +2,9 @@ package com.nexarag.boot.controller;
 
 import com.nexarag.auth.context.CurrentUserContext;
 import com.nexarag.chat.id.ChatIdGenerator;
+import com.nexarag.chat.domain.ChatCitationDTO;
+import com.nexarag.chat.domain.ChatCitationDetailVO;
+import com.nexarag.chat.service.impl.ChatCitationService;
 import com.nexarag.common.exception.AbstractException;
 import com.nexarag.common.exception.ClientException;
 import com.nexarag.common.trace.TraceIdContext;
@@ -13,6 +16,13 @@ import com.nexarag.workflow.stream.ChatStreamEvent;
 import com.nexarag.workflow.stream.ChatStreamEventType;
 import com.nexarag.workflow.stream.ChatStreamResumeService;
 import com.nexarag.document.service.KnowledgeBaseService;
+import com.nexarag.document.service.DocumentChunkService;
+import com.nexarag.document.service.DocumentService;
+import com.nexarag.document.model.entity.Document;
+import com.nexarag.document.model.entity.DocumentChunk;
+import com.nexarag.infra.enums.ExternalDocumentSourceType;
+import com.nexarag.common.web.Result;
+import com.nexarag.common.web.Results;
 import com.alibaba.cloud.ai.graph.NodeOutput;
 import com.alibaba.cloud.ai.graph.streaming.StreamingOutput;
 import lombok.RequiredArgsConstructor;
@@ -50,6 +60,9 @@ public class ChatController {
     private final ChatStreamResumeService resumeService;
     private final ChatIdGenerator idGenerator;
     private final KnowledgeBaseService knowledgeBaseService;
+    private final ChatCitationService citationService;
+    private final DocumentChunkService documentChunkService;
+    private final DocumentService documentService;
 
     /**
      * 发起流式对话。
@@ -139,6 +152,30 @@ public class ChatController {
         }
     }
 
+    /**
+     * 读取当前用户可访问的单条引用预览。
+     *
+     * @param messageId 助手消息 ID
+     * @param citationId 消息内引用编号
+     * @return 引用预览与受控跳转地址
+     */
+    @GetMapping("/messages/{messageId}/citations/{citationId}")
+    public Result<ChatCitationDetailVO> citation(@PathVariable String messageId, @PathVariable int citationId) {
+        String userId = CurrentUserContext.getRequired().userId();
+        ChatCitationDTO citation = citationService.getOwnedCitation(messageId, userId, citationId);
+        Document document = requireOwnedDocument(citation.documentId());
+        DocumentChunk chunk = documentChunkService.getById(citation.chunkId());
+        if (chunk == null || !document.getDocumentId().equals(chunk.getDocumentId())) {
+            throw new ClientException("引用分块不存在或已失效");
+        }
+        String documentPath = "/knowledge-base/" + document.getKnowledgeBaseId()
+                + "/documents/" + document.getDocumentId();
+        String sourceUrl = document.getSourceType() == null || document.getSourceType() == ExternalDocumentSourceType.LOCAL
+                ? null : document.getSourceUrl();
+        return Results.success(new ChatCitationDetailVO(citation.citationId(), document.getTitle(),
+                chunk.getChunkOrder(), chunk.getText(), documentPath, sourceUrl));
+    }
+
     private ServerSentEvent<ChatStreamEvent> toSse(ChatStreamEvent event) {
         ServerSentEvent.Builder<ChatStreamEvent> builder = ServerSentEvent.<ChatStreamEvent>builder(event)
                 .event(event.type().name());
@@ -152,6 +189,14 @@ public class ChatController {
                                                String generationId) {
         return new ChatStreamEvent(event.type(), event.content(), conversationId, traceId, generationId,
                 event.messageId(), event.errorCode(), event.errorMessage(), event.eventVersion(), event.operations());
+    }
+
+    private Document requireOwnedDocument(Long documentId) {
+        if (documentId == null) {
+            throw new ClientException("引用文档不存在或已失效");
+        }
+        Document document = documentService.getRequiredDocument(documentId);
+        return knowledgeBaseService.getRequiredDocument(document.getKnowledgeBaseId(), documentId);
     }
 
     private boolean isTerminal(ChatStreamEvent event) {

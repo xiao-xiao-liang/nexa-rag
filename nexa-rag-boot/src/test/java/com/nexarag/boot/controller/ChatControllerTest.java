@@ -6,6 +6,12 @@ import com.alibaba.cloud.ai.graph.streaming.StreamingOutput;
 import com.nexarag.auth.context.CurrentUser;
 import com.nexarag.auth.context.CurrentUserContext;
 import com.nexarag.chat.id.ChatIdGenerator;
+import com.nexarag.chat.service.impl.ChatCitationService;
+import com.nexarag.chat.domain.ChatCitationDTO;
+import com.nexarag.document.service.DocumentChunkService;
+import com.nexarag.document.service.DocumentService;
+import com.nexarag.document.model.entity.Document;
+import com.nexarag.document.model.entity.DocumentChunk;
 import com.nexarag.common.trace.TraceIdContext;
 import com.nexarag.common.exception.ServiceException;
 import com.nexarag.workflow.service.WorkflowService;
@@ -59,7 +65,8 @@ class ChatControllerTest {
         when(workflowService.stream(eq("chat-conversation"), any())).thenReturn(Flux.just(GraphResponse.of(output)));
         ChatController controller = new ChatController(
                 workflowService, mock(ChatGenerationTaskManager.class), eventPublisher, resumeService,
-                idGenerator, knowledgeBaseService);
+                idGenerator, knowledgeBaseService, mock(ChatCitationService.class), mock(DocumentChunkService.class),
+                mock(DocumentService.class));
         CurrentUserContext.set(new CurrentUser("u1"));
         TraceIdContext.setTraceId("trace-001");
 
@@ -88,7 +95,8 @@ class ChatControllerTest {
                 .thenThrow(new ServiceException("未找到流式工作流图"));
         ChatController controller = new ChatController(
                 workflowService, mock(ChatGenerationTaskManager.class), eventPublisher, resumeService,
-                idGenerator, knowledgeBaseService);
+                idGenerator, knowledgeBaseService, mock(ChatCitationService.class), mock(DocumentChunkService.class),
+                mock(DocumentService.class));
         CurrentUserContext.set(new CurrentUser("u1"));
 
         StepVerifier.create(controller.stream(new ChatStreamRequest(null, "你好")))
@@ -117,7 +125,8 @@ class ChatControllerTest {
         }));
         ChatController controller = new ChatController(
                 workflowService, mock(ChatGenerationTaskManager.class), eventPublisher, resumeService,
-                idGenerator, knowledgeBaseService);
+                idGenerator, knowledgeBaseService, mock(ChatCitationService.class), mock(DocumentChunkService.class),
+                mock(DocumentService.class));
         CurrentUserContext.set(new CurrentUser("u1"));
 
         StepVerifier.create(controller.stream(new ChatStreamRequest(null, "你好")))
