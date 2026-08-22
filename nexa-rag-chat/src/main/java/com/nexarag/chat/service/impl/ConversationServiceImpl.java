@@ -6,15 +6,23 @@ import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.nexarag.chat.domain.ChatConversationVO;
+import com.nexarag.chat.cache.ConversationContextCache;
+import com.nexarag.chat.cache.ConversationContextLock;
 import com.nexarag.chat.entity.ChatConversation;
+import com.nexarag.chat.entity.ChatMessage;
+import com.nexarag.chat.enums.ChatMessageRole;
+import com.nexarag.chat.enums.ChatMessageStatus;
 import com.nexarag.chat.enums.ConversationStatus;
 import com.nexarag.chat.id.ChatIdGenerator;
 import com.nexarag.chat.mapper.ChatConversationMapper;
+import com.nexarag.chat.mapper.ChatMessageMapper;
 import com.nexarag.chat.service.ConversationService;
 import com.nexarag.common.exception.ClientException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import static com.nexarag.chat.constants.ConversationQueryConstants.MAX_CONVERSATION_PAGE_SIZE;
 
@@ -29,6 +37,9 @@ public class ConversationServiceImpl extends ServiceImpl<ChatConversationMapper,
     private static final String DEFAULT_TITLE = "新会话";
 
     private final ChatIdGenerator chatIdGenerator;
+    private final ChatMessageMapper chatMessageMapper;
+    private final ConversationContextLock contextLock;
+    private final ConversationContextCache contextCache;
 
     @Override
     @Transactional(rollbackFor = Exception.class)
@@ -93,7 +104,25 @@ public class ConversationServiceImpl extends ServiceImpl<ChatConversationMapper,
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void delete(String conversationId, String userId) {
-        updateStatus(conversationId, userId, ConversationStatus.DELETED);
+        contextLock.execute(userId, conversationId, () -> {
+            // 1. 校验会话归属并阻止活动生成与删除并发
+            ChatConversation entity = getOwnedConversation(conversationId, userId);
+            if (hasGeneratingAssistantMessage(conversationId, userId)) {
+                throw new ClientException("当前会话正在生成回答，暂不允许删除");
+            }
+
+            // 2. 级联逻辑删除会话和其全部消息
+            entity.setStatus(ConversationStatus.DELETED.name());
+            if (!updateById(entity) || !removeById(conversationId)) {
+                throw new ClientException("删除会话失败，请重试");
+            }
+            chatMessageMapper.delete(new LambdaQueryWrapper<ChatMessage>()
+                    .eq(ChatMessage::getConversationId, conversationId)
+                    .eq(ChatMessage::getUserId, userId));
+
+            // 3. 提交成功后清除活跃上下文缓存
+            evictContextAfterCommit(userId, conversationId);
+        });
     }
 
     /**
@@ -112,6 +141,27 @@ public class ConversationServiceImpl extends ServiceImpl<ChatConversationMapper,
         ChatConversation entity = getOwnedConversation(conversationId, userId);
         entity.setStatus(status.name());
         updateById(entity);
+    }
+
+    private boolean hasGeneratingAssistantMessage(String conversationId, String userId) {
+        return chatMessageMapper.selectCount(new LambdaQueryWrapper<ChatMessage>()
+                .eq(ChatMessage::getConversationId, conversationId)
+                .eq(ChatMessage::getUserId, userId)
+                .eq(ChatMessage::getRole, ChatMessageRole.ASSISTANT.name())
+                .eq(ChatMessage::getStatus, ChatMessageStatus.GENERATING.name())) > 0;
+    }
+
+    private void evictContextAfterCommit(String userId, String conversationId) {
+        if (!TransactionSynchronizationManager.isSynchronizationActive()) {
+            contextCache.evict(userId, conversationId);
+            return;
+        }
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                contextCache.evict(userId, conversationId);
+            }
+        });
     }
 
     private void validateUserId(String userId) {
