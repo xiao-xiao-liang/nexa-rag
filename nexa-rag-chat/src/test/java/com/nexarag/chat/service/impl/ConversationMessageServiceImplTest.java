@@ -102,6 +102,20 @@ class ConversationMessageServiceImplTest {
     }
 
     @Test
+    void shouldKeepCitationJsonWhenAssistantMessageFailsOrIsCancelled() {
+        when(mapper.update(any(ChatMessage.class), any())).thenReturn(1);
+
+        messageService.failAssistantMessage("m1", "部分回答", "MODEL_UNAVAILABLE", "模型不可用",
+                "{\"version\":1}", "[]");
+        messageService.cancelAssistantMessage("m2", "已生成内容", "{\"version\":1}", "[]");
+
+        verify(mapper).update(argThat(message -> "{\"version\":1}".equals(message.getReferencesJson())
+                        && "FAILED".equals(message.getStatus())), any());
+        verify(mapper).update(argThat(message -> "{\"version\":1}".equals(message.getReferencesJson())
+                        && "CANCELLED".equals(message.getStatus())), any());
+    }
+
+    @Test
     void shouldExposeGenerationAndToolSnapshotFieldsForAssistantMessages() {
         assertThat(Stream.of(ChatMessage.class.getDeclaredFields()).map(field -> field.getName()))
                 .contains("generationId", "toolOperationsJson");

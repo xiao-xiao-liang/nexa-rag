@@ -3,8 +3,10 @@ package com.nexarag.chat.controller;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.nexarag.auth.context.CurrentUserContext;
 import com.nexarag.chat.domain.*;
+import com.nexarag.chat.enums.ChatMessageRole;
 import com.nexarag.chat.service.ConversationMessageService;
 import com.nexarag.chat.service.ConversationService;
+import com.nexarag.chat.service.impl.ChatCitationService;
 import com.nexarag.common.error.BaseErrorCode;
 import com.nexarag.common.exception.ClientException;
 import com.nexarag.common.web.CursorPageVO;
@@ -14,6 +16,7 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
 import java.util.Optional;
 
 import static com.nexarag.chat.constants.ConversationQueryConstants.*;
@@ -28,6 +31,7 @@ public class ConversationController {
 
     private final ConversationService conversationService;
     private final ConversationMessageService messageService;
+    private final ChatCitationService citationService;
 
     /**
      * 创建新会话。
@@ -170,9 +174,23 @@ public class ConversationController {
                 .content(message.content())
                 .generationId(message.generationId())
                 .toolOperationsJson(message.toolOperationsJson())
+                .citations(listCitationSummaries(message))
                 .createdTime(message.createdTime())
                 .updatedTime(message.updatedTime())
                 .build();
+    }
+
+    /**
+     * 仅为助手消息加载引用摘要，用户消息不具备引用数据。
+     *
+     * @param message 历史消息
+     * @return 可公开的引用摘要
+     */
+    private List<ChatCitationSummaryVO> listCitationSummaries(ChatMessageVO message) {
+        if (message.role() != ChatMessageRole.ASSISTANT) {
+            return List.of();
+        }
+        return citationService.listSummaries(message.messageId(), message.userId());
     }
 
     /**

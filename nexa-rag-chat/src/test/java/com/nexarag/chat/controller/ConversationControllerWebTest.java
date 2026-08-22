@@ -2,6 +2,7 @@ package com.nexarag.chat.controller;
 
 import com.nexarag.chat.service.ConversationMessageService;
 import com.nexarag.chat.service.ConversationService;
+import com.nexarag.chat.service.impl.ChatCitationService;
 import com.nexarag.common.web.GlobalExceptionHandler;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -28,11 +29,14 @@ class ConversationControllerWebTest {
     private ConversationService conversationService;
     @Mock
     private ConversationMessageService messageService;
+    @Mock
+    private ChatCitationService citationService;
     private MockMvc mockMvc;
 
     @BeforeEach
     void setUp() {
-        mockMvc = MockMvcBuilders.standaloneSetup(new ConversationController(conversationService, messageService))
+        mockMvc = MockMvcBuilders.standaloneSetup(new ConversationController(conversationService, messageService,
+                        citationService))
                 .setControllerAdvice(new GlobalExceptionHandler())
                 .build();
     }

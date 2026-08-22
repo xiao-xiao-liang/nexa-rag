@@ -161,12 +161,21 @@ public class ConversationMessageServiceImpl extends ServiceImpl<ChatMessageMappe
     @Transactional(rollbackFor = Exception.class)
     public void failAssistantMessage(String messageId, String partialContent,
                                      String failureCode, String failureMessage, String toolOperationsJson) {
+        failAssistantMessage(messageId, partialContent, failureCode, failureMessage, null, toolOperationsJson);
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void failAssistantMessage(String messageId, String partialContent,
+                                     String failureCode, String failureMessage, String referencesJson,
+                                     String toolOperationsJson) {
         // 1. 组装失败状态和已生成的部分回答
         ChatMessage message = new ChatMessage();
         message.setStatus(ChatMessageStatus.FAILED.name());
         message.setContent(partialContent);
         message.setFailureCode(failureCode);
         message.setFailureMessage(failureMessage);
+        message.setReferencesJson(referencesJson);
         message.setToolOperationsJson(toolOperationsJson);
 
         // 2. 仅允许生成中的消息进入失败状态
@@ -182,10 +191,18 @@ public class ConversationMessageServiceImpl extends ServiceImpl<ChatMessageMappe
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void cancelAssistantMessage(String messageId, String partialContent, String toolOperationsJson) {
+        cancelAssistantMessage(messageId, partialContent, null, toolOperationsJson);
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void cancelAssistantMessage(String messageId, String partialContent, String referencesJson,
+                                       String toolOperationsJson) {
         // 1. 组装取消状态和已生成的部分回答
         ChatMessage message = new ChatMessage();
         message.setStatus(ChatMessageStatus.CANCELLED.name());
         message.setContent(partialContent);
+        message.setReferencesJson(referencesJson);
         message.setToolOperationsJson(toolOperationsJson);
 
         // 2. 仅允许生成中的消息进入取消状态

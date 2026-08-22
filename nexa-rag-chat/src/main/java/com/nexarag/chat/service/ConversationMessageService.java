@@ -49,11 +49,20 @@ public interface ConversationMessageService extends IService<ChatMessage> {
     void failAssistantMessage(String messageId, String partialContent,
                               String failureCode, String failureMessage, String toolOperationsJson);
 
+    /** 更新助手消息为失败状态，并保存引用与工具运行卡终态快照。 */
+    void failAssistantMessage(String messageId, String partialContent,
+                              String failureCode, String failureMessage, String referencesJson,
+                              String toolOperationsJson);
+
     /** 更新助手消息为取消状态，并保存已生成的部分回答。 */
     void cancelAssistantMessage(String messageId, String partialContent);
 
     /** 更新助手消息为取消状态，并保存工具运行卡终态快照。 */
     void cancelAssistantMessage(String messageId, String partialContent, String toolOperationsJson);
+
+    /** 更新助手消息为取消状态，并保存引用与工具运行卡终态快照。 */
+    void cancelAssistantMessage(String messageId, String partialContent, String referencesJson,
+                                String toolOperationsJson);
 
     /** 分页限制查询会话历史消息。 */
     List<ChatMessageVO> listHistory(String conversationId, String userId, int limit);

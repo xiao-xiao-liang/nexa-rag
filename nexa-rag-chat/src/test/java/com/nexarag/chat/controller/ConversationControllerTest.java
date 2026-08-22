@@ -12,6 +12,7 @@ import com.nexarag.chat.enums.ChatMessageStatus;
 import com.nexarag.chat.enums.ConversationStatus;
 import com.nexarag.chat.service.ConversationMessageService;
 import com.nexarag.chat.service.ConversationService;
+import com.nexarag.chat.service.impl.ChatCitationService;
 import com.nexarag.common.exception.ClientException;
 import com.nexarag.common.web.CursorPageVO;
 import org.junit.jupiter.api.AfterEach;
@@ -40,6 +41,8 @@ class ConversationControllerTest {
     private ConversationService conversationService;
     @Mock
     private ConversationMessageService messageService;
+    @Mock
+    private ChatCitationService citationService;
     @InjectMocks
     private ConversationController controller;
 
@@ -88,6 +91,8 @@ class ConversationControllerTest {
                 LocalDateTime.of(2026, 7, 26, 9, 0), LocalDateTime.of(2026, 7, 26, 9, 1));
         when(messageService.pageHistory("c1", "u1", 8L, 50))
                 .thenReturn(new CursorPageVO<>(List.of(message), false, 8L));
+        when(citationService.listSummaries("m1", "u1"))
+                .thenReturn(List.of(new com.nexarag.chat.domain.ChatCitationSummaryVO(1)));
 
         var response = controller.history("c1", 8L, 50);
 
@@ -97,12 +102,30 @@ class ConversationControllerTest {
             assertThat(item.getStatus()).isEqualTo(ChatMessageStatus.FAILED);
             assertThat(item.getGenerationId()).isEqualTo("g1");
             assertThat(item.getToolOperationsJson()).isEqualTo("[{\"opId\":\"g1:tool:1\"}]");
+            assertThat(item.getCitations()).extracting(citation -> citation.citationId()).containsExactly(1);
         });
         assertThat(ConversationMessageItemVO.class.getDeclaredFields())
                 .extracting(field -> field.getName())
                 .containsExactlyInAnyOrder("messageId", "sequence", "role", "status", "content",
-                        "generationId", "toolOperationsJson", "createdTime", "updatedTime");
+                        "generationId", "toolOperationsJson", "citations", "createdTime", "updatedTime");
         verify(messageService).pageHistory("c1", "u1", 8L, 50);
+    }
+
+    @Test
+    void historyShouldNotReadCitationsForUserMessage() {
+        CurrentUserContext.set(new CurrentUser("u1"));
+        ChatMessageVO message = new ChatMessageVO("m1", "c1", "u1", 1L,
+                ChatMessageRole.USER, ChatMessageStatus.COMPLETED, "用户问题", null,
+                null, null, null, null, null, null, null, null,
+                LocalDateTime.of(2026, 8, 22, 18, 0), LocalDateTime.of(2026, 8, 22, 18, 0));
+        when(messageService.pageHistory("c1", "u1", null, 20))
+                .thenReturn(new CursorPageVO<>(List.of(message), false, null));
+
+        var response = controller.history("c1", null, 20);
+
+        assertThat(response.data().getRecords()).singleElement().satisfies(item ->
+                assertThat(item.getCitations()).isEmpty());
+        verifyNoInteractions(citationService);
     }
 
     @Test
