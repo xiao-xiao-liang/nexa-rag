@@ -37,6 +37,7 @@ export interface ChatMessageVO {
   generationId?: string;
   toolOperationsJson?: string;
   operations?: ChatToolOperation[];
+  citations?: ChatCitationSummaryVO[];
   connectionState?: 'STREAMING' | 'RECONNECTING' | 'BACKGROUND_RUNNING';
   createdTime?: string;
   updatedTime?: string;
@@ -58,7 +59,20 @@ export interface ChatToolOperation {
   status: ChatToolOperationStatus;
 }
 
-export type ChatStreamEventType = 'META' | 'SNAPSHOT' | 'ANSWER_DELTA' | 'TOKEN' | 'COMPLETE' | 'ERROR' | 'CANCELLED' | 'TEXT';
+export interface ChatCitationSummaryVO {
+  citationId: number;
+}
+
+export interface ChatCitationDetailVO {
+  citationId: number;
+  title: string;
+  chunkOrder?: number;
+  content: string;
+  documentPath: string;
+  sourceUrl?: string;
+}
+
+export type ChatStreamEventType = 'META' | 'SNAPSHOT' | 'CITATIONS' | 'ANSWER_DELTA' | 'TOKEN' | 'COMPLETE' | 'ERROR' | 'CANCELLED' | 'TEXT';
 
 export interface ChatStreamEvent {
   type: ChatStreamEventType;
@@ -71,6 +85,7 @@ export interface ChatStreamEvent {
   errorMessage?: string;
   eventVersion?: number | string;
   operations?: ChatToolOperation[];
+  citations?: ChatCitationSummaryVO[];
 }
 
 export interface ChatStreamRequest {

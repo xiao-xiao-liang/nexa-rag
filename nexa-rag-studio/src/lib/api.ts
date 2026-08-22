@@ -5,6 +5,7 @@ import {
   ConversationHistoryPageVO,
   ChatStreamRequest,
   ChatStreamEvent,
+  ChatCitationDetailVO,
   KnowledgeBaseSummaryVO,
   KnowledgeBaseDetailVO,
   CreateKnowledgeBaseDTO,
@@ -144,6 +145,12 @@ export const chatApi = {
   async getHistory(conversationId: string, beforeSequence?: number, size = 20): Promise<ConversationHistoryPageVO> {
     const url = `/conversations/${conversationId}/messages?size=${size}${beforeSequence ? `&beforeSequence=${beforeSequence}` : ""}`;
     return await fetchJson<ConversationHistoryPageVO>(url);
+  },
+
+  async getCitation(messageId: string, citationId: number): Promise<ChatCitationDetailVO> {
+    return await fetchJson<ChatCitationDetailVO>(
+      `/chat/messages/${encodeURIComponent(messageId)}/citations/${citationId}`
+    );
   },
 
   async cancelGeneration(generationId: string): Promise<void> {

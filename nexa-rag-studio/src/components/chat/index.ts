@@ -8,5 +8,6 @@ export * from "./FeishuArtifactCard";
 export * from "./ChatHeader";
 export * from "./ChatInputBox";
 export * from "./ChatMessageItem";
+export * from "./FeishuCitationPopover";
 export * from "./ConversationSidebar";
 export * from "./markdown";

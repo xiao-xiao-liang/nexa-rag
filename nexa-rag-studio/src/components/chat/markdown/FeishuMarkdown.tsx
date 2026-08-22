@@ -12,11 +12,19 @@ import {
 import { FeishuCodeBlock } from "./FeishuMarkdownCodeBlock";
 import { FeishuMarkdownImage } from "./FeishuMarkdownImage";
 import { parseFeishuMessageContent } from "./utils";
+import {
+  CITATION_LINK_PREFIX,
+  linkifyCitationMarkers,
+} from "../../../lib/chat-stream-event";
+import { FeishuCitationPopover } from "../FeishuCitationPopover";
 
 export interface FeishuMarkdownProps {
   content: string;
   isGenerating?: boolean;
   className?: string;
+  onCitationClick?: (citationId: number) => void;
+  citationIds?: number[];
+  messageId?: string;
 }
 
 /**
@@ -27,6 +35,9 @@ export const FeishuMarkdown: React.FC<FeishuMarkdownProps> = ({
   content,
   isGenerating = false,
   className = "",
+  onCitationClick,
+  citationIds = [],
+  messageId,
 }) => {
   // 1. 智能解析消息文本（兼容纯 Markdown 与飞书 ops JSON 结构体）
   const parsedMessage = useMemo(() => {
@@ -115,16 +126,28 @@ export const FeishuMarkdown: React.FC<FeishuMarkdownProps> = ({
       ),
 
       // 链接
-      a: ({ href, children }) => (
-        <a
-          href={href}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="base-chatbot-maker-md-comp-link"
-        >
-          {children}
-        </a>
-      ),
+      a: ({ href, children }) => {
+        if (href?.startsWith(CITATION_LINK_PREFIX)) {
+          const citationId = Number(href.slice(CITATION_LINK_PREFIX.length));
+          return (
+            <FeishuCitationPopover
+              citationId={citationId}
+              messageId={messageId}
+              onCitationClick={onCitationClick}
+            />
+          );
+        }
+        return (
+          <a
+            href={href}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="base-chatbot-maker-md-comp-link"
+          >
+            {children}
+          </a>
+        );
+      },
 
       // 图片 (支持骨架屏、1:1 飞书错误态、自适应尺寸与全屏放大灯箱)
       img: ({ src, alt, className: imgClass }) => (
@@ -157,7 +180,7 @@ export const FeishuMarkdown: React.FC<FeishuMarkdownProps> = ({
       th: FeishuTh,
       td: FeishuTd,
     }),
-    []
+    [messageId, onCitationClick]
   );
 
   return (
@@ -166,7 +189,7 @@ export const FeishuMarkdown: React.FC<FeishuMarkdownProps> = ({
         remarkPlugins={[remarkGfm]}
         components={components}
       >
-        {parsedMessage.markdownContent}
+        {linkifyCitationMarkers(parsedMessage.markdownContent, new Set(citationIds))}
       </Markdown>
 
       {/* 流式生成中的打字呼吸圆点光标 */}

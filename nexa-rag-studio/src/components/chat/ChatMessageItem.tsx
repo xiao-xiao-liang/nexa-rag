@@ -164,7 +164,7 @@ export const ChatMessageItem: React.FC<ChatMessageItemProps> = ({
   // 2. 智能助手消息：左侧通透排版 + 工具链执行折叠卡 + 1:1 FeishuMarkdown 渲染器
   // =========================================================================
   return (
-    <div className="group space-y-1 select-none pr-12">
+    <div className="group relative space-y-1 select-none pr-12">
       {showToolBox && (
         <AgentToolExecutionBox
           defaultOpen
@@ -183,8 +183,10 @@ export const ChatMessageItem: React.FC<ChatMessageItemProps> = ({
         <>
           {/* 正文：严格 1:1 飞书官方 Markdown Component Renderer */}
           <FeishuMarkdown
+            messageId={message.messageId}
             content={content}
             isGenerating={isGenerating}
+            citationIds={(message.citations ?? []).map((item) => item.citationId)}
           />
 
           {/* 助手消息底部操作栏 (默认透明，hover 显现：左对齐，先复制按钮后时间) */}

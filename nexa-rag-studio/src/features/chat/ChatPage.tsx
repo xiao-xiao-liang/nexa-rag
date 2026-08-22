@@ -12,6 +12,7 @@ import {
 import { FEISHU_FONT_FAMILY } from "../../components/ui/feishu-table";
 import { Sparkles, Table2, FileText, Globe } from "lucide-react";
 import { emptyHistoryCache, getHistoryEntry, prependHistoryPage, putHistoryPage, removeHistoryEntry, touchHistoryEntry } from "./chat-history-cache";
+import { applyCitationSnapshot } from "../../lib/chat-stream-event";
 
 export const ChatPage: React.FC = () => {
   const { conversationId: urlConversationId } = useParams<{ conversationId?: string }>();
@@ -380,6 +381,11 @@ export const ChatPage: React.FC = () => {
         return;
       }
 
+      if (event.type === "CITATIONS") {
+        setMessages((prev) => applyCitationSnapshot(prev, targetMessageId, event.citations));
+        return;
+      }
+
       if (event.type === "ANSWER_DELTA" || event.type === "TOKEN" || event.type === "TEXT") {
         if (event.content) setMessages((prev) => prev.map((message) => message.messageId === targetMessageId
           ? { ...message, content: `${message.content || ""}${event.content}`, status: "GENERATING", connectionState: "STREAMING" }
@@ -391,9 +397,10 @@ export const ChatPage: React.FC = () => {
         terminalRef.current = true;
         const status = event.type === "COMPLETE" ? "COMPLETED" : event.type;
         setMessages((prev) => {
-          const nextMessages = prev.map((message) => message.messageId === targetMessageId
+          const messagesWithTerminalState = prev.map((message) => message.messageId === targetMessageId
             ? { ...message, status, operations: event.operations || message.operations, connectionState: undefined }
             : message);
+          const nextMessages = applyCitationSnapshot(messagesWithTerminalState, targetMessageId, event.citations);
           const conversationId = generationConversationIdRef.current;
           if (conversationId && conversationId === activeConversationIdRef.current) {
             updateHistoryCacheMessages(conversationId, nextMessages);
