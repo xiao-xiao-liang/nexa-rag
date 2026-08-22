@@ -6,6 +6,7 @@ package com.nexarag.workflow.stream;
 public enum ChatStreamEventType {
     META,
     SNAPSHOT,
+    CITATIONS,
     ANSWER_DELTA,
     TOKEN,
     COMPLETE,

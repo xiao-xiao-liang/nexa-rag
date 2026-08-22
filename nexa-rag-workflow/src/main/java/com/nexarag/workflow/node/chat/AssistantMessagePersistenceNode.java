@@ -3,6 +3,9 @@ package com.nexarag.workflow.node.chat;
 import com.alibaba.cloud.ai.graph.GraphResponse;
 import com.alibaba.cloud.ai.graph.OverAllState;
 import com.alibaba.cloud.ai.graph.action.NodeAction;
+import com.nexarag.chat.domain.ChatCitationSetCodec;
+import com.nexarag.chat.domain.ChatCitationSetDTO;
+import com.nexarag.chat.domain.ChatCitationSummaryVO;
 import com.nexarag.chat.service.ConversationContextService;
 import com.nexarag.chat.service.ConversationMessageService;
 import com.nexarag.chat.service.ConversationSummaryService;
@@ -17,6 +20,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 
 import java.util.Map;
+import java.util.List;
 
 import static com.nexarag.workflow.constants.ChatWorkflowStateKeys.ASSISTANT_CONTENT;
 import static com.nexarag.workflow.constants.ChatWorkflowStateKeys.ASSISTANT_MESSAGE_ID;
@@ -32,6 +36,7 @@ import static com.nexarag.workflow.constants.ChatWorkflowStateKeys.USER_ID;
 import static com.nexarag.workflow.constants.ChatWorkflowStateKeys.TRACE_ID;
 import static com.nexarag.workflow.constants.ChatWorkflowStateKeys.GENERATION_ID;
 import static com.nexarag.workflow.constants.ChatWorkflowStateKeys.GENERATION_ACCUMULATOR;
+import static com.nexarag.workflow.constants.ChatWorkflowStateKeys.CITATION_SET;
 
 /**
  * 助手消息最终化节点，负责持久化生成结果并刷新成功上下文。
@@ -46,6 +51,7 @@ public class AssistantMessagePersistenceNode implements NodeAction {
     private final ConversationSummaryService summaryService;
     private final ChatGenerationEventPublisher eventPublisher;
     private final ChatGenerationTaskManager taskManager;
+    private final ChatCitationSetCodec citationSetCodec;
 
     @Override
     public Map<String, Object> apply(OverAllState state) {
@@ -55,23 +61,27 @@ public class AssistantMessagePersistenceNode implements NodeAction {
         String status = (String) result.getOrDefault(STREAM_STATUS, "FAILED");
         ChatGenerationAccumulator accumulator = state.value(GENERATION_ACCUMULATOR,
                 new ChatGenerationAccumulator());
+        ChatCitationSetDTO citationSet = state.value(CITATION_SET,
+                new ChatCitationSetDTO(ChatCitationSetDTO.CURRENT_VERSION, List.of()));
+        String referencesJson = citationSetCodec.encode(citationSet);
         String toolOperationsJson = eventPublisher.serializeOperations(accumulator.operationsSnapshot());
         if ("COMPLETED".equals(status)) {
             // 1. 完成消息并刷新活跃上下文
             messageService.completeAssistantMessage(messageId, content, null,
                     (Integer) result.get(PROMPT_TOKENS), (Integer) result.get(COMPLETION_TOKENS),
-                    (Integer) result.get(TOTAL_TOKENS), null, toolOperationsJson);
+                    (Integer) result.get(TOTAL_TOKENS), referencesJson, toolOperationsJson);
             String conversationId = state.value(CONVERSATION_ID, "");
             String userId = state.value(USER_ID, "");
             contextService.rebuild(conversationId, userId);
             summaryService.scheduleIfNecessary(conversationId, userId);
         } else if ("CANCELLED".equals(status)) {
-            messageService.cancelAssistantMessage(messageId, content, toolOperationsJson);
+            messageService.cancelAssistantMessage(messageId, content, referencesJson, toolOperationsJson);
         } else {
             messageService.failAssistantMessage(messageId, content,
-                    (String) result.get(ERROR_CODE), (String) result.get(ERROR_MESSAGE), toolOperationsJson);
+                    (String) result.get(ERROR_CODE), (String) result.get(ERROR_MESSAGE), referencesJson,
+                    toolOperationsJson);
         }
-        publishTerminalEvent(state, messageId, status, accumulator, result);
+        publishTerminalEvent(state, messageId, status, accumulator, result, citationSet);
         log.info("回答生成结束，会话ID：{}，内容长度：{}，总Token：{}",
                state.value(CONVERSATION_ID, ""), content.length(), result.getOrDefault(TOTAL_TOKENS, 0));
         log.debug("模型回答：{}", result);
@@ -79,7 +89,8 @@ public class AssistantMessagePersistenceNode implements NodeAction {
     }
 
     private void publishTerminalEvent(OverAllState state, String messageId, String status,
-                                      ChatGenerationAccumulator accumulator, Map<String, Object> result) {
+                                      ChatGenerationAccumulator accumulator, Map<String, Object> result,
+                                      ChatCitationSetDTO citationSet) {
         ChatStreamEventType eventType = switch (status) {
             case "COMPLETED" -> ChatStreamEventType.COMPLETE;
             case "CANCELLED" -> ChatStreamEventType.CANCELLED;
@@ -88,7 +99,9 @@ public class AssistantMessagePersistenceNode implements NodeAction {
         String generationId = state.value(GENERATION_ID, "");
         eventPublisher.publish(new ChatStreamEvent(eventType, null, state.value(CONVERSATION_ID, ""),
                 state.value(TRACE_ID, ""), generationId, messageId, (String) result.get(ERROR_CODE),
-                (String) result.get(ERROR_MESSAGE), 0L, accumulator.operationsSnapshot()));
+                (String) result.get(ERROR_MESSAGE), 0L, accumulator.operationsSnapshot(), citationSet.citations().stream()
+                        .map(citation -> new ChatCitationSummaryVO(citation.citationId()))
+                        .toList()));
         taskManager.complete(generationId);
         eventPublisher.complete(generationId);
     }

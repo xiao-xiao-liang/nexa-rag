@@ -1,5 +1,7 @@
 package com.nexarag.workflow.stream;
 
+import com.nexarag.chat.domain.ChatCitationSummaryVO;
+
 import java.util.List;
 
 /**
@@ -15,11 +17,32 @@ import java.util.List;
  * @param errorMessage 错误信息
  * @param eventVersion 生成任务内单调递增的事件版本
  * @param operations 工具调用最小展示快照
+ * @param citations 消息内引用公开摘要
  */
 public record ChatStreamEvent(ChatStreamEventType type, String content, String conversationId,
                               String traceId, String generationId, String messageId,
                               String errorCode, String errorMessage, long eventVersion,
-                              List<ChatToolOperationDTO> operations) {
+                              List<ChatToolOperationDTO> operations,
+                              List<ChatCitationSummaryVO> citations) {
+
+    /**
+     * 统一将集合复制为不可变快照，避免发布后被调用方修改。
+     */
+    public ChatStreamEvent {
+        operations = operations == null ? List.of() : List.copyOf(operations);
+        citations = citations == null ? List.of() : List.copyOf(citations);
+    }
+
+    /**
+     * 兼容尚未携带引用的完整事件构造器。
+     */
+    public ChatStreamEvent(ChatStreamEventType type, String content, String conversationId,
+                           String traceId, String generationId, String messageId,
+                           String errorCode, String errorMessage, long eventVersion,
+                           List<ChatToolOperationDTO> operations) {
+        this(type, content, conversationId, traceId, generationId, messageId,
+                errorCode, errorMessage, eventVersion, operations, List.of());
+    }
 
     /**
      * 兼容既有调用的事件构造器，版本由 Redis 缓冲分配。
@@ -28,7 +51,7 @@ public record ChatStreamEvent(ChatStreamEventType type, String content, String c
                            String traceId, String generationId, String messageId,
                            String errorCode, String errorMessage) {
         this(type, content, conversationId, traceId, generationId, messageId,
-                errorCode, errorMessage, 0L, List.of());
+                errorCode, errorMessage, 0L, List.of(), List.of());
     }
 
     /**
@@ -62,6 +85,6 @@ public record ChatStreamEvent(ChatStreamEventType type, String content, String c
      */
     public ChatStreamEvent withEventVersion(long version) {
         return new ChatStreamEvent(type, content, conversationId, traceId, generationId, messageId,
-                errorCode, errorMessage, version, operations == null ? List.of() : List.copyOf(operations));
+                errorCode, errorMessage, version, operations, citations);
     }
 }
