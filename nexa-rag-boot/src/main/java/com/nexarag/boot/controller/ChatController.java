@@ -28,6 +28,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import reactor.core.publisher.Flux;
+import reactor.core.scheduler.Schedulers;
 
 import java.util.List;
 import java.util.concurrent.atomic.AtomicLong;
@@ -75,6 +76,8 @@ public class ChatController {
                     Flux<ChatStreamEvent> realtimeEvents = eventPublisher.open(generationId);
                     Flux<ChatStreamEvent> legacyGraphEvents = workflowService
                             .stream(CHAT_CONVERSATION_GRAPH_NAME, workflowRequest.toInitialState())
+                            // Graph 前置节点包含阻塞式模型调用，必须脱离 Servlet 请求线程，保证 SSE 可立即刷出。
+                            .subscribeOn(Schedulers.boundedElastic())
                             .handle((response, sink) -> {
                                 if (response.getOutput() == null || response.getOutput().isCompletedExceptionally()) {
                                     return;

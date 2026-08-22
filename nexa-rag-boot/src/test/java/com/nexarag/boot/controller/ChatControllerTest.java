@@ -22,6 +22,7 @@ import reactor.test.StepVerifier;
 
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static com.nexarag.workflow.constants.ChatWorkflowStateKeys.USER_ID;
 import static com.nexarag.workflow.constants.ChatWorkflowStateKeys.TRACE_ID;
@@ -97,5 +98,31 @@ class ChatControllerTest {
                     assertThat(event.data().errorMessage()).isEqualTo("未找到流式工作流图");
                 })
                 .verifyComplete();
+    }
+
+    @Test
+    void streamShouldSubscribeWorkflowOnBoundedElasticThread() {
+        WorkflowService workflowService = mock(WorkflowService.class);
+        ChatIdGenerator idGenerator = mock(ChatIdGenerator.class);
+        ChatGenerationEventPublisher eventPublisher = mock(ChatGenerationEventPublisher.class);
+        ChatStreamResumeService resumeService = mock(ChatStreamResumeService.class);
+        KnowledgeBaseService knowledgeBaseService = mock(KnowledgeBaseService.class);
+        AtomicReference<String> subscriptionThread = new AtomicReference<>();
+        when(idGenerator.nextId()).thenReturn("g1");
+        when(knowledgeBaseService.validateRequestedKnowledgeBases(java.util.List.of())).thenReturn(Set.of());
+        when(eventPublisher.open("g1")).thenReturn(Flux.empty());
+        when(workflowService.stream(eq("chat-conversation"), any())).thenReturn(Flux.defer(() -> {
+            subscriptionThread.set(Thread.currentThread().getName());
+            return Flux.empty();
+        }));
+        ChatController controller = new ChatController(
+                workflowService, mock(ChatGenerationTaskManager.class), eventPublisher, resumeService,
+                idGenerator, knowledgeBaseService);
+        CurrentUserContext.set(new CurrentUser("u1"));
+
+        StepVerifier.create(controller.stream(new ChatStreamRequest(null, "你好")))
+                .verifyComplete();
+
+        assertThat(subscriptionThread.get()).contains("boundedElastic");
     }
 }
