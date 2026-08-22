@@ -47,7 +47,7 @@ class ConversationContextAdvisorTest {
                 ChatMessageRole.USER, ChatMessageStatus.COMPLETED, "历史问题", null,
                 null, null, null, null, null, null, null, null, null, null);
         when(contextService.loadForTurn("c1", "864019719617777664"))
-                .thenReturn(new ConversationContext("c1", "864019719617777664", "摘要", null,
+                .thenReturn(new ConversationContext("c1", "864019719617777664", "摘要", null, null,
                         List.of(message), "m1", 1L));
 
         ConversationContextAdvisor advisor = new ConversationContextAdvisor(contextService);

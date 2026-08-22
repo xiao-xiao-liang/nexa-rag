@@ -9,12 +9,14 @@ import java.util.List;
  * @param userId 用户 ID
  * @param summary 最新摘要
  * @param summaryLastMessageId 摘要覆盖的最后消息 ID
+ * @param summaryUntilSequence 摘要覆盖的最后消息序号
  * @param recentMessages 最近消息
  * @param lastMessageId 快照中的最后消息 ID
  * @param version 快照版本
  */
 public record ConversationContext(String conversationId, String userId, String summary,
-                                  String summaryLastMessageId, List<ChatMessageVO> recentMessages,
+                                  String summaryLastMessageId, Long summaryUntilSequence,
+                                  List<ChatMessageVO> recentMessages,
                                   String lastMessageId, long version) {
 
     /**

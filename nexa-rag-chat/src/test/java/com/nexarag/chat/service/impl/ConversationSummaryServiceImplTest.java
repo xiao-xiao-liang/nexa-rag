@@ -34,6 +34,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 /**
@@ -85,7 +86,8 @@ class ConversationSummaryServiceImplTest {
                     ChatMessageStatus.COMPLETED, "消息" + i, null, null,
                     null, null, null, null, null, null, null, LocalDateTime.now(), LocalDateTime.now()));
         }
-        when(messageService.listHistory("c1", "u1", 1000)).thenReturn(messages);
+        when(messageService.countCompletedUserMessagesAfterSequence("c1", "u1", 0L)).thenReturn(9L);
+        when(messageService.listContextMessagesAfterSequence("c1", "u1", 0L, 1000)).thenReturn(messages);
         when(chatIdGenerator.nextId()).thenReturn("s1");
         when(modelGateway.chat(any())).thenReturn(ChatModelResponse.builder().content("摘要内容").build());
         when(mapper.insert(any(ChatConversationSummary.class))).thenReturn(1);
@@ -96,5 +98,20 @@ class ConversationSummaryServiceImplTest {
         assertThat(result.content()).isEqualTo("摘要内容");
         assertThat(result.lastMessageId()).isEqualTo("m18");
         verify(mapper).insert(any(ChatConversationSummary.class));
+    }
+
+    @Test
+    void shouldNotGenerateSummaryBeforeEightNewUserTurns() {
+        doAnswer(invocation -> invocation.getArgument(2, java.util.function.Supplier.class).get())
+                .when(contextLock).execute(any(), any(), any(java.util.function.Supplier.class));
+        when(conversationService.getOwned("c1", "u1"))
+                .thenReturn(new ChatConversationVO("c1", "u1", "测试会话", ConversationStatus.ACTIVE,
+                        null, null, 0, LocalDateTime.now(), LocalDateTime.now()));
+        when(messageService.countCompletedUserMessagesAfterSequence("c1", "u1", 0L)).thenReturn(7L);
+
+        var result = summaryService.generate("c1", "u1");
+
+        assertThat(result).isNull();
+        verifyNoInteractions(modelGateway);
     }
 }

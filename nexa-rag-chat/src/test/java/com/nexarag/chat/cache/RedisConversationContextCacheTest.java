@@ -26,7 +26,7 @@ class RedisConversationContextCacheTest {
         StringRedisTemplate redisTemplate = mock(StringRedisTemplate.class);
         ValueOperations<String, String> valueOperations = mock(ValueOperations.class);
         when(redisTemplate.opsForValue()).thenReturn(valueOperations);
-        ConversationContext context = new ConversationContext("c1", "u1", "摘要", "m0", List.of(), "m1", 1L);
+        ConversationContext context = new ConversationContext("c1", "u1", "摘要", "m0", 0L, List.of(), "m1", 1L);
         when(valueOperations.get("nexa:chat:context:u1:c1:v1"))
                 .thenReturn(new ObjectMapper().writeValueAsString(context));
 
@@ -42,7 +42,7 @@ class RedisConversationContextCacheTest {
         StringRedisTemplate redisTemplate = mock(StringRedisTemplate.class);
         ValueOperations<String, String> valueOperations = mock(ValueOperations.class);
         when(redisTemplate.opsForValue()).thenReturn(valueOperations);
-        ConversationContext context = new ConversationContext("c1", "u1", null, null, List.of(), null, 1L);
+        ConversationContext context = new ConversationContext("c1", "u1", null, null, null, List.of(), null, 1L);
         RedisConversationContextCache cache = new RedisConversationContextCache(redisTemplate, new ObjectMapper());
 
         cache.put(context);

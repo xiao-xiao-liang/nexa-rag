@@ -10,11 +10,13 @@ import java.time.LocalDateTime;
  * @param userId 用户 ID
  * @param content 摘要内容
  * @param lastMessageId 摘要覆盖的最后消息 ID
+ * @param summaryUntilSequence 摘要覆盖的最后消息序号
  * @param summaryVersion 摘要版本
  * @param createdTime 创建时间
  * @param updatedTime 更新时间
  */
 public record ChatConversationSummaryVO(String summaryId, String conversationId, String userId,
-                                        String content, String lastMessageId, long summaryVersion,
+                                        String content, String lastMessageId, Long summaryUntilSequence,
+                                        long summaryVersion,
                                         LocalDateTime createdTime, LocalDateTime updatedTime) {
 }

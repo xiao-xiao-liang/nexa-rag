@@ -397,6 +397,7 @@ CREATE TABLE IF NOT EXISTS chat_conversation_summary (
     user_id VARCHAR(64) NOT NULL COMMENT '用户ID',
     content TEXT NOT NULL COMMENT '摘要内容',
     last_message_id VARCHAR(64) NOT NULL COMMENT '摘要覆盖的最后消息ID',
+    summary_until_sequence BIGINT NULL COMMENT '摘要覆盖的最后消息序号',
     summary_version BIGINT NOT NULL COMMENT '摘要版本',
     create_time DATETIME NOT NULL COMMENT '创建时间',
     update_time DATETIME NOT NULL COMMENT '更新时间',

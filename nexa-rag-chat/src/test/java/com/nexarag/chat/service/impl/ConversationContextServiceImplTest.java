@@ -45,7 +45,7 @@ class ConversationContextServiceImplTest {
     void shouldReturnCachedContextWithoutReadingDatabaseMessages() {
         ChatConversationVO conversation = new ChatConversationVO(
                 "c1", "u1", "新会话", ConversationStatus.ACTIVE, null, null, 0, null, null);
-        ConversationContext cached = new ConversationContext("c1", "u1", "摘要", "m0",
+        ConversationContext cached = new ConversationContext("c1", "u1", "摘要", "m0", 0L,
                 List.of(), "m1", 1L);
         when(conversationService.getOwned("c1", "u1")).thenReturn(conversation);
         when(contextCache.get("u1", "c1")).thenReturn(Optional.of(cached));

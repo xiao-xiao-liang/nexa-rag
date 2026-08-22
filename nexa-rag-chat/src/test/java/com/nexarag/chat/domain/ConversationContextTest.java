@@ -23,11 +23,12 @@ class ConversationContextTest {
         List<ChatMessageVO> source = new java.util.ArrayList<>(List.of(message));
 
         ConversationContext context = new ConversationContext(
-                "c1", "u1", "摘要", "m0", source, "m1", 1L
+                "c1", "u1", "摘要", "m0", 16L, source, "m1", 1L
         );
         source.clear();
 
         assertThat(context.recentMessages()).containsExactly(message);
         assertThat(context.recentMessages().getFirst().role()).isEqualTo(ChatMessageRole.USER);
+        assertThat(context.summaryUntilSequence()).isEqualTo(16L);
     }
 }

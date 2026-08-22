@@ -25,7 +25,6 @@ import org.springframework.stereotype.Service;
 
 import java.util.*;
 import java.util.concurrent.Semaphore;
-import java.util.stream.IntStream;
 
 import static com.nexarag.chat.constants.ChatContextConstants.SUMMARY_MAX_CHARS;
 import static com.nexarag.chat.constants.ChatContextConstants.SUMMARY_ROUTE_KEY;
@@ -80,15 +79,19 @@ public class ConversationSummaryServiceImpl extends ServiceImpl<ChatConversation
         ChatConversationSummaryVO latest = findLatestEntity(conversationId, userId)
                 .map(this::toVO)
                 .orElse(null);
-        List<ChatMessageVO> messages = messageService.listHistory(conversationId, userId, SUMMARY_MESSAGE_LIMIT)
-                .stream()
-                .filter(ChatMessageVO::usableForContext)
-                .toList();
-        List<ChatMessageVO> newMessages = messagesAfterSummary(messages, latest);
-        long totalUserTurns = messages.stream()
-                .filter(message -> message.role() == ChatMessageRole.USER)
-                .count();
-        if (newMessages.isEmpty() || totalUserTurns < ChatContextConstants.SUMMARY_START_TURNS) {
+        Long latestSequence = latest == null ? 0L : latest.summaryUntilSequence();
+        if (latestSequence == null) {
+            log.warn("会话摘要缺少覆盖序号，跳过本次增量摘要, conversationId={}", conversationId);
+            return latest;
+        }
+        long newUserMessageCount = messageService.countCompletedUserMessagesAfterSequence(
+                conversationId, userId, latestSequence);
+        if (newUserMessageCount < ChatContextConstants.SUMMARY_INCREMENTAL_USER_TURN_THRESHOLD) {
+            return latest;
+        }
+        List<ChatMessageVO> newMessages = messageService.listContextMessagesAfterSequence(
+                conversationId, userId, latestSequence, SUMMARY_MESSAGE_LIMIT);
+        if (newMessages.isEmpty()) {
             return latest;
         }
 
@@ -126,6 +129,7 @@ public class ConversationSummaryServiceImpl extends ServiceImpl<ChatConversation
                 .userId(userId)
                 .content(normalized)
                 .lastMessageId(lastMessage.messageId())
+                .summaryUntilSequence(lastMessage.sequence())
                 .summaryVersion(version)
                 .build();
         save(summary);
@@ -141,20 +145,6 @@ public class ConversationSummaryServiceImpl extends ServiceImpl<ChatConversation
                 .oneOpt();
     }
 
-    private List<ChatMessageVO> messagesAfterSummary(List<ChatMessageVO> messages, ChatConversationSummaryVO summary) {
-        if (summary == null || summary.lastMessageId() == null) {
-            return messages;
-        }
-
-        return IntStream.range(0, messages.size())
-                .filter(index -> summary.lastMessageId().equals(messages.get(index).messageId()))
-                .findFirst()
-                .stream()
-                .mapToObj(index -> messages.subList(index + 1, messages.size()))
-                .findFirst()
-                .orElse(messages);
-    }
-
     private ChatConversationSummaryVO toVO(ChatConversationSummary entity) {
         return new ChatConversationSummaryVO(
                 entity.getSummaryId(),
@@ -162,6 +152,7 @@ public class ConversationSummaryServiceImpl extends ServiceImpl<ChatConversation
                 entity.getUserId(),
                 entity.getContent(),
                 entity.getLastMessageId(),
+                entity.getSummaryUntilSequence(),
                 entity.getSummaryVersion(),
                 entity.getCreateTime(),
                 entity.getUpdateTime()

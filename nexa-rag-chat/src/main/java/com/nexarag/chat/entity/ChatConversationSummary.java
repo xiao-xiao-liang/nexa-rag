@@ -48,6 +48,11 @@ public class ChatConversationSummary {
     private String lastMessageId;
 
     /**
+     * 摘要覆盖的最后消息序号。
+     */
+    private Long summaryUntilSequence;
+
+    /**
      * 摘要版本号。
      */
     private Long summaryVersion;

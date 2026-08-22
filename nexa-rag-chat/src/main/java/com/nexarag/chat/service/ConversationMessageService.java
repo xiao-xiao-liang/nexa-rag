@@ -69,4 +69,11 @@ public interface ConversationMessageService extends IService<ChatMessage> {
      */
     CursorPageVO<ChatMessageVO> pageHistory(String conversationId, String userId,
                                             Long beforeSequence, int size);
+
+    /** 统计摘要边界之后已完成的用户消息数量。 */
+    long countCompletedUserMessagesAfterSequence(String conversationId, String userId, long afterSequence);
+
+    /** 查询摘要边界之后可用于上下文的已完成消息。 */
+    List<ChatMessageVO> listContextMessagesAfterSequence(String conversationId, String userId,
+                                                          long afterSequence, int limit);
 }

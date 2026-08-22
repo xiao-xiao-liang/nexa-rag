@@ -244,6 +244,35 @@ public class ConversationMessageServiceImpl extends ServiceImpl<ChatMessageMappe
         return new CursorPageVO<>(records, hasMore, nextBeforeSequence);
     }
 
+    @Override
+    @Transactional(readOnly = true)
+    public long countCompletedUserMessagesAfterSequence(String conversationId, String userId, long afterSequence) {
+        return baseMapper.selectCount(new LambdaQueryWrapper<ChatMessage>()
+                .eq(ChatMessage::getConversationId, conversationId)
+                .eq(ChatMessage::getUserId, userId)
+                .eq(ChatMessage::getRole, ChatMessageRole.USER.name())
+                .eq(ChatMessage::getStatus, ChatMessageStatus.COMPLETED.name())
+                .gt(ChatMessage::getSequence, afterSequence));
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<ChatMessageVO> listContextMessagesAfterSequence(String conversationId, String userId,
+                                                                 long afterSequence, int limit) {
+        int safeLimit = Math.min(Math.max(limit, 1), MAX_HISTORY_PAGE_SIZE);
+        return baseMapper.selectList(new LambdaQueryWrapper<ChatMessage>()
+                        .eq(ChatMessage::getConversationId, conversationId)
+                        .eq(ChatMessage::getUserId, userId)
+                        .eq(ChatMessage::getStatus, ChatMessageStatus.COMPLETED.name())
+                        .in(ChatMessage::getRole, ChatMessageRole.USER.name(), ChatMessageRole.ASSISTANT.name())
+                        .gt(ChatMessage::getSequence, afterSequence)
+                        .orderByAsc(ChatMessage::getSequence)
+                        .last("LIMIT " + safeLimit))
+                .stream()
+                .map(this::toDomain)
+                .toList();
+    }
+
     /**
      * 查询会话内下一个消息序号。调用方必须已持有会话级锁。
      *

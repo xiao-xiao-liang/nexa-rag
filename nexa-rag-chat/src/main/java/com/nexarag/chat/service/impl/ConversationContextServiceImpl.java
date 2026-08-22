@@ -71,7 +71,8 @@ public class ConversationContextServiceImpl implements ConversationContextServic
                 messages.isEmpty() ? 0L : messages.getLast().sequence());
         ConversationContext context = new ConversationContext(
                 conversationId, userId, summary == null ? null : summary.content(),
-                summary == null ? null : summary.lastMessageId(), messages, lastMessageId, version);
+                summary == null ? null : summary.lastMessageId(),
+                summary == null ? null : summary.summaryUntilSequence(), messages, lastMessageId, version);
 
         // 3. 写入 Redis，供下一轮模型调用直接读取
         contextCache.put(context);
