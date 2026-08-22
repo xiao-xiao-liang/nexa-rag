@@ -35,6 +35,8 @@ import static com.nexarag.workflow.constants.ChatWorkflowStateKeys.RETRIEVAL_KNO
 import static com.nexarag.workflow.constants.ChatWorkflowStateKeys.REWRITTEN_QUESTION;
 import static com.nexarag.workflow.constants.ChatWorkflowStateKeys.TRACE_ID;
 import static com.nexarag.workflow.constants.ChatWorkflowStateKeys.TOOL_FAILURE_SUMMARIES;
+import static com.nexarag.workflow.constants.ChatWorkflowSystemToolConstants.KNOWLEDGE_SEARCH_SEQUENCE;
+import static com.nexarag.workflow.constants.ChatWorkflowSystemToolConstants.KNOWLEDGE_SEARCH_TOOL_NAME;
 
 /**
  * 对话检索节点，负责按当前轮次参数调用混合检索服务。
@@ -44,8 +46,6 @@ import static com.nexarag.workflow.constants.ChatWorkflowStateKeys.TOOL_FAILURE_
 @Slf4j
 public class RetrievalNode implements NodeAction {
     private static final int MAX_RETRIEVAL_ATTEMPTS = 3;
-    private static final String RETRIEVAL_TOOL_NAME = "system:knowledge_search";
-
     private final ConversationRetrievalService retrievalService;
     private final RetrievalProperties retrievalProperties;
     private final ChatGenerationEventPublisher eventPublisher;
@@ -64,7 +64,7 @@ public class RetrievalNode implements NodeAction {
                 new ChatGenerationAccumulator());
         String generationId = state.value(GENERATION_ID, "");
         ChatToolOperationDTO runningOperation = new ChatToolOperationDTO(generationId + ":tool:retrieval:1",
-                generationId, 1L, RETRIEVAL_TOOL_NAME, ChatToolOperationStatus.RUNNING);
+                generationId, KNOWLEDGE_SEARCH_SEQUENCE, KNOWLEDGE_SEARCH_TOOL_NAME, ChatToolOperationStatus.RUNNING);
         accumulator.upsertOperation(runningOperation);
         publishSnapshot(state, accumulator);
 
