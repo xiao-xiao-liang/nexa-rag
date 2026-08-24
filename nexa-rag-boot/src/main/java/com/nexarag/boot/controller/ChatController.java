@@ -23,8 +23,6 @@ import com.nexarag.document.model.entity.DocumentChunk;
 import com.nexarag.infra.enums.ExternalDocumentSourceType;
 import com.nexarag.common.web.Result;
 import com.nexarag.common.web.Results;
-import com.alibaba.cloud.ai.graph.NodeOutput;
-import com.alibaba.cloud.ai.graph.streaming.StreamingOutput;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.MediaType;
@@ -38,7 +36,8 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import reactor.core.publisher.Flux;
-import reactor.core.scheduler.Schedulers;
+import reactor.core.publisher.Mono;
+import reactor.core.scheduler.Scheduler;
 
 import java.util.List;
 import java.util.concurrent.atomic.AtomicLong;
@@ -63,6 +62,7 @@ public class ChatController {
     private final ChatCitationService citationService;
     private final DocumentChunkService documentChunkService;
     private final DocumentService documentService;
+    private final Scheduler chatWorkflowScheduler;
 
     /**
      * 发起流式对话。
@@ -87,28 +87,35 @@ public class ChatController {
         // 2. 先打开本实例事件订阅，再驱动 Graph 执行，避免丢失首个工具快照
         return Flux.defer(() -> {
                     Flux<ChatStreamEvent> realtimeEvents = eventPublisher.open(generationId);
-                    Flux<ChatStreamEvent> legacyGraphEvents = workflowService
-                            .stream(CHAT_CONVERSATION_GRAPH_NAME, workflowRequest.toInitialState())
-                            // Graph 前置节点包含阻塞式模型调用，必须脱离 Servlet 请求线程，保证 SSE 可立即刷出。
-                            .subscribeOn(Schedulers.boundedElastic())
-                            .handle((response, sink) -> {
-                                if (response.getOutput() == null || response.getOutput().isCompletedExceptionally()) {
-                                    return;
-                                }
-                                Object graphOutput = response.getOutput().join();
-                                if (graphOutput instanceof StreamingOutput<?> streamingOutput
-                                        && streamingOutput.getOriginData() instanceof ChatStreamEvent event) {
-                                    if (event.eventVersion() <= 0) {
-                                        sink.next(enrichLegacyEvent(event, request.conversationId(), traceId,
-                                                generationId));
-                                    }
-                                }
-                            });
-                    return Flux.merge(realtimeEvents, legacyGraphEvents).map(this::toSse);
+                    Flux<ChatStreamEvent> workflowCompletion = Flux.defer(() -> workflowService
+                                    .stream(CHAT_CONVERSATION_GRAPH_NAME, workflowRequest.toInitialState()))
+                            // Graph 的构建与前置节点均可能阻塞，必须整体脱离 Servlet 请求线程。
+                            .subscribeOn(chatWorkflowScheduler)
+                            // 所有客户端事件均由 eventPublisher 发布；Graph 包装的节点异常必须重新传播。
+                            .flatMap(response -> response.isError()
+                                    ? Mono.fromFuture(response.getOutput()).then()
+                                    : Mono.empty())
+                            .thenMany(Flux.empty());
+                    return Flux.merge(realtimeEvents, workflowCompletion)
+                            .map(this::toSse);
                 })
-                .onErrorResume(AbstractException.class, exception -> Flux.just(
-                        toSse(new ChatStreamEvent(ChatStreamEventType.ERROR, null, request.conversationId(), traceId,
-                                generationId, null, exception.getErrorCode(), exception.getErrorMessage()))));
+                .onErrorResume(exception -> {
+                    log.error("Chat SSE 请求执行失败，generationId={}，traceId={}", generationId, traceId, exception);
+                    String errorCode = exception instanceof AbstractException abstractException
+                            ? abstractException.getErrorCode() : "CHAT_WORKFLOW_ERROR";
+                    String errorMessage = exception instanceof AbstractException abstractException
+                            ? abstractException.getErrorMessage() : "对话工作流执行失败，请稍后重试";
+                    try {
+                        if (!taskManager.fail(generationId, errorCode, errorMessage)) {
+                            eventPublisher.complete(generationId);
+                        }
+                    } catch (Exception finalizationException) {
+                        log.error("Chat SSE 失败最终化异常，generationId={}，traceId={}", generationId, traceId,
+                                finalizationException);
+                    }
+                    return Flux.just(toSse(new ChatStreamEvent(ChatStreamEventType.ERROR, null,
+                            request.conversationId(), traceId, generationId, null, errorCode, errorMessage)));
+                });
     }
 
     /**
@@ -183,12 +190,6 @@ public class ChatController {
             builder.id(String.valueOf(event.eventVersion()));
         }
         return builder.build();
-    }
-
-    private ChatStreamEvent enrichLegacyEvent(ChatStreamEvent event, String conversationId, String traceId,
-                                               String generationId) {
-        return new ChatStreamEvent(event.type(), event.content(), conversationId, traceId, generationId,
-                event.messageId(), event.errorCode(), event.errorMessage(), event.eventVersion(), event.operations());
     }
 
     private Document requireOwnedDocument(Long documentId) {

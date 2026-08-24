@@ -6,12 +6,6 @@ import com.alibaba.cloud.ai.graph.streaming.StreamingOutput;
 import com.nexarag.auth.context.CurrentUser;
 import com.nexarag.auth.context.CurrentUserContext;
 import com.nexarag.chat.id.ChatIdGenerator;
-import com.nexarag.chat.service.impl.ChatCitationService;
-import com.nexarag.chat.domain.ChatCitationDTO;
-import com.nexarag.document.service.DocumentChunkService;
-import com.nexarag.document.service.DocumentService;
-import com.nexarag.document.model.entity.Document;
-import com.nexarag.document.model.entity.DocumentChunk;
 import com.nexarag.common.trace.TraceIdContext;
 import com.nexarag.common.exception.ServiceException;
 import com.nexarag.workflow.service.WorkflowService;
@@ -20,10 +14,18 @@ import com.nexarag.workflow.stream.ChatGenerationEventPublisher;
 import com.nexarag.workflow.stream.ChatStreamEvent;
 import com.nexarag.workflow.stream.ChatStreamResumeService;
 import com.nexarag.document.service.KnowledgeBaseService;
+import com.nexarag.document.service.DocumentChunkService;
+import com.nexarag.document.service.DocumentService;
+import com.nexarag.chat.service.impl.ChatCitationService;
+import com.nexarag.chat.domain.ChatCitationDTO;
+import com.nexarag.document.model.entity.Document;
+import com.nexarag.document.model.entity.DocumentChunk;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import reactor.core.publisher.Flux;
+import reactor.core.scheduler.Scheduler;
+import reactor.core.scheduler.Schedulers;
 import reactor.test.StepVerifier;
 
 import java.util.Map;
@@ -59,14 +61,14 @@ class ChatControllerTest {
         KnowledgeBaseService knowledgeBaseService = mock(KnowledgeBaseService.class);
         when(idGenerator.nextId()).thenReturn("g1");
         when(knowledgeBaseService.validateRequestedKnowledgeBases(java.util.List.of())).thenReturn(Set.of());
-        when(eventPublisher.open("g1")).thenReturn(Flux.empty());
+        when(eventPublisher.open("g1")).thenReturn(Flux.just(ChatStreamEvent.token("你")));
         StreamingOutput<ChatStreamEvent> output = new StreamingOutput<>(
                 ChatStreamEvent.token("你"), "answer", new OverAllState(Map.of()));
         when(workflowService.stream(eq("chat-conversation"), any())).thenReturn(Flux.just(GraphResponse.of(output)));
         ChatController controller = new ChatController(
                 workflowService, mock(ChatGenerationTaskManager.class), eventPublisher, resumeService,
                 idGenerator, knowledgeBaseService, mock(ChatCitationService.class), mock(DocumentChunkService.class),
-                mock(DocumentService.class));
+                mock(DocumentService.class), Schedulers.immediate());
         CurrentUserContext.set(new CurrentUser("u1"));
         TraceIdContext.setTraceId("trace-001");
 
@@ -85,6 +87,7 @@ class ChatControllerTest {
     @Test
     void streamShouldReturnErrorEventWhenWorkflowCannotBeStarted() {
         WorkflowService workflowService = mock(WorkflowService.class);
+        ChatGenerationTaskManager taskManager = mock(ChatGenerationTaskManager.class);
         ChatIdGenerator idGenerator = mock(ChatIdGenerator.class);
         ChatGenerationEventPublisher eventPublisher = mock(ChatGenerationEventPublisher.class);
         ChatStreamResumeService resumeService = mock(ChatStreamResumeService.class);
@@ -93,10 +96,11 @@ class ChatControllerTest {
         when(knowledgeBaseService.validateRequestedKnowledgeBases(java.util.List.of())).thenReturn(Set.of());
         when(workflowService.stream(eq("chat-conversation"), any()))
                 .thenThrow(new ServiceException("未找到流式工作流图"));
+        when(taskManager.fail("g1", "B000001", "未找到流式工作流图")).thenReturn(true);
         ChatController controller = new ChatController(
-                workflowService, mock(ChatGenerationTaskManager.class), eventPublisher, resumeService,
+                workflowService, taskManager, eventPublisher, resumeService,
                 idGenerator, knowledgeBaseService, mock(ChatCitationService.class), mock(DocumentChunkService.class),
-                mock(DocumentService.class));
+                mock(DocumentService.class), Schedulers.immediate());
         CurrentUserContext.set(new CurrentUser("u1"));
 
         StepVerifier.create(controller.stream(new ChatStreamRequest(null, "你好")))
@@ -106,6 +110,7 @@ class ChatControllerTest {
                     assertThat(event.data().errorMessage()).isEqualTo("未找到流式工作流图");
                 })
                 .verifyComplete();
+        verify(taskManager).fail("g1", "B000001", "未找到流式工作流图");
     }
 
     @Test
@@ -123,15 +128,53 @@ class ChatControllerTest {
             subscriptionThread.set(Thread.currentThread().getName());
             return Flux.empty();
         }));
+        Scheduler scheduler = Schedulers.newBoundedElastic(1, 10, "chat-workflow");
         ChatController controller = new ChatController(
                 workflowService, mock(ChatGenerationTaskManager.class), eventPublisher, resumeService,
                 idGenerator, knowledgeBaseService, mock(ChatCitationService.class), mock(DocumentChunkService.class),
-                mock(DocumentService.class));
+                mock(DocumentService.class), scheduler);
         CurrentUserContext.set(new CurrentUser("u1"));
 
-        StepVerifier.create(controller.stream(new ChatStreamRequest(null, "你好")))
-                .verifyComplete();
+        try {
+            StepVerifier.create(controller.stream(new ChatStreamRequest(null, "你好")))
+                    .verifyComplete();
 
-        assertThat(subscriptionThread.get()).contains("boundedElastic");
+            assertThat(subscriptionThread.get()).contains("chat-workflow");
+        } finally {
+            scheduler.dispose();
+        }
+    }
+
+    @Test
+    void citationShouldValidateMessageDocumentAndChunkBeforeReturningPreview() {
+        ChatCitationService citationService = mock(ChatCitationService.class);
+        DocumentService documentService = mock(DocumentService.class);
+        DocumentChunkService chunkService = mock(DocumentChunkService.class);
+        KnowledgeBaseService knowledgeBaseService = mock(KnowledgeBaseService.class);
+        when(citationService.getOwnedCitation("m1", "u1", 1))
+                .thenReturn(new ChatCitationDTO(1, 10L, "chunk-1", 2, "引用标题", null, 1, 0.9D, "hybrid"));
+        Document document = new Document();
+        document.setDocumentId(10L);
+        document.setKnowledgeBaseId(3L);
+        document.setTitle("费用制度");
+        when(documentService.getRequiredDocument(10L)).thenReturn(document);
+        when(knowledgeBaseService.getRequiredDocument(3L, 10L)).thenReturn(document);
+        DocumentChunk chunk = new DocumentChunk();
+        chunk.setChunkId("chunk-1");
+        chunk.setDocumentId(10L);
+        chunk.setChunkOrder(2);
+        chunk.setText("可展示的分块正文");
+        when(chunkService.getById("chunk-1")).thenReturn(chunk);
+        ChatController controller = new ChatController(mock(WorkflowService.class), mock(ChatGenerationTaskManager.class),
+                mock(ChatGenerationEventPublisher.class), mock(ChatStreamResumeService.class), mock(ChatIdGenerator.class),
+                knowledgeBaseService, citationService, chunkService, documentService, Schedulers.immediate());
+        CurrentUserContext.set(new CurrentUser("u1"));
+
+        var response = controller.citation("m1", 1);
+
+        assertThat(response.data().title()).isEqualTo("费用制度");
+        assertThat(response.data().content()).isEqualTo("可展示的分块正文");
+        assertThat(response.data().documentPath()).isEqualTo("/knowledge-base/3/documents/10");
+        assertThat(response.data().sourceUrl()).isNull();
     }
 }

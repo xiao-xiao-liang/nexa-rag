@@ -4,6 +4,9 @@ server:
 spring:
   application:
     name: nexa-rag
+  mvc:
+    async:
+      request-timeout: -1
   mail:
     host: smtp.qq.com # QQ邮箱SMTP主机。
     port: 465 # QQ邮箱SSL端口。
@@ -47,6 +50,12 @@ rocketmq:
     group: nexa-document-pipeline-producer # 文档流水线生产者组，同一应用集群应保持一致。
 
 nexa:
+  chat:
+    workflow:
+      scheduler:
+        max-concurrency: 16 # 对话工作流最大并发数，避免长连接模型流耗尽通用阻塞线程池。
+        queue-capacity: 1000 # 等待调度的工作流最大数量，超出时快速失败而非无限堆积。
+        thread-name-prefix: chat-workflow # 便于线程转储和监控定位。
   cloud-document:
     yuque:
       token: ${NEXA_SOURCE_YUQUE_TOKEN:}
