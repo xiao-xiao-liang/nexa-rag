@@ -38,7 +38,8 @@ class PandocDocxConverterTest {
                     new byte[]{1, 2, 3});
             return null;
         }).when(runner).run(any(), any());
-        PandocDocxConverter converter = new PandocDocxConverter(new PandocProperties(), runner, artifactProperties);
+        FeishuDocxCodeBlockMarkdownRewriter rewriter = mock(FeishuDocxCodeBlockMarkdownRewriter.class);
+        PandocDocxConverter converter = new PandocDocxConverter(new PandocProperties(), runner, artifactProperties, rewriter);
 
         try (ArtifactWorkspace workspace = new ArtifactWorkspaceFactory(artifactProperties).create(1L)) {
             Path source = workspace.resolve("source.docx");
@@ -53,6 +54,7 @@ class PandocDocxConverterTest {
                 assertThat(asset.file()).isRegularFile();
             });
             verify(runner).run(argThat(command -> command.contains("--extract-media=assets")), eq(workspace.root()));
+            verify(rewriter).rewrite(source, workspace.resolve("content.md"));
         }
     }
 
@@ -65,7 +67,8 @@ class PandocDocxConverterTest {
                     null);
             return null;
         }).when(runner).run(any(), any());
-        PandocDocxConverter converter = new PandocDocxConverter(new PandocProperties(), runner, artifactProperties);
+        PandocDocxConverter converter = new PandocDocxConverter(new PandocProperties(), runner, artifactProperties,
+                mock(FeishuDocxCodeBlockMarkdownRewriter.class));
 
         try (ArtifactWorkspace workspace = new ArtifactWorkspaceFactory(artifactProperties).create(1L)) {
             Path source = workspace.resolve("source.docx");

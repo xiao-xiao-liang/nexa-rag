@@ -35,6 +35,7 @@ public class PandocDocxConverter implements DocumentConverter {
     private final PandocProperties properties;
     private final PandocProcessRunner processRunner;
     private final ArtifactProcessingProperties artifactProcessingProperties;
+    private final FeishuDocxCodeBlockMarkdownRewriter feishuDocxCodeBlockMarkdownRewriter;
 
     /**
      * 返回 Pandoc 当前支持的文档格式。
@@ -62,6 +63,7 @@ public class PandocDocxConverter implements DocumentConverter {
             Files.createDirectories(assetsDirectory);
             processRunner.run(buildCommand(stagedSource, assetsDirectory, markdownPath), workspace.root());
             validateMarkdown(markdownPath);
+            feishuDocxCodeBlockMarkdownRewriter.rewrite(stagedSource, markdownPath);
             List<ExtractedAssetBO> assets = collectAssets(workspace, assetsDirectory, Files.size(markdownPath));
             return new ExtractedDocumentBO(markdownPath, assets, Map.of("parser", "pandoc"));
         } catch (DocumentPipelineNonRetryableException | ServiceException exception) {
