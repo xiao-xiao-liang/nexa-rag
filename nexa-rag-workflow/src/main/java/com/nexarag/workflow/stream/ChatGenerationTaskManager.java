@@ -6,6 +6,7 @@ import reactor.core.Disposable;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.BiConsumer;
 
 /**
  * Chat 生成任务管理器，负责本地流绑定、取消鉴权和最终化幂等控制。
@@ -36,9 +37,27 @@ public class ChatGenerationTaskManager {
      * @param cancellationFinalizer 取消最终化回调
      */
     public void register(String generationId, String userId, String conversationId,
-                         ChatGenerationAccumulator accumulator, Runnable cancellationFinalizer) {
+                          ChatGenerationAccumulator accumulator, Runnable cancellationFinalizer) {
+        register(generationId, userId, conversationId, accumulator, cancellationFinalizer,
+                (errorCode, errorMessage) -> { });
+    }
+
+    /**
+     * 注册生成任务及其失败最终化回调。
+     *
+     * @param generationId 生成任务 ID
+     * @param userId 用户 ID
+     * @param conversationId 会话 ID
+     * @param accumulator 生成累积器
+     * @param cancellationFinalizer 取消最终化回调
+     * @param failureFinalizer 失败最终化回调，参数依次为错误码和错误信息
+     */
+    public void register(String generationId, String userId, String conversationId,
+                         ChatGenerationAccumulator accumulator, Runnable cancellationFinalizer,
+                         BiConsumer<String, String> failureFinalizer) {
         // 1. 保存本地任务和跨实例鉴权信息
-        GenerationTask task = new GenerationTask(userId, conversationId, accumulator, cancellationFinalizer);
+        GenerationTask task = new GenerationTask(userId, conversationId, accumulator, cancellationFinalizer,
+                failureFinalizer);
         tasks.put(generationId, task);
         cancellationHandler.registerOwner(generationId, userId);
 
@@ -115,6 +134,24 @@ public class ChatGenerationTaskManager {
         tasks.remove(generationId);
     }
 
+    /**
+     * 将生成任务收口为失败状态。
+     *
+     * @param generationId 生成任务 ID
+     * @param errorCode 失败错误码
+     * @param errorMessage 面向用户的失败信息
+     * @return true 表示本次调用实际执行了失败最终化
+     */
+    public boolean fail(String generationId, String errorCode, String errorMessage) {
+        GenerationTask task = tasks.get(generationId);
+        if (task == null || !task.finalized.compareAndSet(false, true)) {
+            return false;
+        }
+        tasks.remove(generationId, task);
+        task.failureFinalizer.accept(errorCode, errorMessage);
+        return true;
+    }
+
     private boolean cancelTask(GenerationTask task) {
         if (!task.cancelled.compareAndSet(false, true)) {
             return false;
@@ -138,12 +175,16 @@ public class ChatGenerationTaskManager {
         private final AtomicBoolean finalized = new AtomicBoolean();
         private volatile Disposable disposable;
 
+        private final BiConsumer<String, String> failureFinalizer;
+
         private GenerationTask(String userId, String conversationId,
-                               ChatGenerationAccumulator accumulator, Runnable cancellationFinalizer) {
+                               ChatGenerationAccumulator accumulator, Runnable cancellationFinalizer,
+                               BiConsumer<String, String> failureFinalizer) {
             this.userId = userId;
             this.conversationId = conversationId;
             this.accumulator = accumulator;
             this.cancellationFinalizer = cancellationFinalizer;
+            this.failureFinalizer = failureFinalizer;
         }
     }
 }

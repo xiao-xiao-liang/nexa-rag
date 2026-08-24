@@ -73,7 +73,7 @@ public final class ChatWorkflowStreamingUtil {
         String nodeName = nodeClass.getSimpleName();
 
         return modelStream.concatMap(response -> {
-                    // 1. 累积模型分片中的正文和用量
+                    // 1. 逐个处理模型分片，避免定时任务在同步 Redis 写入期间中断当前线程。
                     accumulator.append(response);
                     if (response.errorCode() != null) {
                         terminal.set(true);
@@ -117,7 +117,7 @@ public final class ChatWorkflowStreamingUtil {
         return new ChatStreamEvent(event.type(), event.content(), state.value("conversationId", ""),
                 state.value("traceId", ""), state.value("generationId", ""),
                 state.value("assistantMessageId", ""), event.errorCode(), event.errorMessage(),
-                event.eventVersion(), event.operations());
+                event.eventVersion(), event.operations(), event.citations());
     }
 
     private static GraphResponse<StreamingOutput<ChatStreamEvent>> done(

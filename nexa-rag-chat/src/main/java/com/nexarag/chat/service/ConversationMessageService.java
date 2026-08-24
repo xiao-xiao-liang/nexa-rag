@@ -31,6 +31,9 @@ public interface ConversationMessageService extends IService<ChatMessage> {
     ChatGenerationTurnBO beginGenerationTurn(String conversationId, String userId,
                                              String userContent, String generationId);
 
+    /** 生成期间持久化引用清单，确保异常收口时仍可恢复引用。 */
+    void updateGeneratingAssistantReferences(String messageId, String referencesJson);
+
     /** 更新助手消息为完成状态。 */
     void completeAssistantMessage(String messageId, String content, String thinkingContent,
                                   Integer promptTokens, Integer completionTokens, Integer totalTokens,

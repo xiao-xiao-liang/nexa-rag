@@ -58,7 +58,8 @@ class QuestionRewriteNodeTest {
                 GENERATION_ID, "g1",
                 ASSISTANT_MESSAGE_ID, "m1",
                 GENERATION_ACCUMULATOR, new ChatGenerationAccumulator(),
-                CONVERSATION_CONTEXT, new com.nexarag.chat.domain.ConversationContext("c1", "u1", "", "", List.of(), "", 1L),
+                CONVERSATION_CONTEXT, new com.nexarag.chat.domain.ConversationContext("c1", "u1", "", "", null,
+                        List.of(), "", 1L),
                 PROMPT_EXECUTION_SNAPSHOT, snapshot())));
 
         assertThat(result).containsEntry(REWRITTEN_QUESTION, "原问题");

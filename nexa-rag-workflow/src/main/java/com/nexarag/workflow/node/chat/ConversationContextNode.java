@@ -56,16 +56,31 @@ public class ConversationContextNode implements NodeAction {
         taskManager.register(generationId, userId, conversationId, accumulator, () -> {
             String toolOperationsJson = eventPublisher.serializeOperations(accumulator.operationsSnapshot());
             messageService.cancelAssistantMessage(turn.assistantMessage().messageId(), accumulator.snapshot().content(),
-                    toolOperationsJson);
+                    accumulator.referencesJson(), toolOperationsJson);
             eventPublisher.publish(new ChatStreamEvent(ChatStreamEventType.CANCELLED, null, conversationId,
                     state.value(TRACE_ID, ""), generationId, turn.assistantMessage().messageId(), null, null,
                     0L, accumulator.operationsSnapshot()));
             eventPublisher.complete(generationId);
+        }, (errorCode, errorMessage) -> {
+            String toolOperationsJson = eventPublisher.serializeOperations(accumulator.operationsSnapshot());
+            try {
+                messageService.failAssistantMessage(turn.assistantMessage().messageId(), accumulator.snapshot().content(),
+                        errorCode, errorMessage, accumulator.referencesJson(), toolOperationsJson);
+            } finally {
+                try {
+                    eventPublisher.publish(new ChatStreamEvent(ChatStreamEventType.ERROR, null, conversationId,
+                            state.value(TRACE_ID, ""), generationId, turn.assistantMessage().messageId(), errorCode,
+                            errorMessage, 0L, accumulator.operationsSnapshot()));
+                } finally {
+                    eventPublisher.complete(generationId);
+                }
+            }
         });
 
         // 3. 发布客户端恢复所需的初始元数据
-        eventPublisher.publish(new ChatStreamEvent(ChatStreamEventType.META, null, conversationId,
-                state.value(TRACE_ID, ""), generationId, turn.assistantMessage().messageId(), null, null));
+        eventPublisher.publish(new ChatStreamEvent(ChatStreamEventType.META, null,
+                conversationId, state.value(TRACE_ID, ""), generationId, turn.assistantMessage().messageId(),
+                null, null));
         log.debug("会话上下文加载完成，conversationId={}，context={}", conversationId, context);
         return Map.of(CONVERSATION_CONTEXT, context, USER_MESSAGE_ID, turn.userMessage().messageId(),
                 ASSISTANT_MESSAGE_ID, turn.assistantMessage().messageId(), GENERATION_ACCUMULATOR, accumulator);

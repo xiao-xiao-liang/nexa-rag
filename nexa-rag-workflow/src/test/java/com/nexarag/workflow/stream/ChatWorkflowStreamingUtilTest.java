@@ -20,7 +20,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 class ChatWorkflowStreamingUtilTest {
 
     @Test
-    void toGraphStreamShouldEmitTokenEventsAndCompletedState() {
+    void toGraphStreamShouldEmitEachAnswerDeltaAndEmitCompletedState() {
         OverAllState state = new OverAllState(Map.of());
 
         Flux<GraphResponse<StreamingOutput<ChatStreamEvent>>> stream = ChatWorkflowStreamingUtil.toGraphStream(

@@ -17,6 +17,7 @@ public class ChatGenerationAccumulator {
     private Integer completionTokens;
     private Integer totalTokens;
     private String finishReason;
+    private volatile String referencesJson;
     private final Map<String, ChatToolOperationDTO> operations = new ConcurrentHashMap<>();
 
     /**
@@ -64,6 +65,24 @@ public class ChatGenerationAccumulator {
         return operations.values().stream()
                 .sorted(Comparator.comparingLong(ChatToolOperationDTO::sequence))
                 .toList();
+    }
+
+    /**
+     * 保存已经生成并持久化的引用清单，供异常或取消时的终态写入复用。
+     *
+     * @param referencesJson 引用清单 JSON
+     */
+    public void recordReferencesJson(String referencesJson) {
+        this.referencesJson = referencesJson;
+    }
+
+    /**
+     * 获取已生成的引用清单 JSON。
+     *
+     * @return 引用清单 JSON；尚未生成时为 {@code null}
+     */
+    public String referencesJson() {
+        return referencesJson;
     }
 
     private <T> T latest(T candidate, T current) {

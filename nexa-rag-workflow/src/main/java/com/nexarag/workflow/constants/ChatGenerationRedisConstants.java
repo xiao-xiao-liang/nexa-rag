@@ -14,7 +14,7 @@ public final class ChatGenerationRedisConstants {
     public static final String CANCEL_TOPIC = "nexa:chat:generation:cancel";
     public static final String EVENT_TOPIC_PREFIX = "nexa:chat:generation:event:";
     public static final Duration TASK_TTL = Duration.ofMinutes(30);
-    public static final long MAX_BUFFERED_EVENTS = 1_000L;
+    public static final int MAX_BUFFERED_EVENTS = 1_000;
 
     private ChatGenerationRedisConstants() {
     }

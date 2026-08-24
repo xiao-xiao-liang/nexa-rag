@@ -121,6 +121,15 @@ public class ConversationMessageServiceImpl extends ServiceImpl<ChatMessageMappe
 
     @Override
     @Transactional(rollbackFor = Exception.class)
+    public void updateGeneratingAssistantReferences(String messageId, String referencesJson) {
+        // 仅在生成期间写入引用，避免覆盖已经终态化消息的数据。
+        ChatMessage message = new ChatMessage();
+        message.setReferencesJson(referencesJson);
+        updateGeneratingMessage(messageId, message);
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
     public void completeAssistantMessage(String messageId, String content, String thinkingContent,
                                          Integer promptTokens, Integer completionTokens, Integer totalTokens,
                                          String referencesJson) {

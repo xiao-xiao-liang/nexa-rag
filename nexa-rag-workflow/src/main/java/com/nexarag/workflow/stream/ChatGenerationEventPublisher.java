@@ -11,7 +11,8 @@ import reactor.core.publisher.Sinks;
 import java.util.Map;
 import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.atomic.AtomicLong;
+
+import static com.nexarag.workflow.constants.ChatGenerationRedisConstants.MAX_BUFFERED_EVENTS;
 
 /**
  * 将生成事件写入 Redis 并分发给本实例 SSE 订阅者。
@@ -23,8 +24,7 @@ public class ChatGenerationEventPublisher {
 
     private final ChatStreamEventBuffer eventBuffer;
     private final ObjectMapper objectMapper;
-    private final Map<String, Sinks.Many<ChatStreamEvent>> localSinks = new ConcurrentHashMap<>();
-    private final Map<String, AtomicLong> deliveredVersions = new ConcurrentHashMap<>();
+    private final Map<String, LocalGenerationStream> localStreams = new ConcurrentHashMap<>();
 
     /**
      * 发布事件并立即通知本实例订阅者。
@@ -45,9 +45,9 @@ public class ChatGenerationEventPublisher {
      * @return 实时事件流
      */
     public Flux<ChatStreamEvent> open(String generationId) {
-        Sinks.Many<ChatStreamEvent> sink = localSinks.computeIfAbsent(generationId,
-                ignored -> Sinks.many().replay().limit(1_000));
-        return sink.asFlux();
+        LocalGenerationStream stream = localStreams.computeIfAbsent(generationId,
+                ignored -> new LocalGenerationStream());
+        return stream.sink.asFlux();
     }
 
     /**
@@ -57,7 +57,11 @@ public class ChatGenerationEventPublisher {
      */
     public void acceptRedisPayload(String payload) {
         try {
-            emitIfNew(objectMapper.readValue(payload, ChatStreamEvent.class));
+            ChatStreamEvent event = objectMapper.readValue(payload, ChatStreamEvent.class);
+            emitIfNew(event);
+            if (isTerminal(event)) {
+                complete(event.generationId());
+            }
         } catch (JsonProcessingException exception) {
             log.warn("忽略无法解析的生成流事件", exception);
         }
@@ -69,11 +73,12 @@ public class ChatGenerationEventPublisher {
      * @param generationId 生成任务 ID
      */
     public void complete(String generationId) {
-        Sinks.Many<ChatStreamEvent> sink = localSinks.remove(generationId);
-        if (sink != null) {
-            sink.tryEmitComplete();
+        LocalGenerationStream stream = localStreams.remove(generationId);
+        if (stream != null) {
+            synchronized (stream.monitor) {
+                stream.sink.tryEmitComplete();
+            }
         }
-        deliveredVersions.remove(generationId);
     }
 
     /**
@@ -83,8 +88,13 @@ public class ChatGenerationEventPublisher {
      * @param eventVersion 已交付的版本
      */
     public void markDelivered(String generationId, long eventVersion) {
-        deliveredVersions.computeIfAbsent(generationId, ignored -> new AtomicLong())
-                .accumulateAndGet(eventVersion, Math::max);
+        LocalGenerationStream stream = localStreams.get(generationId);
+        if (stream == null) {
+            return;
+        }
+        synchronized (stream.monitor) {
+            stream.deliveredVersion = Math.max(stream.deliveredVersion, eventVersion);
+        }
     }
 
     /**
@@ -105,17 +115,35 @@ public class ChatGenerationEventPublisher {
         if (event.generationId() == null || event.generationId().isBlank()) {
             return;
         }
-        AtomicLong deliveredVersion = deliveredVersions.computeIfAbsent(event.generationId(),
-                ignored -> new AtomicLong());
-        if (event.eventVersion() > 0 && event.eventVersion() <= deliveredVersion.get()) {
+        LocalGenerationStream stream = localStreams.get(event.generationId());
+        if (stream == null) {
             return;
         }
-        if (event.eventVersion() > 0) {
-            deliveredVersion.accumulateAndGet(event.eventVersion(), Math::max);
+        synchronized (stream.monitor) {
+            if (event.eventVersion() > 0 && event.eventVersion() <= stream.deliveredVersion) {
+                return;
+            }
+            Sinks.EmitResult emitResult = stream.sink.tryEmitNext(event);
+            if (!emitResult.isSuccess()) {
+                log.warn("生成流事件本地投递失败，generationId={}，eventType={}，eventVersion={}，result={}",
+                        event.generationId(), event.type(), event.eventVersion(), emitResult);
+                return;
+            }
+            if (event.eventVersion() > 0) {
+                stream.deliveredVersion = event.eventVersion();
+            }
         }
-        Sinks.Many<ChatStreamEvent> sink = localSinks.get(event.generationId());
-        if (sink != null) {
-            sink.tryEmitNext(event);
-        }
+    }
+
+    private boolean isTerminal(ChatStreamEvent event) {
+        return event.type() == ChatStreamEventType.COMPLETE
+                || event.type() == ChatStreamEventType.ERROR
+                || event.type() == ChatStreamEventType.CANCELLED;
+    }
+
+    private static final class LocalGenerationStream {
+        private final Object monitor = new Object();
+        private final Sinks.Many<ChatStreamEvent> sink = Sinks.many().replay().limit(MAX_BUFFERED_EVENTS);
+        private long deliveredVersion;
     }
 }

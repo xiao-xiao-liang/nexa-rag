@@ -3,9 +3,11 @@ package com.nexarag.workflow.node.chat;
 import com.alibaba.cloud.ai.graph.OverAllState;
 import com.alibaba.cloud.ai.graph.action.NodeAction;
 import com.alibaba.cloud.ai.graph.streaming.GraphFlux;
+import com.nexarag.chat.domain.ChatCitationSetCodec;
 import com.nexarag.chat.domain.ChatCitationSetDTO;
 import com.nexarag.chat.domain.ChatCitationSummaryVO;
 import com.nexarag.chat.domain.ConversationContext;
+import com.nexarag.chat.service.ConversationMessageService;
 import com.nexarag.model.enums.ModelBizType;
 import com.nexarag.model.gateway.ModelGateway;
 import com.nexarag.model.gateway.chat.ChatModelRequest;
@@ -59,6 +61,8 @@ public class AnswerGenerationNode implements NodeAction {
     private final ChatGenerationTaskManager taskManager;
     private final ChatGenerationEventPublisher eventPublisher;
     private final CitationSetFactory citationSetFactory;
+    private final ConversationMessageService messageService;
+    private final ChatCitationSetCodec citationSetCodec;
 
     @Override
     public Map<String, Object> apply(OverAllState state) {
@@ -71,8 +75,12 @@ public class AnswerGenerationNode implements NodeAction {
         List<RetrievalChunk> chunks = state.value(ACCEPTED_EVIDENCE_RESULTS, List.of());
         ChatCitationSetDTO citationSet = new ChatCitationSetDTO(ChatCitationSetDTO.CURRENT_VERSION,
                 citationSetFactory.create(chunks));
+        String assistantMessageId = state.value(ASSISTANT_MESSAGE_ID, "");
+        String referencesJson = citationSetCodec.encode(citationSet);
+        accumulator.recordReferencesJson(referencesJson);
+        messageService.updateGeneratingAssistantReferences(assistantMessageId, referencesJson);
         eventPublisher.publish(new ChatStreamEvent(ChatStreamEventType.CITATIONS, null, conversationId,
-                state.value(TRACE_ID, ""), generationId, state.value(ASSISTANT_MESSAGE_ID, ""), null, null,
+                state.value(TRACE_ID, ""), generationId, assistantMessageId, null, null,
                 0L, List.of(), citationSet.citations().stream()
                 .map(citation -> new ChatCitationSummaryVO(citation.citationId()))
                 .toList()));
