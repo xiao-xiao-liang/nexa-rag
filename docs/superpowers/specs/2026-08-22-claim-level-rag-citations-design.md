@@ -25,7 +25,6 @@
   "citations": [
     {
       "citationId": 1,
-      "knowledgeBaseId": 1001,
       "documentId": 2001,
       "chunkId": "chunk-2001-003",
       "chunkOrder": 3,
@@ -39,7 +38,7 @@
 }
 ```
 
-`citationId` 仅在同一 `messageId` 内有效，从 `1` 按 `acceptedEvidenceResults` 的稳定顺序分配。正文、原始文件 URL、对象名和外部 URL 不进入此 JSON。无法解析、版本不支持或为空的历史值均按无引用处理。
+`citationId` 仅在同一 `messageId` 内有效，从 `1` 按 `acceptedEvidenceResults` 的稳定顺序分配。知识库 ID、正文、原始文件 URL、对象名和外部 URL 不进入此 JSON；点击时由当前文档反查知识库并校验权限。无法解析、版本不支持或为空的历史值均按无引用处理。
 
 ### 公开引用投影
 
