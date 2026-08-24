@@ -88,8 +88,8 @@ export const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
         await documentApi.submitExternalDocument(
           {
             sourceType: "FEISHU",
-            documentUrl: externalUrl.trim(),
-            customTitle: title.trim() || undefined,
+            sourceUrl: externalUrl.trim(),
+            title: title.trim() || undefined,
           },
           knowledgeBaseId
         );

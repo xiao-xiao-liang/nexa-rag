@@ -400,7 +400,7 @@ export const documentApi = {
   },
 
   async submitExternalDocument(
-    request: { sourceType: string; documentUrl: string; docToken?: string; customTitle?: string },
+    request: { sourceType: string; sourceUrl: string; title?: string },
     knowledgeBaseId: number | string = DEFAULT_KNOWLEDGE_BASE_ID
   ): Promise<UploadDocumentResponse> {
     return await fetchJson<UploadDocumentResponse>(
