@@ -74,23 +74,26 @@ export const ChatPage: React.FC = () => {
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const messageListRef = useRef<HTMLDivElement>(null);
   const shouldAutoScrollRef = useRef(true);
-  const isSwitchingConversationRef = useRef(false);
-  const switchingConversationTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const isInitialLoadRef = useRef(true);
+  const hasReachedBottomOnceRef = useRef(false);
+  const initialLoadTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   // 平滑或瞬间滚动到底部锚点
   const scrollToBottom = useCallback((smooth = true) => {
-    const container = scrollContainerRef.current;
-    if (container) {
-      container.scrollTo({
-        top: container.scrollHeight,
-        behavior: smooth ? "smooth" : "auto",
-      });
-    } else if (messagesEndRef.current) {
-      messagesEndRef.current.scrollIntoView({
-        behavior: smooth ? "smooth" : "auto",
-        block: "end",
-      });
-    }
+    requestAnimationFrame(() => {
+      const container = scrollContainerRef.current;
+      if (container) {
+        container.scrollTo({
+          top: container.scrollHeight,
+          behavior: smooth ? "smooth" : "auto",
+        });
+      } else if (messagesEndRef.current) {
+        messagesEndRef.current.scrollIntoView({
+          behavior: smooth ? "smooth" : "auto",
+          block: "end",
+        });
+      }
+    });
   }, []);
 
   // 1. 初始化拉取会话列表 (保持默认新建会话视图，不自动激活首个会话)
@@ -121,8 +124,8 @@ export const ChatPage: React.FC = () => {
     setIsLoadingHistory(true);
     try {
       const page = await chatApi.getHistory(convId, undefined, 20);
-      if (page.records) {
-        const normalized = page.records.map((message) => ({
+      if (page && page.records) {
+        const normalized = page.records.map((message: ChatMessageVO) => ({
           ...message,
           content: message.content ?? "",
           operations: parseToolOperations(message.toolOperationsJson),
@@ -148,7 +151,7 @@ export const ChatPage: React.FC = () => {
   }, []);
 
   const loadOlderHistory = useCallback(async () => {
-    if (!activeConversationId || isLoadingOlderHistory || isSwitchingConversationRef.current) return;
+    if (!activeConversationId || isLoadingOlderHistory) return;
     const entry = getHistoryEntry(historyCacheRef.current, activeConversationId);
     if (!entry?.hasMore || !entry.nextBeforeSequence) return;
     const container = scrollContainerRef.current;
@@ -156,19 +159,21 @@ export const ChatPage: React.FC = () => {
     setIsLoadingOlderHistory(true);
     try {
       const page = await chatApi.getHistory(activeConversationId, entry.nextBeforeSequence, 20);
-      const normalized = page.records.map((message) => ({
-        ...message,
-        content: message.content ?? "",
-        operations: parseToolOperations(message.toolOperationsJson),
-      }));
-      historyCacheRef.current = prependHistoryPage(
-        historyCacheRef.current, activeConversationId, normalized, page.hasMore, page.nextBeforeSequence
-      );
-      if (activeConversationIdRef.current !== activeConversationId) return;
-      setMessages(getHistoryEntry(historyCacheRef.current, activeConversationId)?.messages ?? []);
-      requestAnimationFrame(() => {
-        if (container) container.scrollTop += container.scrollHeight - previousHeight;
-      });
+      if (page && page.records) {
+        const normalized = page.records.map((message: ChatMessageVO) => ({
+          ...message,
+          content: message.content ?? "",
+          operations: parseToolOperations(message.toolOperationsJson),
+        }));
+        historyCacheRef.current = prependHistoryPage(
+          historyCacheRef.current, activeConversationId, normalized, page.hasMore, page.nextBeforeSequence
+        );
+        if (activeConversationIdRef.current !== activeConversationId) return;
+        setMessages(getHistoryEntry(historyCacheRef.current, activeConversationId)?.messages ?? []);
+        requestAnimationFrame(() => {
+          if (container) container.scrollTop += container.scrollHeight - previousHeight;
+        });
+      }
     } catch (err) {
       console.warn(`拉取会话 ${activeConversationId} 更早历史失败:`, err);
     } finally {
@@ -179,14 +184,18 @@ export const ChatPage: React.FC = () => {
   }, [activeConversationId, isLoadingOlderHistory]);
 
   useEffect(() => {
-    isSwitchingConversationRef.current = true;
     shouldAutoScrollRef.current = true;
-    if (switchingConversationTimerRef.current) {
-      clearTimeout(switchingConversationTimerRef.current);
+    isInitialLoadRef.current = true;
+    hasReachedBottomOnceRef.current = false;
+
+    if (initialLoadTimerRef.current) {
+      clearTimeout(initialLoadTimerRef.current);
     }
-    switchingConversationTimerRef.current = setTimeout(() => {
-      isSwitchingConversationRef.current = false;
-    }, 2000);
+    // 给予 2.5 秒进入会话缓冲期（确保包含图片等异步资源完全加载并完成滚动触底）
+    initialLoadTimerRef.current = setTimeout(() => {
+      isInitialLoadRef.current = false;
+      hasReachedBottomOnceRef.current = true;
+    }, 2500);
 
     if (activeConversationId) {
       if (skipNextHistoryLoadRef.current) {
@@ -197,31 +206,49 @@ export const ChatPage: React.FC = () => {
     } else {
       setMessages([]);
     }
+
+    return () => {
+      if (initialLoadTimerRef.current) {
+        clearTimeout(initialLoadTimerRef.current);
+      }
+    };
   }, [activeConversationId, loadHistory]);
 
   // 3. 监听用户手动滚动行为 (若向上回溯查看历史则不强行吸底)
   const handleScroll = () => {
     const container = scrollContainerRef.current;
     if (!container) return;
-
-    // 若处于刚切入会话的动画保护期内，不因过渡阶段的临时位置将 shouldAutoScroll 误置为 false
-    if (isSwitchingConversationRef.current) {
-      return;
-    }
-
     const isNearBottom =
       container.scrollHeight - container.scrollTop - container.clientHeight <= 140;
-    shouldAutoScrollRef.current = isNearBottom;
 
-    if (container.scrollTop <= 32 && !isSwitchingConversationRef.current) {
+    // 只有在非初次加载过渡期，才允许将 shouldAutoScroll 置为 false
+    if (!isInitialLoadRef.current) {
+      shouldAutoScrollRef.current = isNearBottom;
+    } else if (isNearBottom) {
+      hasReachedBottomOnceRef.current = true;
+    }
+
+    // 只有在初次加载完成且已经到达过底部之后，用户向上滚动到顶部时才拉取更早历史
+    if (!isInitialLoadRef.current && hasReachedBottomOnceRef.current && container.scrollTop <= 32) {
       void loadOlderHistory();
     }
   };
 
-  // 用户主动滚轮/触摸事件：如果主动往上翻，立即解除保护并停止自动吸底
-  const handleUserScrollInteraction = (e: React.WheelEvent | React.TouchEvent) => {
-    if ("deltaY" in e && e.deltaY < 0) {
-      isSwitchingConversationRef.current = false;
+  // 监听用户真实鼠标滚轮/触摸事件：如果用户主动向上滚动，立即退出初次加载强行吸底
+  const handleWheel = (e: React.WheelEvent<HTMLDivElement>) => {
+    if (e.deltaY < -10) {
+      isInitialLoadRef.current = false;
+      shouldAutoScrollRef.current = false;
+    }
+  };
+
+  const handleTouchMove = () => {
+    const container = scrollContainerRef.current;
+    if (!container) return;
+    const isNearBottom =
+      container.scrollHeight - container.scrollTop - container.clientHeight <= 140;
+    if (!isNearBottom) {
+      isInitialLoadRef.current = false;
       shouldAutoScrollRef.current = false;
     }
   };
@@ -232,7 +259,7 @@ export const ChatPage: React.FC = () => {
     if (!targetElement) return;
 
     const resizeObserver = new ResizeObserver(() => {
-      if (shouldAutoScrollRef.current || isGenerating || isSwitchingConversationRef.current) {
+      if (isInitialLoadRef.current || shouldAutoScrollRef.current || isGenerating) {
         scrollToBottom(true);
       }
     });
@@ -242,11 +269,31 @@ export const ChatPage: React.FC = () => {
     return () => {
       resizeObserver.disconnect();
     };
+  }, [messages, scrollToBottom, isGenerating]);
+
+  // 5. 监听图片异步加载完成事件 (通过捕获阶段捕获所有 img 的 load 事件，即刻平滑纠偏触底)
+  useEffect(() => {
+    const container = scrollContainerRef.current;
+    if (!container) return;
+
+    const handleImgLoad = (e: Event) => {
+      if (e.target && (e.target as HTMLElement).tagName === "IMG") {
+        if (isInitialLoadRef.current || shouldAutoScrollRef.current || isGenerating) {
+          scrollToBottom(true);
+        }
+      }
+    };
+
+    container.addEventListener("load", handleImgLoad, true);
+
+    return () => {
+      container.removeEventListener("load", handleImgLoad, true);
+    };
   }, [scrollToBottom, isGenerating]);
 
-  // 5. 消息内容或生成状态变化时触发触底
+  // 6. 消息内容或生成状态变化时触发触底
   useEffect(() => {
-    if (shouldAutoScrollRef.current || isGenerating || isSwitchingConversationRef.current) {
+    if (isInitialLoadRef.current || shouldAutoScrollRef.current || isGenerating) {
       scrollToBottom(true);
     }
   }, [messages, isGenerating, scrollToBottom]);
@@ -518,8 +565,8 @@ export const ChatPage: React.FC = () => {
         <div
           ref={scrollContainerRef}
           onScroll={handleScroll}
-          onWheel={handleUserScrollInteraction}
-          onTouchMove={handleUserScrollInteraction}
+          onWheel={handleWheel}
+          onTouchMove={handleTouchMove}
           className="flex-1 overflow-y-auto px-6 pt-4 pb-3 bg-white standard-scrollbar"
         >
           {isLoadingHistory ? (
