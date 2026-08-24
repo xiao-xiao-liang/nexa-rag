@@ -16,6 +16,7 @@ import {
 import { PromptResponse } from "../../../types";
 import { PromptDiffViewer } from "./PromptDiffViewer";
 import { FeishuEmptyState } from "../../../components/ui/feishu-table/FeishuEmptyState";
+import { FeishuMarkdown } from "../../../components/chat/markdown";
 
 export type CanvasViewMode = "editor" | "preview" | "diff";
 
@@ -367,8 +368,8 @@ export const PromptCanvas: React.FC<PromptCanvasProps> = ({
                   <span className="text-[14px] text-[#646A73]">正在调用脱敏渲染服务...</span>
                 </div>
               ) : previewContent ? (
-                <div className="max-w-4xl mx-auto bg-white p-6 rounded-[12px] border border-[#DEE0E3] shadow-2xs font-mono text-[13px] text-[#1F2329] leading-relaxed whitespace-pre-wrap">
-                  {previewContent}
+                <div className="max-w-4xl mx-auto bg-white p-6 rounded-[12px] border border-[#DEE0E3] shadow-2xs">
+                  <FeishuMarkdown content={previewContent} />
                 </div>
               ) : (
                 <FeishuEmptyState
