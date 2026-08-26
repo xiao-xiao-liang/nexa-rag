@@ -380,7 +380,7 @@ DELETE /api/chat/generations/{generationId}
 }
 ```
 
-`userId` 从 `CurrentUserContext` 获取，Controller 生成 `generationId` 和 `traceId`。
+`userId` 从 `UserContext` 获取，Controller 生成 `generationId` 和 `traceId`。
 
 ### 10.2 任务管理
 
@@ -476,7 +476,7 @@ version
 Chat Controller 负责：
 
 1. 校验请求；
-2. 从 `CurrentUserContext` 获取用户；
+2. 从 `UserContext` 获取用户；
 3. 生成 `generationId`、`traceId`；
 4. 调用 Chat Workflow；
 5. 将 Graph 流映射为 `ServerSentEvent<ChatStreamEvent>`；

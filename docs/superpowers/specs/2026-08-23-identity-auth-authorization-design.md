@@ -26,16 +26,15 @@ Spring Boot
        └─ /api/model/**：登录态 + 管理员权限
 ```
 
-认证、授权和数据范围均由服务端决定。客户端可展示账号、角色、当前租户和设备摘要，但不得提交或篡改 `userId`、`accountId`、角色、权限或当前租户来取得访问权。
+认证、授权和数据范围均由服务端决定。客户端可展示账号、角色、当前租户和设备摘要，但不得提交或篡改 `userId`、角色、权限或当前租户来取得访问权。
 
 ## 3. 身份、账号与凭据
 
 ### 3.1 稳定标识
 
-- `userId`：不可变业务用户标识，继续作为聊天等业务数据的所有者。
-- `accountId`：不可变登录账号主体标识，关联账号名、状态、邮箱、本地密码、第三方身份、会话与全局 RBAC 角色。
-- 一期 `userId` 和 `accountId` 严格一对一；登录成功后服务端同时解析两者。
-- `accountName`：独立、可变的登录名称。改名不影响任何 ID、角色、租户成员资格或历史业务资源；旧名称立即释放。
+- `userId`：唯一不可变的认证、授权与业务用户标识，继续作为聊天等业务数据的所有者。
+- `accountName`：用户的可变登录名称。改名不影响 `userId`、角色、租户成员资格或历史业务资源；旧名称立即释放。
+- 不设置 `accountId` 或独立账号表；邮箱、密码、第三方身份、会话与全局 RBAC 均直接关联 `userId`。
 
 新 ID 沿用项目现有的 `BIGINT`/IdWorker 体系。现有业务表的 `user_id VARCHAR(64)` 可继续存放 `userId` 的字符串形式，认证接入不得把该字段替换为账号名。
 
@@ -80,6 +79,21 @@ https://xiaoxiaoliang.top/api/auth/oauth/{qq|feishu|google|github}/callback
 
 GitHub 使用一个 GitHub App，可登记多个回调地址。所有 Client ID、Secret 与第三方密钥仅存在于部署环境变量或密钥管理系统。
 
+### 4.1.1 平台协议固定契约
+
+平台端点不允许通过应用配置覆盖；`nexa.auth.oauth` 只保存 Client ID、Client Secret 和对外 HTTPS 基址。提供方是否可用由 Client ID 与 Client Secret 是否完整决定。这样可避免因端点配置错误把授权码或 Token 发送给非官方地址。四个平台的实现契约如下：
+
+| 平台 | 授权端点 | 授权码交换与稳定主体 | PKCE / 最小权限 |
+| --- | --- | --- | --- |
+| QQ | `https://graph.qq.com/oauth2.0/authorize` | 查询参数调用 `https://graph.qq.com/oauth2.0/token?fmt=json`，再调用 `https://graph.qq.com/oauth2.0/me?fmt=json`；只使用 `openid`。 | 不附加 `code_challenge`；不申请 `get_user_info`，不读取昵称、头像或邮箱。 |
+| 飞书 | `https://open.feishu.cn/open-apis/authen/v1/authorize` | 先调用 `/open-apis/auth/v3/app_access_token/internal` 取得短期 app access token，再以 Bearer 调用 `/open-apis/authen/v1/access_token` 和 `/open-apis/authen/v1/user_info`；只使用当前应用下的 `data.open_id`。 | 该网页登录链路不附加 PKCE；应用后台须授予 `contact:user.base:readonly`。 |
+| Google | `https://accounts.google.com/o/oauth2/v2/auth` | 表单 POST `https://oauth2.googleapis.com/token`，再以 Bearer 查询 `https://openidconnect.googleapis.com/v1/userinfo`；只使用永不复用的 `sub`。 | 强制 S256 PKCE；scope 固定为 `openid profile`。 |
+| GitHub | `https://github.com/login/oauth/authorize` | 表单 POST `https://github.com/login/oauth/access_token`，再以 Bearer 查询 `https://api.github.com/user`；只使用数值 `id`，不使用可改名的 `login`。 | 强制 S256 PKCE；不申请额外 scope。 |
+
+`state` 为 32 字节密码学随机值，服务端 Redis 保存 10 分钟且以 `GETDEL` 单次消费。它保存平台、动作、首次注册账号名、精确回调 URL、可选 PKCE verifier；绑定流程额外保存发起操作的 Sa-Token 值，但该值只存在 Redis，绝不回传浏览器、写日志或落库。由于 `SameSite=Strict` Cookie 不会随跨站回调发送，绑定回调按该 Token 重新确认同一 `userId` 的登录态仍有效，并检查同一 Token-Session 的最近验证授权未过期。
+
+第三方登录在已有绑定时建立新的 Sa-Token 会话并签发最近验证授权；首次登录只在用户事先提交合规账号名时创建 `USER`、默认租户成员关系和外部身份绑定。绑定冲突由 `(provider_code, provider_subject)` 唯一约束最终裁决。绑定列表只展示 `externalIdentityId`、provider 和绑定时间，不返回主体 ID；解绑必须携带该记录 ID，并在锁定邮箱、密码和全部外部身份后执行，邮箱、密码和解绑目标以外的任一外部身份均可作为保留登录凭据。
+
 ### 4.2 密码策略
 
 本地密码满足下列其一：至少 15 位任意字符；或至少 8 位且同时包含小写 ASCII 字母与数字。不在一期接入泄漏/弱密码数据集检测。
@@ -114,7 +128,7 @@ GitHub 使用一个 GitHub App，可登记多个回调地址。所有 Client ID�
 
 ### 5.2 最近验证授权
 
-最近验证授权是服务端保存、仅绑定 `accountId` 和当前 Sa-Token 会话、有效 15 分钟的短期二次验证凭据。它可被复用于第三方绑定/解绑、设置/修改密码、踢出设备和退出所有设备。
+最近验证授权是服务端保存、仅绑定 `userId` 和当前 Sa-Token 会话、有效 15 分钟的短期二次验证凭据。它可被复用于第三方绑定/解绑、设置/修改密码、踢出设备和退出所有设备。
 
 显式二次验证、邮箱验证码登录、第三方登录和邮箱自助注册自动签发该授权；账号密码和邮箱密码登录不自动签发。它在新会话、登出、会话撤销、密码重置造成的全账号会话撤销或到期时失效。邮箱双重更换验证与密码重置不使用该复用授权替代。
 
@@ -130,7 +144,6 @@ GitHub 使用一个 GitHub App，可登记多个回调地址。所有 Client ID�
 
 - `auth_role`：角色定义；
 - `auth_permission`：权限定义；
-- `auth_account_role`：账号—角色关系；
 - `auth_role_permission`：角色—权限关系。
 
 一期初始化 `ADMIN` 和 `USER`。默认管理员拥有 `ADMIN`；所有自助注册和首次第三方创建的账号初始拥有 `USER`。一期不提供角色、权限、关联关系的在线编辑，也不允许管理员委派、转让或撤销其他账号的全局管理员角色。
@@ -141,7 +154,7 @@ GitHub 使用一个 GitHub App，可登记多个回调地址。所有 Client ID�
 
 ## 7. 默认管理员、历史数据与受控恢复
 
-现有固定开发用户 `864019719617777664` 是既有业务 `userId`。迁移时将其关联到受控默认管理员账号对应的 `accountId`，普通首个注册用户永远不会继承历史聊天数据。
+现有固定开发用户 `864019719617777664` 是既有业务 `userId`。迁移时将其补全为受控默认管理员用户，普通首个注册用户永远不会继承历史聊天数据。
 
 部署配置预置默认管理员账号名和邮箱，但不包含初始密码、验证码或第三方密钥。应用初始化应幂等地保留/创建管理员用户、账号、RBAC 角色和历史数据映射；初始管理员没有可用密码、会话或第三方绑定。持有预置邮箱的人完成验证码验证并设置密码后才激活该账号和管理员能力。
 
@@ -180,11 +193,11 @@ GitHub 使用一个 GitHub App，可登记多个回调地址。所有 Client ID�
 
 | 领域 | 概念实体/关系 | 核心约束 |
 | --- | --- | --- |
-| 用户与账号 | 用户、账号、用户—账号一对一 | `userId` 与 `accountId` 都不可变；账号名可变。 |
+| 用户与账号 | 用户及其账号名/凭据属性 | 仅 `userId` 不可变；账号名可变。 |
 | 本地凭据 | 密码凭据、邮箱凭据、邮箱验证码挑战 | 已验证邮箱全局唯一；验证码用途/上下文绑定、单次消费。 |
 | 外部凭据 | 第三方身份绑定、OAuth state | 提供方 + 稳定外部主体全局唯一；不保存第三方 Token。 |
 | 会话与安全 | Sa-Token 会话、最近验证授权、设备摘要、安全审计 | 会话/授权撤销服务端立即生效；审计数据最小化。 |
-| 全局授权 | 角色、权限、账号—角色、角色—权限 | 基于 `accountId` 读取；不根据账号名或客户端参数授权。 |
+| 全局授权 | 用户角色、角色、权限、角色—权限 | 基于 `userId` 读取；不根据账号名或客户端参数授权。 |
 | 租户 | 租户、用户—租户成员、租户邀请 | 成员关系连接 `userId` 与 `tenantId`；租户内角色不等同于全局 RBAC。 |
 
 所有创建/绑定/接受/转交/撤销等跨实体敏感操作必须具备事务一致性、竞争唯一约束与幂等语义；失败不得留下孤立账号、凭据、成员关系、邀请或可用会话。

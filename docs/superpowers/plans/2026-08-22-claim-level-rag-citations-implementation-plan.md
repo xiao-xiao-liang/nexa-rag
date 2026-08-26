@@ -217,7 +217,7 @@ Expected: FAIL，历史没有 `citations`，详情路由不存在。
 
 - [ ] **Step 4: 实现详情控制器的权限顺序。**
 
-`ChatCitationController` 路由固定为 `GET /api/chat/messages/{messageId}/citations/{citationId}`。控制器只读取 `CurrentUserContext` 并委托服务；服务依次执行：确认消息归属和助手角色 → 从该消息清单找编号 → 由 `documentId` 查询当前文档并取得知识库 ID → `knowledgeBaseService.getRequiredDocument(knowledgeBaseId, documentId)` → `documentChunkService.getById(chunkId)` 且验证 `chunk.documentId` 一致 → 组装 VO。
+`ChatCitationController` 路由固定为 `GET /api/chat/messages/{messageId}/citations/{citationId}`。控制器只读取 `UserContext` 并委托服务；服务依次执行：确认消息归属和助手角色 → 从该消息清单找编号 → 由 `documentId` 查询当前文档并取得知识库 ID → `knowledgeBaseService.getRequiredDocument(knowledgeBaseId, documentId)` → `documentChunkService.getById(chunkId)` 且验证 `chunk.documentId` 一致 → 组装 VO。
 
 ```java
 if (chunk == null || !citation.documentId().equals(chunk.getDocumentId())) {

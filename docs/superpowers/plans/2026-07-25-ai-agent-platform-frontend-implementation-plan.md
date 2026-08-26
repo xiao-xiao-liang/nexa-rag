@@ -107,13 +107,13 @@ chat 增加 spring-boot-starter-web 和 nexa-rag-common 的直接依赖。Conver
 
 ConversationPageVO 继承 PageVO<ConversationListItemVO>；ConversationHistoryPageVO 继承 CursorPageVO<ConversationMessageItemVO>。两者及列表项/消息项均位于 chat.controller.vo，并有简体中文 Java doc。
 
-ConversationController 使用 @RequestMapping("/api/conversations")。GET /api/conversations 的默认 current=1、size=20，调用 pageByUser；GET /api/conversations/{conversationId}/messages 的默认 size=50、可空 beforeSequence，调用 pageHistory。两者都从 CurrentUserContext 获取用户。外部消息只返回 messageId、sequence、role、status、content、createdTime、updatedTime；不得泄露 userId、thinkingContent、referencesJson、Token 用量和失败详情。
+ConversationController 使用 @RequestMapping("/api/conversations")。GET /api/conversations 的默认 current=1、size=20，调用 pageByUser；GET /api/conversations/{conversationId}/messages 的默认 size=50、可空 beforeSequence，调用 pageHistory。两者都从 UserContext 获取用户。外部消息只返回 messageId、sequence、role、status、content、createdTime、updatedTime；不得泄露 userId、thinkingContent、referencesJson、Token 用量和失败详情。
 
 - [ ] **步骤 4：写并运行 Controller 测试。**
 
     @Test
     void historyShouldPassCurrentUserAndCursorToService() {
-        CurrentUserContext.set(new CurrentUser("u1"));
+        StpUtil.login("u1");
         when(messageService.pageHistory("c1", "u1", 8L, 50)).thenReturn(new CursorPageVO<>(List.of(), false, null));
 
         controller.history("c1", 8L, 50);

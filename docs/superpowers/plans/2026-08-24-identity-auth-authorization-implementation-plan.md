@@ -4,7 +4,7 @@
 
 **Goal:** 以 Sa-Token 替换固定开发用户认证，交付真实账号、多凭据登录、RBAC、设备安全与企业租户协作能力。
 
-**Architecture:** `nexa-rag-auth` 成为身份领域模块，持有用户、账号、凭据、RBAC、租户成员和安全审计的服务端事实；`nexa-rag-boot` 负责 Sa-Token Web 装配与数据库迁移。Sa-Token 只保存会话与授权状态，`CurrentUserContext` 仍是业务模块读取可信 `userId`/`accountId`/当前 `tenantId` 的兼容边界。
+**Architecture:** `nexa-rag-auth` 成为身份领域模块，持有用户账号属性、凭据、RBAC、租户成员和安全审计的服务端事实；`nexa-rag-boot` 负责 Sa-Token Web 装配与数据库迁移。Sa-Token 保存会话与授权状态，`UserContext` 仅作为业务模块读取 Sa-Token 稳定 `userId` 与 Token-Session 当前 `tenantId` 的无状态兼容门面。
 
 **Tech Stack:** Java 21、Spring Boot 3.5.13、Sa-Token Spring Boot 3 Starter 1.46.0、MyBatis-Plus 3.5.16、MySQL、Redis、Flyway、JUnit 5、Mockito、MockMvc。
 
@@ -50,16 +50,16 @@
 
 - [ ] **Step 1: 先写失败的 Schema 契约测试。**
 
-测试同时读取增量迁移和全量 Schema，断言二者包含以下表及不可缺少的关系：`auth_user`、`auth_account`、`auth_role`、`auth_permission`、`auth_account_role`、`auth_role_permission`、`tenant`、`tenant_member`。断言 `auth_account.user_id` 唯一、账号名规范化键唯一、`tenant_member(user_id, tenant_id)` 唯一，以及 `ADMIN`、`USER`、模型模块权限初始数据存在。
+测试同时读取增量迁移和全量 Schema，断言二者包含以下表及不可缺少的关系：`auth_user`、`auth_role`、`auth_permission`、`auth_role_permission`、`tenant`、`tenant_member`。断言 `auth_user.account_name_key` 唯一、用户表直接保存 `role_id`、`tenant_member(user_id, tenant_id)` 唯一，以及 `ADMIN`、`USER`、模型模块权限初始数据存在。
 
 ```java
 @Test
 void shouldDefineStableUserAccountRbacAndTenantRelations() {
     String migration = read("migration/V24__add_identity_rbac_and_tenant_schema.sql");
-    assertThat(migration).contains("CREATE TABLE auth_user", "CREATE TABLE auth_account",
-            "CREATE TABLE auth_role", "CREATE TABLE auth_permission", "CREATE TABLE auth_account_role",
-            "CREATE TABLE auth_role_permission", "CREATE TABLE tenant", "CREATE TABLE tenant_member");
-    assertThat(migration).contains("UNIQUE KEY uk_auth_account_user", "UNIQUE KEY uk_auth_account_name_key",
+    assertThat(migration).contains("CREATE TABLE auth_user", "CREATE TABLE auth_role",
+            "CREATE TABLE auth_permission", "CREATE TABLE auth_role_permission", "CREATE TABLE tenant",
+            "CREATE TABLE tenant_member");
+    assertThat(migration).contains("UNIQUE KEY uk_auth_user_account_name_key",
             "UNIQUE KEY uk_tenant_member_user_tenant", "'ADMIN'", "'USER'", "'model:manage'");
 }
 ```
@@ -75,17 +75,16 @@ Expected: FAIL，提示迁移文件或表定义不存在。
 在 `docs/design/identity-auth-schema-review.md` 明确列出所有字段、主键、唯一约束、索引、状态枚举、初始数据和历史 `user_id=864019719617777664` 映射。核心表必须采用以下关系：
 
 ```text
-auth_user(user_id BIGINT PK) 1 ── 1 auth_account(account_id BIGINT PK, user_id UNIQUE)
-auth_account N ── N auth_role        通过 auth_account_role
-auth_role    N ── N auth_permission  通过 auth_role_permission
-auth_user    N ── N tenant           通过 tenant_member(role_code OWNER|MEMBER)
+auth_user(user_id BIGINT PK, role_id) N ── 1 auth_role
+auth_role N ── N auth_permission 通过 auth_role_permission
+auth_user N ── N tenant          通过 tenant_member(member_role OWNER|MEMBER)
 ```
 
 默认管理员初始化必须幂等：用配置提供的规范化账号名和邮箱定位保留账号；历史用户 `864019719617777664` 映射到该 `auth_user`；禁止 SQL 写入初始密码、验证码或 OAuth 密钥。提交 DDL 前由用户评审此文档，只有明确确认后才继续本计划的后续步骤。
 
 - [ ] **Step 4: 在用户确认后实现迁移与全量 Schema。**
 
-`V24` 创建用户、账号、角色、权限、账号角色、角色权限、租户和成员表，并创建共享默认租户和默认知识库兼容关系。账号表保存 `account_name`、`account_name_key`、`status`、`user_id`、时间和乐观锁版本；不得把业务 `user_id` 改成账号名。角色/权限种子使 `ADMIN` 拥有 `model:manage`，`USER` 不拥有该权限。
+`V24` 创建用户、角色、权限、角色权限、租户和成员表，并创建共享默认租户和默认知识库兼容关系。用户表保存 `account_name`、`account_name_key`、`role_id`、TINYINT 状态和时间；不得把业务 `user_id` 改成账号名。角色/权限种子使 `ADMIN` 拥有 `model:manage`，`USER` 不拥有该权限。
 
 - [ ] **Step 5: 运行 Schema 契约测试。**
 
@@ -97,26 +96,26 @@ Expected: PASS。
 
 **Files:**
 
-- Create: `nexa-rag-auth/src/main/java/com/nexarag/auth/entity/{AuthUser,AuthAccount,AuthRole,AuthPermission,AuthAccountRole,AuthRolePermission,Tenant,TenantMember}.java`
-- Create: `nexa-rag-auth/src/main/java/com/nexarag/auth/mapper/{AuthUserMapper,AuthAccountMapper,AuthRoleMapper,AuthPermissionMapper,AuthAccountRoleMapper,AuthRolePermissionMapper,TenantMapper,TenantMemberMapper}.java`
-- Create: `nexa-rag-auth/src/main/java/com/nexarag/auth/enums/{AccountStatus,GlobalRoleCode,TenantMemberRole}.java`
+- Create: `nexa-rag-auth/src/main/java/com/nexarag/auth/model/dataobject/{AuthUserDO,AuthRoleDO,AuthPermissionDO,AuthRolePermissionDO,TenantDO,TenantMemberDO}.java`
+- Create: `nexa-rag-auth/src/main/java/com/nexarag/auth/mapper/{AuthUserMapper,AuthRoleMapper,AuthPermissionMapper,AuthRolePermissionMapper,TenantMapper,TenantMemberMapper}.java`
+- Create: `nexa-rag-auth/src/main/java/com/nexarag/auth/enums/{UserStatus,GlobalRoleCode,TenantStatus,TenantMemberRole,TenantMemberStatus}.java`
 - Create: `nexa-rag-auth/src/main/java/com/nexarag/auth/error/AuthErrorCode.java`
 - Modify: `nexa-rag-boot/src/main/java/com/nexarag/boot/NexaRagApplication.java`
-- Test: `nexa-rag-auth/src/test/java/com/nexarag/auth/mapper/AuthAccountMapperTest.java`
+- Test: `nexa-rag-auth/src/test/java/com/nexarag/auth/mapper/AuthUserMapperTest.java`
 
-- [ ] **Step 1: 写失败测试，验证账号名查找和角色/权限查询的 SQL 契约。**
+- [ ] **Step 1: 写失败测试，验证用户账号名查找和角色/权限查询的 SQL 契约。**
 
-测试应要求 `selectByAccountNameKey`、`selectActiveAccountByVerifiedEmail`、`selectRoleCodesByAccountId`、`selectPermissionCodesByAccountId` 和成员资格查询均存在，并在并发凭据绑定场景使用 `FOR UPDATE` 查询。
+测试应要求 `selectByAccountNameKey`、`selectByUserIdForUpdate`、`selectPermissionCodesByUserId` 和成员资格查询均存在；并发改变用户或成员关系的查询必须使用 `FOR UPDATE`。
 
 - [ ] **Step 2: 运行失败测试。**
 
-Run: `mvn -pl nexa-rag-auth -am -Dtest=AuthAccountMapperTest test`
+Run: `mvn -pl nexa-rag-auth -am -Dtest=AuthUserMapperTest test`
 
 Expected: FAIL，身份实体和 Mapper 尚不存在。
 
-- [ ] **Step 3: 实现最小实体与 Mapper。**
+- [ ] **Step 3: 实现最小 DO 与 Mapper。**
 
-每个实体使用 `@TableName`、`@TableId(type = IdType.INPUT)`、`Long` ID 和中文 JavaDoc；创建时间使用 `LocalDateTime`。Mapper 继承 `BaseMapper<T>`，对并发改变的账号、成员和角色关系提供显式加锁查询。启动类 MapperScan 加入 `com.nexarag.auth.mapper`。
+每个 DO 使用 `@TableName`、`@TableId(type = IdType.INPUT)`、中文 JavaDoc 与字段注释；`auth_user` 的主键和角色 ID 使用 `Long`，租户 ID 使用 `String`，时间使用 `LocalDateTime`。Mapper 继承 `BaseMapper<T>`，对并发改变的用户与成员关系提供显式加锁查询。启动类 MapperScan 加入 `com.nexarag.auth.mapper`。不建立 `AuthAccountDO` 或 `AuthAccountRoleDO`。
 
 - [ ] **Step 4: 运行模块测试。**
 
@@ -134,12 +133,9 @@ Expected: PASS。
 - Delete: `nexa-rag-auth/src/main/java/com/nexarag/auth/constants/AuthConstants.java`
 - Delete: `nexa-rag-auth/src/main/java/com/nexarag/auth/filter/FixedUserAuthenticationFilter.java`
 - Modify: `nexa-rag-auth/src/main/java/com/nexarag/auth/context/CurrentUser.java`
-- Modify: `nexa-rag-auth/src/main/java/com/nexarag/auth/context/CurrentUserContext.java`
-- Create: `nexa-rag-auth/src/main/java/com/nexarag/auth/context/CurrentSubjectResolver.java`
-- Create: `nexa-rag-auth/src/main/java/com/nexarag/auth/config/SaTokenConfiguration.java`
+- Create: `nexa-rag-auth/src/main/java/com/nexarag/auth/context/UserContext.java`
 - Modify: `nexa-rag-boot/src/main/java/com/nexarag/boot/config/AuthWebConfiguration.java`
 - Modify: `nexa-rag-boot/src/main/resources/application.yml`
-- Test: `nexa-rag-auth/src/test/java/com/nexarag/auth/context/CurrentSubjectResolverTest.java`
 - Test: `nexa-rag-boot/src/test/java/com/nexarag/boot/config/AuthWebConfigurationTest.java`
 
 - [ ] **Step 1: 写失败测试，要求 Sa-Token 登录身份解析出完整业务主体。**
@@ -148,16 +144,16 @@ Expected: PASS。
 @Test
 void shouldResolveUserAccountAndCurrentTenantFromAuthenticatedSession() {
     when(subjectRepository.findRequired(1001L)).thenReturn(
-            new AuthenticatedSubject("864019719617777664", 1001L, "default-tenant"));
+            new AuthenticatedSubject("864019719617777664", "default-tenant"));
     StpUtil.login(1001L);
     assertThat(resolver.resolveRequired()).isEqualTo(
-            new CurrentUser("864019719617777664", 1001L, "default-tenant"));
+            new CurrentUser("864019719617777664", "default-tenant"));
 }
 ```
 
 - [ ] **Step 2: 运行失败测试。**
 
-Run: `mvn -pl nexa-rag-auth -am -Dtest=CurrentSubjectResolverTest test`
+Run: `mvn -pl nexa-rag-auth -am test`
 
 Expected: FAIL，Sa-Token 与解析器尚未接入。
 
@@ -167,7 +163,7 @@ Expected: FAIL，Sa-Token 与解析器尚未接入。
 
 - [ ] **Step 4: 实现认证过滤链和上下文。**
 
-`CurrentUser` 扩展为 `String userId, Long accountId, String tenantId`。请求过滤链先让 Sa-Token 校验登录态，再由 `CurrentSubjectResolver` 从数据库/会话可靠解析主体并写入 ThreadLocal，finally 清理。不得继续注入固定用户。对流式请求确保 Reactor 回调开始前已经取得不可变主体快照，不能在异步线程直接读取遗留 ThreadLocal。
+`CurrentUser` 扩展为 `String userId, String tenantId`。`UserContext` 直接通过 `StpUtil.getLoginIdAsString()` 读取稳定用户ID，并通过 `StpUtil.getTokenSession()` 读取设备级当前租户；不得继续注入固定用户、写入 ThreadLocal 或维护第二套会话状态。对流式请求确保 Reactor 回调开始前已经取得不可变主体快照。
 
 - [ ] **Step 5: 运行认证模块与启动层测试。**
 
@@ -179,9 +175,7 @@ Expected: PASS；旧 `FixedUserAuthenticationFilter` 测试被替换，不再有
 
 **Files:**
 
-- Create: `nexa-rag-auth/src/main/java/com/nexarag/auth/authorization/AuthPermissionProvider.java`
 - Create: `nexa-rag-auth/src/main/java/com/nexarag/auth/authorization/SaTokenStpInterface.java`
-- Create: `nexa-rag-auth/src/main/java/com/nexarag/auth/web/AuthRoutePolicy.java`
 - Modify: `nexa-rag-boot/src/main/java/com/nexarag/boot/config/AuthWebConfiguration.java`
 - Create: `nexa-rag-auth/src/main/java/com/nexarag/auth/web/CsrfTokenService.java`
 - Create: `nexa-rag-auth/src/main/java/com/nexarag/auth/web/CsrfRequestValidator.java`
@@ -210,7 +204,7 @@ Expected: FAIL，当前所有请求仍会被固定用户过滤器放行。
 
 - [ ] **Step 3: 实现路由策略与权限读取。**
 
-`SaTokenStpInterface` 仅根据已认证 `accountId` 读取 `auth_account_role → auth_role_permission`，返回权限码；不得按账号名、请求参数或前端角色判断。`/api/model/**` 统一要求 `model:manage`，其余 `/api/**` 默认 `checkLogin()`。所有状态变更请求校验自定义 CSRF Header、同源 Origin 和 Fetch Metadata；OAuth 回调只校验服务端 state，不依赖 Strict Cookie。
+`SaTokenStpInterface` 直接根据已认证 `userId` 通过 Mapper 读取 `auth_user.role_id → auth_role_permission`，返回权限码；不得按账号名、请求参数或前端角色判断。`AuthWebConfiguration` 使用 Sa-Token 原生 `SaInterceptor`、`SaRouter` 和 `StpUtil`：`/api/model/**` 统一要求 `model:manage`，其余 `/api/**` 默认 `checkLogin()`。所有状态变更请求校验自定义 CSRF Header、同源 Origin 和 Fetch Metadata；OAuth 回调只校验服务端 state，不依赖 Strict Cookie。
 
 - [ ] **Step 4: 统一未认证/未授权响应。**
 
@@ -264,11 +258,11 @@ Expected: PASS。
 
 - [ ] **Step 1: 更新失败测试为完整主体构造器。**
 
-所有测试通过 `new CurrentUser("u1", 1001L, "default-tenant")` 设置上下文；断言聊天、会话和提示词操作人仍使用 `userId`，不误改为 `accountId` 或账号名。
+所有测试通过 `new CurrentUser("u1", "default-tenant")` 设置上下文；断言聊天、会话和提示词操作人仍使用 `userId`，不误改为账号名。
 
 - [ ] **Step 2: 修正业务代码只读取正确身份字段。**
 
-个人聊天数据继续取 `CurrentUserContext.getRequired().userId()`；涉及租户的资源入口改为同时读取 `tenantId` 并在任务 15 统一复验成员资格。提示词操作人继续为 `userId`，因为它是业务审计主体。
+个人聊天数据继续取 `UserContext.getRequired().userId()`；涉及租户的资源入口改为同时读取 `tenantId` 并在任务 15 统一复验成员资格。提示词操作人继续为 `userId`，因为它是业务审计主体。
 
 - [ ] **Step 3: 运行计划 A 回归。**
 
@@ -294,7 +288,7 @@ Expected: PASS。
 
 - [ ] **Step 2: 实现 V25 凭据和安全表。**
 
-密码表一账号一行，保存 PHC 哈希和失败计数/冻结时间；邮箱凭据表以规范化邮箱全局唯一；验证码表保存安全哈希、purpose、context、过期/尝试/消费状态；最近验证授权绑定 `accountId` 与 Sa-Token token-session；安全审计与设备会话只保存脱敏安全摘要。所有唯一约束和查询索引写入增量与全量 Schema。
+密码表一用户一行，保存 PHC 哈希和失败计数/冻结时间；邮箱凭据表以规范化邮箱全局唯一；验证码本身及其安全哈希保存在 Redis，MySQL 验证码表只保留 purpose、context、过期/尝试/消费元数据；最近验证授权绑定 `userId` 与 Sa-Token token-session；安全审计与设备会话只保存脱敏安全摘要。所有唯一约束和查询索引写入增量与全量 Schema。
 
 - [ ] **Step 3: 实现密码服务。**
 
@@ -477,7 +471,7 @@ Expected: PASS。
 
 - Create: `nexa-rag-auth/src/main/java/com/nexarag/auth/tenant/CurrentTenantService.java`
 - Create: `nexa-rag-auth/src/main/java/com/nexarag/auth/tenant/TenantAccessGuard.java`
-- Modify: `nexa-rag-auth/src/main/java/com/nexarag/auth/context/CurrentSubjectResolver.java`
+- Modify: `nexa-rag-auth/src/main/java/com/nexarag/auth/context/UserContext.java`
 - Modify: `nexa-rag-auth/src/main/java/com/nexarag/auth/service/impl/SessionServiceImpl.java`
 - Modify: `nexa-rag-auth/src/main/java/com/nexarag/auth/controller/TenantController.java`
 - Test: `nexa-rag-auth/src/test/java/com/nexarag/auth/tenant/CurrentTenantServiceTest.java`
@@ -517,7 +511,7 @@ Expected: PASS。
 
 - [ ] **Step 2: 在业务边界加入可信租户范围。**
 
-知识库和文档查询必须带 `CurrentUserContext.getRequired().tenantId()`；异步消息负载携带创建时可信 tenantId，但消费者执行前再次调用 `TenantAccessGuard`。缓存键加入 tenantId，避免不同企业空间命中相同业务缓存。
+知识库和文档查询必须带 `UserContext.getRequired().tenantId()`；异步消息负载携带创建时可信 tenantId，但消费者执行前再次调用 `TenantAccessGuard`。缓存键加入 tenantId，避免不同企业空间命中相同业务缓存。
 
 - [ ] **Step 3: 执行分层回归。**
 

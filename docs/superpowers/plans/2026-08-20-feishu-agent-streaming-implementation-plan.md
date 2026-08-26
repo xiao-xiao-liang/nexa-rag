@@ -240,7 +240,7 @@ Expected: 恢复端点不存在导致失败。
 
 - [ ] **Step 3: 实现 SSE 映射与恢复端点**
 
-保留 `POST /api/chat/stream` 作为初始生成入口，首个事件发送包含 `generationId`、`conversationId`、`messageId` 的 `META`。新增 `GET /api/chat/generations/{generationId}/stream?afterVersion={version}`，从 Redis 缓冲重放并连接 Pub/Sub 后续事件。所有 `ServerSentEvent` 使用 `eventVersion` 作为 SSE `id`；用户身份始终从 `CurrentUserContext` 读取。恢复缓冲缺失时返回可识别的业务错误，供前端进入后台运行降级态。
+保留 `POST /api/chat/stream` 作为初始生成入口，首个事件发送包含 `generationId`、`conversationId`、`messageId` 的 `META`。新增 `GET /api/chat/generations/{generationId}/stream?afterVersion={version}`，从 Redis 缓冲重放并连接 Pub/Sub 后续事件。所有 `ServerSentEvent` 使用 `eventVersion` 作为 SSE `id`；用户身份始终从 `UserContext` 读取。恢复缓冲缺失时返回可识别的业务错误，供前端进入后台运行降级态。
 
 - [ ] **Step 4: 运行 boot 控制器测试**
 

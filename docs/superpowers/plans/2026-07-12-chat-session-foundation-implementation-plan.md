@@ -16,10 +16,9 @@
 
 ```text
 nexa-rag-auth/src/main/java/com/nexarag/auth
-├── constants/AuthConstants.java
+├── constants/AuthSessionConstants.java
 ├── context/CurrentUser.java
-├── context/CurrentUserContext.java
-└── filter/FixedUserAuthenticationFilter.java
+└── context/UserContext.java
 
 nexa-rag-model/src/main/java/com/nexarag/model/gateway/chat
 └── ChatModelMessage.java
@@ -76,41 +75,30 @@ public record ChatModelMessage(String role, String content) {
 
 ---
 
-### 任务 2：增加固定用户身份边界
+### 任务 2：增加用户身份边界
 
 **Files:**
-- Create: `nexa-rag-auth/src/main/java/com/nexarag/auth/constants/AuthConstants.java`
+- Create: `nexa-rag-auth/src/main/java/com/nexarag/auth/constants/AuthSessionConstants.java`
 - Create: `nexa-rag-auth/src/main/java/com/nexarag/auth/context/CurrentUser.java`
-- Create: `nexa-rag-auth/src/main/java/com/nexarag/auth/context/CurrentUserContext.java`
-- Create: `nexa-rag-auth/src/main/java/com/nexarag/auth/filter/FixedUserAuthenticationFilter.java`
-- Create: `nexa-rag-auth/src/test/java/com/nexarag/auth/context/CurrentUserContextTest.java`
-- Create: `nexa-rag-auth/src/test/java/com/nexarag/auth/filter/FixedUserAuthenticationFilterTest.java`
+- Create: `nexa-rag-auth/src/main/java/com/nexarag/auth/context/UserContext.java`
 
-- [ ] **Step 1: 定义固定用户 ID**
+- [ ] **Step 1: 定义当前租户 Token-Session 键**
 
-将一次生成的雪花 ID 以十进制字符串写入 `AuthConstants.DEFAULT_USER_ID`，运行期间不得重新生成。该常量作为临时用户身份，类型保持 `String`，便于未来兼容普通用户数字 ID 和带前缀的员工 ID。
+将当前租户的 Token-Session 键写入 `AuthSessionConstants.CURRENT_TENANT_ID`。登录成功后由认证服务写入该键，用户切换租户时更新该键。
 
-- [ ] **Step 2: 实现请求上下文**
+- [ ] **Step 2: 实现请求上下文门面**
 
-`CurrentUserContext` 使用 `ThreadLocal<CurrentUser>` 保存当前请求用户，并提供 `set`、`getRequired`、`clear` 方法。`getRequired` 在请求外访问时抛出客户端异常。
+`UserContext` 从 `StpUtil.getLoginIdAsString()` 获取稳定用户 ID，并从 `StpUtil.getTokenSession()` 读取当前租户；不维护 `ThreadLocal`。未登录由 Sa-Token 拒绝，未设置当前租户则失败，禁止降级到默认租户。
 
-- [ ] **Step 3: 实现固定用户过滤器**
+- [ ] **Step 3: 由 Sa-Token 路由拦截器完成登录校验**
 
-继承 `OncePerRequestFilter`，按以下步骤处理：
-
-```text
-1. 写入 DEFAULT_USER_ID
-2. 调用 FilterChain
-3. 在 finally 中清理 ThreadLocal
-```
-
-过滤器不读取客户端传入的 `userId`。异步任务必须在提交前显式复制 `CurrentUser.userId()`。
+登录校验由 `SaInterceptor` 与 `SaRouter` 完成，不额外实现固定用户过滤器。异步任务必须在提交前显式复制 `CurrentUser.userId()`。
 
 - [ ] **Step 4: 运行认证模块测试**
 
 运行：`mvn -pl nexa-rag-auth -am test`
 
-预期：过滤器能够写入固定用户，调用结束后上下文为空，异常路径也会清理上下文。
+预期：未登录请求由 Sa-Token 拒绝，已登录请求可从 `UserContext` 读取用户与当前租户。
 
 ---
 

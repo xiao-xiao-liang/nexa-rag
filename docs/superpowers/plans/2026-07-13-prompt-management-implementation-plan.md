@@ -179,7 +179,7 @@ RenderedPrompt render(PromptExecutionSnapshot snapshot, String promptCode,
 
 - [ ] **步骤 2：实现 REST 接口**
 
-实现 `GET /api/model/prompts`、`GET /api/model/prompts/{promptCode}`、`POST /api/model/prompts/{promptCode}/preview`、`POST /api/model/prompts/{promptCode}/submit`、`POST /api/model/prompts/{promptCode}/release`、`POST /api/model/prompts/{promptCode}/rollback`。操作者取自 `CurrentUserContext`；预览只使用脱敏变量渲染，不调用模型。
+实现 `GET /api/model/prompts`、`GET /api/model/prompts/{promptCode}`、`POST /api/model/prompts/{promptCode}/preview`、`POST /api/model/prompts/{promptCode}/submit`、`POST /api/model/prompts/{promptCode}/release`、`POST /api/model/prompts/{promptCode}/rollback`。操作者取自 `UserContext`；预览只使用脱敏变量渲染，不调用模型。
 
 - [ ] **步骤 3：运行测试并提交**
 

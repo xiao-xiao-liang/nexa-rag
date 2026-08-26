@@ -309,7 +309,7 @@ mockMvc.perform(post("/api/chat/stream")
 
 - [x] **Step 2: 实现发起与取消接口**
 
-`POST /api/chat/stream` 从 `CurrentUserContext` 获取 userId，生成雪花 `generationId` 和 UUID `traceId`，调用 Chat Workflow 并映射为 `ServerSentEvent<ChatStreamEvent>`；`DELETE /api/chat/generations/{generationId}` 由任务管理器校验用户后取消。
+`POST /api/chat/stream` 从 `UserContext` 获取 userId，生成雪花 `generationId` 和 UUID `traceId`，调用 Chat Workflow 并映射为 `ServerSentEvent<ChatStreamEvent>`；`DELETE /api/chat/generations/{generationId}` 由任务管理器校验用户后取消。
 
 - [x] **Step 3: 在 SSE 取消时触发任务取消并运行测试**
 
