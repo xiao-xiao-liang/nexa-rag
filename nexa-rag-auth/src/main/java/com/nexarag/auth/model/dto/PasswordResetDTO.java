@@ -1,0 +1,39 @@
+package com.nexarag.auth.model.dto;
+
+import jakarta.validation.constraints.Email;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Pattern;
+import jakarta.validation.constraints.Positive;
+import jakarta.validation.constraints.Size;
+import lombok.Getter;
+import lombok.Setter;
+
+/**
+ * 邮箱验证码密码重置请求数据传输对象。
+ */
+@Getter
+@Setter
+public class PasswordResetDTO {
+
+    /** 当前绑定邮箱。 */
+    @NotBlank(message = "邮箱不能为空")
+    @Email(message = "邮箱格式不合法")
+    @Size(max = 320, message = "邮箱长度不能超过 320 个字符")
+    private String email;
+
+    /** 密码重置验证码挑战ID。 */
+    @NotNull(message = "验证码挑战不能为空")
+    @Positive(message = "验证码挑战不合法")
+    private Long challengeId;
+
+    /** 用户输入验证码。 */
+    @NotBlank(message = "验证码不能为空")
+    @Pattern(regexp = "\\d{6}", message = "验证码必须为六位数字")
+    private String verificationCode;
+
+    /** 待设置的新明文密码，仅用于本次哈希。 */
+    @NotBlank(message = "新密码不能为空")
+    @Size(max = 1024, message = "新密码长度不能超过 1024 个字符")
+    private String newPassword;
+}
