@@ -9,6 +9,7 @@ import {
   Plus,
 } from "lucide-react";
 import { Button } from "../../components/ui/button";
+import { useAuthStore } from "../auth/store/authStore";
 
 /** 飞书原版 1:1 灰色极简趋势折线迷你图 (Sparklines) */
 const Sparkline1 = () => (
@@ -48,6 +49,8 @@ const Sparkline3 = () => (
 );
 
 export const HomePage: React.FC = () => {
+  const { hasPermission } = useAuthStore();
+
   return (
     <div className="flex h-full flex-col overflow-y-auto bg-white text-[#1F2329] select-none space-y-4">
       {/* 1. 顶部标题栏 Header (纯白背景 + 飞书风格标题与操作) */}
@@ -94,33 +97,45 @@ export const HomePage: React.FC = () => {
           </span>
           接入知识文档
         </Link>
-        <Link
-          to="/models/configs"
-          className="flex h-7 items-center gap-1.5 rounded-[6px] border border-[#DEE0E3] bg-white px-2.5 text-[12px] text-[#1F2329] transition-colors hover:border-[#3370FF] hover:text-[#3370FF] shrink-0"
-        >
-          <span className="flex h-3.5 w-3.5 items-center justify-center rounded-full bg-[#8D55ED] text-[10px] text-white font-bold">
-            <Cpu className="w-2.5 h-2.5" />
-          </span>
-          模型网关配置
-        </Link>
-        <Link
-          to="/prompts"
-          className="flex h-7 items-center gap-1.5 rounded-[6px] border border-[#DEE0E3] bg-white px-2.5 text-[12px] text-[#1F2329] transition-colors hover:border-[#3370FF] hover:text-[#3370FF] shrink-0"
-        >
-          <span className="flex h-3.5 w-3.5 items-center justify-center rounded-full bg-[#FF811A] text-[10px] text-white font-bold">
-            <Sliders className="w-2.5 h-2.5" />
-          </span>
-          Prompt 在线工坊
-        </Link>
-        <Link
-          to="/crm"
-          className="flex h-7 items-center gap-1.5 rounded-[6px] border border-[#DEE0E3] bg-white px-2.5 text-[12px] text-[#1F2329] transition-colors hover:border-[#3370FF] hover:text-[#3370FF] shrink-0"
-        >
-          <span className="flex h-3.5 w-3.5 items-center justify-center rounded-full bg-[#10A893] text-[10px] text-white font-bold">
-            <TableProperties className="w-2.5 h-2.5" />
-          </span>
-          CRM 调样演示
-        </Link>
+        {hasPermission("model:manage") && (
+          <>
+            <Link
+              to="/models/configs"
+              className="flex h-7 items-center gap-1.5 rounded-[6px] border border-[#DEE0E3] bg-white px-2.5 text-[12px] text-[#1F2329] transition-colors hover:border-[#3370FF] hover:text-[#3370FF] shrink-0"
+            >
+              <span className="flex h-3.5 w-3.5 items-center justify-center rounded-full bg-[#8D55ED] text-[10px] text-white font-bold">
+                <Cpu className="w-2.5 h-2.5" />
+              </span>
+              模型网关配置
+            </Link>
+          </>
+        )}
+        {hasPermission("prompt:manage") && (
+          <>
+            <Link
+              to="/prompts"
+              className="flex h-7 items-center gap-1.5 rounded-[6px] border border-[#DEE0E3] bg-white px-2.5 text-[12px] text-[#1F2329] transition-colors hover:border-[#3370FF] hover:text-[#3370FF] shrink-0"
+            >
+              <span className="flex h-3.5 w-3.5 items-center justify-center rounded-full bg-[#FF811A] text-[10px] text-white font-bold">
+                <Sliders className="w-2.5 h-2.5" />
+              </span>
+              Prompt 在线工坊
+            </Link>
+          </>
+        )}
+        {hasPermission("crm:view") && (
+          <>
+            <Link
+              to="/crm"
+              className="flex h-7 items-center gap-1.5 rounded-[6px] border border-[#DEE0E3] bg-white px-2.5 text-[12px] text-[#1F2329] transition-colors hover:border-[#3370FF] hover:text-[#3370FF] shrink-0"
+            >
+              <span className="flex h-3.5 w-3.5 items-center justify-center rounded-full bg-[#10A893] text-[10px] text-white font-bold">
+                <TableProperties className="w-2.5 h-2.5" />
+              </span>
+              CRM 调样演示
+            </Link>
+          </>
+        )}
       </div>
 
       {/* 3. 核心看板网格 (1:1 飞书 CRM 3 + 1 经典黄金结构，圆角统一 12px) */}

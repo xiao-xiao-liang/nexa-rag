@@ -16,6 +16,7 @@ import {
 import { cn } from "../../lib/utils";
 import { FeishuTopNav } from "./FeishuTopNav";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "../ui/tooltip";
+import { useAuthStore } from "../../features/auth/store/authStore";
 
 interface AppShellProps {
   children: React.ReactNode;
@@ -149,14 +150,28 @@ export const AppShell: React.FC<AppShellProps> = ({ children }) => {
     }
   };
 
-  // 收起时的一级图标列表 (图二 1:1 对标)
+  const { hasPermission } = useAuthStore();
+
+  // 收起时的一级图标列表 (图二 1:1 对标，依据权限动态过滤)
   const collapsedNavItems = [
     { id: "home", label: "首页", icon: Home, path: "/home", active: currentPath === "/home" || currentPath === "/" },
     { id: "chat", label: "对话", icon: MessageSquare, path: "/chat", active: currentPath.startsWith("/chat") },
     { id: "knowledge", label: "知识库", icon: BookOpen, path: "/knowledge-base", active: currentPath.startsWith("/knowledge") || currentPath.startsWith("/documents") },
-    { id: "models", label: "模型网关", icon: Cpu, path: "/models/configs", active: currentPath.startsWith("/models") },
-    { id: "prompts", label: "提示词管理", icon: Sliders, path: "/prompts", active: currentPath.startsWith("/prompts") },
-    { id: "crm", label: "CRM 表格演示", icon: TableProperties, path: "/crm", active: currentPath.startsWith("/crm") },
+    ...(hasPermission("model:manage")
+      ? [
+          { id: "models", label: "模型网关", icon: Cpu, path: "/models/configs", active: currentPath.startsWith("/models") },
+        ]
+      : []),
+    ...(hasPermission("prompt:manage")
+      ? [
+          { id: "prompts", label: "提示词管理", icon: Sliders, path: "/prompts", active: currentPath.startsWith("/prompts") },
+        ]
+      : []),
+    ...(hasPermission("crm:view")
+      ? [
+          { id: "crm", label: "CRM 表格演示", icon: TableProperties, path: "/crm", active: currentPath.startsWith("/crm") },
+        ]
+      : []),
   ];
 
   // 渲染完整的侧边栏内容
@@ -185,32 +200,46 @@ export const AppShell: React.FC<AppShellProps> = ({ children }) => {
         {/* 📚 知识库 */}
         <NavItem to="/knowledge-base" label="知识库" icon={BookOpen} onClick={onItemClick} />
 
-        {/* ▾ 🖧 模型网关 */}
-        <NavGroup
-          label="模型网关"
-          icon={Cpu}
-          prefix="/models"
-          onItemClick={onItemClick}
-          items={[
-            { to: "/models/configs", label: "LLM 模型配置", icon: Settings2 },
-            { to: "/models/routes", label: "智能路由决策", icon: GitFork },
-            { to: "/models/governance", label: "熔断限流治理", icon: ShieldCheck },
-          ]}
-        />
+        {hasPermission("model:manage") && (
+          <>
+            {/* ▾ 🖧 模型网关 */}
+            <NavGroup
+              label="模型网关"
+              icon={Cpu}
+              prefix="/models"
+              onItemClick={onItemClick}
+              items={[
+                { to: "/models/configs", label: "LLM 模型配置", icon: Settings2 },
+                { to: "/models/routes", label: "智能路由决策", icon: GitFork },
+                { to: "/models/governance", label: "熔断限流治理", icon: ShieldCheck },
+              ]}
+            />
 
-        {/* ▾ 📝 提示词管理 */}
-        <NavGroup
-          label="提示词管理"
-          icon={Sliders}
-          prefix="/prompts"
-          onItemClick={onItemClick}
-          items={[
-            { to: "/prompts", label: "Prompt 在线工坊", icon: Sparkles },
-          ]}
-        />
+          </>
+        )}
 
-        {/* ⚡ CRM 表格演示 */}
-        <NavItem to="/crm" label="CRM 表格演示" icon={TableProperties} onClick={onItemClick} />
+        {hasPermission("prompt:manage") && (
+          <>
+            {/* ▾ 📝 提示词管理 */}
+            <NavGroup
+              label="提示词管理"
+              icon={Sliders}
+              prefix="/prompts"
+              onItemClick={onItemClick}
+              items={[
+                { to: "/prompts", label: "Prompt 在线工坊", icon: Sparkles },
+              ]}
+            />
+
+          </>
+        )}
+
+        {hasPermission("crm:view") && (
+          <>
+            {/* ⚡ CRM 表格演示 */}
+            <NavItem to="/crm" label="CRM 表格演示" icon={TableProperties} onClick={onItemClick} />
+          </>
+        )}
       </nav>
     </div>
   );

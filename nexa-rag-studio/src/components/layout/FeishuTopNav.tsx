@@ -16,6 +16,8 @@ import {
   DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from "../ui/dropdown-menu";
+import { authApi } from "../../lib/api";
+import { authStore, useAuthStore } from "../../features/auth/store/authStore";
 
 // --- 飞书原装 1:1 Universe Design 顶栏矢量图标 ---
 
@@ -110,6 +112,7 @@ export const FeishuTopNav: React.FC<FeishuTopNavProps> = ({
   onToggleSidebar,
 }) => {
   const navigate = useNavigate();
+  const { hasPermission } = useAuthStore();
   const [theme, setTheme] = useState<"light" | "dark" | "system">("light");
   const [lang, setLang] = useState<string>("zh-CN");
 
@@ -124,6 +127,18 @@ export const FeishuTopNav: React.FC<FeishuTopNavProps> = ({
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [onToggleSidebar]);
+
+  // 退出登录
+  const handleLogout = async () => {
+    try {
+      await authApi.logout();
+    } catch (err) {
+      console.warn("退出登录请求异常:", err);
+    } finally {
+      authStore.clearSession();
+      navigate("/login");
+    }
+  };
 
   return (
     <header className="h-16 w-full bg-white border-b border-[rgba(31,35,41,0.15)] pl-5 pr-4 flex items-center justify-between select-none z-30 shrink-0">
@@ -160,15 +175,17 @@ export const FeishuTopNav: React.FC<FeishuTopNavProps> = ({
 
       {/* 右侧：多维表格 / 应用 / 智能体 / 新建 快捷入口 + 26px分割线 + 问号帮助 + 头像 */}
       <div className="flex items-center gap-2">
-        {/* 多维表格 */}
-        <button
-          type="button"
-          onClick={() => navigate("/crm")}
-          className="h-8 px-2 rounded-[6px] hover:bg-[rgba(31,35,41,0.08)] active:bg-[rgba(31,35,41,0.12)] text-[#1F2329] text-[14px] font-medium leading-[22px] flex items-center gap-1 transition-colors cursor-pointer"
-        >
-          <FileLinkBitableOutlinedIcon />
-          <span>多维表格</span>
-        </button>
+        {/* 多维表格 (仅具备管理员/演示权限展示) */}
+        {hasPermission("crm:view") && (
+          <button
+            type="button"
+            onClick={() => navigate("/crm")}
+            className="h-8 px-2 rounded-[6px] hover:bg-[rgba(31,35,41,0.08)] active:bg-[rgba(31,35,41,0.12)] text-[#1F2329] text-[14px] font-medium leading-[22px] flex items-center gap-1 transition-colors cursor-pointer"
+          >
+            <FileLinkBitableOutlinedIcon />
+            <span>多维表格</span>
+          </button>
+        )}
 
         {/* 应用 */}
         <button
@@ -411,7 +428,10 @@ export const FeishuTopNav: React.FC<FeishuTopNavProps> = ({
 
             {/* 底部退出登录 */}
             <div className="p-1.5">
-              <DropdownMenuItem className="px-3 py-2 rounded-[6px] h-10 text-[14px] leading-[22px] text-[#1F2329] hover:bg-[rgba(31,35,41,0.06)] hover:text-[#F54A45] transition-colors cursor-pointer">
+              <DropdownMenuItem
+                onClick={handleLogout}
+                className="px-3 py-2 rounded-[6px] h-10 text-[14px] leading-[22px] text-[#1F2329] hover:bg-[rgba(31,35,41,0.06)] hover:text-[#F54A45] transition-colors cursor-pointer"
+              >
                 <span>退出登录</span>
               </DropdownMenuItem>
             </div>
