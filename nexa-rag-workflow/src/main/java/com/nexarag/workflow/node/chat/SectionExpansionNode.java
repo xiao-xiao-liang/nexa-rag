@@ -19,6 +19,7 @@ import static com.nexarag.workflow.constants.ChatWorkflowStateKeys.FUSED_RETRIEV
 import static com.nexarag.workflow.constants.ChatWorkflowStateKeys.REWRITTEN_QUESTION;
 import static com.nexarag.workflow.constants.ChatWorkflowStateKeys.TRACE_ID;
 import static com.nexarag.workflow.constants.ChatWorkflowStateKeys.RETRIEVAL_KNOWLEDGE_BASE_IDS;
+import static com.nexarag.workflow.constants.ChatWorkflowStateKeys.TENANT_ID;
 
 /**
  * 章节扩展节点，根据导航范围补充正文片段并返回重排序节点；导航标题不会写入证据状态。
@@ -41,11 +42,12 @@ public class SectionExpansionNode implements NodeAction {
     public Map<String, Object> apply(OverAllState state) {
         // 1. 读取初始候选和触发原因
         List<RetrievalChunk> initialChunks = state.value(FUSED_RETRIEVAL_RESULTS, List.of());
-        Set<Long> knowledgeBaseIds = knowledgeBaseService.validateRequestedKnowledgeBases(
+        String tenantId = requireTenantId(state.value(TENANT_ID, ""));
+        Set<Long> knowledgeBaseIds = knowledgeBaseService.validateRequestedKnowledgeBases(tenantId,
                 state.value(RETRIEVAL_KNOWLEDGE_BASE_IDS, List.of()));
         List<RetrievalChunk> candidateExpandedChunks = sectionExpansionRetriever.retrieve(
                 state.value(REWRITTEN_QUESTION, ""));
-        Set<Long> accessibleDocumentIds = knowledgeBaseService.filterDocumentIdsInCurrentTenantScope(
+        Set<Long> accessibleDocumentIds = knowledgeBaseService.filterDocumentIdsInTenantScope(tenantId,
                 candidateExpandedChunks.stream().map(RetrievalChunk::documentId).toList(), knowledgeBaseIds);
         List<RetrievalChunk> expandedChunks = candidateExpandedChunks.stream()
                 .filter(chunk -> accessibleDocumentIds.contains(chunk.documentId()))
@@ -70,5 +72,12 @@ public class SectionExpansionNode implements NodeAction {
             String key = chunk.chunkId() == null ? chunk.documentId() + ":" + chunk.content().hashCode() : chunk.chunkId();
             target.putIfAbsent(key, chunk);
         }
+    }
+
+    private String requireTenantId(String tenantId) {
+        if (tenantId == null || tenantId.isBlank()) {
+            throw new IllegalArgumentException("对话工作流缺少可信租户ID");
+        }
+        return tenantId;
     }
 }

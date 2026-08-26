@@ -40,6 +40,15 @@ public interface KnowledgeBaseService extends IService<KnowledgeBaseDO> {
 
     Set<Long> validateRequestedKnowledgeBases(Collection<Long> knowledgeBaseIds);
 
+    /**
+     * 校验指定租户范围内的知识库，适用于脱离 HTTP 请求线程的异步任务。
+     *
+     * @param tenantId 可信租户ID
+     * @param knowledgeBaseIds 待校验知识库ID集合；为空表示检索全部知识库
+     * @return 去重后的知识库ID集合
+     */
+    Set<Long> validateRequestedKnowledgeBases(String tenantId, Collection<Long> knowledgeBaseIds);
+
     boolean isDocumentInCurrentTenantScope(Long documentId, Set<Long> knowledgeBaseIds);
 
     /**
@@ -50,4 +59,14 @@ public interface KnowledgeBaseService extends IService<KnowledgeBaseDO> {
      * @return 可访问的文档ID集合
      */
     Set<Long> filterDocumentIdsInCurrentTenantScope(Collection<Long> documentIds, Set<Long> knowledgeBaseIds);
+
+    /**
+     * 批量过滤指定租户和指定知识库范围内可访问的文档ID，适用于脱离 HTTP 请求线程的异步任务。
+     *
+     * @param tenantId 可信租户ID
+     * @param documentIds 待校验的文档ID集合
+     * @param knowledgeBaseIds 已校验的知识库范围；为空表示该租户全部知识库
+     * @return 可访问的文档ID集合
+     */
+    Set<Long> filterDocumentIdsInTenantScope(String tenantId, Collection<Long> documentIds, Set<Long> knowledgeBaseIds);
 }

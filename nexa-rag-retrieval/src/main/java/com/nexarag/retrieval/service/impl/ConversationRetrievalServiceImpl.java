@@ -8,6 +8,7 @@ import com.nexarag.document.service.KnowledgeBaseService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.util.StringUtils;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -27,10 +28,13 @@ public class ConversationRetrievalServiceImpl implements ConversationRetrievalSe
 
     @Override
     public List<RetrievalChunk> retrieve(ConversationRetrievalRequest request) {
-        // 1. 在调用异步检索通道前校验范围，避免后续认证上下文跨线程丢失
-        Set<Long> knowledgeBaseIds = knowledgeBaseService.validateRequestedKnowledgeBases(request.knowledgeBaseIds());
+        // 1. 异步工作流必须携带入口处捕获的可信租户，不能在工作线程读取认证上下文。
+        String tenantId = requireTenantId(request.tenantId());
+        Set<Long> knowledgeBaseIds = knowledgeBaseService.validateRequestedKnowledgeBases(tenantId,
+                request.knowledgeBaseIds());
         ConversationRetrievalRequest scopedRequest = new ConversationRetrievalRequest(request.question(), request.intentResult(),
-                request.scope(), request.topK(), request.vectorThreshold(), request.round(), List.copyOf(knowledgeBaseIds));
+                request.scope(), request.topK(), request.vectorThreshold(), request.round(), tenantId,
+                List.copyOf(knowledgeBaseIds));
 
         // 2. 并行执行所有已装配的检索通道
         List<CompletableFuture<List<RetrievalChunk>>> futures = retrievers.stream()
@@ -42,11 +46,18 @@ public class ConversationRetrievalServiceImpl implements ConversationRetrievalSe
         for (CompletableFuture<List<RetrievalChunk>> future : futures) {
             result.addAll(future.join());
         }
-        Set<Long> accessibleDocumentIds = knowledgeBaseService.filterDocumentIdsInCurrentTenantScope(
+        Set<Long> accessibleDocumentIds = knowledgeBaseService.filterDocumentIdsInTenantScope(tenantId,
                 result.stream().map(RetrievalChunk::documentId).toList(), knowledgeBaseIds);
         return result.stream()
                 .filter(chunk -> accessibleDocumentIds.contains(chunk.documentId()))
                 .toList();
+    }
+
+    private String requireTenantId(String tenantId) {
+        if (!StringUtils.hasText(tenantId)) {
+            throw new IllegalArgumentException("对话检索缺少可信租户ID");
+        }
+        return tenantId;
     }
 
     private List<RetrievalChunk> retrieveSafely(ConversationRetriever retriever,

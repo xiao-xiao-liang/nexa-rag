@@ -47,6 +47,22 @@ public class ChatCitationService {
     }
 
     /**
+     * 从已完成归属校验的消息引用 JSON 构建引用摘要。
+     *
+     * <p>会话历史分页已经以当前用户作为查询条件，此方法不得再次按消息 ID 查询，避免助手消息数量
+     * 增长时产生 N+1 查询。公开的引用详情接口仍必须使用 {@link #getOwnedCitation(String, String, int)}
+     * 重新完成归属校验。</p>
+     *
+     * @param referencesJson 已查询消息携带的引用 JSON
+     * @return 仅包含引用编号的列表
+     */
+    public List<ChatCitationSummaryVO> listSummariesByReferencesJson(String referencesJson) {
+        return citationSetCodec.decode(referencesJson).citations().stream()
+                .map(citation -> new ChatCitationSummaryVO(citation.citationId()))
+                .toList();
+    }
+
+    /**
      * 查询当前用户可见的单条引用定位信息。
      *
      * @param messageId 消息 ID

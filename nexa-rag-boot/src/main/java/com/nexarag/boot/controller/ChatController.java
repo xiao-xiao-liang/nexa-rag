@@ -1,6 +1,6 @@
 package com.nexarag.boot.controller;
 
-import com.nexarag.auth.context.CurrentUserContext;
+import com.nexarag.auth.context.UserContext;
 import com.nexarag.chat.id.ChatIdGenerator;
 import com.nexarag.chat.domain.ChatCitationDTO;
 import com.nexarag.chat.domain.ChatCitationDetailVO;
@@ -76,13 +76,15 @@ public class ChatController {
             throw new ClientException("消息内容不能为空");
         }
         // 1. 从鉴权上下文读取用户并生成请求级标识
-        String userId = CurrentUserContext.getRequired().userId();
+        var currentUser = UserContext.getCurrUser();
+        String userId = currentUser.userId();
         String generationId = idGenerator.nextId();
         String traceId = TraceIdContext.getTraceId();
         log.debug("用户原始问题：{}", request.content());
         List<Long> knowledgeBaseIds = List.copyOf(knowledgeBaseService.validateRequestedKnowledgeBases(request.knowledgeBaseIds()));
         ChatWorkflowRequest workflowRequest = new ChatWorkflowRequest(
-                userId, request.conversationId(), request.content(), generationId, traceId, knowledgeBaseIds);
+                userId, currentUser.tenantId(), request.conversationId(), request.content(), generationId, traceId,
+                knowledgeBaseIds);
 
         // 2. 先打开本实例事件订阅，再驱动 Graph 执行，避免丢失首个工具快照
         return Flux.defer(() -> {
@@ -128,7 +130,7 @@ public class ChatController {
     @GetMapping(value = "/generations/{generationId}/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public Flux<ServerSentEvent<ChatStreamEvent>> resume(@PathVariable String generationId,
                                                           @RequestParam(defaultValue = "0") long afterVersion) {
-        String userId = CurrentUserContext.getRequired().userId();
+        String userId = UserContext.getCurrUser().userId();
         return Flux.defer(() -> {
             // 1. 先创建本实例订阅，再读取 Redis 重放事件
             Flux<ChatStreamEvent> realtimeEvents = eventPublisher.open(generationId);
@@ -153,7 +155,7 @@ public class ChatController {
      */
     @DeleteMapping("/generations/{generationId}")
     public void cancel(@PathVariable String generationId) {
-        String userId = CurrentUserContext.getRequired().userId();
+        String userId = UserContext.getCurrUser().userId();
         if (!taskManager.cancel(generationId, userId)) {
             throw new ClientException("生成任务不存在或无权取消");
         }
@@ -168,7 +170,7 @@ public class ChatController {
      */
     @GetMapping("/messages/{messageId}/citations/{citationId}")
     public Result<ChatCitationDetailVO> citation(@PathVariable String messageId, @PathVariable int citationId) {
-        String userId = CurrentUserContext.getRequired().userId();
+        String userId = UserContext.getCurrUser().userId();
         ChatCitationDTO citation = citationService.getOwnedCitation(messageId, userId, citationId);
         Document document = requireOwnedDocument(citation.documentId());
         DocumentChunk chunk = documentChunkService.getById(citation.chunkId());
@@ -197,7 +199,9 @@ public class ChatController {
             throw new ClientException("引用文档不存在或已失效");
         }
         Document document = documentService.getRequiredDocument(documentId);
-        return knowledgeBaseService.getRequiredDocument(document.getKnowledgeBaseId(), documentId);
+        // 文档已由 documentService 查询，无需再次按文档 ID 查询；只补齐当前租户的知识库归属校验。
+        knowledgeBaseService.getRequiredKnowledgeBase(document.getKnowledgeBaseId());
+        return document;
     }
 
     private boolean isTerminal(ChatStreamEvent event) {

@@ -5,6 +5,9 @@ package com.nexarag.workflow.constants;
  */
 public final class ChatWorkflowStateKeys {
 
+    /** 工作流启动时捕获并在执行边界复验的可信租户ID。 */
+    public static final String TENANT_ID = "tenantId";
+
     public static final String USER_QUESTION = "userQuestion";
     public static final String CONVERSATION_CONTEXT = "conversationContext";
     public static final String REWRITTEN_QUESTION = "rewrittenQuestion";

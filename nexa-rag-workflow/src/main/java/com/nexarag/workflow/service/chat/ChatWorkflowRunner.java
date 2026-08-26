@@ -7,6 +7,7 @@ import com.alibaba.cloud.ai.graph.StateGraph;
 import com.alibaba.cloud.ai.graph.exception.GraphStateException;
 import com.alibaba.cloud.ai.graph.streaming.StreamingOutput;
 import com.nexarag.common.exception.ServiceException;
+import com.nexarag.auth.tenant.TenantAccessGuard;
 import com.nexarag.model.toolkits.prompt.PromptBuilder;
 import com.nexarag.model.toolkits.prompt.PromptReleaseResolver;
 import com.nexarag.workflow.service.StreamingWorkflowGraphRunner;
@@ -23,6 +24,7 @@ import static com.nexarag.workflow.constants.ChatWorkflowGraphConstants.CHAT_CON
 import static com.nexarag.workflow.constants.ChatWorkflowGraphConstants.CHAT_THREAD_PREFIX;
 import static com.nexarag.workflow.constants.ChatWorkflowStateKeys.TRACE_ID;
 import static com.nexarag.workflow.constants.ChatWorkflowStateKeys.USER_ID;
+import static com.nexarag.workflow.constants.ChatWorkflowStateKeys.TENANT_ID;
 import static com.nexarag.workflow.constants.ChatWorkflowStateKeys.PROMPT_EXECUTION_SNAPSHOT;
 import static com.nexarag.workflow.constants.ChatWorkflowStateKeys.CONVERSATION_ID;
 import static com.nexarag.workflow.constants.ChatWorkflowStateKeys.GENERATION_ID;
@@ -45,10 +47,12 @@ public class ChatWorkflowRunner implements StreamingWorkflowGraphRunner {
 
     private final CompiledGraph compiledGraph;
     private final PromptReleaseResolver promptReleaseResolver;
+    private final TenantAccessGuard tenantAccessGuard;
 
     public ChatWorkflowRunner(@Qualifier("chatConversationGraph") StateGraph graph,
-                              PromptReleaseResolver promptReleaseResolver) {
+                              PromptReleaseResolver promptReleaseResolver, TenantAccessGuard tenantAccessGuard) {
         this.promptReleaseResolver = promptReleaseResolver;
+        this.tenantAccessGuard = tenantAccessGuard;
         try {
             this.compiledGraph = graph.compile();
         } catch (GraphStateException exception) {
@@ -73,6 +77,8 @@ public class ChatWorkflowRunner implements StreamingWorkflowGraphRunner {
         String traceId = String.valueOf(state.get(TRACE_ID));
         RunnableConfig config = RunnableConfig.builder().threadId(CHAT_THREAD_PREFIX + traceId).build();
         return Flux.defer(() -> {
+            tenantAccessGuard.requireUserAccess(Long.valueOf(String.valueOf(state.get(USER_ID))),
+                    String.valueOf(state.get(TENANT_ID)));
             long workflowStart = System.currentTimeMillis();
             log.info("对话工作流开始，traceId={}，userId={}，conversationId={}", traceId, state.get(USER_ID), state.get(CONVERSATION_ID));
 

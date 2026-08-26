@@ -1,6 +1,6 @@
 package com.nexarag.chat.advisor;
 
-import com.nexarag.auth.context.CurrentUserContext;
+import com.nexarag.auth.context.UserContext;
 import com.nexarag.chat.constants.ChatContextConstants;
 import com.nexarag.chat.domain.ChatMessageVO;
 import com.nexarag.chat.domain.ConversationContext;
@@ -43,7 +43,7 @@ public class ConversationContextAdvisor implements BaseAdvisor {
         if (conversationId == null || conversationId.isBlank()) {
             return request;
         }
-        String userId = CurrentUserContext.getRequired().userId();
+        String userId = UserContext.getCurrUser().userId();
 
         // 2. 从 Redis 优先加载会话上下文，缓存未命中时由服务负责重建
         ConversationContext context = contextService.loadForTurn(conversationId, userId);

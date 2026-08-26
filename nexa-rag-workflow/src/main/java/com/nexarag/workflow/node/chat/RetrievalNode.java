@@ -2,6 +2,8 @@ package com.nexarag.workflow.node.chat;
 
 import com.alibaba.cloud.ai.graph.OverAllState;
 import com.alibaba.cloud.ai.graph.action.NodeAction;
+import cn.dev33.satoken.exception.SaTokenContextException;
+import com.nexarag.common.exception.ClientException;
 import com.nexarag.retrieval.config.RetrievalProperties;
 import com.nexarag.retrieval.model.RetrievalChunk;
 import com.nexarag.retrieval.service.ConversationRetrievalService;
@@ -35,6 +37,7 @@ import static com.nexarag.workflow.constants.ChatWorkflowStateKeys.RETRIEVAL_KNO
 import static com.nexarag.workflow.constants.ChatWorkflowStateKeys.REWRITTEN_QUESTION;
 import static com.nexarag.workflow.constants.ChatWorkflowStateKeys.TRACE_ID;
 import static com.nexarag.workflow.constants.ChatWorkflowStateKeys.TOOL_FAILURE_SUMMARIES;
+import static com.nexarag.workflow.constants.ChatWorkflowStateKeys.TENANT_ID;
 import static com.nexarag.workflow.constants.ChatWorkflowSystemToolConstants.KNOWLEDGE_SEARCH_SEQUENCE;
 import static com.nexarag.workflow.constants.ChatWorkflowSystemToolConstants.KNOWLEDGE_SEARCH_TOOL_NAME;
 
@@ -59,6 +62,7 @@ public class RetrievalNode implements NodeAction {
                 state.value(RETRIEVAL_TOP_K, retrievalProperties.getCandidate().getVectorCandidateLimit()),
                 state.value(RETRIEVAL_VECTOR_THRESHOLD, retrievalProperties.getCandidate().getCoarseScoreFloor()),
                 state.value(RETRIEVAL_ROUND, 1),
+                requireTenantId(state.value(TENANT_ID, "")),
                 state.value(RETRIEVAL_KNOWLEDGE_BASE_IDS, List.of()));
         ChatGenerationAccumulator accumulator = state.value(GENERATION_ACCUMULATOR,
                 new ChatGenerationAccumulator());
@@ -75,6 +79,9 @@ public class RetrievalNode implements NodeAction {
             accumulator.upsertOperation(new ChatToolOperationDTO(runningOperation.opId(), runningOperation.processId(),
                     runningOperation.sequence(), runningOperation.name(), ChatToolOperationStatus.SUCCESS));
         } catch (RuntimeException exception) {
+            if (!isRetryable(exception)) {
+                throw exception;
+            }
             results = List.of();
             failureSummary = "知识库检索暂时不可用，已基于现有上下文继续回答";
             accumulator.upsertOperation(new ChatToolOperationDTO(runningOperation.opId(), runningOperation.processId(),
@@ -98,11 +105,31 @@ public class RetrievalNode implements NodeAction {
             try {
                 return retrievalService.retrieve(request);
             } catch (RuntimeException exception) {
+                if (!isRetryable(exception)) {
+                    throw exception;
+                }
                 lastException = exception;
                 log.warn("知识库检索失败，将重试，generationId={}，attempt={}", generationId, attempt, exception);
             }
         }
         throw lastException;
+    }
+
+    /**
+     * 仅对可能自行恢复的基础设施异常重试；认证上下文与请求参数错误必须立即失败。
+     */
+    private boolean isRetryable(RuntimeException exception) {
+        return !(exception instanceof SaTokenContextException
+                || exception instanceof ClientException
+                || exception instanceof IllegalArgumentException
+                || exception instanceof IllegalStateException);
+    }
+
+    private String requireTenantId(String tenantId) {
+        if (tenantId == null || tenantId.isBlank()) {
+            throw new IllegalArgumentException("对话工作流缺少可信租户ID");
+        }
+        return tenantId;
     }
 
     private void publishSnapshot(OverAllState state, ChatGenerationAccumulator accumulator) {

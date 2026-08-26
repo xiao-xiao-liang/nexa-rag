@@ -258,6 +258,19 @@ public class KnowledgeBaseServiceImpl extends ServiceImpl<KnowledgeBaseMapper, K
      */
     @Override
     public Set<Long> validateRequestedKnowledgeBases(Collection<Long> knowledgeBaseIds) {
+        return validateRequestedKnowledgeBases(currentTenantProvider.getRequiredTenantId(), knowledgeBaseIds);
+    }
+
+    /**
+     * 校验指定租户范围内的知识库，避免异步任务依赖线程绑定的当前租户。
+     *
+     * @param tenantId 可信租户ID
+     * @param knowledgeBaseIds 待校验知识库ID集合；为空表示检索全部知识库
+     * @return 去重后的知识库ID集合
+     */
+    @Override
+    public Set<Long> validateRequestedKnowledgeBases(String tenantId, Collection<Long> knowledgeBaseIds) {
+        requireTenantId(tenantId);
         if (knowledgeBaseIds == null || knowledgeBaseIds.isEmpty()) {
             return Set.of();
         }
@@ -265,7 +278,6 @@ public class KnowledgeBaseServiceImpl extends ServiceImpl<KnowledgeBaseMapper, K
         if (distinctIds.contains(null)) {
             throw new ClientException("知识库ID不能为空", DocumentErrorCode.KNOWLEDGE_BASE_NOT_FOUND);
         }
-        String tenantId = currentTenantProvider.getRequiredTenantId();
         Long count = knowledgeBaseMapper.selectCount(new LambdaQueryWrapper<KnowledgeBaseDO>()
                 .eq(KnowledgeBaseDO::getTenantId, tenantId)
                 .in(KnowledgeBaseDO::getKnowledgeBaseId, distinctIds));
@@ -300,6 +312,21 @@ public class KnowledgeBaseServiceImpl extends ServiceImpl<KnowledgeBaseMapper, K
     @Override
     public Set<Long> filterDocumentIdsInCurrentTenantScope(Collection<Long> documentIds,
                                                             Set<Long> knowledgeBaseIds) {
+        return filterDocumentIdsInTenantScope(currentTenantProvider.getRequiredTenantId(), documentIds, knowledgeBaseIds);
+    }
+
+    /**
+     * 批量校验文档与指定租户知识库的归属关系，避免异步任务依赖线程绑定的当前租户。
+     *
+     * @param tenantId 可信租户ID
+     * @param documentIds 待校验的文档ID集合
+     * @param knowledgeBaseIds 已校验的知识库范围；为空表示该租户全部知识库
+     * @return 当前请求可访问的文档ID集合
+     */
+    @Override
+    public Set<Long> filterDocumentIdsInTenantScope(String tenantId, Collection<Long> documentIds,
+                                                     Set<Long> knowledgeBaseIds) {
+        requireTenantId(tenantId);
         if (documentIds == null || documentIds.isEmpty()) {
             return Set.of();
         }
@@ -323,7 +350,6 @@ public class KnowledgeBaseServiceImpl extends ServiceImpl<KnowledgeBaseMapper, K
         }
 
         // 2. 批量确认知识库均属于当前租户且未被逻辑删除。
-        String tenantId = currentTenantProvider.getRequiredTenantId();
         Set<Long> activeKnowledgeBaseIds = knowledgeBaseMapper.selectList(new LambdaQueryWrapper<KnowledgeBaseDO>()
                         .eq(KnowledgeBaseDO::getTenantId, tenantId)
                         .in(KnowledgeBaseDO::getKnowledgeBaseId, documentKnowledgeBaseIds))
@@ -339,6 +365,17 @@ public class KnowledgeBaseServiceImpl extends ServiceImpl<KnowledgeBaseMapper, K
                         || knowledgeBaseIds.contains(document.getKnowledgeBaseId()))
                 .map(Document::getDocumentId)
                 .collect(java.util.stream.Collectors.toUnmodifiableSet());
+    }
+
+    /**
+     * 确保异步调用方传入已在入口处验证的可信租户ID。
+     *
+     * @param tenantId 租户ID
+     */
+    private void requireTenantId(String tenantId) {
+        if (tenantId == null || tenantId.isBlank()) {
+            throw new IllegalArgumentException("租户ID不能为空");
+        }
     }
 
     private void ensureNameAvailable(String tenantId, String name, Long excludedKnowledgeBaseId) {

@@ -1,7 +1,7 @@
 package com.nexarag.chat.controller;
 
 import com.baomidou.mybatisplus.core.metadata.IPage;
-import com.nexarag.auth.context.CurrentUserContext;
+import com.nexarag.auth.context.UserContext;
 import com.nexarag.chat.domain.*;
 import com.nexarag.chat.enums.ChatMessageRole;
 import com.nexarag.chat.service.ConversationMessageService;
@@ -41,7 +41,7 @@ public class ConversationController {
      */
     @PostMapping
     public Result<ConversationListItemVO> create(@RequestBody(required = false) @Valid CreateConversationRequest request) {
-        String userId = CurrentUserContext.getRequired().userId();
+        String userId = UserContext.getCurrUser().userId();
         String title = Optional.ofNullable(request).map(CreateConversationRequest::title).orElse(null);
         ChatConversationVO conversation = conversationService.create(userId, title);
         return Results.success(toConversationItem(conversation));
@@ -61,7 +61,7 @@ public class ConversationController {
         validateConversationPageParameters(current, size);
 
         // 2. 从鉴权上下文获取当前用户
-        String userId = CurrentUserContext.getRequired().userId();
+        String userId = UserContext.getCurrUser().userId();
 
         // 3. 查询并转换为不含内部字段的会话投影
         IPage<ChatConversationVO> page = conversationService.pageByUser(userId, current, size);
@@ -82,7 +82,7 @@ public class ConversationController {
      */
     @GetMapping("/{conversationId}")
     public Result<ConversationListItemVO> get(@PathVariable String conversationId) {
-        String userId = CurrentUserContext.getRequired().userId();
+        String userId = UserContext.getCurrUser().userId();
         ChatConversationVO conversation = conversationService.getOwned(conversationId, userId);
         return Results.success(toConversationItem(conversation));
     }
@@ -97,7 +97,7 @@ public class ConversationController {
     @PutMapping("/{conversationId}")
     public Result<Void> update(@PathVariable String conversationId,
                                @RequestBody @Valid UpdateConversationRequest request) {
-        String userId = CurrentUserContext.getRequired().userId();
+        String userId = UserContext.getCurrUser().userId();
         conversationService.rename(conversationId, userId, request.title());
         return Results.success();
     }
@@ -110,7 +110,7 @@ public class ConversationController {
      */
     @DeleteMapping("/{conversationId}")
     public Result<Void> delete(@PathVariable String conversationId) {
-        String userId = CurrentUserContext.getRequired().userId();
+        String userId = UserContext.getCurrUser().userId();
         conversationService.delete(conversationId, userId);
         return Results.success();
     }
@@ -131,7 +131,7 @@ public class ConversationController {
         validateHistoryPageParameters(beforeSequence, size);
 
         // 2. 从鉴权上下文获取当前用户
-        String userId = CurrentUserContext.getRequired().userId();
+        String userId = UserContext.getCurrUser().userId();
 
         // 3. 查询并转换为不含内部字段的历史消息投影
         CursorPageVO<ChatMessageVO> page = messageService.pageHistory(conversationId, userId, beforeSequence, size);
@@ -190,7 +190,7 @@ public class ConversationController {
         if (message.role() != ChatMessageRole.ASSISTANT) {
             return List.of();
         }
-        return citationService.listSummaries(message.messageId(), message.userId());
+        return citationService.listSummariesByReferencesJson(message.referencesJson());
     }
 
     /**
