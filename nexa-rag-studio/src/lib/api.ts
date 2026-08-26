@@ -32,10 +32,84 @@ import {
   ModelRegistrySnapshotResponse,
   PromptResponse,
   PromptReleaseResponse,
+  CsrfTokenVO,
+  EmailChallengeVO,
+  LoginSessionVO,
+  OAuthAuthorizationVO,
+  OAuthCallbackVO,
+  EmailCodeSendDTO,
+  EmailCodeLoginDTO,
+  AccountPasswordLoginDTO,
+  EmailPasswordLoginDTO,
+  RegisterAccountDTO,
+  PasswordResetDTO,
 } from "../types";
 import { normalizeChatStreamEvent } from "./chat-stream-event";
 
 const API_BASE = "/api";
+
+let cachedCsrfToken: string | null = null;
+let pendingCsrfPromise: Promise<string> | null = null;
+
+const RETRYABLE_CSRF_ERROR_CODES = new Set(["A000014", "A000026"]);
+
+/**
+ * 清除与当前浏览器身份状态不再匹配的 CSRF Token。
+ */
+export function invalidateCsrfToken(): void {
+  cachedCsrfToken = null;
+}
+
+function isRetryableCsrfTokenFailure(status: number, responseData: unknown): boolean {
+  if (!responseData || typeof responseData !== "object") {
+    return false;
+  }
+  const payload = responseData as { code?: string | number; message?: unknown };
+  if (RETRYABLE_CSRF_ERROR_CODES.has(String(payload.code ?? ""))) {
+    return true;
+  }
+  if (status !== 403 || typeof payload.message !== "string") {
+    return false;
+  }
+  const message = payload.message.toLowerCase();
+  return message.includes("csrf") || message.includes("安全校验");
+}
+
+/**
+ * 获取或刷新当前浏览器会话的 CSRF Token
+ */
+export async function getOrFetchCsrfToken(forceRefresh = false): Promise<string> {
+  if (!forceRefresh && cachedCsrfToken) {
+    return cachedCsrfToken;
+  }
+  if (pendingCsrfPromise) {
+    return await pendingCsrfPromise;
+  }
+
+  pendingCsrfPromise = (async () => {
+    try {
+      const res = await fetch(`${API_BASE}/auth/csrf-token`, {
+        method: "GET",
+        credentials: "include",
+      });
+      if (res.ok) {
+        const json = await res.json().catch(() => null);
+        const token = json?.data?.token || json?.token;
+        if (token && typeof token === "string") {
+          cachedCsrfToken = token;
+          return token;
+        }
+      }
+    } catch (e) {
+      console.warn("Failed to fetch CSRF token:", e);
+    } finally {
+      pendingCsrfPromise = null;
+    }
+    return cachedCsrfToken || "";
+  })();
+
+  return await pendingCsrfPromise;
+}
 
 async function consumeSseResponse(
   response: Response,
@@ -77,35 +151,50 @@ async function consumeSseResponse(
 
 async function fetchJson<T>(url: string, options?: RequestInit): Promise<T> {
   const isFormData = options?.body instanceof FormData;
-  const headers: Record<string, string> = {};
-  if (!isFormData) {
-    headers["Content-Type"] = "application/json";
-  }
+  const method = (options?.method || "GET").toUpperCase();
+  const isStateChanging = method !== "GET" && method !== "HEAD" && method !== "OPTIONS";
 
   try {
-    const res = await fetch(`${API_BASE}${url}`, {
-      ...options,
-      headers: {
-        ...headers,
-        ...(options?.headers as Record<string, string> | undefined),
-      },
-    });
-
-    const responseData = await res.json().catch(() => null);
-
-    if (!res.ok) {
-      const errMsg = responseData?.message || `HTTP ${res.status}: ${res.statusText}`;
-      throw new Error(errMsg);
-    }
-
-    if (responseData && typeof responseData === "object") {
-      if (responseData.code !== undefined && responseData.code !== "0" && responseData.code !== 0) {
-        throw new Error(responseData.message || "请求处理失败");
+    const maxAttempts = isStateChanging && !url.includes("/auth/csrf-token") ? 2 : 1;
+    for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+      const headers: Record<string, string> = {};
+      if (!isFormData) {
+        headers["Content-Type"] = "application/json";
       }
-      return responseData.data !== undefined ? responseData.data : responseData;
-    }
 
-    return responseData as T;
+      if (maxAttempts > 1) {
+        const csrfToken = await getOrFetchCsrfToken();
+        if (csrfToken) {
+          headers["X-CSRF-Token"] = csrfToken;
+        }
+      }
+
+      const res = await fetch(`${API_BASE}${url}`, {
+        credentials: "include",
+        ...options,
+        headers: {
+          ...headers,
+          ...(options?.headers as Record<string, string> | undefined),
+        },
+      });
+      const responseData = await res.json().catch(() => null);
+      const responseCode = responseData && typeof responseData === "object" ? responseData.code : undefined;
+      const isBusinessFailure = responseCode !== undefined && responseCode !== "0" && responseCode !== 0;
+
+      if (!res.ok || isBusinessFailure) {
+        if (attempt === 0 && isRetryableCsrfTokenFailure(res.status, responseData)) {
+          invalidateCsrfToken();
+          continue;
+        }
+        const errMsg = responseData?.message || `HTTP ${res.status}: ${res.statusText}`;
+        throw new Error(errMsg);
+      }
+
+      return responseData && typeof responseData === "object" && responseData.data !== undefined
+        ? responseData.data
+        : responseData as T;
+    }
+    throw new Error("CSRF Token 刷新后请求仍未通过安全校验");
   } catch (err) {
     console.warn(`API Request to ${url} failed. Error:`, err);
     throw err;
@@ -166,9 +255,17 @@ export const chatApi = {
   ): Promise<void> {
     const response = await fetch(
       `${API_BASE}/chat/generations/${encodeURIComponent(generationId)}/stream?afterVersion=${afterVersion}`,
-      { headers: { Accept: "text/event-stream" }, signal }
+      {
+        credentials: "include",
+        headers: { Accept: "text/event-stream, application/json" },
+        signal,
+      }
     );
-    if (!response.ok) throw new Error(`恢复生成流失败: HTTP ${response.status}`);
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => null);
+      const errMsg = errorData?.message || `恢复生成流失败: HTTP ${response.status}`;
+      throw new Error(errMsg);
+    }
     await consumeSseResponse(response, onEvent, signal);
   },
 
@@ -183,98 +280,41 @@ export const chatApi = {
     signal?: AbortSignal
   ): Promise<void> {
     try {
-      const res = await fetch(`${API_BASE}/chat/stream`, {
-        method: "POST",
-        headers: {
+      for (let attempt = 0; attempt < 2; attempt += 1) {
+        const csrfToken = await getOrFetchCsrfToken();
+        const headers: Record<string, string> = {
           "Content-Type": "application/json",
-          Accept: "text/event-stream",
-        },
-        body: JSON.stringify(request),
-        signal,
-      });
-
-      if (!res.ok) {
-        const errorData = await res.json().catch(() => null);
-        const errMsg = errorData?.message || `HTTP ${res.status}: ${res.statusText}`;
-        throw new Error(errMsg);
-      }
-
-      if (!res.body) {
-        throw new Error("当前环境不支持 ReadableStream 响应流");
-      }
-
-      const reader = res.body.getReader();
-      const decoder = new TextDecoder("utf-8");
-      let buffer = "";
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-
-        buffer += decoder.decode(value, { stream: true });
-
-        // SSE 数据帧以换行分界
-        const blocks = buffer.split(/\r?\n\r?\n/);
-        buffer = blocks.pop() || "";
-
-        for (const block of blocks) {
-          const trimmed = block.trim();
-          if (!trimmed) continue;
-
-          let eventName = "message";
-          let dataStr = "";
-
-          const lines = block.split(/\r?\n/);
-          for (const line of lines) {
-            if (line.startsWith("event:")) {
-              eventName = line.slice(6).trim();
-            } else if (line.startsWith("data:")) {
-              dataStr += (dataStr ? "\n" : "") + line.slice(5).trim();
-            }
-          }
-
-          if (dataStr) {
-            try {
-              const eventObj = normalizeChatStreamEvent(JSON.parse(dataStr) as ChatStreamEvent);
-              if (!eventObj.type && eventName && eventName !== "message") {
-                eventObj.type = eventName as any;
-              }
-              onEvent(eventObj);
-            } catch (jsonErr) {
-              console.warn("Failed to parse SSE data JSON:", dataStr, jsonErr);
-              onEvent({
-                type: (eventName as any) || "TOKEN",
-                content: dataStr,
-              });
-            }
-          }
+          Accept: "text/event-stream, application/json",
+        };
+        if (csrfToken) {
+          headers["X-CSRF-Token"] = csrfToken;
         }
-      }
 
-      if (buffer.trim()) {
-        const lines = buffer.split(/\r?\n/);
-        let dataStr = "";
-        let eventName = "message";
-        for (const line of lines) {
-          if (line.startsWith("event:")) {
-            eventName = line.slice(6).trim();
-          } else if (line.startsWith("data:")) {
-            dataStr += (dataStr ? "\n" : "") + line.slice(5).trim();
-          }
-        }
-        if (dataStr) {
-          try {
-            const eventObj = normalizeChatStreamEvent(JSON.parse(dataStr) as ChatStreamEvent);
-            onEvent(eventObj);
-          } catch {
-            onEvent({ type: (eventName as any) || "TOKEN", content: dataStr });
-          }
-        }
-      }
+        const res = await fetch(`${API_BASE}/chat/stream`, {
+          method: "POST",
+          credentials: "include",
+          headers,
+          body: JSON.stringify(request),
+          signal,
+        });
 
-      onComplete?.();
+        if (!res.ok) {
+          const errorData = await res.json().catch(() => null);
+          if (attempt === 0 && isRetryableCsrfTokenFailure(res.status, errorData)) {
+            invalidateCsrfToken();
+            continue;
+          }
+          const errMsg = errorData?.message || `HTTP ${res.status}: ${res.statusText}`;
+          throw new Error(errMsg);
+        }
+
+        await consumeSseResponse(res, onEvent, signal);
+        onComplete?.();
+        return;
+      }
+      throw new Error("CSRF Token 刷新后对话请求仍未通过安全校验");
     } catch (err: any) {
-      if (err?.name === "AbortError") {
+      if (err?.name === "AbortError" || signal?.aborted) {
         console.log("Chat stream aborted by user");
         onComplete?.();
         return;
@@ -596,5 +636,129 @@ export const promptApi = {
       method: "PUT",
       body: JSON.stringify(data),
     });
+  },
+};
+
+// ============================================================================
+// 5. AUTHENTICATION & IDENTITY API (AuthController)
+// ============================================================================
+export const authApi = {
+  /**
+   * 获取服务端验证后的当前会话资料，用于页面刷新时同步登录态与权限。
+   */
+  async getCurrentSession(): Promise<LoginSessionVO> {
+    return await fetchJson<LoginSessionVO>("/auth/me");
+  },
+
+  /**
+   * 预先获取/刷新 CSRF Token
+   */
+  async getCsrfToken(): Promise<CsrfTokenVO> {
+    return { token: await getOrFetchCsrfToken(true) };
+  },
+
+  /**
+   * 发送邮箱验证码 (登录 / 注册 / 重置密码)
+   */
+  async sendEmailCode(dto: EmailCodeSendDTO): Promise<EmailChallengeVO> {
+    return await fetchJson<EmailChallengeVO>("/auth/email/send-code", {
+      method: "POST",
+      body: JSON.stringify(dto),
+    });
+  },
+
+  /**
+   * 邮箱 + 验证码登录 (自动带上 challengeId)
+   */
+  async loginByEmailCode(dto: EmailCodeLoginDTO): Promise<LoginSessionVO> {
+    const session = await fetchJson<LoginSessionVO>("/auth/login/email-code", {
+      method: "POST",
+      body: JSON.stringify(dto),
+    });
+    invalidateCsrfToken();
+    return session;
+  },
+
+  /**
+   * 账号名 + 密码登录
+   */
+  async loginByAccount(dto: AccountPasswordLoginDTO): Promise<LoginSessionVO> {
+    const session = await fetchJson<LoginSessionVO>("/auth/login/account", {
+      method: "POST",
+      body: JSON.stringify(dto),
+    });
+    invalidateCsrfToken();
+    return session;
+  },
+
+  /**
+   * 邮箱 + 密码登录
+   */
+  async loginByEmailPassword(dto: EmailPasswordLoginDTO): Promise<LoginSessionVO> {
+    const session = await fetchJson<LoginSessionVO>("/auth/login/email-password", {
+      method: "POST",
+      body: JSON.stringify(dto),
+    });
+    invalidateCsrfToken();
+    return session;
+  },
+
+  /**
+   * 邮箱验证码注册并自动登录
+   */
+  async register(dto: RegisterAccountDTO): Promise<LoginSessionVO> {
+    const session = await fetchJson<LoginSessionVO>("/auth/register", {
+      method: "POST",
+      body: JSON.stringify(dto),
+    });
+    invalidateCsrfToken();
+    return session;
+  },
+
+  /**
+   * 邮箱验证码重置密码
+   */
+  async resetPassword(dto: PasswordResetDTO): Promise<void> {
+    await fetchJson<void>("/auth/password/reset", {
+      method: "POST",
+      body: JSON.stringify(dto),
+    });
+  },
+
+  /**
+   * 发起第三方 OAuth 登录
+   */
+  async startOAuth(provider: string, accountName?: string): Promise<OAuthAuthorizationVO> {
+    const query = accountName ? `?accountName=${encodeURIComponent(accountName)}` : "";
+    return await fetchJson<OAuthAuthorizationVO>(`/auth/oauth/${provider}/start${query}`);
+  },
+
+  /**
+   * 第三方 OAuth 授权回调完成登录
+   */
+  async completeOAuthCallback(
+    provider: string,
+    params: { code?: string; state?: string; error?: string }
+  ): Promise<OAuthCallbackVO> {
+    const search = new URLSearchParams();
+    if (params.code) search.set("code", params.code);
+    if (params.state) search.set("state", params.state);
+    if (params.error) search.set("error", params.error);
+    const result = await fetchJson<OAuthCallbackVO>(`/auth/oauth/${provider}/callback?${search.toString()}`);
+    invalidateCsrfToken();
+    return result;
+  },
+
+  /**
+   * 退出当前登录设备的会话登录态 (POST /api/auth/logout)
+   */
+  async logout(): Promise<void> {
+    try {
+      await fetchJson<void>("/auth/logout", {
+        method: "POST",
+      });
+    } finally {
+      invalidateCsrfToken();
+    }
   },
 };

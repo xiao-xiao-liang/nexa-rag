@@ -383,3 +383,13 @@ body {
   flex-shrink: 0;
   height: 14px;
 }
+
+/* 飞书 1:1 右侧插画矢量微浮动动效 */
+@keyframes feishuFloat {
+  0%, 100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-5px);
+  }
+}

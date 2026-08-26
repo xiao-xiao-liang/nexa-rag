@@ -535,3 +535,70 @@ export interface PromptReleaseResponse {
   releaseId: number;
   releaseRevision: number;
 }
+
+// -------------------------------------------------------------
+// 5. Auth & Identity Types (AuthController, AccountSecurityController)
+// -------------------------------------------------------------
+export interface CsrfTokenVO {
+  token: string;
+}
+
+export interface EmailChallengeVO {
+  challengeId: number;
+  expiresTime: string;
+}
+
+export interface LoginSessionVO {
+  userId: string;
+  tenantId: string;
+  role?: 'ADMIN' | 'USER' | string;
+  permissions?: string[];
+}
+
+export interface OAuthAuthorizationVO {
+  authorizationUrl: string;
+}
+
+export interface OAuthCallbackVO {
+  success: boolean;
+  action: 'LOGIN' | 'REGISTER' | 'BIND' | string;
+  userId?: string;
+  tenantId?: string;
+  provider?: string;
+  error?: string;
+}
+
+export interface EmailCodeSendDTO {
+  email: string;
+  purpose: 'REGISTER' | 'EMAIL_LOGIN' | 'PASSWORD_RESET' | 'CHANGE_EMAIL_OLD' | 'CHANGE_EMAIL_NEW' | 'LOGIN';
+}
+
+export interface EmailCodeLoginDTO {
+  email: string;
+  challengeId: number;
+  verificationCode: string;
+}
+
+export interface AccountPasswordLoginDTO {
+  accountName: string;
+  password: string;
+}
+
+export interface EmailPasswordLoginDTO {
+  email: string;
+  password: string;
+}
+
+export interface RegisterAccountDTO {
+  accountName: string;
+  email: string;
+  challengeId: number;
+  verificationCode: string;
+}
+
+export interface PasswordResetDTO {
+  email: string;
+  challengeId: number;
+  verificationCode: string;
+  newPassword: string;
+}
