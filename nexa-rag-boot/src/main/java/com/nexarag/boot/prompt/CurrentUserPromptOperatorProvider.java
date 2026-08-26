@@ -1,6 +1,6 @@
 package com.nexarag.boot.prompt;
 
-import com.nexarag.auth.context.CurrentUserContext;
+import com.nexarag.auth.context.UserContext;
 import com.nexarag.model.prompt.PromptOperatorProvider;
 import org.springframework.stereotype.Component;
 
@@ -18,6 +18,6 @@ public class CurrentUserPromptOperatorProvider implements PromptOperatorProvider
     @Override
     public String getCurrentOperator() {
         // 1. 从认证模块维护的请求线程上下文读取当前用户
-        return CurrentUserContext.getRequired().userId();
+        return UserContext.getCurrUser().userId();
     }
 }
