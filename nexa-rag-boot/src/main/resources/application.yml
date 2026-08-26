@@ -1,3 +1,16 @@
+sa-token:
+  token-name: __Host-nexa-rag
+  timeout: 259200 # 登录有效期三天。
+  auto-renew: true # 每次有效访问刷新三天有效期。
+  active-timeout: -1 # 不额外设置连续无操作失效时长。
+  is-concurrent: true # 同一账号允许多个设备同时在线。
+  is-share: false # 每次登录创建独立 Token，支持指定设备剔除。
+  cookie:
+    path: /
+    secure: true
+    http-only: true
+    same-site: Strict
+
 server:
   port: 8009
 
@@ -16,6 +29,9 @@ spring:
       mail:
         smtp:
           auth: true
+          connectiontimeout: 5000 # SMTP 建连超时，避免认证邮件线程长期阻塞。
+          timeout: 10000 # SMTP 读取超时。
+          writetimeout: 10000 # SMTP 写入超时。
           ssl:
             enable: true # QQ邮箱SMTP使用SSL。
   main:
@@ -28,17 +44,17 @@ spring:
     enabled: false
   data:
     redis:
-      host: 192.168.0.134 # 127.0.0.1
+      host: 192.168.31.11 # 127.0.0.1
       port: 6379
       password: 
       timeout: 3s
   datasource:
     driver-class-name: com.mysql.cj.jdbc.Driver
-    url: jdbc:mysql://192.168.0.134:3306/nexa_rag?useUnicode=true&characterEncoding=utf8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true
+    url: jdbc:mysql://192.168.31.11:3306/nexa_rag?useUnicode=true&characterEncoding=utf8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true
     username: root
     password:  # root
   elasticsearch:
-    uris: http://192.168.0.134:9200 # Spring Data Elasticsearch 连接地址。
+    uris: http://192.168.31.11:9200 # Spring Data Elasticsearch 连接地址。
     username: elastic # Elasticsearch 用户名。
     password:  # Elasticsearch 密码。
     socket-timeout: 30s # Elasticsearch 请求超时时间。
@@ -50,6 +66,41 @@ rocketmq:
     group: nexa-document-pipeline-producer # 文档流水线生产者组，同一应用集群应保持一致。
 
 nexa:
+  auth:
+    web:
+      allowed-origin: http://localhost:3000 # https://xiaoxiaoliang.top # Cookie 状态变更请求允许的唯一浏览器源。
+    email-code-pepper: ${EMAIL_CODE_PEPPER:} # 必填：验证码 HMAC Pepper，仅通过环境变量注入。
+    bootstrap-admin:
+      enabled: ${BOOTSTRAP_ADMIN_ENABLED:false}
+      account-name: ${BOOTSTRAP_ADMIN_ACCOUNT_NAME:}
+      email: ${BOOTSTRAP_ADMIN_EMAIL:}
+    oauth:
+      # 对外 HTTPS 基址；平台后台必须为四个回调地址分别精确登记此基址下的固定路径。
+      public-base-url: ${OAUTH_PUBLIC_BASE_URL:https://xiaoxiaoliang.top}
+      providers:
+        qq:
+          client-id: ${QQ_APP_ID:}
+          client-secret: ${QQ_APP_KEY:}
+        feishu:
+          client-id: ${FEISHU_APP_ID:}
+          client-secret: ${FEISHU_APP_SECRET:}
+          # 飞书应用后台还需开通 contact:user.base:readonly，用于回调后读取 open_id。
+        google:
+          client-id: ${GOOGLE_CLIENT_ID:}
+          client-secret: ${GOOGLE_CLIENT_SECRET:}
+        github:
+          client-id: ${GITHUB_CLIENT_ID:}
+          client-secret: ${GITHUB_CLIENT_SECRET:}
+    ip-location:
+      provider: ${IP_LOCATION_PROVIDER:tencent}
+      tencent-key: ${TENCENT_IP_LOCATION_KEY:}
+      tencent-sk: ${TENCENT_IP_LOCATION_SK:}
+      amap-key: ${AMAP_IP_LOCATION_KEY:}
+    mail:
+      transaction:
+        topic: nexa-auth-email # 认证验证码 RocketMQ 事务消息主题。
+        consumer-group: nexa-auth-email-worker # 认证邮件投递消费者组。
+        message-master-key: ${MESSAGE_MASTER_KEY:} # 必填：Base64 编码的 AES-256 密钥，禁止写入仓库。
   chat:
     workflow:
       scheduler:
@@ -119,7 +170,7 @@ nexa:
   # 文件存储配置，用于控制文档原始文件和解析产物的存取位置。
   storage:
     type: MINIO # 存储类型，可选值：MINIO、RUSTFS、OSS、QINIU、LOCAL。
-    endpoint: http://192.168.0.134:9000 # http://127.0.0.1:9000 # 对象存储服务地址。
+    endpoint: http://192.168.31.11:9000 # http://127.0.0.1:9000 # 对象存储服务地址。
     access-key:  # liang  # 对象存储访问密钥。
     secret-key:  # liang123 # 对象存储访问密钥密码。
     bucket: nexa-rag # 文档对象存储桶名称。
@@ -187,7 +238,7 @@ nexa:
       parent-context-neighbor-window-count: 1 # 未使用完整父片段时，每侧补充的相邻子片段数量。
     vector:
       type: milvus # 向量索引类型，可选值：milvus。
-      host: 192.168.0.134 # 101.132.158.169 # 向量索引服务地址。
+      host: 192.168.31.11 # 101.132.158.169 # 向量索引服务地址。
       port: 19530 # 向量索引服务端口。
       database-name: nexa_rag # 向量库数据库名称，为空时使用默认数据库。
       collection-name: nexa_document_chunk # 文档片段向量集合名称。
