@@ -1,19 +1,24 @@
 package com.nexarag.common.web;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nexarag.common.error.BaseErrorCode;
 import com.nexarag.common.exception.AbstractException;
+import com.nexarag.common.exception.ClientException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.MediaType;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.validation.FieldError;
-import org.springframework.web.bind.MissingServletRequestParameterException;
+import org.springframework.web.HttpMediaTypeNotAcceptableException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.util.Optional;
 
 /**
@@ -22,6 +27,8 @@ import java.util.Optional;
 @Slf4j
 @RestControllerAdvice
 public class GlobalExceptionHandler {
+
+    private final ObjectMapper objectMapper = new ObjectMapper();
 
     /**
      * 处理参数校验异常。
@@ -53,14 +60,32 @@ public class GlobalExceptionHandler {
     }
 
     /**
+     * 处理 JSON 结构、枚举或字段类型无法解析的请求体，避免落入通用 500。
+     *
+     * @param request HTTP 请求
+     * @param exception 请求体解析异常
+     * @return 统一参数错误响应
+     */
+    @ExceptionHandler(HttpMessageNotReadableException.class)
+    public Result<Void> handleUnreadableRequestBody(HttpServletRequest request, HttpMessageNotReadableException exception) {
+        log.warn("[{}] {} 请求体解析失败，message={}", request.getMethod(), getUrl(request), exception.getMessage());
+        return Results.failure(BaseErrorCode.PARAM_ERROR.code(), BaseErrorCode.PARAM_ERROR.message());
+    }
+
+    /**
      * 处理应用内主动抛出的异常。
      *
      * @param request   HTTP 请求
+     * @param response  HTTP 响应
      * @param exception 应用异常
      * @return 统一失败响应
      */
     @ExceptionHandler(AbstractException.class)
-    public Result<Void> handleAbstractException(HttpServletRequest request, AbstractException exception) {
+    public Result<Void> handleAbstractException(HttpServletRequest request, HttpServletResponse response,
+                                                AbstractException exception) {
+        if (exception instanceof ClientException clientException && clientException.getHttpStatus() != null) {
+            response.setStatus(clientException.getHttpStatus().value());
+        }
         if (exception.getCause() != null) {
             log.error("[{}] {} 应用异常，code={}，message={}", request.getMethod(), getUrl(request),
                     exception.getErrorCode(), exception.getErrorMessage(), exception.getCause());
@@ -69,6 +94,30 @@ public class GlobalExceptionHandler {
         log.error("[{}] {} 应用异常，code={}，message={}", request.getMethod(), getUrl(request),
                 exception.getErrorCode(), exception.getErrorMessage());
         return Results.failure(exception);
+    }
+
+    /**
+     * 处理媒体协商不可接受异常（如客户端指定仅接收 text/event-stream，但异常需以 JSON 结构输出），直接通过 Response 输出 JSON 避免容器级 500。
+     *
+     * @param request HTTP 请求
+     * @param response HTTP 响应
+     * @param exception 媒体协商异常
+     * @throws IOException 响应写入异常
+     */
+    @ExceptionHandler(HttpMediaTypeNotAcceptableException.class)
+    public void handleHttpMediaTypeNotAcceptableException(HttpServletRequest request, HttpServletResponse response,
+                                                           HttpMediaTypeNotAcceptableException exception) throws IOException {
+        log.warn("[{}] {} 媒体协商不可接受，直接输出 JSON 错误响应: {}", request.getMethod(), getUrl(request), exception.getMessage());
+        if (!response.isCommitted()) {
+            int currentStatus = response.getStatus();
+            if (currentStatus < HttpServletResponse.SC_BAD_REQUEST) {
+                response.setStatus(HttpServletResponse.SC_NOT_ACCEPTABLE);
+            }
+            response.setContentType(MediaType.APPLICATION_JSON_VALUE);
+            response.setCharacterEncoding(StandardCharsets.UTF_8.name());
+            String json = objectMapper.writeValueAsString(Results.failure(BaseErrorCode.CLIENT_ERROR.code(), "请求指定的媒体类型不受支持"));
+            response.getWriter().write(json);
+        }
     }
 
     /**
