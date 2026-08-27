@@ -95,7 +95,7 @@ public class BootstrapAdministratorServiceImpl implements BootstrapAdministrator
         }
 
         LocalDateTime now = LocalDateTime.now();
-        authUserMapper.insert(new AuthUserDO(BOOTSTRAP_ADMINISTRATOR_USER_ID, accountName, accountNameKey,
+        authUserMapper.insert(new AuthUserDO(BOOTSTRAP_ADMINISTRATOR_USER_ID, accountName, null, accountNameKey,
                 administratorRole.getRoleId(), UserStatus.ACTIVE.getCode(), TenantConstants.DEFAULT_TENANT_ID, now, now));
         // 配置邮箱由部署管理员控制，初始化时即作为管理员账号的唯一邮箱凭据预占，避免被普通注册抢占。
         emailCredentialMapper.insert(new EmailCredentialDO(BOOTSTRAP_ADMINISTRATOR_USER_ID,

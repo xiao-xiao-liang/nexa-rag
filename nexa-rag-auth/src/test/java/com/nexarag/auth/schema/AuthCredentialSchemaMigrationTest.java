@@ -42,6 +42,15 @@ class AuthCredentialSchemaMigrationTest {
                 "CREATE TABLE auth_security_audit_event");
     }
 
+    @Test
+    void shouldDefineOptionalOAuthDisplayName() throws IOException {
+        String migrationSql = readDatabaseScript("migration/V27__add_auth_user_display_name.sql");
+        String schemaSql = readDatabaseScript("schema/nexa_rag_schema.sql");
+
+        assertThat(migrationSql).contains("ALTER TABLE auth_user", "display_name VARCHAR(128) NULL");
+        assertThat(schemaSql).contains("display_name VARCHAR(128) NULL");
+    }
+
     /**
      * 从 Boot 模块读取数据库脚本。
      *

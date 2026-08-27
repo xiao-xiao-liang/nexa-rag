@@ -45,6 +45,17 @@ public class AuthUserProvisioningService {
      * @return 已创建用户
      */
     public AuthUserDO createDefaultTenantUser(String accountName) {
+        return createDefaultTenantUser(accountName, null);
+    }
+
+    /**
+     * 原子写入一个启用用户和默认租户成员关系，并可保存第三方展示名称。
+     *
+     * @param accountName 用户账号名
+     * @param displayName 第三方登录返回的原始展示名称，可为空
+     * @return 已创建用户
+     */
+    public AuthUserDO createDefaultTenantUser(String accountName, String displayName) {
         // 1. 账号名规则和可用性先行校验，避免产生无凭据孤儿用户
         String accountNameKey = accountNamePolicy.normalizeAndValidate(accountName);
         if (authUserMapper.selectByAccountNameKey(accountNameKey) != null) {
@@ -54,7 +65,7 @@ public class AuthUserProvisioningService {
         // 2. 写入用户和默认租户成员关系；并发冲突由调用方的数据库唯一约束处理
         Long userId = IdWorker.getId();
         LocalDateTime now = LocalDateTime.now();
-        AuthUserDO user = new AuthUserDO(userId, accountName.trim(), accountNameKey, getUserRoleId(),
+        AuthUserDO user = new AuthUserDO(userId, accountName.trim(), displayName, accountNameKey, getUserRoleId(),
                 UserStatus.ACTIVE.getCode(), DEFAULT_TENANT_ID, now, now);
         authUserMapper.insert(user);
         tenantMemberMapper.insert(new TenantMemberDO(DEFAULT_TENANT_ID, userId,

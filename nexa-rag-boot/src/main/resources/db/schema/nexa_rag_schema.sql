@@ -499,6 +499,7 @@ CREATE TABLE tenant (
 CREATE TABLE auth_user (
     user_id BIGINT NOT NULL COMMENT '用户ID',
     account_name VARCHAR(39) NOT NULL COMMENT '账号名',
+    display_name VARCHAR(128) NULL COMMENT '第三方登录返回的原始展示名称',
     account_name_key VARCHAR(39) NOT NULL COMMENT '账号名规范化键',
     role_id BIGINT NOT NULL COMMENT '全局角色ID',
     status TINYINT NOT NULL DEFAULT 0 COMMENT '用户状态：0启用、1禁用',

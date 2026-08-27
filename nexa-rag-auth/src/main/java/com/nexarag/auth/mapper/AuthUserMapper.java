@@ -21,7 +21,7 @@ public interface AuthUserMapper extends BaseMapper<AuthUserDO> {
      * @return 用户；不存在时返回 null
      */
     @Select("""
-            SELECT user_id, account_name, account_name_key, role_id, status, default_tenant_id,
+            SELECT user_id, account_name, display_name, account_name_key, role_id, status, default_tenant_id,
                    create_time, update_time
             FROM auth_user
             WHERE account_name_key = #{accountNameKey}
@@ -36,7 +36,7 @@ public interface AuthUserMapper extends BaseMapper<AuthUserDO> {
      * @return 已锁定用户；不存在时返回 null
      */
     @Select("""
-            SELECT user_id, account_name, account_name_key, role_id, status, default_tenant_id,
+            SELECT user_id, account_name, display_name, account_name_key, role_id, status, default_tenant_id,
                    create_time, update_time
             FROM auth_user
             WHERE account_name_key = #{accountNameKey}
@@ -51,7 +51,7 @@ public interface AuthUserMapper extends BaseMapper<AuthUserDO> {
      * @return 已锁定用户；不存在时返回 null
      */
     @Select("""
-            SELECT user_id, account_name, account_name_key, role_id, status, default_tenant_id,
+            SELECT user_id, account_name, display_name, account_name_key, role_id, status, default_tenant_id,
                    create_time, update_time
             FROM auth_user
             WHERE user_id = #{userId}
