@@ -18,6 +18,7 @@ import com.nexarag.auth.model.vo.ExternalIdentityVO;
 import com.nexarag.auth.model.vo.OAuthCallbackVO;
 import com.nexarag.auth.service.AuthUserProvisioningService;
 import com.nexarag.auth.service.CurrentUserProfileService;
+import com.nexarag.auth.service.OAuthAccountNameGenerator;
 import com.nexarag.auth.service.OAuthIdentityService;
 import com.nexarag.auth.service.SecurityAuditService;
 import com.nexarag.auth.service.SessionService;
@@ -44,6 +45,7 @@ public class OAuthIdentityServiceImpl implements OAuthIdentityService {
     private final EmailCredentialMapper emailCredentialMapper;
     private final PasswordCredentialMapper passwordCredentialMapper;
     private final AuthUserProvisioningService authUserProvisioningService;
+    private final OAuthAccountNameGenerator oauthAccountNameGenerator;
     private final SessionService sessionService;
     private final SecurityAuditService securityAuditService;
     private final CurrentUserProfileService currentUserProfileService;
@@ -53,14 +55,15 @@ public class OAuthIdentityServiceImpl implements OAuthIdentityService {
      */
     @Override
     @Transactional(noRollbackFor = ClientException.class)
-    public OAuthCallbackVO loginOrRegister(OAuthProvider provider, String providerSubject, String accountName) {
+    public OAuthCallbackVO loginOrRegister(OAuthProvider provider, String providerSubject, String displayName,
+                                           String accountName) {
         // 1. 锁定稳定第三方主体，避免同一第三方账号被并发注册到多个本地用户
         ExternalIdentityDO identity = externalIdentityMapper.selectByProviderAndSubjectForUpdate(
                 provider.getCode(), providerSubject);
         AuthUserDO user;
         if (identity == null) {
-            // 2. 未绑定主体只能按用户预先输入的账号名创建新用户，绝不使用第三方昵称或邮箱推断账号
-            user = registerExternalIdentity(provider, providerSubject, accountName);
+            // 2. 未绑定主体自动创建本地用户；稳定主体只参与账号名哈希，不直接落入可见字段
+            user = registerExternalIdentity(provider, providerSubject, displayName, accountName);
         } else {
             user = requireActiveUserWithDefaultTenant(identity.getUserId());
         }
@@ -142,12 +145,12 @@ public class OAuthIdentityServiceImpl implements OAuthIdentityService {
     /**
      * 创建用户与其第一条第三方身份绑定。
      */
-    private AuthUserDO registerExternalIdentity(OAuthProvider provider, String providerSubject, String accountName) {
-        if (accountName == null || accountName.isBlank()) {
-            throw new ClientException(AuthErrorCode.ACCOUNT_NAME_INVALID);
-        }
+    private AuthUserDO registerExternalIdentity(OAuthProvider provider, String providerSubject, String displayName,
+                                                String accountName) {
         try {
-            AuthUserDO user = authUserProvisioningService.createDefaultTenantUser(accountName);
+            String generatedAccountName = oauthAccountNameGenerator.generate(provider, providerSubject, displayName,
+                    accountName);
+            AuthUserDO user = authUserProvisioningService.createDefaultTenantUser(generatedAccountName, displayName);
             LocalDateTime now = LocalDateTime.now();
             externalIdentityMapper.insert(new ExternalIdentityDO(IdWorker.getId(), user.getUserId(), provider.getCode(),
                     providerSubject, now, now, now));

@@ -12,9 +12,10 @@ import java.util.List;
 public interface OAuthIdentityService {
 
     /**
-     * 用已验证的第三方主体登录；不存在绑定时按账号名创建用户和身份绑定。
+     * 用已验证的第三方主体登录；不存在绑定时自动创建用户和身份绑定。
      */
-    OAuthCallbackVO loginOrRegister(OAuthProvider provider, String providerSubject, String accountName);
+    OAuthCallbackVO loginOrRegister(OAuthProvider provider, String providerSubject, String displayName,
+                                    String accountName);
 
     /**
      * 将第三方主体绑定到已由 OAuth state 复验的本地用户。

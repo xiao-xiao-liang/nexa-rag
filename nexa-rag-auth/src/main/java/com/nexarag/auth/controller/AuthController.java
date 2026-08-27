@@ -10,7 +10,6 @@ import com.nexarag.auth.model.vo.CsrfTokenVO;
 import com.nexarag.auth.model.vo.EmailChallengeVO;
 import com.nexarag.auth.model.vo.LoginSessionVO;
 import com.nexarag.auth.model.vo.OAuthAuthorizationVO;
-import com.nexarag.auth.model.vo.OAuthCallbackVO;
 import com.nexarag.auth.service.AuthenticationService;
 import com.nexarag.auth.service.CurrentUserProfileService;
 import com.nexarag.auth.service.OAuthAuthenticationService;
@@ -29,6 +28,10 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+
+import java.net.URI;
 
 /**
  * 匿名认证入口控制器，仅负责参数接收、服务调用和统一响应包装。
@@ -168,13 +171,17 @@ public class AuthController {
      * @param code 平台回传的一次性授权码
      * @param state 平台原样回传的一次性 state
      * @param error 平台回传的授权失败码
-     * @return OAuth 回调处理结果
+     * @return 建立登录态后跳转到同源前端首页的响应
      */
     @GetMapping("/oauth/{provider}/callback")
-    public Result<OAuthCallbackVO> completeOAuthCallback(@PathVariable String provider,
-                                                          @RequestParam(required = false) String code,
-                                                          @RequestParam(required = false) String state,
-                                                          @RequestParam(required = false) String error) {
-        return Results.success(oauthAuthenticationService.completeCallback(provider, code, state, error));
+    public ResponseEntity<Void> completeOAuthCallback(@PathVariable String provider,
+                                                       @RequestParam(required = false) String code,
+                                                       @RequestParam(required = false) String state,
+                                                       @RequestParam(required = false) String error) {
+        // 1. 先完成 state 校验、用户登录和 Cookie 写入；异常仍交由统一异常处理器返回 JSON。
+        oauthAuthenticationService.completeCallback(provider, code, state, error);
+
+        // 2. 浏览器回调成功后回到同源前端，避免直接向用户展示回调 JSON。
+        return ResponseEntity.status(HttpStatus.FOUND).location(URI.create("/home")).build();
     }
 }

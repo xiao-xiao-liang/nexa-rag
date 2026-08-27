@@ -71,7 +71,8 @@ public class OAuthAuthenticationServiceImpl implements OAuthAuthenticationServic
 
         // 2. 仅 state 明确标识的业务动作可执行，禁止由回调参数决定登录或绑定语义
         return switch (context.action()) {
-            case LOGIN -> oauthIdentityService.loginOrRegister(provider, principal.subject(), context.accountName());
+            case LOGIN -> oauthIdentityService.loginOrRegister(provider, principal.subject(), principal.displayName(),
+                    context.accountName());
             case BIND -> completeBinding(context, provider, principal);
         };
     }
