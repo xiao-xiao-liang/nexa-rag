@@ -78,6 +78,6 @@ public class GitHubOAuthProviderClient extends AbstractOAuthProviderClient {
                 });
         String accessToken = requireText(token, "access_token");
         JsonNode user = oauthHttpClient.getJson(USER_URL, headers -> headers.setBearerAuth(accessToken));
-        return new OAuthPrincipal(requireText(user, "id"));
+        return new OAuthPrincipal(requireText(user, "id"), optionalText(user, "login"));
     }
 }

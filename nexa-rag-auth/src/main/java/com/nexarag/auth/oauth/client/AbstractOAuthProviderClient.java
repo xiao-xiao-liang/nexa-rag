@@ -50,6 +50,14 @@ abstract class AbstractOAuthProviderClient implements OAuthProviderClient {
     }
 
     /**
+     * 从 JSON 节点中读取可选字符串字段；空白值统一视为缺失。
+     */
+    protected String optionalText(JsonNode node, String fieldName) {
+        String value = node.path(fieldName).asText();
+        return isBlank(value) ? null : value;
+    }
+
+    /**
      * 从路径中读取必填的字符串字段。
      */
     protected String requireTextAt(JsonNode node, String... fieldNames) {
@@ -62,6 +70,18 @@ abstract class AbstractOAuthProviderClient implements OAuthProviderClient {
             throw new ClientException(AuthErrorCode.OAUTH_AUTHORIZATION_FAILED);
         }
         return value;
+    }
+
+    /**
+     * 从路径中读取可选字符串字段；空白值统一视为缺失。
+     */
+    protected String optionalTextAt(JsonNode node, String... fieldNames) {
+        JsonNode current = node;
+        for (String fieldName : fieldNames) {
+            current = current.path(fieldName);
+        }
+        String value = current.asText();
+        return isBlank(value) ? null : value;
     }
 
     /**

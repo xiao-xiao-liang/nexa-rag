@@ -82,6 +82,6 @@ public class GoogleOAuthProviderClient extends AbstractOAuthProviderClient {
         String accessToken = requireText(token, "access_token");
         JsonNode userInfo = oauthHttpClient.getJson(USER_INFO_URL,
                 headers -> headers.setBearerAuth(accessToken));
-        return new OAuthPrincipal(requireText(userInfo, "sub"));
+        return new OAuthPrincipal(requireText(userInfo, "sub"), optionalText(userInfo, "name"));
     }
 }

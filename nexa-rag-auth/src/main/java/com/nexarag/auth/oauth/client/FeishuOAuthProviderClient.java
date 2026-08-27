@@ -89,6 +89,7 @@ public class FeishuOAuthProviderClient extends AbstractOAuthProviderClient {
         String userAccessToken = requireTextAt(userToken, "data", "access_token");
         JsonNode userInfo = oauthHttpClient.getJson(USER_INFO_URL, headers -> headers.setBearerAuth(userAccessToken));
         requireSuccessfulCode(userInfo);
-        return new OAuthPrincipal(requireTextAt(userInfo, "data", "open_id"));
+        return new OAuthPrincipal(requireTextAt(userInfo, "data", "open_id"),
+                optionalTextAt(userInfo, "data", "name"));
     }
 }

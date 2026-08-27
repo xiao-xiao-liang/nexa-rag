@@ -2,16 +2,18 @@ package com.nexarag.auth.oauth.client;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.nexarag.auth.config.OAuthProviderProperties;
+import com.nexarag.auth.enums.AuthErrorCode;
 import com.nexarag.auth.enums.OAuthProvider;
 import com.nexarag.auth.oauth.OAuthAuthorizationRequest;
 import com.nexarag.auth.oauth.OAuthPrincipal;
+import com.nexarag.common.exception.ClientException;
 import org.springframework.stereotype.Component;
 
 /**
  * QQ 互联授权码客户端。
  *
  * <p>QQ 的 Token 与 OpenID 接口均是查询参数协议，稳定主体只能取 {@code /me} 返回的 {@code openid}；
- * 不申请昵称等资料权限，也不调用用户资料接口。</p>
+ * 昵称仅用于新用户展示名称，不参与身份绑定。</p>
  */
 @Component
 public class QqOAuthProviderClient extends AbstractOAuthProviderClient {
@@ -24,6 +26,9 @@ public class QqOAuthProviderClient extends AbstractOAuthProviderClient {
 
     /** QQ 互联 OpenID 端点。 */
     private static final String OPEN_ID_URL = "https://graph.qq.com/oauth2.0/me";
+
+    /** QQ 互联用户资料端点。 */
+    private static final String USER_INFO_URL = "https://graph.qq.com/user/get_user_info";
 
     private final OAuthHttpClient oauthHttpClient;
 
@@ -58,6 +63,7 @@ public class QqOAuthProviderClient extends AbstractOAuthProviderClient {
                 .queryParam("response_type", "code")
                 .queryParam("client_id", configuration.getClientId())
                 .queryParam("redirect_uri", request.redirectUri())
+                .queryParam("scope", "get_user_info")
                 .queryParam("state", request.state()));
     }
 
@@ -82,6 +88,25 @@ public class QqOAuthProviderClient extends AbstractOAuthProviderClient {
                 .queryParam("fmt", "json"));
         JsonNode openId = oauthHttpClient.getJson(openIdUrl, headers -> {
         });
-        return new OAuthPrincipal(requireText(openId, "openid"));
+        String subject = requireText(openId, "openid");
+        String userInfoUrl = createUrl(USER_INFO_URL, builder -> builder
+                .queryParam("access_token", accessToken)
+                .queryParam("oauth_consumer_key", configuration.getClientId())
+                .queryParam("openid", subject)
+                .queryParam("fmt", "json"));
+        JsonNode userInfo = oauthHttpClient.getJson(userInfoUrl, headers -> {
+        });
+        requireSuccessfulResponse(userInfo);
+        return new OAuthPrincipal(subject, optionalText(userInfo, "nickname"));
+    }
+
+    /**
+     * 校验 QQ 资料接口使用的 ret 返回码。
+     */
+    private void requireSuccessfulResponse(JsonNode response) {
+        JsonNode result = response.get("ret");
+        if (result != null && (!result.canConvertToInt() || result.asInt() != 0)) {
+            throw new ClientException(AuthErrorCode.OAUTH_AUTHORIZATION_FAILED);
+        }
     }
 }
