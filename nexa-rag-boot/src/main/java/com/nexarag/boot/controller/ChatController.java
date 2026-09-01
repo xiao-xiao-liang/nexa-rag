@@ -1,40 +1,31 @@
 package com.nexarag.boot.controller;
 
 import com.nexarag.auth.context.UserContext;
-import com.nexarag.chat.id.ChatIdGenerator;
 import com.nexarag.chat.domain.ChatCitationDTO;
 import com.nexarag.chat.domain.ChatCitationDetailVO;
+import com.nexarag.chat.id.ChatIdGenerator;
 import com.nexarag.chat.service.impl.ChatCitationService;
 import com.nexarag.common.exception.AbstractException;
 import com.nexarag.common.exception.ClientException;
 import com.nexarag.common.trace.TraceIdContext;
-import com.nexarag.workflow.request.ChatWorkflowRequest;
-import com.nexarag.workflow.service.WorkflowService;
-import com.nexarag.workflow.stream.ChatGenerationTaskManager;
-import com.nexarag.workflow.stream.ChatGenerationEventPublisher;
-import com.nexarag.workflow.stream.ChatStreamEvent;
-import com.nexarag.workflow.stream.ChatStreamEventType;
-import com.nexarag.workflow.stream.ChatStreamResumeService;
-import com.nexarag.document.service.KnowledgeBaseService;
-import com.nexarag.document.service.DocumentChunkService;
-import com.nexarag.document.service.DocumentService;
-import com.nexarag.document.model.entity.Document;
-import com.nexarag.document.model.entity.DocumentChunk;
-import com.nexarag.infra.enums.ExternalDocumentSourceType;
 import com.nexarag.common.web.Result;
 import com.nexarag.common.web.Results;
+import com.nexarag.document.model.entity.Document;
+import com.nexarag.document.model.entity.DocumentChunk;
+import com.nexarag.document.model.entity.DocumentVersionDO;
+import com.nexarag.document.service.DocumentChunkService;
+import com.nexarag.document.service.DocumentService;
+import com.nexarag.document.service.DocumentVersionService;
+import com.nexarag.document.service.KnowledgeBaseService;
+import com.nexarag.infra.enums.ExternalDocumentSourceType;
+import com.nexarag.workflow.request.ChatWorkflowRequest;
+import com.nexarag.workflow.service.WorkflowService;
+import com.nexarag.workflow.stream.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.MediaType;
 import org.springframework.http.codec.ServerSentEvent;
-import org.springframework.web.bind.annotation.DeleteMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Scheduler;
@@ -62,6 +53,7 @@ public class ChatController {
     private final ChatCitationService citationService;
     private final DocumentChunkService documentChunkService;
     private final DocumentService documentService;
+    private final DocumentVersionService documentVersionService;
     private final Scheduler chatWorkflowScheduler;
 
     /**
@@ -129,7 +121,7 @@ public class ChatController {
      */
     @GetMapping(value = "/generations/{generationId}/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public Flux<ServerSentEvent<ChatStreamEvent>> resume(@PathVariable String generationId,
-                                                          @RequestParam(defaultValue = "0") long afterVersion) {
+                                                         @RequestParam(defaultValue = "0") long afterVersion) {
         String userId = UserContext.getCurrUser().userId();
         return Flux.defer(() -> {
             // 1. 先创建本实例订阅，再读取 Redis 重放事件
@@ -164,7 +156,7 @@ public class ChatController {
     /**
      * 读取当前用户可访问的单条引用预览。
      *
-     * @param messageId 助手消息 ID
+     * @param messageId  助手消息 ID
      * @param citationId 消息内引用编号
      * @return 引用预览与受控跳转地址
      */
@@ -177,10 +169,15 @@ public class ChatController {
         if (chunk == null || !document.getDocumentId().equals(chunk.getDocumentId())) {
             throw new ClientException("引用分块不存在或已失效");
         }
+        DocumentVersionDO activeVersion = documentVersionService.getActiveVersionOrNull(document);
+        if (activeVersion == null || !activeVersion.getDocumentVersionId().equals(chunk.getDocumentVersionId())) {
+            throw new ClientException("引用分块所属版本不是当前生效版本或已失效");
+        }
         String documentPath = "/knowledge-base/" + document.getKnowledgeBaseId()
                 + "/documents/" + document.getDocumentId();
-        String sourceUrl = document.getSourceType() == null || document.getSourceType() == ExternalDocumentSourceType.LOCAL
-                ? null : document.getSourceUrl();
+        String sourceUrl = activeVersion.getSourceType() == null
+                || activeVersion.getSourceType() == ExternalDocumentSourceType.LOCAL
+                ? null : activeVersion.getSourceUrl();
         return Results.success(new ChatCitationDetailVO(citation.citationId(), document.getTitle(),
                 chunk.getChunkOrder(), chunk.getText(), documentPath, sourceUrl));
     }
@@ -213,7 +210,7 @@ public class ChatController {
     /**
      * 按事件版本过滤重放窗口与本地 sink 中重复的事件。
      *
-     * @param event 待发送事件
+     * @param event                待发送事件
      * @param lastDeliveredVersion 当前连接已发送的最大版本
      * @return true 表示当前连接应继续发送该事件
      */
