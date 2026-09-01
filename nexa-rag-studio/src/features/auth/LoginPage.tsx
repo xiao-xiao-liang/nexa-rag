@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { AuthLayout } from "./components/layout/AuthLayout";
 import { FeishuAuthCard } from "./components/shared/FeishuAuthCard";
 import { AuthQrCornerSwitch } from "./components/shared/AuthQrCornerSwitch";
@@ -15,7 +15,8 @@ import { AccountPasswordForm } from "./components/forms/AccountPasswordForm";
 import { RegisterForm } from "./components/forms/RegisterForm";
 import { ResetPasswordForm } from "./components/forms/ResetPasswordForm";
 import { QrScanLoginBox } from "./components/forms/QrScanLoginBox";
-import { authApi } from "../../lib/api";
+import { feishuToast } from "../../components/ui/FeishuToast";
+import { authApi } from "@/lib/api.ts";
 import { authStore, useAuthStore } from "./store/authStore";
 import {
   AuthMainMode,
@@ -33,6 +34,7 @@ import {
  */
 export const LoginPage: React.FC = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const auth = useAuthStore();
 
   const [mainMode, setMainMode] = useState<AuthMainMode>("form-login");
@@ -50,7 +52,7 @@ export const LoginPage: React.FC = () => {
   const [countryCode, setCountryCode] = useState("+86");
   const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
-  const [agreePolicy, setAgreePolicy] = useState(true); // 默认同意或点击下一步自动同意
+  const [agreePolicy, setAgreePolicy] = useState(false); // 默认不勾选，提交时校验
   const [errors, setErrors] = useState<{ phone?: string; email?: string; agree?: boolean }>({});
 
   // 认证流上下文凭证（传递给验证码校验步骤）
@@ -70,6 +72,25 @@ export const LoginPage: React.FC = () => {
       console.warn("预获取 CSRF Token 失败:", err);
     });
   }, []);
+
+  const unauthorizedToastShownRef = useRef(false);
+
+  // 0.1 当未登录用户尝试访问受保护页面被重定向至 /login 时，弹出错误 Toast
+  useEffect(() => {
+    const state = location.state as { from?: { pathname: string }; unauthorized?: boolean } | null;
+    if (state?.unauthorized || (state?.from && state.from.pathname !== "/login")) {
+      if (!unauthorizedToastShownRef.current) {
+        unauthorizedToastShownRef.current = true;
+        feishuToast.show({
+          id: "unauthorized-redirect-toast",
+          type: "error",
+          content: "请先登录",
+        });
+        // 清除 history 中的 state 避免刷新页面重复提示
+        window.history.replaceState({}, document.title);
+      }
+    }
+  }, [location.state]);
 
   // 切换折角扫码/表单模式
   const handleToggleCornerSwitch = () => {
@@ -135,8 +156,13 @@ export const LoginPage: React.FC = () => {
       return;
     }
 
-    // 若未勾选协议，点击下一步时自动勾选并放行
-    setAgreePolicy(true);
+    // 校验是否勾选协议与隐私政策，未勾选时弹出飞书错误 Toast 并标红复选框
+    if (!agreePolicy) {
+      setErrors((prev) => ({ ...prev, agree: true }));
+      feishuToast.error("请阅读并同意《服务协议》和《隐私政策》");
+      return;
+    }
+
     setErrors({});
 
     setCurrentCredential({
@@ -336,13 +362,13 @@ export const LoginPage: React.FC = () => {
   const loginTabs =
     brandVariant === "lark"
       ? [
-          { key: "email-password" as const, label: "邮箱" },
-          { key: "mobile" as const, label: "手机号" },
-        ]
+        { key: "email-password" as const, label: "邮箱" },
+        { key: "mobile" as const, label: "手机号" },
+      ]
       : [
-          { key: "mobile" as const, label: "手机号" },
-          { key: "email-password" as const, label: "邮箱" },
-        ];
+        { key: "mobile" as const, label: "手机号" },
+        { key: "email-password" as const, label: "邮箱" },
+      ];
 
   // 是否处于第 1 个 Tab
   const isFirstTabActive =
