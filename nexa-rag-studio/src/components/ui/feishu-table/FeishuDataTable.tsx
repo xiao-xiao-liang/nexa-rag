@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect, useRef } from "react";
-import { cn } from "../../../lib/utils";
+import { cn } from "@/lib/utils.ts";
 import { FeishuToolbar } from "./FeishuToolbar";
 import { FeishuPagination } from "./FeishuPagination";
 import {
@@ -160,27 +160,27 @@ function estimateStringWidth(str: string): number {
  * 支持基于最长内容的智能自适应列宽、列名下限保护与最大上限截断、平滑精确的列宽拖拽引擎、最右侧操作列吸附不遮挡
  */
 export function FeishuDataTable<T extends Record<string, any>>({
-  title,
-  columns,
-  data = [],
-  rowKey,
-  selectable = true,
-  selectedRowKeys: externalSelectedKeys,
-  onSelectionChange,
-  tabs,
-  activeTabKey,
-  onTabChange,
-  searchPlaceholder = "在列表中搜索",
-  onAdd,
-  addButtonText = "+ 新增",
-  onExport,
-  onBatchDelete,
-  customLeftTools,
-  customRightTools,
-  pagination,
-  emptyText = "暂无相关数据",
-  className,
-}: FeishuDataTableProps<T>) {
+                                                                 title,
+                                                                 columns,
+                                                                 data = [],
+                                                                 rowKey,
+                                                                 selectable = true,
+                                                                 selectedRowKeys: externalSelectedKeys,
+                                                                 onSelectionChange,
+                                                                 tabs,
+                                                                 activeTabKey,
+                                                                 onTabChange,
+                                                                 searchPlaceholder = "在列表中搜索",
+                                                                 onAdd,
+                                                                 addButtonText = "+ 新增",
+                                                                 onExport,
+                                                                 onBatchDelete,
+                                                                 customLeftTools,
+                                                                 customRightTools,
+                                                                 pagination,
+                                                                 emptyText = "暂无相关数据",
+                                                                 className,
+                                                               }: FeishuDataTableProps<T>) {
   // 内部选中的 Keys（如果非受控）
   const [internalSelectedKeys, setInternalSelectedKeys] = useState<(string | number)[]>([]);
   const selectedKeys = externalSelectedKeys !== undefined ? externalSelectedKeys : internalSelectedKeys;
@@ -492,7 +492,7 @@ export function FeishuDataTable<T extends Record<string, any>>({
     <div
       style={{ fontFamily: FEISHU_FONT_FAMILY }}
       className={cn(
-        "flex flex-col bg-white border border-[#DEE0E3] rounded-[12px] shadow-2xs overflow-hidden select-none",
+        "flex flex-col bg-white border border-[#DEE0E3] rounded-xl shadow-2xs overflow-hidden select-none",
         className
       )}
     >
@@ -512,8 +512,8 @@ export function FeishuDataTable<T extends Record<string, any>>({
                   className={cn(
                     "flex items-center gap-2 py-3 cursor-pointer text-[14px] transition-colors relative",
                     isActive
-                      ? "text-[#3370FF] font-medium"
-                      : "text-[#646A73] hover:text-[#1F2329]"
+                      ? "text-feishu-blue font-medium"
+                      : "text-[#646A73] hover:text-feishu-text-primary"
                   )}
                 >
                   {tab.icon}
@@ -523,8 +523,8 @@ export function FeishuDataTable<T extends Record<string, any>>({
                       className={cn(
                         "px-1.5 py-0.5 rounded-full text-[12px] tabular-nums font-normal",
                         isActive
-                          ? "bg-[#E8F3FF] text-[#3370FF]"
-                          : "bg-[#F2F3F5] text-[#8F959E]"
+                          ? "bg-feishu-blue-light text-feishu-blue"
+                          : "bg-[#F2F3F5] text-feishu-text-muted"
                       )}
                     >
                       {tab.count}
@@ -534,7 +534,7 @@ export function FeishuDataTable<T extends Record<string, any>>({
               );
             })}
             <div
-              className="absolute bottom-0 h-[2px] bg-[#3370FF] rounded-full transition-all duration-200 ease-out pointer-events-none"
+              className="absolute bottom-0 h-0.5 bg-feishu-blue rounded-full transition-all duration-200 ease-out pointer-events-none"
               style={{
                 left: `${inkStyle.left}px`,
                 width: `${inkStyle.width}px`,
@@ -589,8 +589,8 @@ export function FeishuDataTable<T extends Record<string, any>>({
                 columnWidths[col.key] !== undefined
                   ? columnWidths[col.key]
                   : hasResized
-                  ? (typeof col.width === "number" ? col.width : 160)
-                  : computedColumnWidths[col.key];
+                    ? (typeof col.width === "number" ? col.width : 160)
+                    : computedColumnWidths[col.key];
               return (
                 <col
                   key={col.key}
@@ -601,172 +601,172 @@ export function FeishuDataTable<T extends Record<string, any>>({
           </colgroup>
 
           {/* 表头 */}
-          <thead className="bg-white border-b border-[#DEE0E3] select-none text-[#646A75] group/thead feishu-table-head">
-            <tr>
-              {/* Checkbox 列 */}
-              {selectable && (
-                <th className="w-12 pl-5 pr-3 py-2.5 text-center font-normal relative">
-                  <input
-                    type="checkbox"
-                    checked={isAllSelected}
-                    onChange={(e) => handleSelectAll(e.target.checked)}
-                    className="w-4 h-4 rounded border-[#D0D3D6] text-[#3370FF] focus:ring-0 cursor-pointer accent-[#3370FF]"
-                  />
-                  <span className="feishu-col-divider absolute right-0 top-1/2 -translate-y-1/2 h-[20px] w-[2px] rounded-full bg-[#DEE0E3] opacity-0 group-hover/thead:opacity-100 transition-opacity duration-150 pointer-events-none z-10" />
-                </th>
-              )}
+          <thead className="bg-white border-b border-[#DEE0E3] select-none text-feishu-text-secondary group/thead feishu-table-head">
+          <tr>
+            {/* Checkbox 列 */}
+            {selectable && (
+              <th className="w-12 pl-5 pr-3 py-2.5 text-center font-normal relative">
+                <input
+                  type="checkbox"
+                  checked={isAllSelected}
+                  onChange={(e) => handleSelectAll(e.target.checked)}
+                  className="w-4 h-4 rounded border-feishu-border text-feishu-blue focus:ring-0 cursor-pointer accent-feishu-blue"
+                />
+                <span className="feishu-col-divider absolute right-0 top-1/2 -translate-y-1/2 h-5 w-0.5 rounded-full bg-[#DEE0E3] opacity-0 group-hover/thead:opacity-100 transition-opacity duration-150 pointer-events-none z-10" />
+              </th>
+            )}
 
-              {/* 字段列头 */}
-              {columns.map((col, idx) => {
-                const sortRule = sortRules.find((r) => r.key === col.key);
-                const isStickyRight =
-                  col.fixed === "right" || (col.fixed === undefined && (idx === columns.length - 1 || col.key === "actions"));
-                const showStickyShadow = isStickyRight && hasHorizontalOverflow && !isScrolledToEnd;
-                const isFirstCol = idx === 0 && !selectable;
-                const isLastCol = idx === columns.length - 1;
+            {/* 字段列头 */}
+            {columns.map((col, idx) => {
+              const sortRule = sortRules.find((r) => r.key === col.key);
+              const isStickyRight =
+                col.fixed === "right" || (col.fixed === undefined && (idx === columns.length - 1 || col.key === "actions"));
+              const showStickyShadow = isStickyRight && hasHorizontalOverflow && !isScrolledToEnd;
+              const isFirstCol = idx === 0 && !selectable;
+              const isLastCol = idx === columns.length - 1;
 
-                return (
-                  <th
-                    key={col.key}
-                    ref={(el) => {
-                      thRefs.current[col.key] = el;
+              return (
+                <th
+                  key={col.key}
+                  ref={(el) => {
+                    thRefs.current[col.key] = el;
+                  }}
+                  className={cn(
+                    "p-0 font-normal border-none transition-shadow duration-200",
+                    isFirstCol && "pl-2",
+                    isLastCol && "pr-2",
+                    isStickyRight && "sticky right-0 bg-white z-30",
+                    showStickyShadow && "shadow-[-6px_0_16px_rgba(31,35,41,0.08)] border-l border-[#DEE0E3]/60"
+                  )}
+                >
+                  <FeishuHeaderCell
+                    title={col.title}
+                    align={col.align}
+                    sortable={col.sortable}
+                    enableMenu={col.enableMenu}
+                    dataType={col.dataType}
+                    isSorted={!!sortRule}
+                    sortDirection={sortRule?.direction}
+                    onSortAsc={() => handleSetColumnSort(col.key, "asc")}
+                    onSortDesc={() => handleSetColumnSort(col.key, "desc")}
+                    onFilter={() => {
+                      const fieldKey = (col.dataIndex || col.key) as string;
+                      const existingIdx = filterConditions.findIndex((c) => c.field === fieldKey);
+                      if (existingIdx === -1) {
+                        const ops = getOperatorsByDataType(col.dataType);
+                        setFilterConditions((prev) => [
+                          ...prev,
+                          { id: String(Date.now()), field: fieldKey, operator: ops[0].value, value: "" },
+                        ]);
+                      }
+                      setIsFilterOpen(true);
                     }}
-                    className={cn(
-                      "p-0 font-normal border-none transition-shadow duration-200",
-                      isFirstCol && "pl-2",
-                      isLastCol && "pr-2",
-                      isStickyRight && "sticky right-0 bg-white z-30",
-                      showStickyShadow && "shadow-[-6px_0_16px_rgba(31,35,41,0.08)] border-l border-[#DEE0E3]/60"
-                    )}
-                  >
-                    <FeishuHeaderCell
-                      title={col.title}
-                      align={col.align}
-                      sortable={col.sortable}
-                      enableMenu={col.enableMenu}
-                      dataType={col.dataType}
-                      isSorted={!!sortRule}
-                      sortDirection={sortRule?.direction}
-                      onSortAsc={() => handleSetColumnSort(col.key, "asc")}
-                      onSortDesc={() => handleSetColumnSort(col.key, "desc")}
-                      onFilter={() => {
-                        const fieldKey = (col.dataIndex || col.key) as string;
-                        const existingIdx = filterConditions.findIndex((c) => c.field === fieldKey);
-                        if (existingIdx === -1) {
-                          const ops = getOperatorsByDataType(col.dataType);
-                          setFilterConditions((prev) => [
-                            ...prev,
-                            { id: String(Date.now()), field: fieldKey, operator: ops[0].value, value: "" },
-                          ]);
-                        }
-                        setIsFilterOpen(true);
-                      }}
-                      resizable={col.resizable !== false}
-                      isResizing={resizingKey === col.key}
-                      isLast={idx === columns.length - 1}
-                      onResizeStart={(e) => handleResizeStart(col.key, e)}
-                    />
-                  </th>
-                );
-              })}
-            </tr>
+                    resizable={col.resizable !== false}
+                    isResizing={resizingKey === col.key}
+                    isLast={idx === columns.length - 1}
+                    onResizeStart={(e) => handleResizeStart(col.key, e)}
+                  />
+                </th>
+              );
+            })}
+          </tr>
           </thead>
 
           {/* 表格内容行 */}
           <tbody className="divide-y divide-[#DEE0E3]/60 bg-white">
-            {paginatedData.length === 0 ? (
-              <tr>
-                <td
-                  colSpan={columns.length + (selectable ? 1 : 0)}
-                  className="p-0 text-center bg-white"
+          {paginatedData.length === 0 ? (
+            <tr>
+              <td
+                colSpan={columns.length + (selectable ? 1 : 0)}
+                className="p-0 text-center bg-white"
+              >
+                <FeishuEmptyState
+                  title={
+                    searchQuery || filterConditions.length > 0
+                      ? "未找到匹配的数据"
+                      : emptyText || "暂无相关记录"
+                  }
+                  description={
+                    searchQuery || filterConditions.length > 0
+                      ? `未找到与 “${searchQuery}” 相关的结果，请尝试更换关键词`
+                      : "当前暂无数据"
+                  }
+                />
+              </td>
+            </tr>
+          ) : (
+            paginatedData.map((record, index) => {
+              const id = getRowId(record);
+              const isSelected = selectedKeys.includes(id);
+
+              return (
+                <tr
+                  key={id}
+                  className={cn(
+                    "hover:bg-[#F8F9FA] transition-colors group",
+                    isSelected && "bg-[#F0F4FF] hover:bg-[#E8F0FF]"
+                  )}
                 >
-                  <FeishuEmptyState
-                    title={
-                      searchQuery || filterConditions.length > 0
-                        ? "未找到匹配的数据"
-                        : emptyText || "暂无相关记录"
-                    }
-                    description={
-                      searchQuery || filterConditions.length > 0
-                        ? `未找到与 “${searchQuery}” 相关的结果，请尝试更换关键词`
-                        : "当前暂无数据"
-                    }
-                  />
-                </td>
-              </tr>
-            ) : (
-              paginatedData.map((record, index) => {
-                const id = getRowId(record);
-                const isSelected = selectedKeys.includes(id);
+                  {/* Checkbox 单元格 */}
+                  {selectable && (
+                    <td className="w-12 pl-5 pr-3 py-2.5 text-center">
+                      <input
+                        type="checkbox"
+                        checked={isSelected}
+                        onChange={(e) => handleSelectRow(id, record, e.target.checked)}
+                        className="w-4 h-4 rounded border-feishu-border text-feishu-blue focus:ring-0 cursor-pointer accent-feishu-blue"
+                      />
+                    </td>
+                  )}
 
-                return (
-                  <tr
-                    key={id}
-                    className={cn(
-                      "hover:bg-[#F8F9FA] transition-colors group",
-                      isSelected && "bg-[#F0F4FF] hover:bg-[#E8F0FF]"
-                    )}
-                  >
-                    {/* Checkbox 单元格 */}
-                    {selectable && (
-                      <td className="w-12 pl-5 pr-3 py-2.5 text-center">
-                        <input
-                          type="checkbox"
-                          checked={isSelected}
-                          onChange={(e) => handleSelectRow(id, record, e.target.checked)}
-                          className="w-4 h-4 rounded border-[#D0D3D6] text-[#3370FF] focus:ring-0 cursor-pointer accent-[#3370FF]"
-                        />
-                      </td>
-                    )}
+                  {/* 数据单元格 */}
+                  {columns.map((col, cIdx) => {
+                    const val = col.dataIndex ? record[col.dataIndex] : undefined;
+                    const colKey = (col.key || col.dataIndex) as string;
+                    const isStickyRight =
+                      col.fixed === "right" ||
+                      (col.fixed === undefined && (cIdx === columns.length - 1 || col.key === "actions"));
+                    const showStickyShadow = isStickyRight && hasHorizontalOverflow && !isScrolledToEnd;
+                    const isFirstCol = cIdx === 0 && !selectable;
+                    const isLastCol = cIdx === columns.length - 1;
 
-                    {/* 数据单元格 */}
-                    {columns.map((col, cIdx) => {
-                      const val = col.dataIndex ? record[col.dataIndex] : undefined;
-                      const colKey = (col.key || col.dataIndex) as string;
-                      const isStickyRight =
-                        col.fixed === "right" ||
-                        (col.fixed === undefined && (cIdx === columns.length - 1 || col.key === "actions"));
-                      const showStickyShadow = isStickyRight && hasHorizontalOverflow && !isScrolledToEnd;
-                      const isFirstCol = cIdx === 0 && !selectable;
-                      const isLastCol = cIdx === columns.length - 1;
+                    // 检查当前单元格是否命中了搜索关键词
+                    const isScopeMatched =
+                      !searchScopeKeys || searchScopeKeys.length === 0 || searchScopeKeys.includes(colKey);
+                    const isSearchMatched =
+                      searchQuery.trim().length > 0 &&
+                      isScopeMatched &&
+                      val !== null &&
+                      val !== undefined &&
+                      String(val).toLowerCase().includes(searchQuery.trim().toLowerCase());
 
-                      // 检查当前单元格是否命中了搜索关键词
-                      const isScopeMatched =
-                        !searchScopeKeys || searchScopeKeys.length === 0 || searchScopeKeys.includes(colKey);
-                      const isSearchMatched =
-                        searchQuery.trim().length > 0 &&
-                        isScopeMatched &&
-                        val !== null &&
-                        val !== undefined &&
-                        String(val).toLowerCase().includes(searchQuery.trim().toLowerCase());
-
-                      return (
-                        <td
-                          key={col.key}
-                          className={cn(
-                            "py-2.5 text-[#1F2329] leading-[22px] transition-colors",
-                            isFirstCol ? "pl-5 pr-3" : isLastCol ? "pl-3 pr-5" : "px-3",
-                            !isStickyRight && "truncate",
-                            isStickyRight && "sticky right-0 bg-white group-hover:bg-[#F8F9FA] z-20 overflow-visible whitespace-nowrap",
-                            showStickyShadow && "shadow-[-6px_0_16px_rgba(31,35,41,0.08)] border-l border-[#DEE0E3]/60",
-                            isSearchMatched
-                              ? "bg-[#DCE8FD]"
-                              : isSelected
-                              ? isStickyRight ? "!bg-[#F0F4FF] group-hover:!bg-[#E8F0FF]" : "bg-transparent"
+                    return (
+                      <td
+                        key={col.key}
+                        className={cn(
+                          "py-2.5 text-feishu-text-primary leading-5.5 transition-colors",
+                          isFirstCol ? "pl-5 pr-3" : isLastCol ? "pl-3 pr-5" : "px-3",
+                          !isStickyRight && "truncate",
+                          isStickyRight && "sticky right-0 bg-white group-hover:bg-[#F8F9FA] z-20 overflow-visible whitespace-nowrap",
+                          showStickyShadow && "shadow-[-6px_0_16px_rgba(31,35,41,0.08)] border-l border-[#DEE0E3]/60",
+                          isSearchMatched
+                            ? "bg-[#DCE8FD]"
+                            : isSelected
+                              ? isStickyRight ? "bg-[#F0F4FF]! group-hover:bg-[#E8F0FF]!" : "bg-transparent"
                               : "",
-                            col.align === "center" && "text-center",
-                            col.align === "right" && "text-right",
-                            col.dataType === "number" && "tabular-nums"
-                          )}
-                        >
-                          {col.render ? col.render(val, record, index) : String(val ?? "—")}
-                        </td>
-                      );
-                    })}
-                  </tr>
-                );
-              })
-            )}
+                          col.align === "center" && "text-center",
+                          col.align === "right" && "text-right",
+                          col.dataType === "number" && "tabular-nums"
+                        )}
+                      >
+                        {col.render ? col.render(val, record, index) : String(val ?? "—")}
+                      </td>
+                    );
+                  })}
+                </tr>
+              );
+            })
+          )}
           </tbody>
         </table>
       </div>
