@@ -6,12 +6,12 @@ import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nexarag.common.exception.ServiceException;
-import com.nexarag.document.model.entity.DocumentChunk;
 import com.nexarag.document.enums.ChunkStatus;
 import com.nexarag.document.enums.DocumentErrorCode;
 import com.nexarag.document.mapper.DocumentChunkMapper;
-import com.nexarag.document.service.DocumentChunkService;
 import com.nexarag.document.model.bo.split.ChunkDraft;
+import com.nexarag.document.model.entity.DocumentChunk;
+import com.nexarag.document.service.DocumentChunkService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -32,10 +32,9 @@ public class DocumentChunkServiceImpl extends ServiceImpl<DocumentChunkMapper, D
     private static final long MAX_PAGE_SIZE = 100;
 
     @Override
-    public List<DocumentChunk> listByDocumentId(Long documentId) {
-        // 1. 使用 lambdaQuery 按文档ID和片段顺序查询
+    public List<DocumentChunk> listByDocumentVersionId(Long documentVersionId) {
         return this.lambdaQuery()
-                .eq(DocumentChunk::getDocumentId, documentId)
+                .eq(DocumentChunk::getDocumentVersionId, documentVersionId)
                 .orderByAsc(DocumentChunk::getChunkOrder)
                 .list();
     }
@@ -54,73 +53,58 @@ public class DocumentChunkServiceImpl extends ServiceImpl<DocumentChunkMapper, D
     }
 
     @Override
-    public IPage<DocumentChunk> pageByDocumentId(Long documentId, long pageNum, long pageSize) {
+    public IPage<DocumentChunk> pageByDocumentVersionId(Long documentVersionId, long pageNum, long pageSize) {
         long safePageNum = pageNum <= 0 ? 1 : pageNum;
         long safePageSize = pageSize <= 0 ? DEFAULT_PAGE_SIZE : Math.min(pageSize, MAX_PAGE_SIZE);
-
-        // 1. 使用归一化后的分页参数查询指定文档片段
-        return queryChunkPage(documentId, safePageNum, safePageSize);
-    }
-
-    /**
-     * 查询指定文档的片段分页数据。
-     *
-     * @param documentId 文档ID
-     * @param pageNum    页码
-     * @param pageSize   每页数量
-     * @return 文档片段分页数据
-     */
-    protected IPage<DocumentChunk> queryChunkPage(Long documentId, long pageNum, long pageSize) {
-        Page<DocumentChunk> page = Page.of(pageNum, pageSize);
+        Page<DocumentChunk> page = Page.of(safePageNum, safePageSize);
         return this.lambdaQuery()
-                .eq(DocumentChunk::getDocumentId, documentId)
+                .eq(DocumentChunk::getDocumentVersionId, documentVersionId)
                 .orderByAsc(DocumentChunk::getChunkOrder)
                 .page(page);
     }
 
     @Transactional(rollbackFor = Exception.class)
     @Override
-    public List<DocumentChunk> replaceDocumentChunks(Long documentId, List<ChunkDraft> drafts) {
-        if (documentId == null || drafts == null || drafts.isEmpty()) {
-            throw new ServiceException("文档片段不能为空，documentId=" + documentId,
+    public List<DocumentChunk> replaceDocumentVersionChunks(Long documentId, Long documentVersionId,
+                                                            List<ChunkDraft> drafts) {
+        if (documentId == null || documentVersionId == null || drafts == null || drafts.isEmpty()) {
+            throw new ServiceException("文档版本片段不能为空，documentId=" + documentId
+                    + "，documentVersionId=" + documentVersionId, DocumentErrorCode.DOCUMENT_PROCESS_CONFIG_INVALID);
+        }
+        deleteByDocumentVersionId(documentVersionId);
+        return saveDocumentVersionChunks(documentId, documentVersionId, drafts);
+    }
+
+    @Override
+    public void deleteByDocumentVersionId(Long documentVersionId) {
+        // 历史版本永久删除不得受逻辑删除插件影响，避免残留正文数据。
+        baseMapper.physicalDeleteByDocumentVersionId(documentVersionId);
+    }
+
+    @Override
+    public List<DocumentChunk> saveDocumentVersionChunks(Long documentId, Long documentVersionId,
+                                                         List<ChunkDraft> drafts) {
+        if (documentVersionId == null) {
+            throw new ServiceException("文档版本ID不能为空，documentId=" + documentId,
                     DocumentErrorCode.DOCUMENT_PROCESS_CONFIG_INVALID);
         }
-
-        // 1. 先删除旧片段，再保存新片段
-        deleteByDocumentId(documentId);
-
-        return saveDocumentChunks(documentId, drafts);
+        return saveChunks(documentId, documentVersionId, drafts);
     }
 
-    @Override
-    public void deleteByDocumentId(Long documentId) {
-        this.lambdaUpdate()
-                .eq(DocumentChunk::getDocumentId, documentId)
-                .remove();
-    }
-
-    @Override
-    public List<DocumentChunk> saveDocumentChunks(Long documentId, List<ChunkDraft> drafts) {
+    private List<DocumentChunk> saveChunks(Long documentId, Long documentVersionId, List<ChunkDraft> drafts) {
         if (documentId == null || drafts == null || drafts.isEmpty()) {
             throw new ServiceException("文档片段不能为空，documentId=" + documentId, DocumentErrorCode.DOCUMENT_PROCESS_CONFIG_INVALID);
         }
 
         List<DocumentChunk> chunks = new ArrayList<>();
         for (int i = 0; i < drafts.size(); i++) {
-            chunks.add(toChunk(documentId, drafts.get(i), i));
+            chunks.add(toChunk(documentId, documentVersionId, drafts.get(i), i));
         }
         boolean saved = this.saveBatch(chunks);
         if (!saved) {
             throw new ServiceException("保存文档片段失败，documentId=" + documentId);
         }
         return chunks;
-    }
-
-    @Override
-    public long countByDocumentId(Long documentId) {
-        return this.lambdaQuery()
-                .eq(DocumentChunk::getDocumentId, documentId)
-                .count();
     }
 
     /**
@@ -159,21 +143,21 @@ public class DocumentChunkServiceImpl extends ServiceImpl<DocumentChunkMapper, D
     }
 
     /**
-     * 标记指定文档中需要跳过索引的片段。
+     * 标记指定文档版本中需要跳过索引的片段。
      *
-     * @param documentId 文档ID
+     * @param documentVersionId 文档版本ID
      */
     @Override
-    public void markDocumentSkippedChunks(Long documentId) {
-        // 1. 将跳过索引的片段稳定标记为 SKIP_INDEX
+    public void markDocumentVersionSkippedChunks(Long documentVersionId) {
+        // 1. 将当前版本的跳过片段稳定标记为 SKIP_INDEX，防止覆盖其他版本状态
         this.lambdaUpdate()
-                .eq(DocumentChunk::getDocumentId, documentId)
+                .eq(DocumentChunk::getDocumentVersionId, documentVersionId)
                 .eq(DocumentChunk::getSkipIndex, 1)
                 .set(DocumentChunk::getStatus, ChunkStatus.SKIP_INDEX)
                 .update();
     }
 
-    private DocumentChunk toChunk(Long documentId, ChunkDraft draft, int order) {
+    private DocumentChunk toChunk(Long documentId, Long documentVersionId, ChunkDraft draft, int order) {
         if (draft == null || !StringUtils.hasText(draft.chunkId()) || !StringUtils.hasText(draft.text())) {
             throw new ServiceException("文档片段草稿不合法，documentId=" + documentId,
                     DocumentErrorCode.DOCUMENT_PROCESS_CONFIG_INVALID);
@@ -181,6 +165,7 @@ public class DocumentChunkServiceImpl extends ServiceImpl<DocumentChunkMapper, D
         return DocumentChunk.builder()
                 .chunkId(draft.chunkId())
                 .documentId(documentId)
+                .documentVersionId(documentVersionId)
                 .chunkOrder(order)
                 .parentChunkId(draft.parentChunkId())
                 .sectionId(draft.sectionId())

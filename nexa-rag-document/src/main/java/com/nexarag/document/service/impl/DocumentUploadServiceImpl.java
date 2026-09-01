@@ -4,17 +4,19 @@ import com.nexarag.common.error.BaseErrorCode;
 import com.nexarag.common.exception.ClientException;
 import com.nexarag.common.exception.ServiceException;
 import com.nexarag.document.config.DocumentUploadRetryProperties;
+import com.nexarag.document.converter.DocumentConverter;
+import com.nexarag.document.enums.DocumentErrorCode;
+import com.nexarag.document.enums.FileType;
 import com.nexarag.document.model.dto.CreateDocumentRequest;
+import com.nexarag.document.model.dto.DocumentVersionUploadDTO;
 import com.nexarag.document.model.dto.ProcessDocumentRequest;
 import com.nexarag.document.model.dto.UploadDocumentRequest;
-import com.nexarag.document.model.entity.Document;
-import com.nexarag.document.enums.FileType;
-import com.nexarag.document.enums.DocumentErrorCode;
+import com.nexarag.document.model.entity.DocumentVersionDO;
+import com.nexarag.document.model.vo.UploadDocumentResponse;
 import com.nexarag.document.service.DocumentPipelineSubmitService;
 import com.nexarag.document.service.DocumentUploadRetryWaiter;
 import com.nexarag.document.service.DocumentUploadService;
 import com.nexarag.document.service.ProcessConfigDefaults;
-import com.nexarag.document.model.vo.UploadDocumentResponse;
 import com.nexarag.infra.storage.StoredFile;
 import com.nexarag.infra.storage.service.FileStorageService;
 import lombok.RequiredArgsConstructor;
@@ -43,7 +45,8 @@ public class DocumentUploadServiceImpl implements DocumentUploadService {
     private final DocumentUploadRetryWaiter retryWaiter;
 
     @Override
-    public UploadDocumentResponse upload(Long knowledgeBaseId, MultipartFile file, UploadDocumentRequest request) {
+    public UploadDocumentResponse upload(Long knowledgeBaseId, MultipartFile file, UploadDocumentRequest request,
+                                         String operator) {
         // 1. 校验上传文件，避免无效文件进入对象存储
         validateFile(file);
         UploadDocumentRequest safeRequest = request == null
@@ -58,11 +61,41 @@ public class DocumentUploadServiceImpl implements DocumentUploadService {
         try {
             ProcessDocumentRequest processRequest = processConfigDefaults.merge(
                     FileType.fromFileName(originalFileName), safeRequest);
-            Document document = pipelineSubmitService.createAndSubmit(knowledgeBaseId,
-                    buildCreateDocumentRequest(safeRequest, originalFileName, storedFile), processRequest);
-            log.info("文档上传并提交处理成功，documentId={}，processId={}，status={}",
-                    document.getDocumentId(), document.getProcessId(), document.getStatus());
-            return new UploadDocumentResponse(document.getDocumentId(), document.getProcessId(), document.getStatus());
+            DocumentVersionDO documentVersion = pipelineSubmitService.createAndSubmit(knowledgeBaseId,
+                    buildCreateDocumentRequest(safeRequest, originalFileName, storedFile), processRequest, operator);
+            log.info("文档首个版本上传并提交处理成功，documentId={}，documentVersionId={}，processId={}，status={}",
+                    documentVersion.getDocumentId(), documentVersion.getDocumentVersionId(),
+                    documentVersion.getProcessId(), documentVersion.getStatus());
+            return new UploadDocumentResponse(documentVersion.getDocumentId(), documentVersion.getProcessId(),
+                    DocumentConverter.toDocumentStatus(documentVersion), documentVersion.getDocumentVersionId());
+        } catch (RuntimeException exception) {
+            compensateStoredFile(storedFile.objectName(), exception);
+            throw exception;
+        }
+    }
+
+    @Override
+    public UploadDocumentResponse uploadVersion(Long documentId, MultipartFile file, UploadDocumentRequest request,
+                                                String operator) {
+        validateFile(file);
+        UploadDocumentRequest safeRequest = request == null
+                ? new UploadDocumentRequest(null, null, null, null, null)
+                : request;
+        String originalFileName = file.getOriginalFilename();
+        StoredFile storedFile = saveOriginalFileWithRetry(file, originalFileName);
+        try {
+            ProcessDocumentRequest processRequest = processConfigDefaults.merge(
+                    FileType.fromFileName(originalFileName), safeRequest);
+            DocumentVersionDO documentVersion = pipelineSubmitService.createVersionAndSubmit(documentId,
+                    DocumentVersionUploadDTO.builder()
+                            .originalFileName(originalFileName)
+                            .fileType(FileType.fromFileName(originalFileName))
+                            .fileSize(storedFile.size())
+                            .originalObjectName(storedFile.objectName())
+                            .originalFileUrl(storedFile.url())
+                            .build(), processRequest, operator);
+            return new UploadDocumentResponse(documentId, documentVersion.getProcessId(),
+                    DocumentConverter.toDocumentStatus(documentVersion), documentVersion.getDocumentVersionId());
         } catch (RuntimeException exception) {
             compensateStoredFile(storedFile.objectName(), exception);
             throw exception;

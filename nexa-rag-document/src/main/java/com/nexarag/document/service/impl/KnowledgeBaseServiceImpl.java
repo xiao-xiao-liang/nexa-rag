@@ -8,6 +8,7 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.nexarag.common.exception.ClientException;
 import com.nexarag.common.web.PageVO;
+import com.nexarag.document.converter.DocumentConverter;
 import com.nexarag.document.converter.KnowledgeBaseConverter;
 import com.nexarag.document.enums.DocumentErrorCode;
 import com.nexarag.document.enums.DocumentStatus;
@@ -17,9 +18,11 @@ import com.nexarag.document.model.dataobject.KnowledgeBaseDO;
 import com.nexarag.document.model.dto.CreateKnowledgeBaseDTO;
 import com.nexarag.document.model.dto.UpdateKnowledgeBaseDTO;
 import com.nexarag.document.model.entity.Document;
+import com.nexarag.document.model.entity.DocumentVersionDO;
 import com.nexarag.document.model.vo.KnowledgeBaseDetailVO;
 import com.nexarag.document.model.vo.KnowledgeBaseStatisticsVO;
 import com.nexarag.document.model.vo.KnowledgeBaseSummaryVO;
+import com.nexarag.document.service.DocumentVersionService;
 import com.nexarag.document.service.KnowledgeBaseService;
 import com.nexarag.document.tenant.CurrentTenantProvider;
 import lombok.RequiredArgsConstructor;
@@ -29,12 +32,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
-import java.util.Collection;
-import java.util.HashMap;
-import java.util.LinkedHashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 
 /**
  * 知识库服务实现，确保知识库和文档访问始终限制在当前租户内。
@@ -51,6 +49,7 @@ public class KnowledgeBaseServiceImpl extends ServiceImpl<KnowledgeBaseMapper, K
     private final KnowledgeBaseMapper knowledgeBaseMapper;
     private final DocumentMapper documentMapper;
     private final CurrentTenantProvider currentTenantProvider;
+    private final DocumentVersionService documentVersionService;
 
     /**
      * 在当前租户创建知识库。
@@ -88,7 +87,7 @@ public class KnowledgeBaseServiceImpl extends ServiceImpl<KnowledgeBaseMapper, K
     /**
      * 分页查询当前租户的知识库摘要。
      *
-     * @param pageNum 页码
+     * @param pageNum  页码
      * @param pageSize 每页数量
      * @return 知识库分页结果
      */
@@ -134,7 +133,7 @@ public class KnowledgeBaseServiceImpl extends ServiceImpl<KnowledgeBaseMapper, K
      * 更新当前租户内知识库的名称和描述；默认知识库不可改名。
      *
      * @param knowledgeBaseId 知识库ID
-     * @param request 更新请求
+     * @param request         更新请求
      * @return 更新后的知识库详情
      */
     @Override
@@ -234,7 +233,7 @@ public class KnowledgeBaseServiceImpl extends ServiceImpl<KnowledgeBaseMapper, K
      * 获取归属于指定知识库的文档，不允许跨知识库访问。
      *
      * @param knowledgeBaseId 知识库ID
-     * @param documentId 文档ID
+     * @param documentId      文档ID
      * @return 文档实体
      */
     @Override
@@ -264,7 +263,7 @@ public class KnowledgeBaseServiceImpl extends ServiceImpl<KnowledgeBaseMapper, K
     /**
      * 校验指定租户范围内的知识库，避免异步任务依赖线程绑定的当前租户。
      *
-     * @param tenantId 可信租户ID
+     * @param tenantId         可信租户ID
      * @param knowledgeBaseIds 待校验知识库ID集合；为空表示检索全部知识库
      * @return 去重后的知识库ID集合
      */
@@ -290,7 +289,7 @@ public class KnowledgeBaseServiceImpl extends ServiceImpl<KnowledgeBaseMapper, K
     /**
      * 判断文档是否属于当前租户，并且满足可选知识库范围。
      *
-     * @param documentId 文档ID
+     * @param documentId       文档ID
      * @param knowledgeBaseIds 已校验的知识库范围；为空表示全部知识库
      * @return true 表示文档在当前可访问范围内
      */
@@ -305,27 +304,27 @@ public class KnowledgeBaseServiceImpl extends ServiceImpl<KnowledgeBaseMapper, K
     /**
      * 批量校验文档与当前租户知识库的归属关系，避免召回结果逐条触发数据库查询。
      *
-     * @param documentIds 待校验的文档ID集合
+     * @param documentIds      待校验的文档ID集合
      * @param knowledgeBaseIds 已校验的知识库范围；为空表示当前租户全部知识库
      * @return 当前请求可访问的文档ID集合
      */
     @Override
     public Set<Long> filterDocumentIdsInCurrentTenantScope(Collection<Long> documentIds,
-                                                            Set<Long> knowledgeBaseIds) {
+                                                           Set<Long> knowledgeBaseIds) {
         return filterDocumentIdsInTenantScope(currentTenantProvider.getRequiredTenantId(), documentIds, knowledgeBaseIds);
     }
 
     /**
      * 批量校验文档与指定租户知识库的归属关系，避免异步任务依赖线程绑定的当前租户。
      *
-     * @param tenantId 可信租户ID
-     * @param documentIds 待校验的文档ID集合
+     * @param tenantId         可信租户ID
+     * @param documentIds      待校验的文档ID集合
      * @param knowledgeBaseIds 已校验的知识库范围；为空表示该租户全部知识库
      * @return 当前请求可访问的文档ID集合
      */
     @Override
     public Set<Long> filterDocumentIdsInTenantScope(String tenantId, Collection<Long> documentIds,
-                                                     Set<Long> knowledgeBaseIds) {
+                                                    Set<Long> knowledgeBaseIds) {
         requireTenantId(tenantId);
         if (documentIds == null || documentIds.isEmpty()) {
             return Set.of();
@@ -367,6 +366,35 @@ public class KnowledgeBaseServiceImpl extends ServiceImpl<KnowledgeBaseMapper, K
                 .collect(java.util.stream.Collectors.toUnmodifiableSet());
     }
 
+    @Override
+    public Map<Long, Long> findActiveVersionIdsInTenantScope(String tenantId, Collection<Long> documentIds,
+                                                             Set<Long> knowledgeBaseIds) {
+        Set<Long> accessibleDocumentIds = filterDocumentIdsInTenantScope(tenantId, documentIds, knowledgeBaseIds);
+        if (accessibleDocumentIds.isEmpty()) {
+            return Map.of();
+        }
+        return documentMapper.selectList(new LambdaQueryWrapper<Document>()
+                        .in(Document::getDocumentId, accessibleDocumentIds)
+                        .isNotNull(Document::getActiveVersionId))
+                .stream().collect(java.util.stream.Collectors.toUnmodifiableMap(Document::getDocumentId,
+                        Document::getActiveVersionId));
+    }
+
+    @Override
+    public Set<Long> listActiveVersionIdsInTenantScope(String tenantId, Set<Long> knowledgeBaseIds) {
+        requireTenantId(tenantId);
+        List<KnowledgeBaseDO> knowledgeBases = knowledgeBaseMapper.selectList(new LambdaQueryWrapper<KnowledgeBaseDO>()
+                .eq(KnowledgeBaseDO::getTenantId, tenantId));
+        Set<Long> allowedKnowledgeBaseIds = knowledgeBases.stream().map(KnowledgeBaseDO::getKnowledgeBaseId)
+                .filter(id -> knowledgeBaseIds == null || knowledgeBaseIds.isEmpty() || knowledgeBaseIds.contains(id))
+                .collect(java.util.stream.Collectors.toSet());
+        if (allowedKnowledgeBaseIds.isEmpty()) return Set.of();
+        return documentMapper.selectList(new LambdaQueryWrapper<Document>()
+                        .in(Document::getKnowledgeBaseId, allowedKnowledgeBaseIds)
+                        .isNotNull(Document::getActiveVersionId))
+                .stream().map(Document::getActiveVersionId).collect(java.util.stream.Collectors.toUnmodifiableSet());
+    }
+
     /**
      * 确保异步调用方传入已在入口处验证的可信租户ID。
      *
@@ -398,13 +426,16 @@ public class KnowledgeBaseServiceImpl extends ServiceImpl<KnowledgeBaseMapper, K
         if (knowledgeBaseIds == null || knowledgeBaseIds.isEmpty()) {
             return Map.of();
         }
+        List<Document> documents = documentMapper.selectList(new LambdaQueryWrapper<Document>()
+                .in(Document::getKnowledgeBaseId, knowledgeBaseIds));
+        Map<Long, DocumentVersionDO> activeVersions = documentVersionService.findActiveVersions(documents);
         Map<Long, long[]> countersByKnowledgeBaseId = new HashMap<>();
-        for (Document document : documentMapper.selectList(new LambdaQueryWrapper<Document>()
-                .in(Document::getKnowledgeBaseId, knowledgeBaseIds))) {
+        for (Document document : documents) {
             long[] counters = countersByKnowledgeBaseId.computeIfAbsent(document.getKnowledgeBaseId(),
                     ignored -> new long[5]);
             counters[0]++;
-            switch (document.getStatus()) {
+            DocumentStatus activeStatus = DocumentConverter.toDocumentStatus(activeVersions.get(document.getDocumentId()));
+            switch (activeStatus) {
                 case UPLOADED -> counters[1]++;
                 case QUEUED, PARSING, PARSED, CHUNKING, CHUNKED, INDEXING -> counters[2]++;
                 case INDEXED -> counters[3]++;

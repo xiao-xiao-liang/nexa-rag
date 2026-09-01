@@ -2,14 +2,12 @@ package com.nexarag.document.messaging.publisher;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nexarag.document.config.DocumentPipelineOutboxProperties;
-import com.nexarag.document.model.entity.DocumentTaskOutboxDO;
 import com.nexarag.document.enums.DocumentTaskType;
+import com.nexarag.document.model.entity.DocumentTaskOutboxDO;
 import com.nexarag.document.service.DocumentPipelineOutboxService;
 import com.nexarag.infra.alert.model.AlertMessage;
 import com.nexarag.infra.messaging.document.model.DocumentPipelineMessage;
-import com.nexarag.infra.messaging.document.task.DocumentTaskMessage;
-import com.nexarag.infra.messaging.document.task.DocumentStorageCleanupMessage;
-import com.nexarag.infra.messaging.document.task.DocumentTaskMessagePublisher;
+import com.nexarag.infra.messaging.document.task.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -83,6 +81,12 @@ public class DocumentPipelineOutboxPublisher {
         }
         if (taskType == DocumentTaskType.CLEAN_DOCUMENT_STORAGE) {
             return objectMapper.readValue(outbox.getMessageBody(), DocumentStorageCleanupMessage.class);
+        }
+        if (taskType == DocumentTaskType.CLEAN_DOCUMENT_VERSION_INDEX) {
+            return objectMapper.readValue(outbox.getMessageBody(), DocumentVersionIndexCleanupMessage.class);
+        }
+        if (taskType == DocumentTaskType.CLEAN_DOCUMENT_VERSION_STORAGE) {
+            return objectMapper.readValue(outbox.getMessageBody(), DocumentVersionStorageCleanupMessage.class);
         }
         return objectMapper.readValue(outbox.getMessageBody(), DocumentTaskMessage.class);
     }

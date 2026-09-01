@@ -1,9 +1,9 @@
 package com.nexarag.document.service.impl;
 
-import com.nexarag.document.model.entity.Document;
-import com.nexarag.infra.messaging.document.model.DocumentPipelineFailureMessage;
-import com.nexarag.document.service.DocumentService;
+import com.nexarag.document.service.DocumentPipelineOutboxService;
 import com.nexarag.document.service.DocumentTaskAlertService;
+import com.nexarag.document.service.DocumentVersionService;
+import com.nexarag.infra.messaging.document.model.DocumentPipelineFailureMessage;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
@@ -16,22 +16,27 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class DocumentProcessFailureService {
 
-    private final DocumentService documentService;
+    private final DocumentVersionService documentVersionService;
     private final DocumentTaskAlertService taskAlertService;
+    private final DocumentPipelineOutboxService outboxService;
 
     /**
      * 使用独立事务记录文档处理失败信息。
      *
-     * @param documentId   文档ID
-     * @param failureStage 失败阶段
-     * @param reason       失败原因
-     * @param detail       失败详情
-     * @return 失败处理后的文档
+     * @param documentId        文档ID
+     * @param documentVersionId 文档版本ID
+     * @param processId         处理轮次ID
+     * @param failureStage      失败阶段
+     * @param reason            失败原因
+     * @param detail            失败详情
+     * @return 是否成功记录当前处理边界的失败信息
      */
     @Transactional(propagation = Propagation.REQUIRES_NEW, rollbackFor = Exception.class)
-    public Document recordFailure(Long documentId, String failureStage, String reason, String detail) {
+    public boolean recordFailure(Long documentId, Long documentVersionId, String processId,
+                                 String failureStage, String reason, String detail) {
         // 1. 独立提交失败状态和自动重试信息
-        return documentService.recordProcessFailure(documentId, failureStage, reason, detail);
+        return documentVersionService.recordRetryableFailure(documentId, documentVersionId, processId,
+                failureStage, reason, detail);
     }
 
     /**
@@ -43,14 +48,21 @@ public class DocumentProcessFailureService {
     @Transactional(propagation = Propagation.REQUIRES_NEW, rollbackFor = Exception.class)
     public boolean markFinalFailure(DocumentPipelineFailureMessage message) {
         // 1. 条件更新当前处理轮次为最终失败
-        boolean updated = documentService.markProcessFailed(message.documentId(), message.processId(),
+        boolean updated = documentVersionService.markProcessFailed(message.documentId(), message.documentVersionId(),
+                message.processId(),
                 message.failureStage(), message.failureReason(), message.failureDetail(),
                 message.consumedTimes(), message.messageId(), message.failureTime());
         if (!updated) {
             return false;
         }
 
-        // 2. 仅在父任务状态更新成功后创建独立的渠道告警任务
+        // 2. 仅在当前轮次失败落库后终结父Outbox任务
+        if (message.outboxId() != null) {
+            outboxService.markTaskFailed(message.outboxId(), Math.max(message.consumedTimes(), 1),
+                    message.failureReason());
+        }
+
+        // 3. 仅在父任务状态更新成功后创建独立的渠道告警任务
         if (message.outboxId() != null) {
             taskAlertService.createFailureAlerts(message.outboxId(), message.consumedTimes(), message.failureReason());
         }

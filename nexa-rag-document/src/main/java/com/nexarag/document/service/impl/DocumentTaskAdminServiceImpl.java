@@ -13,8 +13,10 @@ import com.nexarag.document.service.DocumentPipelineOutboxService;
 import com.nexarag.document.service.DocumentTaskAdminService;
 import com.nexarag.infra.alert.model.AlertMessage;
 import com.nexarag.infra.messaging.document.model.DocumentPipelineMessage;
-import com.nexarag.infra.messaging.document.task.DocumentTaskMessage;
 import com.nexarag.infra.messaging.document.task.DocumentStorageCleanupMessage;
+import com.nexarag.infra.messaging.document.task.DocumentTaskMessage;
+import com.nexarag.infra.messaging.document.task.DocumentVersionIndexCleanupMessage;
+import com.nexarag.infra.messaging.document.task.DocumentVersionStorageCleanupMessage;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -48,10 +50,11 @@ public class DocumentTaskAdminServiceImpl implements DocumentTaskAdminService {
         DocumentTaskOutboxDO retryTask = DocumentTaskOutboxDO.builder()
                 .outboxId(retryOutboxId)
                 .documentId(failedTask.getDocumentId())
+                .documentVersionId(failedTask.getDocumentVersionId())
                 .parentOutboxId(failedTask.getParentOutboxId())
                 .processId(operationId)
                 .taskType(failedTask.getTaskType())
-                .messageKey(failedTask.getDocumentId() + ":" + failedTask.getTaskType() + ":" + operationId)
+                .messageKey(buildMessageKey(failedTask, operationId))
                 .topic(failedTask.getTopic())
                 .messageBody(rebuildMessageBody(failedTask, retryOutboxId, operationId, now))
                 .publishStatus(OutboxPublishStatus.PENDING)
@@ -87,8 +90,8 @@ public class DocumentTaskAdminServiceImpl implements DocumentTaskAdminService {
                                       LocalDateTime createdTime) {
         try {
             Object retryMessage = switch (failedTask.getTaskType()) {
-                case PROCESS_DOCUMENT -> new DocumentPipelineMessage(failedTask.getDocumentId(), operationId,
-                        retryOutboxId, 1, createdTime);
+                case PROCESS_DOCUMENT -> new DocumentPipelineMessage(failedTask.getDocumentId(),
+                        requireDocumentVersionId(failedTask), operationId, retryOutboxId, 2, createdTime);
                 case CLEAN_DOCUMENT_INDEX -> {
                     DocumentTaskMessage previous = objectMapper.readValue(failedTask.getMessageBody(),
                             DocumentTaskMessage.class);
@@ -104,6 +107,21 @@ public class DocumentTaskAdminServiceImpl implements DocumentTaskAdminService {
                             previous.parsedObjectName(), previous.parsedObjectPrefix(),
                             previous.sourceSnapshotPrefix(), createdTime);
                 }
+                case CLEAN_DOCUMENT_VERSION_INDEX -> {
+                    DocumentVersionIndexCleanupMessage previous = objectMapper.readValue(failedTask.getMessageBody(),
+                            DocumentVersionIndexCleanupMessage.class);
+                    yield new DocumentVersionIndexCleanupMessage(retryOutboxId, failedTask.getDocumentId(),
+                            failedTask.getDocumentVersionId(), operationId, failedTask.getTaskType().name(),
+                            previous.schemaVersion(), createdTime);
+                }
+                case CLEAN_DOCUMENT_VERSION_STORAGE -> {
+                    DocumentVersionStorageCleanupMessage previous = objectMapper.readValue(failedTask.getMessageBody(),
+                            DocumentVersionStorageCleanupMessage.class);
+                    yield new DocumentVersionStorageCleanupMessage(retryOutboxId, failedTask.getDocumentId(),
+                            failedTask.getDocumentVersionId(), operationId, failedTask.getTaskType().name(),
+                            previous.schemaVersion(), previous.originalObjectName(), previous.parsedObjectName(),
+                            createdTime);
+                }
                 case SEND_FEISHU_FAILURE_ALERT, SEND_EMAIL_FAILURE_ALERT -> {
                     AlertMessage previous = objectMapper.readValue(failedTask.getMessageBody(), AlertMessage.class);
                     yield new AlertMessage(retryOutboxId, failedTask.getDocumentId(), failedTask.getParentOutboxId(),
@@ -116,5 +134,21 @@ public class DocumentTaskAdminServiceImpl implements DocumentTaskAdminService {
             throw new ServiceException("重建文档任务重试消息失败，outboxId=" + failedTask.getOutboxId(), exception,
                     com.nexarag.common.error.BaseErrorCode.SERVICE_ERROR);
         }
+    }
+
+    private String buildMessageKey(DocumentTaskOutboxDO task, String operationId) {
+        if (task.getDocumentVersionId() == null) {
+            return task.getDocumentId() + ":" + task.getTaskType() + ":" + operationId;
+        }
+        return task.getDocumentId() + ":" + task.getDocumentVersionId() + ":" + task.getTaskType()
+                + ":" + operationId;
+    }
+
+    private Long requireDocumentVersionId(DocumentTaskOutboxDO task) {
+        Long documentVersionId = task.getDocumentVersionId();
+        if (documentVersionId == null || documentVersionId <= 0) {
+            throw new ClientException("文档处理任务缺少文档版本边界，outboxId=" + task.getOutboxId());
+        }
+        return documentVersionId;
     }
 }
