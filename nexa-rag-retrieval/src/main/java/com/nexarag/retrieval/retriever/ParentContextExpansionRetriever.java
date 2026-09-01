@@ -9,13 +9,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 
-import java.util.ArrayList;
-import java.util.Comparator;
-import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 import java.util.stream.Collectors;
 
 /**
@@ -84,8 +78,11 @@ public class ParentContextExpansionRetriever {
             }
             List<RetrievalChunk> parentHits = groupedHits.getOrDefault(parentChunkId, List.of());
             DocumentChunk parent = parents.get(parentChunkId);
-            if (shouldUseFullParent(parent, parentHits.size())) {
-                addIfAbsent(result, addedChunkIds, toParentContext(parent, parentHits));
+            List<RetrievalChunk> versionMatchedParentHits = parentHits.stream()
+                    .filter(hit -> belongsToSameVersion(parent, hit))
+                    .toList();
+            if (shouldUseFullParent(parent, versionMatchedParentHits.size())) {
+                addIfAbsent(result, addedChunkIds, toParentContext(parent, versionMatchedParentHits));
                 continue;
             }
             appendHitAndNeighbors(result, addedChunkIds, parentHits,
@@ -114,18 +111,19 @@ public class ParentContextExpansionRetriever {
         double score = parentHits.stream().mapToDouble(RetrievalChunk::score).max().orElse(highestRankedHit.score());
         return new RetrievalChunk(parent.getChunkId(), parent.getDocumentId(), parent.getChunkOrder(), null,
                 highestRankedHit.title(), highestRankedHit.source(), parent.getText(), score,
-                PARENT_CONTEXT_CHANNEL, highestRankedHit.rank());
+                PARENT_CONTEXT_CHANNEL, highestRankedHit.rank(), parent.getDocumentVersionId());
     }
 
     private void appendHitAndNeighbors(List<RetrievalChunk> result, Set<String> addedChunkIds,
                                        List<RetrievalChunk> parentHits, List<DocumentChunk> siblings) {
-        List<DocumentChunk> orderedSiblings = siblings.stream()
-                .sorted(Comparator.comparing(DocumentChunk::getChunkOrder, Comparator.nullsLast(Integer::compareTo)))
-                .toList();
-        Map<String, Integer> siblingIndexes = new LinkedHashMap<>();
-        orderedSiblings.forEach(sibling -> siblingIndexes.put(sibling.getChunkId(), siblingIndexes.size()));
         for (RetrievalChunk parentHit : parentHits) {
             addIfAbsent(result, addedChunkIds, parentHit);
+            List<DocumentChunk> orderedSiblings = siblings.stream()
+                    .filter(sibling -> belongsToSameVersion(sibling, parentHit))
+                    .sorted(Comparator.comparing(DocumentChunk::getChunkOrder, Comparator.nullsLast(Integer::compareTo)))
+                    .toList();
+            Map<String, Integer> siblingIndexes = new LinkedHashMap<>();
+            orderedSiblings.forEach(sibling -> siblingIndexes.put(sibling.getChunkId(), siblingIndexes.size()));
             Integer siblingIndex = siblingIndexes.get(parentHit.chunkId());
             if (siblingIndex == null) {
                 continue;
@@ -146,12 +144,13 @@ public class ParentContextExpansionRetriever {
     private RetrievalChunk toNeighborContext(DocumentChunk sibling, RetrievalChunk anchor) {
         return new RetrievalChunk(sibling.getChunkId(), sibling.getDocumentId(), sibling.getChunkOrder(),
                 sibling.getParentChunkId(), anchor.title(), anchor.source(), sibling.getText(), anchor.score(),
-                PARENT_NEIGHBOR_CHANNEL, anchor.rank());
+                PARENT_NEIGHBOR_CHANNEL, anchor.rank(), sibling.getDocumentVersionId());
     }
 
     private void addIfAbsent(List<RetrievalChunk> target, Set<String> addedChunkIds, RetrievalChunk chunk) {
         String identity = StringUtils.hasText(chunk.chunkId())
-                ? chunk.chunkId() : chunk.documentId() + ":" + chunk.content().hashCode();
+                ? chunk.chunkId() + ":" + chunk.documentVersionId()
+                : chunk.documentId() + ":" + chunk.documentVersionId() + ":" + chunk.content().hashCode();
         if (addedChunkIds.add(identity)) {
             target.add(chunk);
         }
@@ -159,5 +158,10 @@ public class ParentContextExpansionRetriever {
 
     private int estimateTokens(String text) {
         return Math.max(1, (text.length() + CHARACTERS_PER_TOKEN - 1) / CHARACTERS_PER_TOKEN);
+    }
+
+    private boolean belongsToSameVersion(DocumentChunk chunk, RetrievalChunk hit) {
+        return chunk != null && hit != null && chunk.getDocumentVersionId() != null
+                && chunk.getDocumentVersionId().equals(hit.documentVersionId());
     }
 }

@@ -12,10 +12,12 @@ public interface SectionContentRepository {
     /**
      * 查询根章节及全部后代章节中的正文片段。
      *
-     * @param documentId 文档ID
+     * @param documentId    文档ID
      * @param rootSectionId 导航命中的根章节ID
-     * @param limit 返回上限
+     * @param limit         返回上限
      * @return 原始正文片段
      */
     List<SectionContentChunk> listBySectionScope(Long documentId, Long rootSectionId, int limit);
+
+    List<SectionContentChunk> listBySectionScope(Long documentId, Long documentVersionId, Long rootSectionId, int limit);
 }

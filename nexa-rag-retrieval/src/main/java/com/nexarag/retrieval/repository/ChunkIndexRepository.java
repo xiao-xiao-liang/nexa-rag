@@ -11,27 +11,26 @@ import java.util.List;
 public interface ChunkIndexRepository {
 
     /**
-     * 查询指定文档中需要写入索引的片段。
+     * 查询指定文档版本中需要写入索引的片段。
      *
-     * @param documentId 文档ID
+     * @param documentId        文档ID
+     * @param documentVersionId 文档版本ID
      * @return 可索引片段列表
      */
-    List<IndexableChunk> listIndexableChunks(Long documentId);
+    List<IndexableChunk> listIndexableChunks(Long documentId, Long documentVersionId);
 
     /**
-     * 查询指定文档中跳过索引的片段。
-     *
-     * @param documentId 文档ID
-     * @return 跳过索引片段列表
+     * 查询指定文档版本中跳过索引的片段。
      */
-    List<DocumentChunk> listSkippedChunks(Long documentId);
+    List<DocumentChunk> listSkippedChunks(Long documentId, Long documentVersionId);
 
     /**
-     * 标记指定文档中的跳过索引片段。
+     * 标记指定文档版本中的跳过索引片段。
      *
-     * @param documentId 文档ID
+     * @param documentId        文档ID
+     * @param documentVersionId 文档版本ID
      */
-    void markSkipped(Long documentId);
+    void markSkipped(Long documentId, Long documentVersionId);
 
     /**
      * 标记片段索引成功。
@@ -50,11 +49,4 @@ public interface ChunkIndexRepository {
      */
     void markFailed(String chunkId, String failureReason);
 
-    /**
-     * 查询已经写入索引的片段。
-     *
-     * @param documentId 文档ID
-     * @return 已索引片段列表
-     */
-    List<DocumentChunk> listIndexedChunks(Long documentId);
 }

@@ -1,9 +1,9 @@
 package com.nexarag.retrieval.retriever.vector;
 
-import com.nexarag.retrieval.dto.req.ConversationRetrievalRequest;
-import com.nexarag.retrieval.model.RetrievalChunk;
 import com.nexarag.retrieval.config.RetrievalProperties;
+import com.nexarag.retrieval.dto.req.ConversationRetrievalRequest;
 import com.nexarag.retrieval.index.vector.DocumentVectorStore;
+import com.nexarag.retrieval.model.RetrievalChunk;
 import com.nexarag.retrieval.model.VectorIndexSearchResult;
 import com.nexarag.retrieval.retriever.ConversationRetriever;
 import lombok.RequiredArgsConstructor;
@@ -26,8 +26,10 @@ public class MilvusConversationRetriever implements ConversationRetriever {
     @Override
     public List<RetrievalChunk> retrieve(ConversationRetrievalRequest request) {
         // 1. 委托文档向量存储执行模型网关向量化与相似度查询
-        List<VectorIndexSearchResult> results = documentVectorStore.search(request.question(),
-                retrievalProperties.getCandidate().getVectorCandidateLimit());
+        List<VectorIndexSearchResult> results = request.activeVersionIds() == null || request.activeVersionIds().isEmpty()
+                ? documentVectorStore.search(request.question(), retrievalProperties.getCandidate().getVectorCandidateLimit())
+                : documentVectorStore.search(request.question(), retrievalProperties.getCandidate().getVectorCandidateLimit(),
+                request.activeVersionIds());
 
         // 2. 标准化通道内排名
         return java.util.stream.IntStream.range(0, results.size())
@@ -38,6 +40,6 @@ public class MilvusConversationRetriever implements ConversationRetriever {
 
     private RetrievalChunk toRetrievalChunk(VectorIndexSearchResult result, int rank) {
         return new RetrievalChunk(result.chunkId(), result.documentId(), result.chunkOrder(), result.parentChunkId(),
-                null, null, result.text(), result.score(), "MILVUS", rank);
+                null, null, result.text(), result.score(), "MILVUS", rank, result.documentVersionId());
     }
 }

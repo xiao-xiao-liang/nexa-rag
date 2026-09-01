@@ -37,13 +37,26 @@ public class SectionExpansionRetriever {
      * @return 原始正文片段；不包含导航标题或路径
      */
     public List<RetrievalChunk> retrieve(String question) {
-        if (!StringUtils.hasText(question)) {
+        return List.of();
+    }
+
+    /**
+     * 根据当前生效版本范围补充受章节限制的正文证据。
+     *
+     * @param question         改写后的用户问题
+     * @param activeVersionIds 当前生效的文档版本ID集合
+     * @return 原始正文片段；不包含导航标题或路径
+     */
+    public List<RetrievalChunk> retrieve(String question, Set<Long> activeVersionIds) {
+        if (!StringUtils.hasText(question) || activeVersionIds == null || activeVersionIds.isEmpty()) {
             return List.of();
         }
 
         // 1. 导航索引仅定位候选章节，不能直接进入回答证据集合
         List<SectionNavigationHit> navigationHits = sectionNavigationIndexRepository.search(question,
-                retrievalProperties.getCandidate().getExpansionCandidateLimit());
+                        retrievalProperties.getCandidate().getExpansionCandidateLimit(), activeVersionIds).stream()
+                .filter(hit -> hit.documentVersionId() != null && activeVersionIds.contains(hit.documentVersionId()))
+                .toList();
         int evidenceLimit = retrievalProperties.getCandidate().getExpansionEvidenceLimit();
         List<RetrievalChunk> result = new ArrayList<>();
         Set<String> addedChunkIds = new LinkedHashSet<>();
@@ -55,16 +68,18 @@ public class SectionExpansionRetriever {
 
             // 2. 使用文档ID和章节树范围读取原始正文，不推断 chunkOrder 邻接关系
             List<SectionContentChunk> contentChunks = sectionContentRepository.listBySectionScope(
-                    navigationHit.documentId(), navigationHit.sectionId(), remaining);
+                    navigationHit.documentId(), navigationHit.documentVersionId(), navigationHit.sectionId(), remaining);
             for (SectionContentChunk contentChunk : contentChunks) {
                 if (result.size() >= evidenceLimit) {
                     break;
                 }
-                if (contentChunk == null || !addedChunkIds.add(contentChunk.chunkId())) {
+                if (contentChunk == null || !navigationHit.documentVersionId().equals(contentChunk.documentVersionId())
+                        || !addedChunkIds.add(contentChunk.chunkId())) {
                     continue;
                 }
                 result.add(new RetrievalChunk(contentChunk.chunkId(), contentChunk.documentId(), null, null,
-                        null, null, contentChunk.content(), navigationHit.score(), CHANNEL, result.size() + 1));
+                        null, null, contentChunk.content(), navigationHit.score(), CHANNEL, result.size() + 1,
+                        contentChunk.documentVersionId()));
             }
         }
         log.info("章节扩展检索完成，导航范围={}，导航命中数={}，补充正文数={}，正文上限={}",

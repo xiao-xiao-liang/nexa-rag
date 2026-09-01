@@ -5,8 +5,8 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nexarag.common.error.BaseErrorCode;
 import com.nexarag.common.exception.ServiceException;
-import com.nexarag.document.model.entity.DocumentSectionDO;
 import com.nexarag.document.mapper.DocumentSectionMapper;
+import com.nexarag.document.model.entity.DocumentSectionDO;
 import com.nexarag.retrieval.config.RetrievalProperties;
 import com.nexarag.retrieval.dto.req.KeywordIndexSearchRequest;
 import com.nexarag.retrieval.dto.req.KeywordIndexWriteRequest;
@@ -20,6 +20,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 
 import java.util.List;
+import java.util.Set;
 
 /**
  * 章节导航索引仓储实现，仅读写章节标题和路径，严格与正文片段证据索引隔离。
@@ -37,23 +38,23 @@ public class SectionNavigationIndexRepositoryImpl implements SectionNavigationIn
     private final ObjectMapper objectMapper;
 
     /**
-     * 写入指定文档的章节标题和路径导航索引。
-     *
-     * @param documentId 文档ID
+     * 写入指定文档版本的章节标题和路径导航索引。
      */
     @Override
-    public void upsert(Long documentId) {
-        if (documentId == null) {
+    public void upsert(Long documentId, Long documentVersionId) {
+        if (documentId == null || documentVersionId == null) {
             return;
         }
 
-        // 1. 先清理该文档的历史导航记录，避免章节结构重建后残留已删除标题
-        deleteByDocumentId(documentId);
+        // 1. 先清理当前版本导航记录，保留同一文档的历史版本索引
+        keywordIndexClient.deleteByDocumentVersionId(documentId, documentVersionId,
+                retrievalProperties.getKeyword().getNavigationIndexName());
 
-        // 2. 查询已持久化章节，确保标题索引只基于数据库中的稳定结构
+        // 2. 只读取当前版本的稳定章节结构
         List<SectionNavigationDocument> navigationDocuments = documentSectionMapper.selectList(
                         new LambdaQueryWrapper<DocumentSectionDO>()
                                 .eq(DocumentSectionDO::getDocumentId, documentId)
+                                .eq(DocumentSectionDO::getDocumentVersionId, documentVersionId)
                                 .orderByAsc(DocumentSectionDO::getStartLine)
                                 .orderByAsc(DocumentSectionDO::getSectionId))
                 .stream()
@@ -64,27 +65,20 @@ public class SectionNavigationIndexRepositoryImpl implements SectionNavigationIn
             return;
         }
 
-        // 3. 写入独立关键词索引，正文片段索引不接收纯标题章节
+        // 3. 章节导航和正文片段均写入版本元数据，供后续生效版本过滤
         List<KeywordIndexWriteResult> results = keywordIndexClient.upsert(new KeywordIndexWriteRequest(
-                retrievalProperties.getKeyword().getNavigationIndexName(), documentId,
-                navigationDocuments.stream().map(this::toKeywordDocument).toList()));
-
-        // 4. 任何章节未写入都抛出异常，由既有文档索引重试链路处理
+                retrievalProperties.getKeyword().getNavigationIndexName(), documentId, documentVersionId,
+                navigationDocuments.stream().map(document -> toKeywordDocument(document, documentVersionId)).toList()));
         if (results == null || results.size() != navigationDocuments.size()
                 || results.stream().anyMatch(result -> !result.success())) {
-            throw new ServiceException("章节导航索引写入失败，documentId=" + documentId);
+            throw new ServiceException("章节导航索引写入失败，documentId=" + documentId
+                    + "，documentVersionId=" + documentVersionId);
         }
     }
 
-    /**
-     * 删除指定文档的章节导航索引。
-     *
-     * @param documentId 文档ID
-     * @return 删除数量
-     */
     @Override
-    public int deleteByDocumentId(Long documentId) {
-        return keywordIndexClient.deleteByDocumentId(documentId,
+    public int deleteByDocumentVersionId(Long documentId, Long documentVersionId) {
+        return keywordIndexClient.deleteByDocumentVersionId(documentId, documentVersionId,
                 retrievalProperties.getKeyword().getNavigationIndexName());
     }
 
@@ -96,17 +90,18 @@ public class SectionNavigationIndexRepositoryImpl implements SectionNavigationIn
      * @return 章节导航命中列表
      */
     @Override
-    public List<SectionNavigationHit> search(String query, int limit) {
-        if (!StringUtils.hasText(query) || limit <= 0) {
+    public List<SectionNavigationHit> search(String query, int limit, Set<Long> activeVersionIds) {
+        if (!StringUtils.hasText(query) || limit <= 0 || activeVersionIds == null || activeVersionIds.isEmpty()) {
             return List.of();
         }
 
-        // 1. 仅查询独立导航索引，结果不接入正文证据或对话回答流程
+        // 1. 仅查询当前生效版本的独立导航索引，结果不直接进入正文证据或对话回答流程
         return keywordIndexClient.search(new KeywordIndexSearchRequest(
-                        retrievalProperties.getKeyword().getNavigationIndexName(), query, limit))
+                        retrievalProperties.getKeyword().getNavigationIndexName(), query, limit, activeVersionIds))
                 .stream()
-                .filter(result -> result.sectionId() != null && result.documentId() != null)
-                .map(result -> new SectionNavigationHit(result.sectionId(), result.documentId(), result.score(),
+                .filter(result -> result.sectionId() != null && result.documentId() != null
+                        && activeVersionIds.contains(result.documentVersionId()))
+                .map(result -> new SectionNavigationHit(result.sectionId(), result.documentId(), result.documentVersionId(), result.score(),
                         NAVIGATION_CHANNEL))
                 .toList();
     }
@@ -116,9 +111,9 @@ public class SectionNavigationIndexRepositoryImpl implements SectionNavigationIn
                 section.getTitle(), parseHeadingPath(section), section.getHeadingLevel());
     }
 
-    private KeywordIndexDocument toKeywordDocument(SectionNavigationDocument document) {
+    private KeywordIndexDocument toKeywordDocument(SectionNavigationDocument document, Long documentVersionId) {
         return new KeywordIndexDocument(SECTION_INDEX_ID_PREFIX + document.sectionId(), document.documentId(),
-                document.parentSectionId() == null ? null : String.valueOf(document.parentSectionId()),
+                documentVersionId, document.parentSectionId() == null ? null : String.valueOf(document.parentSectionId()),
                 document.headingLevel(), document.sectionId(), document.title(), document.indexContent(), null);
     }
 

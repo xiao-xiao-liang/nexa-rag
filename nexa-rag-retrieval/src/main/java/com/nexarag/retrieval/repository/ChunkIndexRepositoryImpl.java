@@ -1,7 +1,7 @@
 package com.nexarag.retrieval.repository;
 
-import com.nexarag.document.model.entity.DocumentChunk;
 import com.nexarag.document.enums.ChunkStatus;
+import com.nexarag.document.model.entity.DocumentChunk;
 import com.nexarag.document.service.DocumentChunkService;
 import com.nexarag.retrieval.model.IndexableChunk;
 import lombok.RequiredArgsConstructor;
@@ -20,43 +20,44 @@ public class ChunkIndexRepositoryImpl implements ChunkIndexRepository {
     private final DocumentChunkService documentChunkService;
 
     /**
-     * 查询指定文档中需要写入索引的片段。
+     * 查询指定文档版本中需要写入索引的片段。
      *
-     * @param documentId 文档ID
+     * @param documentId        文档ID
+     * @param documentVersionId 文档版本ID
      * @return 可索引片段列表
      */
     @Override
-    public List<IndexableChunk> listIndexableChunks(Long documentId) {
-        // 1. 通过 document service 获取片段后在内存中过滤初版可索引数据
-        return documentChunkService.listByDocumentId(documentId).stream()
+    public List<IndexableChunk> listIndexableChunks(Long documentId, Long documentVersionId) {
+        // 1. 按版本读取并二次校验文档归属，防止跨文档版本数据进入索引
+        return documentChunkService.listByDocumentVersionId(documentVersionId).stream()
+                .filter(chunk -> documentId.equals(chunk.getDocumentId()))
                 .filter(chunk -> !Integer.valueOf(1).equals(chunk.getSkipIndex()))
                 .filter(chunk -> chunk.getStatus() == ChunkStatus.PENDING_INDEX || chunk.getStatus() == ChunkStatus.FAILED)
                 .map(this::toIndexableChunk)
                 .toList();
     }
 
-    /**
-     * 查询指定文档中跳过索引的片段。
-     *
-     * @param documentId 文档ID
-     * @return 跳过索引片段列表
-     */
     @Override
-    public List<DocumentChunk> listSkippedChunks(Long documentId) {
-        // 1. 初版复用全量片段查询，后续可替换为分页或条件查询
-        return documentChunkService.listByDocumentId(documentId).stream()
-                .filter(chunk -> Integer.valueOf(1).equals(chunk.getSkipIndex()) || chunk.getStatus() == ChunkStatus.SKIP_INDEX)
+    public List<DocumentChunk> listSkippedChunks(Long documentId, Long documentVersionId) {
+        return documentChunkService.listByDocumentVersionId(documentVersionId).stream()
+                .filter(chunk -> documentId.equals(chunk.getDocumentId()))
+                .filter(chunk -> Integer.valueOf(1).equals(chunk.getSkipIndex())
+                        || chunk.getStatus() == ChunkStatus.SKIP_INDEX)
                 .toList();
     }
 
     /**
-     * 标记指定文档中的跳过索引片段。
+     * 标记指定文档版本中的跳过索引片段。
      *
-     * @param documentId 文档ID
+     * @param documentId        文档ID
+     * @param documentVersionId 文档版本ID
      */
     @Override
-    public void markSkipped(Long documentId) {
-        documentChunkService.markDocumentSkippedChunks(documentId);
+    public void markSkipped(Long documentId, Long documentVersionId) {
+        if (documentId == null || documentVersionId == null) {
+            throw new IllegalArgumentException("文档ID和文档版本ID不能为空");
+        }
+        documentChunkService.markDocumentVersionSkippedChunks(documentVersionId);
     }
 
     /**
@@ -82,24 +83,11 @@ public class ChunkIndexRepositoryImpl implements ChunkIndexRepository {
         documentChunkService.markChunkIndexFailed(chunkId, failureReason);
     }
 
-    /**
-     * 查询已经写入索引的片段。
-     *
-     * @param documentId 文档ID
-     * @return 已索引片段列表
-     */
-    @Override
-    public List<DocumentChunk> listIndexedChunks(Long documentId) {
-        // 1. 初版复用全量片段查询，避免 retrieval 直接操作 mapper
-        return documentChunkService.listByDocumentId(documentId).stream()
-                .filter(chunk -> chunk.getStatus() == ChunkStatus.INDEXED)
-                .toList();
-    }
-
     private IndexableChunk toIndexableChunk(DocumentChunk chunk) {
         return IndexableChunk.builder()
                 .chunkId(chunk.getChunkId())
                 .documentId(chunk.getDocumentId())
+                .documentVersionId(chunk.getDocumentVersionId())
                 .chunkOrder(chunk.getChunkOrder())
                 .parentChunkId(chunk.getParentChunkId())
                 .sectionId(chunk.getSectionId())

@@ -29,7 +29,7 @@ public class Bm25ConversationRetriever implements ConversationRetriever {
         // 1. 调用关键词索引客户端获取 BM25 候选
         List<KeywordIndexSearchResult> results = keywordIndexClient.search(
                 new KeywordIndexSearchRequest(null, request.question(),
-                        retrievalProperties.getCandidate().getKeywordCandidateLimit()));
+                        retrievalProperties.getCandidate().getKeywordCandidateLimit(), request.activeVersionIds()));
 
         // 2. 标准化为对话检索片段并保留通道内排名
         return java.util.stream.IntStream.range(0, results.size())
@@ -40,6 +40,6 @@ public class Bm25ConversationRetriever implements ConversationRetriever {
 
     private RetrievalChunk toRetrievalChunk(KeywordIndexSearchResult result, int rank) {
         return new RetrievalChunk(result.chunkId(), result.documentId(), result.chunkOrder(), result.parentChunkId(),
-                null, null, result.text(), result.score(), "BM25", rank);
+                null, null, result.text(), result.score(), "BM25", rank, result.documentVersionId());
     }
 }

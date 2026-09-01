@@ -1,9 +1,9 @@
 package com.nexarag.retrieval.repository;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import com.nexarag.document.model.entity.DocumentChunk;
 import com.nexarag.document.mapper.DocumentChunkMapper;
 import com.nexarag.document.mapper.DocumentSectionMapper;
+import com.nexarag.document.model.entity.DocumentChunk;
 import com.nexarag.retrieval.model.SectionContentChunk;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
@@ -27,9 +27,9 @@ public class SectionContentRepositoryImpl implements SectionContentRepository {
     /**
      * 查询根章节及其后代章节中的可用正文片段。
      *
-     * @param documentId 文档ID
+     * @param documentId    文档ID
      * @param rootSectionId 根章节ID
-     * @param limit 返回上限
+     * @param limit         返回上限
      * @return 原始正文片段
      */
     @Override
@@ -65,8 +65,42 @@ public class SectionContentRepositoryImpl implements SectionContentRepository {
                     || !chunkIds.add(chunk.getChunkId())) {
                 continue;
             }
-            result.add(new SectionContentChunk(chunk.getChunkId(), chunk.getDocumentId(), chunk.getSectionId(),
+            result.add(new SectionContentChunk(chunk.getChunkId(), chunk.getDocumentId(), chunk.getDocumentVersionId(), chunk.getSectionId(),
                     chunk.getText(), chunk.getTokenCount()));
+        }
+        return result;
+    }
+
+    @Override
+    public List<SectionContentChunk> listBySectionScope(Long documentId, Long documentVersionId, Long rootSectionId, int limit) {
+        if (documentId == null || documentVersionId == null || rootSectionId == null || limit <= 0) {
+            return List.of();
+        }
+
+        // 1. 章节树与正文片段均按版本过滤，避免同一文档的历史章节进入当前导航范围。
+        Set<Long> sectionIds = new LinkedHashSet<>();
+        sectionIds.add(rootSectionId);
+        sectionIds.addAll(documentSectionMapper.selectDescendantSectionIds(documentId, documentVersionId, rootSectionId));
+        List<DocumentChunk> chunks = documentChunkMapper.selectList(new LambdaQueryWrapper<DocumentChunk>()
+                .eq(DocumentChunk::getDocumentId, documentId)
+                .eq(DocumentChunk::getDocumentVersionId, documentVersionId)
+                .in(DocumentChunk::getSectionId, sectionIds)
+                .and(wrapper -> wrapper.eq(DocumentChunk::getSkipIndex, 0)
+                        .or()
+                        .isNull(DocumentChunk::getSkipIndex)));
+
+        List<SectionContentChunk> result = new ArrayList<>();
+        Set<String> chunkIds = new LinkedHashSet<>();
+        for (DocumentChunk chunk : chunks) {
+            if (result.size() >= limit) {
+                break;
+            }
+            if (chunk == null || !StringUtils.hasText(chunk.getChunkId()) || !StringUtils.hasText(chunk.getText())
+                    || !chunkIds.add(chunk.getChunkId())) {
+                continue;
+            }
+            result.add(new SectionContentChunk(chunk.getChunkId(), chunk.getDocumentId(), chunk.getDocumentVersionId(),
+                    chunk.getSectionId(), chunk.getText(), chunk.getTokenCount()));
         }
         return result;
     }

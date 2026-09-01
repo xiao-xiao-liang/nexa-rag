@@ -1,10 +1,10 @@
 package com.nexarag.retrieval.service.impl;
 
-import com.nexarag.retrieval.service.ConversationRetrievalService;
+import com.nexarag.document.service.KnowledgeBaseService;
 import com.nexarag.retrieval.dto.req.ConversationRetrievalRequest;
 import com.nexarag.retrieval.model.RetrievalChunk;
 import com.nexarag.retrieval.retriever.ConversationRetriever;
-import com.nexarag.document.service.KnowledgeBaseService;
+import com.nexarag.retrieval.service.ConversationRetrievalService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -32,9 +32,10 @@ public class ConversationRetrievalServiceImpl implements ConversationRetrievalSe
         String tenantId = requireTenantId(request.tenantId());
         Set<Long> knowledgeBaseIds = knowledgeBaseService.validateRequestedKnowledgeBases(tenantId,
                 request.knowledgeBaseIds());
+        Set<Long> activeVersionIds = knowledgeBaseService.listActiveVersionIdsInTenantScope(tenantId, knowledgeBaseIds);
         ConversationRetrievalRequest scopedRequest = new ConversationRetrievalRequest(request.question(), request.intentResult(),
                 request.scope(), request.topK(), request.vectorThreshold(), request.round(), tenantId,
-                List.copyOf(knowledgeBaseIds));
+                List.copyOf(knowledgeBaseIds), activeVersionIds);
 
         // 2. 并行执行所有已装配的检索通道
         List<CompletableFuture<List<RetrievalChunk>>> futures = retrievers.stream()
@@ -46,10 +47,11 @@ public class ConversationRetrievalServiceImpl implements ConversationRetrievalSe
         for (CompletableFuture<List<RetrievalChunk>> future : futures) {
             result.addAll(future.join());
         }
-        Set<Long> accessibleDocumentIds = knowledgeBaseService.filterDocumentIdsInTenantScope(tenantId,
+        java.util.Map<Long, Long> activeVersionIdsByDocument = knowledgeBaseService.findActiveVersionIdsInTenantScope(tenantId,
                 result.stream().map(RetrievalChunk::documentId).toList(), knowledgeBaseIds);
         return result.stream()
-                .filter(chunk -> accessibleDocumentIds.contains(chunk.documentId()))
+                .filter(chunk -> activeVersionIdsByDocument.containsKey(chunk.documentId()))
+                .filter(chunk -> activeVersionIdsByDocument.get(chunk.documentId()).equals(chunk.documentVersionId()))
                 .toList();
     }
 
