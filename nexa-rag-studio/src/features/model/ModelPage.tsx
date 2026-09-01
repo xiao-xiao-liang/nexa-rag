@@ -700,19 +700,19 @@ export const ModelPage: React.FC = () => {
               type="text"
               value={debugRouteKey}
               onChange={(e) => setDebugRouteKey(e.target.value)}
-              className="w-full h-[36px] px-3 text-[14px] bg-white border border-[#DEE0E3] rounded-[6px] focus:border-[#3370FF] outline-none text-[#1F2329]"
+              className="w-full h-[36px] px-3 text-[14px] bg-white border border-[#DEE0E3] rounded-[6px] outline-none text-[#1F2329]"
             />
           </div>
 
           <div>
-            <label className="block text-[13px] font-medium text-[#1F2329] mb-1.5">
+            <label className="block text-[13px] font-medium text-feishu-text-primary mb-1.5">
               测试请求 Prompt
             </label>
             <input
               type="text"
               value={debugPrompt}
               onChange={(e) => setDebugPrompt(e.target.value)}
-              className="w-full h-[36px] px-3 text-[14px] bg-white border border-[#DEE0E3] rounded-[6px] focus:border-[#3370FF] outline-none text-[#1F2329]"
+              className="w-full h-9 px-3 text-[14px] bg-white border border-[#DEE0E3] rounded-md outline-none text-feishu-text-primary"
             />
           </div>
 
@@ -720,13 +720,13 @@ export const ModelPage: React.FC = () => {
             type="button"
             onClick={handleDebugChat}
             disabled={debugging}
-            className="h-[32px] px-4 rounded-[6px] bg-[#3370FF] hover:bg-[#2860E1] active:scale-[0.98] text-[14px] text-white font-normal transition-all cursor-pointer disabled:opacity-50"
+            className="h-8 px-4 rounded-md bg-feishu-blue hover:bg-feishu-blue-hover active:scale-[0.98] text-[14px] text-white font-normal transition-all cursor-pointer disabled:opacity-50"
           >
             {debugging ? "正在发送测试…" : "执行直连 Debug 测试"}
           </button>
 
           {debugResponse && (
-            <div className="p-4 bg-white border border-[#EFF0F1] text-[#1F2329] text-[13px] rounded-[8px] whitespace-pre-wrap leading-relaxed shadow-2xs">
+            <div className="p-4 bg-white border border-[#EFF0F1] text-feishu-text-primary text-[13px] rounded-lg whitespace-pre-wrap leading-relaxed shadow-2xs">
               {debugResponse}
             </div>
           )}
@@ -778,14 +778,14 @@ export const ModelPage: React.FC = () => {
 
       {/* 删除确认弹窗 */}
       {deletingConfig && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#1F2329]/40 backdrop-blur-[1px]">
-          <div className="w-full max-w-[380px] bg-white rounded-[12px] border border-[#DEE0E3] shadow-2xl p-6 animate-in zoom-in-95 duration-100">
-            <h4 className="text-[16px] font-semibold text-[#1F2329]">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-feishu-text-primary/40 backdrop-blur-[1px]">
+          <div className="w-full max-w-95 bg-white rounded-xl border border-[#DEE0E3] shadow-2xl p-6 animate-in zoom-in-95 duration-100">
+            <h4 className="text-[16px] font-semibold text-feishu-text-primary">
               删除模型配置确认
             </h4>
             <p className="text-[13px] text-[#646A73] mt-2.5 leading-relaxed">
               确定要删除模型配置{" "}
-              <strong className="text-[#1F2329]">
+              <strong className="text-feishu-text-primary">
                 {deletingConfig.configKey || deletingConfig.configName}
               </strong>{" "}
               吗？删除后将自动从所有关联路由候选中移除，该操作不可恢复。
@@ -794,7 +794,7 @@ export const ModelPage: React.FC = () => {
               <button
                 type="button"
                 onClick={() => setDeletingConfig(null)}
-                className="h-[32px] px-3.5 rounded-[6px] border border-[#DEE0E3] bg-white hover:bg-[#F2F3F5] active:scale-[0.96] text-[14px] text-[#1F2329] transition-all cursor-pointer"
+                className="h-8 px-3.5 rounded-md border border-[#DEE0E3] bg-white hover:bg-[#F2F3F5] active:scale-[0.96] text-[14px] text-[#1F2329] transition-all cursor-pointer"
               >
                 取消
               </button>
@@ -802,7 +802,7 @@ export const ModelPage: React.FC = () => {
                 type="button"
                 onClick={handleDeleteConfirm}
                 disabled={isDeleting}
-                className="h-[32px] px-4 rounded-[6px] bg-[#F53F3F] hover:bg-[#E02020] active:scale-[0.96] text-[14px] text-white transition-all cursor-pointer disabled:opacity-50"
+                className="h-8 px-4 rounded-md bg-feishu-danger hover:bg-[#E02020] active:scale-[0.96] text-[14px] text-white transition-all cursor-pointer disabled:opacity-50"
               >
                 {isDeleting ? "正在删除…" : "确定删除"}
               </button>

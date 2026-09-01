@@ -7,7 +7,7 @@ import {
   FeishuAvatar,
   FeishuCellMainSub,
   FeishuActionLink,
-} from "../../components/ui/feishu-table";
+} from "@/components/ui/feishu-table";
 import { FeishuSelect, FeishuSelectOption } from "../../components/ui/feishu-select";
 
 interface OpportunityItem {
@@ -127,7 +127,7 @@ export const CrmOrderPage: React.FC = () => {
       dataIndex: "customerName",
       dataType: "text",
       width: 260,
-      render: (val) => <span className="font-normal text-[#1F2329] text-[14px]">{val}</span>,
+      render: (val) => <span className="font-normal text-feishu-text-primary text-[14px]">{val}</span>,
     },
     {
       key: "description",
@@ -135,7 +135,7 @@ export const CrmOrderPage: React.FC = () => {
       dataIndex: "description",
       dataType: "text",
       width: 240,
-      render: (val) => <span className="text-[#1F2329] text-[14px] font-normal">{val}</span>,
+      render: (val) => <span className="text-feishu-text-primary text-[14px] font-normal">{val}</span>,
     },
     {
       key: "stage",
@@ -171,7 +171,7 @@ export const CrmOrderPage: React.FC = () => {
       dataType: "number",
       width: 120,
       render: (val) => (
-        <span className="font-normal text-[#1F2329] text-[14px] tabular-nums">
+        <span className="font-normal text-feishu-text-primary text-[14px] tabular-nums">
           {val !== undefined ? val : "—"}
         </span>
       ),
@@ -232,14 +232,14 @@ export const CrmOrderPage: React.FC = () => {
       title: "客户",
       dataIndex: "customerName",
       dataType: "text",
-      render: (val) => <span className="text-[14px] text-[#1F2329]">{val}</span>,
+      render: (val) => <span className="text-[14px] text-feishu-text-primary">{val}</span>,
     },
     {
       key: "productName",
       title: "产品",
       dataIndex: "productName",
       dataType: "text",
-      render: (val) => <span className="text-[14px] text-[#1F2329]">{val}</span>,
+      render: (val) => <span className="text-[14px] text-feishu-text-primary">{val}</span>,
     },
     {
       key: "quantity",
@@ -297,10 +297,10 @@ export const CrmOrderPage: React.FC = () => {
   return (
     <div className="space-y-4">
       {/* 顶部筛选卡片 (1:1 飞书 CRM 筛选区，大圆角 rounded-[12px]) */}
-      <div className="rounded-[12px] border border-[#DEE0E3] bg-white p-3 shadow-2xs flex flex-wrap items-center justify-between gap-4 select-none">
+      <div className="rounded-xl border border-[#DEE0E3] bg-white p-3 shadow-2xs flex flex-wrap items-center justify-between gap-4 select-none">
         <div className="flex items-center gap-3">
-          <span className="text-[14px] text-[#646A75] font-medium">优先级</span>
-          <div className="flex items-center rounded-[6px] bg-[#F2F3F5] p-0.5 text-[13px]">
+          <span className="text-[14px] text-feishu-text-secondary font-medium">优先级</span>
+          <div className="flex items-center rounded-md bg-[#F2F3F5] p-0.5 text-[13px]">
             {["全部", "高", "中", "低"].map((p) => (
               <button
                 key={p}
@@ -309,10 +309,10 @@ export const CrmOrderPage: React.FC = () => {
                   setPriorityFilter(p);
                   setCurrentPage(1);
                 }}
-                className={`px-3 py-1 rounded-[4px] font-medium transition-all cursor-pointer ${
+                className={`px-3 py-1 rounded-sm font-medium transition-all cursor-pointer ${
                   priorityFilter === p
-                    ? "bg-white text-[#1F2329] shadow-2xs font-semibold"
-                    : "text-[#646A75] hover:text-[#1F2329]"
+                    ? "bg-white text-feishu-text-primary shadow-2xs font-semibold"
+                    : "text-feishu-text-secondary hover:text-feishu-text-primary"
                 }`}
               >
                 {p}
@@ -323,7 +323,7 @@ export const CrmOrderPage: React.FC = () => {
 
         {/* 1:1 飞书下拉选择器 (商机阶段选择与联动过滤) */}
         <div className="flex items-center gap-2.5">
-          <span className="text-[14px] text-[#646A75] font-medium">商机阶段</span>
+          <span className="text-[14px] text-feishu-text-secondary font-medium">商机阶段</span>
           <FeishuSelect
             options={STAGE_OPTIONS}
             value={stageFilter}
@@ -333,7 +333,7 @@ export const CrmOrderPage: React.FC = () => {
             }}
             placeholder="请选择商机阶段"
             size="md"
-            className="w-[170px]"
+            className="w-42.5"
           />
         </div>
       </div>

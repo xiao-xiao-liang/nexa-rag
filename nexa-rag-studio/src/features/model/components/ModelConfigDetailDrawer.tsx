@@ -3,9 +3,9 @@ import { X, Copy, Check, Eye, EyeOff, Loader2 } from "lucide-react";
 import {
   ModelConfigResponse,
   ModelConnectionTestResponse,
-} from "../../../types";
-import { modelApi } from "../../../lib/api";
-import { FEISHU_FONT_FAMILY, FeishuPill, FeishuTag } from "../../../components/ui/feishu-table";
+} from "@/types";
+import { modelApi } from "@/lib/api.ts";
+import { FEISHU_FONT_FAMILY, FeishuPill, FeishuTag } from "@/components/ui/feishu-table";
 
 export interface ModelConfigDetailDrawerProps {
   isOpen: boolean;
@@ -16,12 +16,12 @@ export interface ModelConfigDetailDrawerProps {
 }
 
 export const ModelConfigDetailDrawer: React.FC<ModelConfigDetailDrawerProps> = ({
-  isOpen,
-  onClose,
-  config,
-  onEdit,
-  onOpenGovernance,
-}) => {
+                                                                                  isOpen,
+                                                                                  onClose,
+                                                                                  config,
+                                                                                  onEdit,
+                                                                                  onOpenGovernance,
+                                                                                }) => {
   const [testing, setTesting] = useState(false);
   const [testResult, setTestResult] = useState<ModelConnectionTestResponse | null>(null);
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
