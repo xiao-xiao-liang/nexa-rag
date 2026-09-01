@@ -7,6 +7,10 @@ public final class DocumentIngestionStateKeys {
 
     public static final String DOCUMENT_ID = "documentId";
 
+    public static final String DOCUMENT_VERSION_ID = "documentVersionId";
+
+    public static final String PROCESS_ID = "processId";
+
     public static final String CURRENT_STATUS = "currentStatus";
 
     public static final String ROUTE_TARGET = "routeTarget";

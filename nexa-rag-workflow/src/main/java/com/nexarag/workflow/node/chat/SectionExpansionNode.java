@@ -2,9 +2,9 @@ package com.nexarag.workflow.node.chat;
 
 import com.alibaba.cloud.ai.graph.OverAllState;
 import com.alibaba.cloud.ai.graph.action.NodeAction;
+import com.nexarag.document.service.KnowledgeBaseService;
 import com.nexarag.retrieval.model.RetrievalChunk;
 import com.nexarag.retrieval.retriever.SectionExpansionRetriever;
-import com.nexarag.document.service.KnowledgeBaseService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -14,12 +14,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-import static com.nexarag.workflow.constants.ChatWorkflowStateKeys.EVIDENCE_EXPANSION_REASON;
-import static com.nexarag.workflow.constants.ChatWorkflowStateKeys.FUSED_RETRIEVAL_RESULTS;
-import static com.nexarag.workflow.constants.ChatWorkflowStateKeys.REWRITTEN_QUESTION;
-import static com.nexarag.workflow.constants.ChatWorkflowStateKeys.TRACE_ID;
-import static com.nexarag.workflow.constants.ChatWorkflowStateKeys.RETRIEVAL_KNOWLEDGE_BASE_IDS;
-import static com.nexarag.workflow.constants.ChatWorkflowStateKeys.TENANT_ID;
+import static com.nexarag.workflow.constants.ChatWorkflowStateKeys.*;
 
 /**
  * 章节扩展节点，根据导航范围补充正文片段并返回重排序节点；导航标题不会写入证据状态。
@@ -45,12 +40,14 @@ public class SectionExpansionNode implements NodeAction {
         String tenantId = requireTenantId(state.value(TENANT_ID, ""));
         Set<Long> knowledgeBaseIds = knowledgeBaseService.validateRequestedKnowledgeBases(tenantId,
                 state.value(RETRIEVAL_KNOWLEDGE_BASE_IDS, List.of()));
+        Set<Long> activeVersionIds = knowledgeBaseService.listActiveVersionIdsInTenantScope(tenantId, knowledgeBaseIds);
         List<RetrievalChunk> candidateExpandedChunks = sectionExpansionRetriever.retrieve(
-                state.value(REWRITTEN_QUESTION, ""));
-        Set<Long> accessibleDocumentIds = knowledgeBaseService.filterDocumentIdsInTenantScope(tenantId,
+                state.value(REWRITTEN_QUESTION, ""), activeVersionIds);
+        Map<Long, Long> activeVersionIdsByDocument = knowledgeBaseService.findActiveVersionIdsInTenantScope(tenantId,
                 candidateExpandedChunks.stream().map(RetrievalChunk::documentId).toList(), knowledgeBaseIds);
         List<RetrievalChunk> expandedChunks = candidateExpandedChunks.stream()
-                .filter(chunk -> accessibleDocumentIds.contains(chunk.documentId()))
+                .filter(chunk -> activeVersionIdsByDocument.containsKey(chunk.documentId()))
+                .filter(chunk -> activeVersionIdsByDocument.get(chunk.documentId()).equals(chunk.documentVersionId()))
                 .toList();
 
         // 2. 将补充的原始正文优先送入重排序，同时按片段ID去重

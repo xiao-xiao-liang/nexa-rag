@@ -3,6 +3,7 @@ package com.nexarag.workflow.service;
 import com.nexarag.retrieval.config.RetrievalProperties;
 import com.nexarag.retrieval.model.RetrievalChunk;
 import com.nexarag.workflow.model.EvidenceQuality;
+import com.nexarag.workflow.constants.WorkflowConstants;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 
@@ -14,9 +15,6 @@ import java.util.List;
  */
 @Component
 public class EvidenceQualityEvaluator {
-
-    private static final String NAVIGATION_CHANNEL = "SECTION_NAVIGATION";
-    private static final int CHARACTERS_PER_TOKEN = 4;
 
     private final RetrievalProperties retrievalProperties;
 
@@ -76,10 +74,10 @@ public class EvidenceQualityEvaluator {
         if (accepted.isEmpty()) {
             return EvidenceQuality.insufficient("TOKEN_BUDGET");
         }
-        if (usedTokens < retrievalProperties.getCandidate().getExpansionMinimumBodyTokens()) {
-            return EvidenceQuality.insufficient("TOO_SHORT_AFTER_EXPANSION");
-        }
-        return new EvidenceQuality(List.copyOf(accepted), true, "ACCEPTED", usedTokens);
+        // 2. 短正文只用于触发章节扩展，扩展后仍无更多正文时不能丢弃已经命中的原始证据。
+        String reason = usedTokens < retrievalProperties.getCandidate().getExpansionMinimumBodyTokens()
+                ? "SHORT_BODY_ACCEPTED" : "ACCEPTED";
+        return new EvidenceQuality(List.copyOf(accepted), true, reason, usedTokens);
     }
 
     private List<RetrievalChunk> bodyChunks(List<RetrievalChunk> chunks) {
@@ -92,10 +90,11 @@ public class EvidenceQualityEvaluator {
     }
 
     private boolean isNavigation(RetrievalChunk chunk) {
-        return NAVIGATION_CHANNEL.equals(chunk.channel());
+        return WorkflowConstants.SECTION_NAVIGATION_CHANNEL.equals(chunk.channel());
     }
 
     private int estimateTokens(RetrievalChunk chunk) {
-        return Math.max(1, (chunk.content().length() + CHARACTERS_PER_TOKEN - 1) / CHARACTERS_PER_TOKEN);
+        return Math.max(1, (chunk.content().length() + WorkflowConstants.CHARACTERS_PER_TOKEN - 1)
+                / WorkflowConstants.CHARACTERS_PER_TOKEN);
     }
 }

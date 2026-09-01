@@ -5,18 +5,19 @@ import com.alibaba.cloud.ai.graph.action.NodeAction;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nexarag.common.exception.ServiceException;
-import com.nexarag.document.constants.DocumentConstants;
+import com.nexarag.document.enums.DocumentErrorCode;
+import com.nexarag.document.enums.DocumentVersionStatus;
 import com.nexarag.document.model.dto.ParseConfigRequest;
 import com.nexarag.document.model.dto.ProcessDocumentRequest;
 import com.nexarag.document.model.entity.Document;
-import com.nexarag.document.enums.DocumentStatus;
-import com.nexarag.document.enums.DocumentErrorCode;
+import com.nexarag.document.model.entity.DocumentVersionDO;
 import com.nexarag.document.service.DocumentService;
+import com.nexarag.document.service.DocumentVersionService;
+import com.nexarag.infra.enums.ExternalDocumentSourceType;
+import com.nexarag.infra.messaging.document.DocumentPipelineNonRetryableException;
 import com.nexarag.infra.parser.model.DocumentParseRequest;
 import com.nexarag.infra.parser.model.ParsedArtifact;
 import com.nexarag.infra.parser.service.DocumentParseService;
-import com.nexarag.infra.enums.ExternalDocumentSourceType;
-import com.nexarag.infra.messaging.document.DocumentPipelineNonRetryableException;
 import com.nexarag.infra.source.ExternalDocumentSourceService;
 import com.nexarag.infra.source.model.SourceArtifactBO;
 import com.nexarag.infra.source.model.SourceReadRequestDTO;
@@ -26,17 +27,14 @@ import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 
 import java.time.LocalDateTime;
-import java.util.Map;
 import java.util.Locale;
+import java.util.Map;
 
 import static com.alibaba.cloud.ai.graph.StateGraph.END;
 import static com.nexarag.document.constants.DocumentConstants.*;
 import static com.nexarag.workflow.constants.DocumentIngestionNodeConstants.CHUNKING_NODE;
 import static com.nexarag.workflow.constants.DocumentIngestionNodeConstants.INDEXING_NODE;
-import static com.nexarag.workflow.constants.DocumentIngestionStateKeys.CURRENT_STAGE;
-import static com.nexarag.workflow.constants.DocumentIngestionStateKeys.CURRENT_STATUS;
-import static com.nexarag.workflow.constants.DocumentIngestionStateKeys.DOCUMENT_ID;
-import static com.nexarag.workflow.constants.DocumentIngestionStateKeys.ROUTE_TARGET;
+import static com.nexarag.workflow.constants.DocumentIngestionStateKeys.*;
 import static com.nexarag.workflow.util.DocumentIngestionStateUtil.requiredLong;
 
 /**
@@ -47,6 +45,7 @@ import static com.nexarag.workflow.util.DocumentIngestionStateUtil.requiredLong;
 public class ParsingNode implements NodeAction {
 
     private final DocumentService documentService;
+    private final DocumentVersionService documentVersionService;
     private final DocumentParseService documentParseService;
     private final ExternalDocumentSourceService externalDocumentSourceService;
     private final FileStorageService fileStorageService;
@@ -60,70 +59,71 @@ public class ParsingNode implements NodeAction {
      */
     @Override
     public Map<String, Object> apply(OverAllState state) {
-        // 1. 读取文档并处理幂等短路
+        // 1. 读取文档版本并处理幂等短路
         Long documentId = requiredLong(state, DOCUMENT_ID);
-        Document document = documentService.getRequiredDocument(documentId);
-        Map<String, Object> shortcutState = shortcutWhenAlreadyAdvanced(document);
+        Long documentVersionId = requiredLong(state, DOCUMENT_VERSION_ID);
+        DocumentVersionDO documentVersion = documentVersionService.getRequiredVersion(documentId, documentVersionId);
+        Map<String, Object> shortcutState = shortcutWhenAlreadyAdvanced(documentVersion);
         if (shortcutState != null) {
             return shortcutState;
         }
 
         // 2. 校验解析节点允许处理的状态
-        validateParseStatus(document);
-        markParsing(document);
+        validateParseStatus(documentVersion);
+        markParsing(documentVersion);
 
         // 3. 调用infra解析能力生成标准解析产物，异常交给RocketMQ触发重试
-        ParsedArtifact parsedArtifact = parseDocument(document);
+        ParsedArtifact parsedArtifact = parseDocument(documentVersion);
 
         // 4. 回写解析产物并路由到切分节点
-        markParsed(document, parsedArtifact);
+        markParsed(documentVersion, parsedArtifact);
         return Map.of(
-                CURRENT_STAGE, DocumentStatus.PARSING.name(),
-                CURRENT_STATUS, DocumentStatus.PARSED.name(),
+                CURRENT_STAGE, DocumentVersionStatus.PARSING.name(),
+                CURRENT_STATUS, DocumentVersionStatus.PARSED.name(),
                 ROUTE_TARGET, CHUNKING_NODE
         );
     }
 
-    private Map<String, Object> shortcutWhenAlreadyAdvanced(Document document) {
-        DocumentStatus status = document.getStatus();
-        if (status == DocumentStatus.PARSED) {
+    private Map<String, Object> shortcutWhenAlreadyAdvanced(DocumentVersionDO documentVersion) {
+        DocumentVersionStatus status = documentVersion.getStatus();
+        if (status == DocumentVersionStatus.PARSED) {
             return Map.of(CURRENT_STATUS, status.name(), ROUTE_TARGET, CHUNKING_NODE);
         }
-        if (status == DocumentStatus.CHUNKED || status == DocumentStatus.INDEXING) {
+        if (status == DocumentVersionStatus.CHUNKED || status == DocumentVersionStatus.INDEXING) {
             return Map.of(CURRENT_STATUS, status.name(), ROUTE_TARGET, INDEXING_NODE);
         }
-        if (status == DocumentStatus.INDEXED || status == DocumentStatus.FAILED) {
+        if (status == DocumentVersionStatus.INDEX_READY || status == DocumentVersionStatus.FAILED) {
             return Map.of(CURRENT_STATUS, status.name(), ROUTE_TARGET, END);
         }
         return null;
     }
 
-    private void validateParseStatus(Document document) {
-        DocumentStatus status = document.getStatus();
-        if (status != DocumentStatus.QUEUED && status != DocumentStatus.PARSING) {
-            throw new ServiceException("文档状态不允许执行解析，documentId=" + document.getDocumentId()
+    private void validateParseStatus(DocumentVersionDO documentVersion) {
+        DocumentVersionStatus status = documentVersion.getStatus();
+        if (status != DocumentVersionStatus.QUEUED && status != DocumentVersionStatus.PARSING) {
+            throw new ServiceException("文档版本状态不允许执行解析，documentId=" + documentVersion.getDocumentId()
                     + "，status=" + status, DocumentErrorCode.DOCUMENT_STATUS_INVALID);
         }
     }
 
-    private void markParsing(Document document) {
-        document.setStatus(DocumentStatus.PARSING);
-        document.setProcessStartTime(LocalDateTime.now());
-        boolean updated = documentService.updateById(document);
+    private void markParsing(DocumentVersionDO documentVersion) {
+        documentVersion.setStatus(DocumentVersionStatus.PARSING);
+        documentVersion.setProcessStartTime(LocalDateTime.now());
+        boolean updated = documentVersionService.updateById(documentVersion);
         if (!updated) {
-            throw new ServiceException("更新文档解析中状态失败，documentId=" + document.getDocumentId(),
+            throw new ServiceException("更新文档版本解析中状态失败，documentId=" + documentVersion.getDocumentId(),
                     DocumentErrorCode.DOCUMENT_STATUS_INVALID);
         }
     }
 
-    private DocumentParseRequest buildParseRequest(Document document) {
-        ParseConfigRequest parseConfig = readParseConfig(document.getProcessConfigJson());
+    private DocumentParseRequest buildParseRequest(DocumentVersionDO documentVersion) {
+        ParseConfigRequest parseConfig = readParseConfig(documentVersion.getProcessConfigJson());
         return DocumentParseRequest.builder()
-                .documentId(document.getDocumentId())
-                .originalFileName(document.getOriginalFileName())
-                .fileType(document.getFileType().name())
-                .originalObjectName(document.getOriginalObjectName())
-                .originalFileUrl(document.getOriginalFileUrl())
+                .documentId(documentVersion.getDocumentId())
+                .originalFileName(documentVersion.getOriginalFileName())
+                .fileType(documentVersion.getFileType().name())
+                .originalObjectName(documentVersion.getOriginalObjectName())
+                .originalFileUrl(documentVersion.getOriginalFileUrl())
                 .enableOcr(parseConfig == null ? null : parseConfig.enableOcr())
                 .enableImageDescription(parseConfig == null ? null : parseConfig.enableImageDescription())
                 .build();
@@ -132,13 +132,13 @@ public class ParsingNode implements NodeAction {
     /**
      * 根据来源选择文件解析器或外部平台 Reader。
      */
-    private ParsedArtifact parseDocument(Document document) {
-        if (document.getSourceType() == null || document.getSourceType() == ExternalDocumentSourceType.LOCAL) {
-            return documentParseService.parse(buildParseRequest(document));
+    private ParsedArtifact parseDocument(DocumentVersionDO documentVersion) {
+        if (documentVersion.getSourceType() == null || documentVersion.getSourceType() == ExternalDocumentSourceType.LOCAL) {
+            return documentParseService.parse(buildParseRequest(documentVersion));
         }
         SourceArtifactBO artifact = externalDocumentSourceService.readAndPersist(new SourceReadRequestDTO(
-                document.getDocumentId(), document.getSourceType(), document.getSourceUrl()));
-        refreshExternalDocumentName(document, artifact.title());
+                documentVersion.getDocumentId(), documentVersion.getSourceType(), documentVersion.getSourceUrl()));
+        refreshExternalDocumentName(documentVersion, artifact.title());
         return artifact.parsedArtifact();
     }
 
@@ -148,22 +148,24 @@ public class ParsingNode implements NodeAction {
      * @param document    当前处理中的文档实体
      * @param sourceTitle 外部平台返回的文档标题
      */
-    private void refreshExternalDocumentName(Document document, String sourceTitle) {
+    private void refreshExternalDocumentName(DocumentVersionDO documentVersion, String sourceTitle) {
         if (!StringUtils.hasText(sourceTitle)) {
             return;
         }
         String normalizedTitle = sourceTitle.trim();
 
         String originalFileName = toMarkdownFileName(normalizedTitle);
-        validateExternalDocumentName(document.getDocumentId(), normalizedTitle, originalFileName);
+        validateExternalDocumentName(documentVersion.getDocumentId(), normalizedTitle, originalFileName);
 
-        // 1. 仅覆盖系统默认标题，保留用户在提交时明确填写的标题
+        // 1. 标题属于文档稳定身份信息，仅在默认标题场景首次回写。
+        Document document = documentService.getRequiredDocument(documentVersion.getDocumentId());
         if (DEFAULT_EXTERNAL_DOCUMENT_TITLE.equals(document.getTitle())) {
             document.setTitle(normalizedTitle);
+            documentService.updateById(document);
         }
 
-        // 2. 外部来源统一解析为 Markdown，文件名使用远端文档名便于追溯
-        document.setOriginalFileName(originalFileName);
+        // 2. 外部来源的文件名属于版本快照，仅更新当前处理版本。
+        documentVersion.setOriginalFileName(originalFileName);
     }
 
     private String toMarkdownFileName(String title) {
@@ -195,24 +197,24 @@ public class ParsingNode implements NodeAction {
         }
     }
 
-    private void markParsed(Document document, ParsedArtifact parsedArtifact) {
+    private void markParsed(DocumentVersionDO documentVersion, ParsedArtifact parsedArtifact) {
         try {
-            document.setParsedMetadataJson(objectMapper.writeValueAsString(
+            documentVersion.setParsedMetadataJson(objectMapper.writeValueAsString(
                     parsedArtifact.metadata() == null ? Map.of() : parsedArtifact.metadata()));
         } catch (JsonProcessingException exception) {
             throw new ServiceException("保存文档解析元数据失败", exception,
                     DocumentErrorCode.DOCUMENT_PROCESS_CONFIG_INVALID);
         }
-        document.setParsedFileUrl(fileStorageService.resolveUrl(parsedArtifact.objectKey()));
-        document.setParsedObjectName(parsedArtifact.objectKey());
-        document.setParsedContentType(parsedArtifact.contentType());
-        document.setFailureStage(null);
-        document.setFailureReason(null);
-        document.setFailureDetail(null);
-        document.setStatus(DocumentStatus.PARSED);
-        boolean updated = documentService.updateById(document);
+        documentVersion.setParsedFileUrl(fileStorageService.resolveUrl(parsedArtifact.objectKey()));
+        documentVersion.setParsedObjectName(parsedArtifact.objectKey());
+        documentVersion.setParsedContentType(parsedArtifact.contentType());
+        documentVersion.setFailureStage(null);
+        documentVersion.setFailureReason(null);
+        documentVersion.setFailureDetail(null);
+        documentVersion.setStatus(DocumentVersionStatus.PARSED);
+        boolean updated = documentVersionService.updateById(documentVersion);
         if (!updated) {
-            throw new ServiceException("更新文档解析完成状态失败，documentId=" + document.getDocumentId(),
+            throw new ServiceException("更新文档版本解析完成状态失败，documentId=" + documentVersion.getDocumentId(),
                     DocumentErrorCode.DOCUMENT_STATUS_INVALID);
         }
     }

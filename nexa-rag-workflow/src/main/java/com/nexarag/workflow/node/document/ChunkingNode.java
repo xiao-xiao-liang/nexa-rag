@@ -3,11 +3,11 @@ package com.nexarag.workflow.node.document;
 import com.alibaba.cloud.ai.graph.OverAllState;
 import com.alibaba.cloud.ai.graph.action.NodeAction;
 import com.nexarag.common.exception.ServiceException;
-import com.nexarag.document.model.entity.Document;
-import com.nexarag.document.enums.DocumentStatus;
 import com.nexarag.document.enums.DocumentErrorCode;
+import com.nexarag.document.enums.DocumentVersionStatus;
+import com.nexarag.document.model.entity.DocumentVersionDO;
 import com.nexarag.document.service.DocumentChunkingService;
-import com.nexarag.document.service.DocumentService;
+import com.nexarag.document.service.DocumentVersionService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
@@ -15,10 +15,7 @@ import java.util.Map;
 
 import static com.alibaba.cloud.ai.graph.StateGraph.END;
 import static com.nexarag.workflow.constants.DocumentIngestionNodeConstants.INDEXING_NODE;
-import static com.nexarag.workflow.constants.DocumentIngestionStateKeys.CURRENT_STAGE;
-import static com.nexarag.workflow.constants.DocumentIngestionStateKeys.CURRENT_STATUS;
-import static com.nexarag.workflow.constants.DocumentIngestionStateKeys.DOCUMENT_ID;
-import static com.nexarag.workflow.constants.DocumentIngestionStateKeys.ROUTE_TARGET;
+import static com.nexarag.workflow.constants.DocumentIngestionStateKeys.*;
 import static com.nexarag.workflow.util.DocumentIngestionStateUtil.requiredLong;
 
 /**
@@ -28,7 +25,7 @@ import static com.nexarag.workflow.util.DocumentIngestionStateUtil.requiredLong;
 @RequiredArgsConstructor
 public class ChunkingNode implements NodeAction {
 
-    private final DocumentService documentService;
+    private final DocumentVersionService documentVersionService;
     private final DocumentChunkingService documentChunkingService;
 
     /**
@@ -39,30 +36,32 @@ public class ChunkingNode implements NodeAction {
      */
     @Override
     public Map<String, Object> apply(OverAllState state) {
-        // 1. 读取文档ID并调用文档模块切分服务
+        // 1. 读取文档版本边界并调用切分服务
         Long documentId = requiredLong(state, DOCUMENT_ID);
-        documentChunkingService.chunk(documentId);
+        Long documentVersionId = requiredLong(state, DOCUMENT_VERSION_ID);
+        documentChunkingService.chunk(documentId, documentVersionId);
 
-        // 2. 读取切分服务写入的最终稳定状态
-        Document document = documentService.getRequiredDocument(documentId);
-        DocumentStatus status = document.getStatus();
-        if (status == DocumentStatus.CHUNKED) {
+        // 2. 读取切分服务写入的版本稳定状态
+        DocumentVersionDO documentVersion = documentVersionService.getRequiredVersion(documentId, documentVersionId);
+        DocumentVersionStatus status = documentVersion.getStatus();
+        if (status == DocumentVersionStatus.CHUNKED) {
             return Map.of(
-                    CURRENT_STAGE, DocumentStatus.CHUNKING.name(),
+                    CURRENT_STAGE, DocumentVersionStatus.CHUNKING.name(),
                     CURRENT_STATUS, status.name(),
                     ROUTE_TARGET, INDEXING_NODE
             );
         }
-        if (status == DocumentStatus.FAILED) {
+        if (status == DocumentVersionStatus.FAILED) {
             return Map.of(
-                    CURRENT_STAGE, DocumentStatus.CHUNKING.name(),
+                    CURRENT_STAGE, DocumentVersionStatus.CHUNKING.name(),
                     CURRENT_STATUS, status.name(),
                     ROUTE_TARGET, END
             );
         }
 
         // 3. 非预期状态说明阶段服务和 Graph 路由约定不一致
-        throw new ServiceException("文档切分后状态异常，documentId=" + documentId + "，status=" + status,
+        throw new ServiceException("文档版本切分后状态异常，documentId=" + documentId
+                + "，documentVersionId=" + documentVersionId + "，status=" + status,
                 DocumentErrorCode.DOCUMENT_STATUS_INVALID);
     }
 }

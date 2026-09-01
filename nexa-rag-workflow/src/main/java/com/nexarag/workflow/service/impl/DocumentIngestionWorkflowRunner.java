@@ -13,7 +13,7 @@ import java.util.Map;
 
 import static com.nexarag.workflow.constants.DocumentIngestionGraphConstants.DOCUMENT_INGESTION_GRAPH_NAME;
 import static com.nexarag.workflow.constants.DocumentIngestionGraphConstants.THREAD_ID_SEPARATOR;
-import static com.nexarag.workflow.constants.DocumentIngestionStateKeys.DOCUMENT_ID;
+import static com.nexarag.workflow.constants.DocumentIngestionStateKeys.*;
 
 /**
  * 文档入库工作流 Runner，负责编译并启动文档入库 Graph。
@@ -49,11 +49,12 @@ public class DocumentIngestionWorkflowRunner implements WorkflowGraphRunner {
      */
     @Override
     public void run(Map<String, Object> initialState) {
-        // 1. 校验并解析文档ID
-        Long documentId = resolveDocumentId(initialState);
+        // 1. 校验并解析文档版本处理边界
+        DocumentProcessingBoundary boundary = resolveProcessingBoundary(initialState);
 
-        // 2. 使用稳定规则生成 Graph threadId
-        String threadId = DOCUMENT_INGESTION_GRAPH_NAME + THREAD_ID_SEPARATOR + documentId;
+        // 2. 使用三元组生成 Graph threadId，隔离同一文档的不同版本和处理轮次
+        String threadId = DOCUMENT_INGESTION_GRAPH_NAME + THREAD_ID_SEPARATOR + boundary.documentId()
+                + THREAD_ID_SEPARATOR + boundary.documentVersionId() + THREAD_ID_SEPARATOR + boundary.processId();
         RunnableConfig runnableConfig = RunnableConfig.builder()
                 .threadId(threadId)
                 .build();
@@ -62,14 +63,30 @@ public class DocumentIngestionWorkflowRunner implements WorkflowGraphRunner {
         compiledGraph.stream(initialState, runnableConfig).blockLast();
     }
 
-    private Long resolveDocumentId(Map<String, Object> initialState) {
-        Object rawDocumentId = initialState == null ? null : initialState.get(DOCUMENT_ID);
-        if (rawDocumentId instanceof Number number) {
+    private DocumentProcessingBoundary resolveProcessingBoundary(Map<String, Object> initialState) {
+        Long documentId = resolvePositiveLong(initialState, DOCUMENT_ID);
+        Long documentVersionId = resolvePositiveLong(initialState, DOCUMENT_VERSION_ID);
+        Object rawProcessId = initialState == null ? null : initialState.get(PROCESS_ID);
+        if (rawProcessId instanceof String processId && !processId.isBlank()) {
+            return new DocumentProcessingBoundary(documentId, documentVersionId, processId);
+        }
+        throw new ServiceException("文档入库工作流缺少有效 processId");
+    }
+
+    private Long resolvePositiveLong(Map<String, Object> initialState, String stateKey) {
+        Object rawValue = initialState == null ? null : initialState.get(stateKey);
+        if (rawValue instanceof Number number && number.longValue() > 0) {
             return number.longValue();
         }
-        if (rawDocumentId instanceof String text && text.matches("\\d+")) {
+        if (rawValue instanceof String text && text.matches("[1-9]\\d*")) {
             return Long.valueOf(text);
         }
-        throw new ServiceException("文档入库工作流缺少有效 documentId");
+        throw new ServiceException("文档入库工作流缺少有效 " + stateKey);
+    }
+
+    /**
+     * 文档入库工作流的不可分割处理边界。
+     */
+    private record DocumentProcessingBoundary(Long documentId, Long documentVersionId, String processId) {
     }
 }

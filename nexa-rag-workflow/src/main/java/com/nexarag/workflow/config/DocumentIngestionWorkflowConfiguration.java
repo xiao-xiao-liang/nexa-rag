@@ -22,16 +22,8 @@ import java.util.Map;
 import static com.alibaba.cloud.ai.graph.StateGraph.END;
 import static com.alibaba.cloud.ai.graph.StateGraph.START;
 import static com.nexarag.workflow.constants.DocumentIngestionGraphConstants.DOCUMENT_INGESTION_GRAPH_NAME;
-import static com.nexarag.workflow.constants.DocumentIngestionNodeConstants.CHUNKING_NODE;
-import static com.nexarag.workflow.constants.DocumentIngestionNodeConstants.INDEXING_NODE;
-import static com.nexarag.workflow.constants.DocumentIngestionNodeConstants.PARSING_NODE;
-import static com.nexarag.workflow.constants.DocumentIngestionNodeConstants.STATUS_ROUTER_NODE;
-import static com.nexarag.workflow.constants.DocumentIngestionStateKeys.CURRENT_STAGE;
-import static com.nexarag.workflow.constants.DocumentIngestionStateKeys.CURRENT_STATUS;
-import static com.nexarag.workflow.constants.DocumentIngestionStateKeys.DOCUMENT_ID;
-import static com.nexarag.workflow.constants.DocumentIngestionStateKeys.FAILURE_REASON;
-import static com.nexarag.workflow.constants.DocumentIngestionStateKeys.FAILURE_STAGE;
-import static com.nexarag.workflow.constants.DocumentIngestionStateKeys.ROUTE_TARGET;
+import static com.nexarag.workflow.constants.DocumentIngestionNodeConstants.*;
+import static com.nexarag.workflow.constants.DocumentIngestionStateKeys.*;
 
 /**
  * 文档入库 Workflow Graph 配置，负责注册节点、条件边和 State Key 策略。
@@ -86,6 +78,8 @@ public class DocumentIngestionWorkflowConfiguration {
     private Map<String, KeyStrategy> buildKeyStrategies() {
         HashMap<String, KeyStrategy> strategies = new HashMap<>();
         strategies.put(DOCUMENT_ID, KeyStrategy.REPLACE);
+        strategies.put(DOCUMENT_VERSION_ID, KeyStrategy.REPLACE);
+        strategies.put(PROCESS_ID, KeyStrategy.REPLACE);
         strategies.put(CURRENT_STATUS, KeyStrategy.REPLACE);
         strategies.put(ROUTE_TARGET, KeyStrategy.REPLACE);
         strategies.put(CURRENT_STAGE, KeyStrategy.REPLACE);
