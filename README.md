@@ -56,6 +56,19 @@ npm run dev
 
 当前流式消息仅展示文本和生成状态。RAG 检索引用的 SSE 事件与历史引用数据契约尚未补齐，因此前端暂不展示引用来源。
 
+## 文档版本后端 API
+
+文档版本接口位于 `/api/knowledge-bases/{knowledgeBaseId}/documents`，版本上传完成后自动进入处理流程，只有索引预热完成才会自动切换为生效版本。检索会在向量与关键词查询中按当前 `activeVersionId` 过滤，并在融合前再次校验数据库版本指针。
+
+- `POST /{documentId}/versions`：上传该文档的新版本。
+- `GET /{documentId}/versions`、`GET /{documentId}/versions/{documentVersionId}`：查询版本列表与详情。
+- `POST /{documentId}/versions/{documentVersionId}/activate`：切换到已预热的历史版本。
+- `POST /{documentId}/versions/{documentVersionId}/retry`：重新提交失败版本。
+- `DELETE /{documentId}/versions/{documentVersionId}`：永久删除非生效、非构建中的历史版本；异步清理版本级索引、对象和数据，审计记录保留。
+- `GET /{documentId}/version-operation-logs`：查询版本操作审计。
+
+升级已有数据后，如需给 V28 回填出的 V1 重写外部索引版本元数据，可在确认外部索引容量后临时启用 `nexa.document.version.backfill.enabled=true`。任务会按 `nexa.document.version.backfill.batch-size` 分批遍历全部符合条件的 V1 版本；重跑幂等，默认关闭。
+
 
 ### 前端验证
 
