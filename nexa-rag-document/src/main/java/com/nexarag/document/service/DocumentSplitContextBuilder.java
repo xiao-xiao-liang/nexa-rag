@@ -4,14 +4,15 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nexarag.common.exception.ServiceException;
+import com.nexarag.document.enums.DocumentErrorCode;
+import com.nexarag.document.enums.FileType;
+import com.nexarag.document.model.bo.split.DocumentSplitContext;
+import com.nexarag.document.model.bo.structure.StructureArtifactReferenceBO;
 import com.nexarag.document.model.dto.ProcessDocumentRequest;
 import com.nexarag.document.model.dto.SplitConfigRequest;
 import com.nexarag.document.model.dto.UploadDocumentRequest;
 import com.nexarag.document.model.entity.Document;
-import com.nexarag.document.enums.FileType;
-import com.nexarag.document.enums.DocumentErrorCode;
-import com.nexarag.document.model.bo.split.DocumentSplitContext;
-import com.nexarag.document.model.bo.structure.StructureArtifactReferenceBO;
+import com.nexarag.document.model.entity.DocumentVersionDO;
 import com.nexarag.infra.storage.service.FileStorageService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
@@ -36,50 +37,48 @@ public class DocumentSplitContextBuilder {
     private final ProcessConfigDefaults processConfigDefaults;
 
     /**
-     * 构建文档切分上下文。
+     * 使用文档稳定元数据与文档版本快照构建切分上下文。
      *
-     * @param document 文档实体
+     * @param document        文档稳定身份信息
+     * @param documentVersion 本次处理的文件与解析产物快照
      * @return 文档切分上下文
      */
-    public DocumentSplitContext build(Document document) {
-        SplitConfigRequest splitConfig = readSplitConfig(document);
-        if (document.getFileType() == FileType.EXCEL) {
-            return buildBinaryContext(document, splitConfig);
+    public DocumentSplitContext build(Document document, DocumentVersionDO documentVersion) {
+        SplitConfigRequest splitConfig = readSplitConfig(documentVersion);
+        if (documentVersion.getFileType() == FileType.EXCEL) {
+            return buildBinaryContext(document, documentVersion, splitConfig);
         }
-        return buildTextContext(document, splitConfig);
+        return buildTextContext(document, documentVersion, splitConfig);
     }
 
-    private DocumentSplitContext buildTextContext(Document document, SplitConfigRequest splitConfig) {
-        String objectName = StringUtils.hasText(document.getParsedObjectName())
-                ? document.getParsedObjectName()
-                : document.getOriginalObjectName();
-        byte[] bytes = loadBytes(objectName);
-        String content = new String(bytes, StandardCharsets.UTF_8);
-        return baseContext(document, splitConfig, content, null);
+    private DocumentSplitContext buildTextContext(Document document, DocumentVersionDO documentVersion,
+                                                  SplitConfigRequest splitConfig) {
+        String objectName = StringUtils.hasText(documentVersion.getParsedObjectName())
+                ? documentVersion.getParsedObjectName() : documentVersion.getOriginalObjectName();
+        return baseContext(document, documentVersion, splitConfig,
+                new String(loadBytes(objectName), StandardCharsets.UTF_8), null);
     }
 
-    private DocumentSplitContext buildBinaryContext(Document document, SplitConfigRequest splitConfig) {
-        byte[] fileBytes = loadBytes(document.getOriginalObjectName());
-        return baseContext(document, splitConfig, null, fileBytes);
+    private DocumentSplitContext buildBinaryContext(Document document, DocumentVersionDO documentVersion,
+                                                    SplitConfigRequest splitConfig) {
+        return baseContext(document, documentVersion, splitConfig, null,
+                loadBytes(documentVersion.getOriginalObjectName()));
     }
 
-    private DocumentSplitContext baseContext(Document document,
-                                             SplitConfigRequest splitConfig,
-                                             String content,
-                                             byte[] fileBytes) {
-        return new DocumentSplitContext(document.getDocumentId(), document.getTitle(), document.getOriginalFileName(),
-                document.getFileType(), document.getOriginalObjectName(), document.getOriginalFileUrl(),
-                document.getParsedObjectName(), document.getParsedFileUrl(), document.getParsedContentType(),
-                content, fileBytes, splitConfig, readStructureArtifacts(document));
+    private DocumentSplitContext baseContext(Document document, DocumentVersionDO documentVersion,
+                                             SplitConfigRequest splitConfig, String content, byte[] fileBytes) {
+        return new DocumentSplitContext(document.getDocumentId(), document.getTitle(), documentVersion.getOriginalFileName(),
+                documentVersion.getFileType(), documentVersion.getOriginalObjectName(), documentVersion.getOriginalFileUrl(),
+                documentVersion.getParsedObjectName(), documentVersion.getParsedFileUrl(), documentVersion.getParsedContentType(),
+                content, fileBytes, splitConfig, readStructureArtifacts(documentVersion));
     }
 
-    /** 只将白名单字段转换为结构制品引用，不读取 JSON 正文。 */
-    private List<StructureArtifactReferenceBO> readStructureArtifacts(Document document) {
-        if (!StringUtils.hasText(document.getParsedMetadataJson())) {
+    private List<StructureArtifactReferenceBO> readStructureArtifacts(DocumentVersionDO documentVersion) {
+        if (!StringUtils.hasText(documentVersion.getParsedMetadataJson())) {
             return List.of();
         }
         try {
-            JsonNode rawArtifacts = OBJECT_MAPPER.readTree(document.getParsedMetadataJson()).path("structureArtifacts");
+            JsonNode rawArtifacts = OBJECT_MAPPER.readTree(documentVersion.getParsedMetadataJson()).path("structureArtifacts");
             if (!rawArtifacts.isArray()) {
                 return List.of();
             }
@@ -91,14 +90,13 @@ public class DocumentSplitContextBuilder {
                 Long size = nonNegativeLongValue(artifact.path("size"));
                 if (("MINERU_MIDDLE_JSON".equals(type) || "MINERU_CONTENT_LIST_JSON".equals(type)
                         || "MINERU_CONTENT_LIST_V2_JSON".equals(type))
-                        && StringUtils.hasText(objectKey) && "application/json".equals(contentType)
-                        && size != null) {
+                        && StringUtils.hasText(objectKey) && "application/json".equals(contentType) && size != null) {
                     references.add(new StructureArtifactReferenceBO(type, objectKey, contentType, size));
                 }
             }
             return List.copyOf(references);
         } catch (JsonProcessingException exception) {
-            throw new ServiceException("读取文档解析元数据失败，documentId=" + document.getDocumentId(), exception,
+            throw new ServiceException("读取文档版本解析元数据失败，documentId=" + documentVersion.getDocumentId(), exception,
                     DocumentErrorCode.DOCUMENT_PROCESS_CONFIG_INVALID);
         }
     }
@@ -126,21 +124,20 @@ public class DocumentSplitContextBuilder {
         }
     }
 
-    private SplitConfigRequest readSplitConfig(Document document) {
+    private SplitConfigRequest readSplitConfig(DocumentVersionDO documentVersion) {
         ProcessDocumentRequest request = null;
-        if (StringUtils.hasText(document.getProcessConfigJson())) {
+        if (StringUtils.hasText(documentVersion.getProcessConfigJson())) {
             try {
-                request = OBJECT_MAPPER.readValue(document.getProcessConfigJson(), ProcessDocumentRequest.class);
+                request = OBJECT_MAPPER.readValue(documentVersion.getProcessConfigJson(), ProcessDocumentRequest.class);
             } catch (JsonProcessingException exception) {
-                throw new ServiceException("读取文档切分配置失败，documentId=" + document.getDocumentId(), exception,
+                throw new ServiceException("读取文档版本切分配置失败，documentId=" + documentVersion.getDocumentId(), exception,
                         DocumentErrorCode.DOCUMENT_PROCESS_CONFIG_INVALID);
             }
         }
         UploadDocumentRequest uploadRequest = new UploadDocumentRequest(null, null,
-                request == null ? null : request.splitConfig(),
-                request == null ? null : request.parseConfig(),
+                request == null ? null : request.splitConfig(), request == null ? null : request.parseConfig(),
                 request == null ? null : request.indexConfig());
-        return processConfigDefaults.merge(document.getFileType(), uploadRequest).splitConfig();
+        return processConfigDefaults.merge(documentVersion.getFileType(), uploadRequest).splitConfig();
     }
 
     private byte[] loadBytes(String objectName) {

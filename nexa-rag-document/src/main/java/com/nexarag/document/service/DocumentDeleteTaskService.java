@@ -1,6 +1,6 @@
 package com.nexarag.document.service;
 
-import com.nexarag.document.model.entity.Document;
+import com.nexarag.document.model.entity.DocumentVersionDO;
 
 /**
  * 文档删除后的异步任务创建服务。
@@ -8,17 +8,18 @@ import com.nexarag.document.model.entity.Document;
 public interface DocumentDeleteTaskService {
 
     /**
-     * 创建待发布的外部索引清理任务。
+     * 创建指定历史版本的外部索引清理任务。
      *
-     * @param documentId 已逻辑删除的文档ID
+     * @param documentId        文档ID
+     * @param documentVersionId 待永久删除的历史版本ID
      * @return 清理任务Outbox ID
      */
-    Long createIndexCleanupTask(Long documentId);
+    Long createVersionIndexCleanupTask(Long documentId, Long documentVersionId);
 
     /**
-     * 创建待发布的对象存储清理任务。
+     * 创建指定历史版本的对象存储清理任务。
      *
-     * @param document 待删除文档，需包含原始和解析文件对象名
+     * @param documentVersion 待永久删除的历史版本快照
      */
-    void createStorageCleanupTask(Document document);
+    void createVersionStorageCleanupTask(DocumentVersionDO documentVersion);
 }

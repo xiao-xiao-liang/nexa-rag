@@ -13,9 +13,15 @@ public interface DocumentUploadService {
      * 上传文档并提交处理。
      *
      * @param knowledgeBaseId 知识库ID
-     * @param file    上传文件
-     * @param request 上传文档请求
+     * @param file            上传文件
+     * @param request         上传文档请求
      * @return 上传响应
      */
-    UploadDocumentResponse upload(Long knowledgeBaseId, MultipartFile file, UploadDocumentRequest request);
+    UploadDocumentResponse upload(Long knowledgeBaseId, MultipartFile file, UploadDocumentRequest request, String operator);
+
+    /**
+     * 为已有文档上传新版本并提交处理。
+     */
+    UploadDocumentResponse uploadVersion(Long documentId, MultipartFile file, UploadDocumentRequest request,
+                                         String operator);
 }

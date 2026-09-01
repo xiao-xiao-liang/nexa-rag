@@ -2,8 +2,8 @@ package com.nexarag.document.service;
 
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.service.IService;
-import com.nexarag.document.model.entity.DocumentChunk;
 import com.nexarag.document.model.bo.split.ChunkDraft;
+import com.nexarag.document.model.entity.DocumentChunk;
 
 import java.util.List;
 
@@ -13,12 +13,12 @@ import java.util.List;
 public interface DocumentChunkService extends IService<DocumentChunk> {
 
     /**
-     * 根据文档ID查询片段。
+     * 根据文档版本ID查询片段。
      *
-     * @param documentId 文档ID
-     * @return 文档片段列表
+     * @param documentVersionId 文档版本ID
+     * @return 文档版本片段列表
      */
-    List<DocumentChunk> listByDocumentId(Long documentId);
+    List<DocumentChunk> listByDocumentVersionId(Long documentVersionId);
 
     /**
      * 根据父片段ID批量查询子片段，并按文档内片段顺序排序。
@@ -29,47 +29,42 @@ public interface DocumentChunkService extends IService<DocumentChunk> {
     List<DocumentChunk> listByParentChunkIds(List<String> parentChunkIds);
 
     /**
-     * 分页查询指定文档的片段。
+     * 分页查询指定文档版本的片段。
      *
-     * @param documentId 文档ID
-     * @param pageNum    页码
-     * @param pageSize   每页数量
-     * @return 文档片段分页数据
+     * @param documentVersionId 文档版本ID
+     * @param pageNum           页码
+     * @param pageSize          每页数量
+     * @return 文档版本片段分页数据
      */
-    IPage<DocumentChunk> pageByDocumentId(Long documentId, long pageNum, long pageSize);
+    IPage<DocumentChunk> pageByDocumentVersionId(Long documentVersionId, long pageNum, long pageSize);
 
     /**
-     * 替换指定文档的片段。
+     * 替换指定文档版本的片段，不影响该文档的其他历史版本。
      *
-     * @param documentId 文档ID
-     * @param drafts     片段草稿
+     * @param documentId        文档ID
+     * @param documentVersionId 文档版本ID
+     * @param drafts            片段草稿
      * @return 保存后的片段列表
      */
-    List<DocumentChunk> replaceDocumentChunks(Long documentId, List<ChunkDraft> drafts);
+    List<DocumentChunk> replaceDocumentVersionChunks(Long documentId, Long documentVersionId,
+                                                     List<ChunkDraft> drafts);
 
     /**
-     * 删除指定文档的全部片段。
+     * 永久删除指定文档版本的片段。
      *
-     * @param documentId 文档ID
+     * @param documentVersionId 文档版本ID
      */
-    void deleteByDocumentId(Long documentId);
+    void deleteByDocumentVersionId(Long documentVersionId);
 
     /**
-     * 保存指定文档的新片段。
+     * 保存指定文档版本的新片段。
      *
-     * @param documentId 文档ID
-     * @param drafts     片段草稿
+     * @param documentId        文档ID
+     * @param documentVersionId 文档版本ID
+     * @param drafts            片段草稿
      * @return 保存后的片段列表
      */
-    List<DocumentChunk> saveDocumentChunks(Long documentId, List<ChunkDraft> drafts);
-
-    /**
-     * 统计指定文档的片段数量。
-     *
-     * @param documentId 文档ID
-     * @return 片段数量
-     */
-    long countByDocumentId(Long documentId);
+    List<DocumentChunk> saveDocumentVersionChunks(Long documentId, Long documentVersionId, List<ChunkDraft> drafts);
 
     /**
      * 标记片段索引成功并回写索引ID。
@@ -83,15 +78,15 @@ public interface DocumentChunkService extends IService<DocumentChunk> {
     /**
      * 标记片段索引失败。
      *
-     * @param chunkId        片段ID
+     * @param chunkId       片段ID
      * @param failureReason 失败原因
      */
     void markChunkIndexFailed(String chunkId, String failureReason);
 
     /**
-     * 标记指定文档中需要跳过索引的片段。
+     * 标记指定文档版本中需要跳过索引的片段，不影响历史或其他构建中的版本。
      *
-     * @param documentId 文档ID
+     * @param documentVersionId 文档版本ID
      */
-    void markDocumentSkippedChunks(Long documentId);
+    void markDocumentVersionSkippedChunks(Long documentVersionId);
 }

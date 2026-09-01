@@ -1,38 +1,22 @@
 package com.nexarag.document.controller;
 
+import com.nexarag.auth.service.CurrentUserAccountNameProvider;
+import com.nexarag.common.web.PageVO;
 import com.nexarag.common.web.Result;
 import com.nexarag.common.web.Results;
-import com.nexarag.common.web.PageVO;
 import com.nexarag.document.converter.DocumentConverter;
 import com.nexarag.document.model.dto.CreateDocumentRequest;
 import com.nexarag.document.model.dto.ExternalDocumentSubmitDTO;
 import com.nexarag.document.model.dto.ProcessDocumentRequest;
 import com.nexarag.document.model.dto.UploadDocumentRequest;
-import com.nexarag.document.service.DocumentChunkService;
-import com.nexarag.document.service.DocumentPipelineSubmitService;
-import com.nexarag.document.service.DocumentService;
-import com.nexarag.document.service.DocumentUploadService;
-import com.nexarag.document.service.KnowledgeBaseService;
+import com.nexarag.document.model.entity.Document;
+import com.nexarag.document.model.vo.*;
+import com.nexarag.document.service.*;
 import com.nexarag.document.service.impl.ExternalDocumentSubmitServiceImpl;
-import com.nexarag.document.model.vo.DocumentChunkVO;
-import com.nexarag.document.model.vo.DocumentDetailVO;
-import com.nexarag.document.model.vo.DocumentDeleteVO;
-import com.nexarag.document.model.vo.DocumentOverviewVO;
-import com.nexarag.document.model.vo.DocumentProcessStatusVO;
-import com.nexarag.document.model.vo.DocumentSummaryVO;
-import com.nexarag.document.model.vo.UploadDocumentResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.MediaType;
-import org.springframework.web.bind.annotation.DeleteMapping;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RequestPart;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 /**
@@ -44,11 +28,12 @@ import org.springframework.web.multipart.MultipartFile;
 public class DocumentController {
 
     private final DocumentService documentService;
-    private final DocumentChunkService documentChunkService;
     private final DocumentUploadService documentUploadService;
+    private final DocumentVersionService documentVersionService;
     private final DocumentPipelineSubmitService documentPipelineSubmitService;
     private final ExternalDocumentSubmitServiceImpl externalDocumentSubmitService;
     private final KnowledgeBaseService knowledgeBaseService;
+    private final CurrentUserAccountNameProvider currentUserAccountNameProvider;
 
     /**
      * 创建文档记录。
@@ -58,9 +43,10 @@ public class DocumentController {
      */
     @PostMapping
     public Result<DocumentDetailVO> createDocument(@PathVariable Long knowledgeBaseId,
-                                                    @Valid @RequestBody CreateDocumentRequest request) {
+                                                   @Valid @RequestBody CreateDocumentRequest request) {
         knowledgeBaseService.getRequiredKnowledgeBase(knowledgeBaseId);
-        return Results.success(DocumentConverter.toDetailVO(documentService.createDocument(knowledgeBaseId, request)));
+        Document document = documentService.createDocument(knowledgeBaseId, request);
+        return Results.success(documentService.getDocumentDetail(document.getDocumentId()));
     }
 
     /**
@@ -76,15 +62,107 @@ public class DocumentController {
                                                          @Valid @RequestPart(value = "request", required = false)
                                                          UploadDocumentRequest request) {
         knowledgeBaseService.getRequiredKnowledgeBase(knowledgeBaseId);
-        return Results.success(documentUploadService.upload(knowledgeBaseId, file, request));
+        return Results.success(documentUploadService.upload(knowledgeBaseId, file, request,
+                currentUserAccountNameProvider.getCurrentAccountName()));
     }
 
-    /** 受理飞书或语雀单篇文档，并异步提交处理。 */
+    /**
+     * 上传已有文档的新文件版本；同一文档存在构建中版本时由版本服务拒绝。
+     */
+    @PostMapping(value = "/{documentId}/versions", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public Result<UploadDocumentResponse> uploadDocumentVersion(@PathVariable Long knowledgeBaseId,
+                                                                @PathVariable Long documentId,
+                                                                @RequestPart("file") MultipartFile file,
+                                                                @Valid @RequestPart(value = "request", required = false)
+                                                                UploadDocumentRequest request) {
+        knowledgeBaseService.getRequiredDocument(knowledgeBaseId, documentId);
+        return Results.success(documentUploadService.uploadVersion(documentId, file, request,
+                currentUserAccountNameProvider.getCurrentAccountName()));
+    }
+
+    /**
+     * 查询文档版本历史。
+     */
+    @GetMapping("/{documentId}/versions")
+    public Result<PageVO<DocumentVersionVO>> listDocumentVersions(@PathVariable Long knowledgeBaseId,
+                                                                  @PathVariable Long documentId,
+                                                                  @RequestParam(defaultValue = "1") long pageNum,
+                                                                  @RequestParam(defaultValue = "20") long pageSize) {
+        knowledgeBaseService.getRequiredDocument(knowledgeBaseId, documentId);
+        return Results.success(documentVersionService.listVersions(documentId, pageNum, pageSize));
+    }
+
+    /**
+     * 查询指定文档版本详情。
+     */
+    @GetMapping("/{documentId}/versions/{documentVersionId}")
+    public Result<DocumentVersionVO> getDocumentVersion(@PathVariable Long knowledgeBaseId,
+                                                        @PathVariable Long documentId,
+                                                        @PathVariable Long documentVersionId) {
+        knowledgeBaseService.getRequiredDocument(knowledgeBaseId, documentId);
+        return Results.success(documentVersionService.getVersionDetail(documentId, documentVersionId));
+    }
+
+    /**
+     * 切换至索引预热完成的历史版本。
+     */
+    @PostMapping("/{documentId}/versions/{documentVersionId}/activate")
+    public Result<Void> activateDocumentVersion(@PathVariable Long knowledgeBaseId,
+                                                @PathVariable Long documentId,
+                                                @PathVariable Long documentVersionId) {
+        knowledgeBaseService.getRequiredDocument(knowledgeBaseId, documentId);
+        documentVersionService.activateReadyVersion(documentId, documentVersionId,
+                currentUserAccountNameProvider.getCurrentAccountName());
+        return Results.success();
+    }
+
+    /**
+     * 重新提交失败版本。
+     */
+    @PostMapping("/{documentId}/versions/{documentVersionId}/retry")
+    public Result<DocumentVersionVO> retryDocumentVersion(@PathVariable Long knowledgeBaseId,
+                                                          @PathVariable Long documentId,
+                                                          @PathVariable Long documentVersionId) {
+        knowledgeBaseService.getRequiredDocument(knowledgeBaseId, documentId);
+        documentPipelineSubmitService.retryVersion(documentId, documentVersionId,
+                currentUserAccountNameProvider.getCurrentAccountName());
+        return Results.success(documentVersionService.getVersionDetail(documentId, documentVersionId));
+    }
+
+    /**
+     * 受理非生效历史版本的永久删除。
+     */
+    @DeleteMapping("/{documentId}/versions/{documentVersionId}")
+    public Result<Void> deleteDocumentVersion(@PathVariable Long knowledgeBaseId,
+                                              @PathVariable Long documentId,
+                                              @PathVariable Long documentVersionId) {
+        knowledgeBaseService.getRequiredDocument(knowledgeBaseId, documentId);
+        documentVersionService.requestPermanentDelete(documentId, documentVersionId,
+                currentUserAccountNameProvider.getCurrentAccountName());
+        return Results.success();
+    }
+
+    /**
+     * 查询文档版本操作审计。
+     */
+    @GetMapping("/{documentId}/version-operation-logs")
+    public Result<PageVO<DocumentVersionOperationLogVO>> listDocumentVersionOperationLogs(
+            @PathVariable Long knowledgeBaseId, @PathVariable Long documentId,
+            @RequestParam(defaultValue = "1") long pageNum,
+            @RequestParam(defaultValue = "20") long pageSize) {
+        knowledgeBaseService.getRequiredDocument(knowledgeBaseId, documentId);
+        return Results.success(documentVersionService.listOperationLogs(documentId, pageNum, pageSize));
+    }
+
+    /**
+     * 受理飞书或语雀单篇文档，并异步提交处理。
+     */
     @PostMapping("/external")
     public Result<UploadDocumentResponse> submitExternalDocument(@PathVariable Long knowledgeBaseId,
-                                                                  @Valid @RequestBody ExternalDocumentSubmitDTO request) {
+                                                                 @Valid @RequestBody ExternalDocumentSubmitDTO request) {
         knowledgeBaseService.getRequiredKnowledgeBase(knowledgeBaseId);
-        return Results.success(externalDocumentSubmitService.submit(knowledgeBaseId, request));
+        return Results.success(externalDocumentSubmitService.submit(knowledgeBaseId, request,
+                currentUserAccountNameProvider.getCurrentAccountName()));
     }
 
     /**
@@ -96,8 +174,8 @@ public class DocumentController {
      */
     @GetMapping
     public Result<PageVO<DocumentSummaryVO>> listDocuments(@PathVariable Long knowledgeBaseId,
-            @RequestParam(defaultValue = "1") long pageNum,
-            @RequestParam(defaultValue = "20") long pageSize) {
+                                                           @RequestParam(defaultValue = "1") long pageNum,
+                                                           @RequestParam(defaultValue = "20") long pageSize) {
         knowledgeBaseService.getRequiredKnowledgeBase(knowledgeBaseId);
         return Results.success(documentService.pageDocuments(knowledgeBaseId, pageNum, pageSize));
     }
@@ -110,8 +188,8 @@ public class DocumentController {
      */
     @GetMapping("/{documentId}")
     public Result<DocumentDetailVO> getDocument(@PathVariable Long knowledgeBaseId, @PathVariable Long documentId) {
-        return Results.success(DocumentConverter.toDetailVO(
-                knowledgeBaseService.getRequiredDocument(knowledgeBaseId, documentId)));
+        knowledgeBaseService.getRequiredDocument(knowledgeBaseId, documentId);
+        return Results.success(documentService.getDocumentDetail(documentId));
     }
 
     /**
@@ -135,7 +213,8 @@ public class DocumentController {
     @DeleteMapping("/{documentId}")
     public Result<DocumentDeleteVO> deleteDocument(@PathVariable Long knowledgeBaseId, @PathVariable Long documentId) {
         knowledgeBaseService.getRequiredDocument(knowledgeBaseId, documentId);
-        return Results.success(documentService.deleteDocument(documentId));
+        return Results.success(documentService.deleteDocument(documentId,
+                currentUserAccountNameProvider.getCurrentAccountName()));
     }
 
     /**
@@ -172,8 +251,8 @@ public class DocumentController {
      */
     @GetMapping("/{documentId}/process-status")
     public Result<DocumentProcessStatusVO> getProcessStatus(@PathVariable Long knowledgeBaseId, @PathVariable Long documentId) {
-        return Results.success(DocumentConverter.toProcessStatusVO(
-                knowledgeBaseService.getRequiredDocument(knowledgeBaseId, documentId)));
+        knowledgeBaseService.getRequiredDocument(knowledgeBaseId, documentId);
+        return Results.success(documentService.getProcessStatus(documentId));
     }
 
     /**
@@ -192,6 +271,6 @@ public class DocumentController {
             @RequestParam(defaultValue = "20") long pageSize) {
         knowledgeBaseService.getRequiredDocument(knowledgeBaseId, documentId);
         return Results.success(DocumentConverter.toChunkPageVO(
-                documentChunkService.pageByDocumentId(documentId, pageNum, pageSize)));
+                documentService.pageActiveVersionChunks(documentId, pageNum, pageSize)));
     }
 }
