@@ -252,10 +252,51 @@ export interface ProcessDocumentRequest {
   indexConfig?: IndexConfigRequest;
 }
 
+export type DocumentVersionStatus =
+  | 'UPLOADED'
+  | 'QUEUED'
+  | 'PARSING'
+  | 'PARSED'
+  | 'CHUNKING'
+  | 'CHUNKED'
+  | 'INDEXING'
+  | 'INDEX_READY'
+  | 'FAILED'
+  | 'DELETING';
+
+export type DocumentVersionOperationType =
+  | 'UPLOAD'
+  | 'AUTO_PUBLISH'
+  | 'ROLLBACK'
+  | 'RETRY'
+  | 'DELETE';
+
+export interface DocumentVersionVO {
+  documentVersionId: number | string;
+  revisionNo: number;
+  originalFileName: string;
+  status: DocumentVersionStatus;
+  failureStage?: string;
+  failureReason?: string;
+  indexReadyTime?: string;
+  createTime?: string;
+}
+
+export interface DocumentVersionOperationLogVO {
+  operationLogId: number | string;
+  documentVersionId: number | string;
+  operationType: DocumentVersionOperationType;
+  activationGeneration?: number;
+  operatorId?: string;
+  operationDetail?: string;
+  createTime?: string;
+}
+
 export interface UploadDocumentResponse {
   documentId: string | number;
   processId: string;
   status: DocumentStatus;
+  documentVersionId?: number | string;
 }
 
 export interface DocumentProcessStatusVO {
