@@ -29,10 +29,12 @@ class DocumentTaskOutboxDOPublisherTest {
         DocumentPipelineOutboxService outboxService = mock(DocumentPipelineOutboxService.class);
         DocumentTaskMessagePublisher messagePublisher = mock(DocumentTaskMessagePublisher.class);
         ObjectMapper objectMapper = new ObjectMapper().findAndRegisterModules();
-        DocumentPipelineMessage message = new DocumentPipelineMessage(1L, "process-1", 1, LocalDateTime.now());
+        DocumentPipelineMessage message = new DocumentPipelineMessage(1L, 2L, "process-1", 10L, 2,
+                LocalDateTime.now());
         DocumentTaskOutboxDO outbox = DocumentTaskOutboxDO.builder()
                 .outboxId(10L)
                 .documentId(1L)
+                .documentVersionId(2L)
                 .processId("process-1")
                 .messageBody(objectMapper.writeValueAsString(message))
                 .build();
@@ -51,12 +53,13 @@ class DocumentTaskOutboxDOPublisherTest {
         DocumentPipelineOutboxService outboxService = mock(DocumentPipelineOutboxService.class);
         DocumentTaskMessagePublisher messagePublisher = mock(DocumentTaskMessagePublisher.class);
         ObjectMapper objectMapper = new ObjectMapper().findAndRegisterModules();
-        DocumentPipelineMessage message = new DocumentPipelineMessage(1L, "process-1", 1, LocalDateTime.now());
+        DocumentPipelineMessage message = new DocumentPipelineMessage(1L, 2L, "process-1", 10L, 2,
+                LocalDateTime.now());
         DocumentTaskOutboxDO failed = DocumentTaskOutboxDO.builder()
-                .outboxId(10L).documentId(1L).processId("process-1")
+                .outboxId(10L).documentId(1L).documentVersionId(2L).processId("process-1")
                 .messageBody(objectMapper.writeValueAsString(message)).build();
         DocumentTaskOutboxDO succeeded = DocumentTaskOutboxDO.builder()
-                .outboxId(11L).documentId(1L).processId("process-1")
+                .outboxId(11L).documentId(1L).documentVersionId(2L).processId("process-1")
                 .messageBody(objectMapper.writeValueAsString(message)).build();
         when(outboxService.claimPublishableMessages(any(), any())).thenReturn(List.of(failed, succeeded));
         when(messagePublisher.publish(any(), any(), any()))
