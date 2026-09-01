@@ -1,8 +1,10 @@
 package com.nexarag.retrieval.repository;
 
 import com.nexarag.document.enums.ChunkStatus;
+import com.nexarag.document.model.bo.DocumentChunkIndexWriteBO;
 import com.nexarag.document.model.entity.DocumentChunk;
 import com.nexarag.document.service.DocumentChunkService;
+import com.nexarag.retrieval.model.DocumentVersionChunkIndexContext;
 import com.nexarag.retrieval.model.IndexableChunk;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
@@ -18,6 +20,24 @@ import java.util.List;
 public class ChunkIndexRepositoryImpl implements ChunkIndexRepository {
 
     private final DocumentChunkService documentChunkService;
+
+    @Override
+    public DocumentVersionChunkIndexContext loadIndexContext(Long documentId, Long documentVersionId) {
+        // 1. 单次读取目标版本片段，避免待索引和跳过索引统计重复访问数据库。
+        List<DocumentChunk> chunks = documentChunkService.listByDocumentVersionId(documentVersionId).stream()
+                .filter(chunk -> documentId.equals(chunk.getDocumentId()))
+                .toList();
+        List<IndexableChunk> indexableChunks = chunks.stream()
+                .filter(chunk -> !Integer.valueOf(1).equals(chunk.getSkipIndex()))
+                .filter(chunk -> chunk.getStatus() == ChunkStatus.PENDING_INDEX || chunk.getStatus() == ChunkStatus.FAILED)
+                .map(this::toIndexableChunk)
+                .toList();
+        int skippedChunkCount = (int) chunks.stream()
+                .filter(chunk -> Integer.valueOf(1).equals(chunk.getSkipIndex())
+                        || chunk.getStatus() == ChunkStatus.SKIP_INDEX)
+                .count();
+        return new DocumentVersionChunkIndexContext(indexableChunks, skippedChunkCount);
+    }
 
     /**
      * 查询指定文档版本中需要写入索引的片段。
@@ -70,6 +90,11 @@ public class ChunkIndexRepositoryImpl implements ChunkIndexRepository {
     @Override
     public void markIndexed(String chunkId, String vectorId, String keywordIndexId) {
         documentChunkService.markChunkIndexed(chunkId, vectorId, keywordIndexId);
+    }
+
+    @Override
+    public void batchMarkIndexed(List<DocumentChunkIndexWriteBO> chunks) {
+        documentChunkService.batchMarkChunksIndexed(chunks);
     }
 
     /**

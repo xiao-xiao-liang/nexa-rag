@@ -6,9 +6,11 @@ import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nexarag.common.exception.ServiceException;
+import com.nexarag.document.constants.DocumentIndexingConstants;
 import com.nexarag.document.enums.ChunkStatus;
 import com.nexarag.document.enums.DocumentErrorCode;
 import com.nexarag.document.mapper.DocumentChunkMapper;
+import com.nexarag.document.model.bo.DocumentChunkIndexWriteBO;
 import com.nexarag.document.model.bo.split.ChunkDraft;
 import com.nexarag.document.model.entity.DocumentChunk;
 import com.nexarag.document.service.DocumentChunkService;
@@ -124,6 +126,23 @@ public class DocumentChunkServiceImpl extends ServiceImpl<DocumentChunkMapper, D
                 .set(DocumentChunk::getKeywordIndexId, keywordIndexId)
                 .set(DocumentChunk::getFailureReason, null)
                 .update();
+    }
+
+    /**
+     * 批量标记片段索引成功，控制单条 SQL 的参数数量。
+     *
+     * @param chunks 待回写的片段集合
+     */
+    @Override
+    public void batchMarkChunksIndexed(List<DocumentChunkIndexWriteBO> chunks) {
+        if (chunks == null || chunks.isEmpty()) {
+            return;
+        }
+        // 1. 按固定上限拆分，避免超长 CASE WHEN 语句占用连接和解析时间。
+        for (int start = 0; start < chunks.size(); start += DocumentIndexingConstants.INDEX_STATUS_UPDATE_BATCH_SIZE) {
+            int end = Math.min(start + DocumentIndexingConstants.INDEX_STATUS_UPDATE_BATCH_SIZE, chunks.size());
+            baseMapper.batchMarkIndexed(chunks.subList(start, end));
+        }
     }
 
     /**

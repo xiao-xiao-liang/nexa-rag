@@ -4,6 +4,7 @@ import com.nexarag.common.exception.ClientException;
 import com.nexarag.common.exception.ServiceException;
 import com.nexarag.document.enums.DocumentErrorCode;
 import com.nexarag.document.enums.DocumentVersionStatus;
+import com.nexarag.document.model.bo.DocumentChunkIndexWriteBO;
 import com.nexarag.document.model.entity.DocumentVersionDO;
 import com.nexarag.document.service.DocumentService;
 import com.nexarag.document.service.DocumentVersionService;
@@ -71,8 +72,9 @@ public class DocumentIndexServiceImpl implements DocumentIndexService {
         boolean vectorEnabled = config.enabled() && config.vectorEnabled();
         boolean keywordEnabled = config.enabled() && config.keywordEnabled();
         chunkIndexRepository.markSkipped(documentId, documentVersionId);
-        List<IndexableChunk> chunks = chunkIndexRepository.listIndexableChunks(documentId, documentVersionId);
-        int skippedChunkCount = chunkIndexRepository.listSkippedChunks(documentId, documentVersionId).size();
+        DocumentVersionChunkIndexContext indexContext = chunkIndexRepository.loadIndexContext(documentId, documentVersionId);
+        List<IndexableChunk> chunks = indexContext.indexableChunks();
+        int skippedChunkCount = indexContext.skippedChunkCount();
         if (chunks.isEmpty()) {
             if (vectorEnabled) {
                 documentVectorStore.replaceDocumentVersion(documentId, documentVersionId, List.of());
@@ -120,8 +122,9 @@ public class DocumentIndexServiceImpl implements DocumentIndexService {
         boolean vectorEnabled = config.enabled() && config.vectorEnabled();
         boolean keywordEnabled = config.enabled() && config.keywordEnabled();
         chunkIndexRepository.markSkipped(documentId, documentVersionId);
-        List<IndexableChunk> chunks = chunkIndexRepository.listIndexableChunks(documentId, documentVersionId);
-        int skippedChunkCount = chunkIndexRepository.listSkippedChunks(documentId, documentVersionId).size();
+        DocumentVersionChunkIndexContext indexContext = chunkIndexRepository.loadIndexContext(documentId, documentVersionId);
+        List<IndexableChunk> chunks = indexContext.indexableChunks();
+        int skippedChunkCount = indexContext.skippedChunkCount();
         if (chunks.isEmpty()) {
             if (vectorEnabled) {
                 documentVectorStore.replaceDocumentVersion(documentId, documentVersionId, List.of());
@@ -150,12 +153,14 @@ public class DocumentIndexServiceImpl implements DocumentIndexService {
 
     private List<DocumentChunkIndexResult> markIndexedWithoutExternalIndex(List<IndexableChunk> chunks) {
         List<DocumentChunkIndexResult> results = new ArrayList<>();
+        List<DocumentChunkIndexWriteBO> indexedChunks = new ArrayList<>();
         for (IndexableChunk chunk : chunks) {
             // 1. 索引禁用时仍推进片段状态，表示入库流水线已完成
-            chunkIndexRepository.markIndexed(chunk.chunkId(), null, null);
+            indexedChunks.add(new DocumentChunkIndexWriteBO(chunk.chunkId(), null, null));
             results.add(new DocumentChunkIndexResult(chunk.chunkId(), chunk.sectionId(), chunk.indexContent(),
                     true, false, null, null, null));
         }
+        chunkIndexRepository.batchMarkIndexed(indexedChunks);
         return results;
     }
 
@@ -170,6 +175,7 @@ public class DocumentIndexServiceImpl implements DocumentIndexService {
         IndexWriteState keywordState = keywordEnabled
                 ? writeVersionKeywordIndex(documentId, documentVersionId, chunks, config) : IndexWriteState.empty();
         List<DocumentChunkIndexResult> results = new ArrayList<>();
+        List<DocumentChunkIndexWriteBO> indexedChunks = new ArrayList<>();
         for (IndexableChunk chunk : chunks) {
             String vectorId = vectorState.ids().get(chunk.chunkId());
             String keywordIndexId = keywordState.ids().get(chunk.chunkId());
@@ -181,10 +187,11 @@ public class DocumentIndexServiceImpl implements DocumentIndexService {
                         false, false, vectorId, keywordIndexId, failureReason));
                 continue;
             }
-            chunkIndexRepository.markIndexed(chunk.chunkId(), vectorId, keywordIndexId);
+            indexedChunks.add(new DocumentChunkIndexWriteBO(chunk.chunkId(), vectorId, keywordIndexId));
             results.add(new DocumentChunkIndexResult(chunk.chunkId(), chunk.sectionId(), chunk.indexContent(),
                     true, false, vectorId, keywordIndexId, null));
         }
+        chunkIndexRepository.batchMarkIndexed(indexedChunks);
         return results;
     }
 

@@ -2,6 +2,7 @@ package com.nexarag.document.service;
 
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.service.IService;
+import com.nexarag.document.model.bo.DocumentChunkIndexWriteBO;
 import com.nexarag.document.model.bo.split.ChunkDraft;
 import com.nexarag.document.model.entity.DocumentChunk;
 
@@ -74,6 +75,13 @@ public interface DocumentChunkService extends IService<DocumentChunk> {
      * @param keywordIndexId 关键词索引ID
      */
     void markChunkIndexed(String chunkId, String vectorId, String keywordIndexId);
+
+    /**
+     * 批量标记片段索引成功并回写索引ID。
+     *
+     * @param chunks 待回写的片段集合
+     */
+    void batchMarkChunksIndexed(List<DocumentChunkIndexWriteBO> chunks);
 
     /**
      * 标记片段索引失败。
