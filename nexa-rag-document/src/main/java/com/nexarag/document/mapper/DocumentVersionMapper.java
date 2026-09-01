@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import com.nexarag.document.model.entity.DocumentVersionDO;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
+import org.apache.ibatis.annotations.Select;
 import org.apache.ibatis.annotations.Update;
 
 /**
@@ -11,6 +12,19 @@ import org.apache.ibatis.annotations.Update;
  */
 @Mapper
 public interface DocumentVersionMapper extends BaseMapper<DocumentVersionDO> {
+
+    /**
+     * 查询指定文档当前最大的业务修订号。
+     *
+     * @param documentId 文档ID
+     * @return 最大修订号；不存在版本时返回0
+     */
+    @Select("""
+            SELECT COALESCE(MAX(revision_no), 0)
+            FROM document_version
+            WHERE document_id = #{documentId}
+            """)
+    Long selectMaxRevisionNo(@Param("documentId") Long documentId);
 
     /**
      * 仅在当前处理轮次仍处于切分完成状态时标记为索引中。
@@ -46,11 +60,11 @@ public interface DocumentVersionMapper extends BaseMapper<DocumentVersionDO> {
     /**
      * 记录指定版本、指定处理轮次的消息消费状态。
      *
-     * @param documentId 文档ID
+     * @param documentId        文档ID
      * @param documentVersionId 文档版本ID
-     * @param processId 处理轮次ID
-     * @param messageId 消息ID
-     * @param consumedTimes 当前消息累计消费次数
+     * @param processId         处理轮次ID
+     * @param messageId         消息ID
+     * @param consumedTimes     当前消息累计消费次数
      * @return 受影响行数，1表示处理边界仍有效
      */
     @Update("""
@@ -135,7 +149,9 @@ public interface DocumentVersionMapper extends BaseMapper<DocumentVersionDO> {
                           @Param("messageId") String messageId,
                           @Param("failureTime") java.time.LocalDateTime failureTime);
 
-    /** 将最终失败版本以新的处理轮次重新入队。 */
+    /**
+     * 将最终失败版本以新的处理轮次重新入队。
+     */
     @Update("""
             UPDATE document_version
             SET status = 'QUEUED', process_id = #{processId}, message_status = 'PENDING_PUBLISH',
@@ -150,7 +166,9 @@ public interface DocumentVersionMapper extends BaseMapper<DocumentVersionDO> {
                            @Param("processId") String processId,
                            @Param("operator") String operator);
 
-    /** 将非生效、非构建版本标记为永久删除中。 */
+    /**
+     * 将非生效、非构建版本标记为永久删除中。
+     */
     @Update("""
             UPDATE document_version
             SET status = 'DELETING', cleanup_status = 'PENDING', cleanup_retry_count = 0,
@@ -162,7 +180,9 @@ public interface DocumentVersionMapper extends BaseMapper<DocumentVersionDO> {
                      @Param("documentVersionId") Long documentVersionId,
                      @Param("operator") String operator);
 
-    /** 将逻辑删除文档下的单个版本标记为删除中，不限制该版本此前的处理阶段。 */
+    /**
+     * 将逻辑删除文档下的单个版本标记为删除中，不限制该版本此前的处理阶段。
+     */
     @Update("""
             UPDATE document_version
             SET status = 'DELETING', cleanup_status = 'PENDING', cleanup_retry_count = 0,

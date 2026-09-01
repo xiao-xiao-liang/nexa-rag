@@ -7,9 +7,9 @@ import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.nexarag.common.exception.ClientException;
 import com.nexarag.common.web.PageVO;
 import com.nexarag.document.enums.DocumentErrorCode;
+import com.nexarag.document.enums.DocumentTaskStatus;
 import com.nexarag.document.enums.DocumentVersionOperationType;
 import com.nexarag.document.enums.DocumentVersionStatus;
-import com.nexarag.document.enums.DocumentTaskStatus;
 import com.nexarag.document.mapper.DocumentMapper;
 import com.nexarag.document.mapper.DocumentVersionMapper;
 import com.nexarag.document.mapper.DocumentVersionOperationLogMapper;
@@ -32,10 +32,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import static com.nexarag.document.constants.DocumentConstants.DEFAULT_PAGE_SIZE;
-import static com.nexarag.document.constants.DocumentConstants.MAX_PAGE_SIZE;
-import static com.nexarag.document.constants.DocumentConstants.MAX_RETRY_COUNT;
-import static com.nexarag.document.constants.DocumentConstants.SYSTEM_OPERATOR;
+import static com.nexarag.document.constants.DocumentConstants.*;
 
 /**
  * 文档版本服务实现，为上传、重试和发布流程提供版本级的一致性边界。
@@ -456,9 +453,8 @@ public class DocumentVersionServiceImpl extends ServiceImpl<DocumentVersionMappe
     }
 
     private long nextRevisionNo(Long documentId) {
-        Long versionCount = documentVersionMapper.selectCount(new LambdaQueryWrapper<DocumentVersionDO>()
-                .eq(DocumentVersionDO::getDocumentId, documentId));
-        return (versionCount == null ? 0 : versionCount) + 1;
+        Long maxRevisionNo = documentVersionMapper.selectMaxRevisionNo(documentId);
+        return (maxRevisionNo == null ? 0 : maxRevisionNo) + 1;
     }
 
     private void validateCreateRequest(Long documentId, DocumentVersionUploadDTO upload, String processId) {
