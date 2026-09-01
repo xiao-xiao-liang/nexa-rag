@@ -164,7 +164,7 @@ public class SpringAiDocumentVectorStore implements DocumentVectorStore {
         if (!StringUtils.hasText(chunk.chunkId()) || !StringUtils.hasText(chunk.indexContent())) {
             throw new IllegalArgumentException("向量索引片段缺少chunkId或indexContent");
         }
-        Map<String, Object> metadata = new HashMap<>();
+        Map<String, Object> metadata = new HashMap<>(8);
         metadata.put(DOCUMENT_ID, chunk.documentId());
         putIfNotNull(metadata, DOCUMENT_VERSION_ID, chunk.documentVersionId());
         putIfNotNull(metadata, PARENT_CHUNK_ID, chunk.parentChunkId());
