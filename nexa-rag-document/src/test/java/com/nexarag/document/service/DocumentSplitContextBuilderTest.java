@@ -2,6 +2,7 @@ package com.nexarag.document.service;
 
 import com.nexarag.document.enums.FileType;
 import com.nexarag.document.model.entity.Document;
+import com.nexarag.document.model.entity.DocumentVersionDO;
 import com.nexarag.document.model.bo.split.DocumentSplitContext;
 import com.nexarag.infra.storage.service.FileStorageService;
 import org.junit.jupiter.api.Test;
@@ -24,6 +25,10 @@ class DocumentSplitContextBuilderTest {
         Document document = Document.builder()
                 .documentId(1L)
                 .title("测试文档")
+                .build();
+        DocumentVersionDO documentVersion = DocumentVersionDO.builder()
+                .documentId(1L)
+                .documentVersionId(2L)
                 .originalFileName("测试.pdf")
                 .fileType(FileType.PDF)
                 .originalObjectName("original/test.pdf")
@@ -39,7 +44,7 @@ class DocumentSplitContextBuilderTest {
         DocumentSplitContextBuilder builder = new DocumentSplitContextBuilder(fileStorageService,
                 new ProcessConfigDefaults());
 
-        DocumentSplitContext context = builder.build(document);
+        DocumentSplitContext context = builder.build(document, documentVersion);
 
         assertThat(context.structureArtifacts()).singleElement().satisfies(artifact -> {
             assertThat(artifact.type()).isEqualTo("MINERU_MIDDLE_JSON");

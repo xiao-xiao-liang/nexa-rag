@@ -1,8 +1,8 @@
 package com.nexarag.document.service.impl;
 
 import com.nexarag.document.model.dto.ExternalDocumentSubmitDTO;
-import com.nexarag.document.model.entity.Document;
-import com.nexarag.document.enums.DocumentStatus;
+import com.nexarag.document.model.entity.DocumentVersionDO;
+import com.nexarag.document.enums.DocumentVersionStatus;
 import com.nexarag.document.service.DocumentPipelineSubmitService;
 import com.nexarag.infra.enums.ExternalDocumentSourceType;
 import com.nexarag.infra.source.ExternalDocumentSourceService;
@@ -23,15 +23,16 @@ class ExternalDocumentSubmitServiceImplTest {
         DocumentPipelineSubmitService pipelineService = mock(DocumentPipelineSubmitService.class);
         when(sourceService.validateAndExtractDocumentId(ExternalDocumentSourceType.YUQUE, "https://www.yuque.com/a/b"))
                 .thenReturn("b");
-        when(pipelineService.createAndSubmit(any(), any(), any())).thenReturn(Document.builder()
-                .documentId(1L).processId("process-1").status(DocumentStatus.QUEUED).build());
+        when(pipelineService.createAndSubmit(any(), any(), any(), any())).thenReturn(DocumentVersionDO.builder()
+                .documentId(1L).documentVersionId(101L).processId("process-1")
+                .status(DocumentVersionStatus.QUEUED).build());
 
         var result = new ExternalDocumentSubmitServiceImpl(sourceService, pipelineService, new com.nexarag.document.service.ProcessConfigDefaults())
                 .submit(10L, new ExternalDocumentSubmitDTO(ExternalDocumentSourceType.YUQUE, "标题", null,
-                        "https://www.yuque.com/a/b", null, null, null));
+                        "https://www.yuque.com/a/b", null, null, null), "alice");
 
         assertThat(result.documentId()).isEqualTo(1L);
         verify(sourceService).validateAndExtractDocumentId(ExternalDocumentSourceType.YUQUE, "https://www.yuque.com/a/b");
-        verify(pipelineService).createAndSubmit(any(), any(), any());
+        verify(pipelineService).createAndSubmit(any(), any(), any(), org.mockito.ArgumentMatchers.eq("alice"));
     }
 }

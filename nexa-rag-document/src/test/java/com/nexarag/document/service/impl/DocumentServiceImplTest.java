@@ -2,366 +2,130 @@ package com.nexarag.document.service.impl;
 
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
-import com.baomidou.mybatisplus.extension.conditions.update.LambdaUpdateChainWrapper;
-import com.nexarag.common.web.PageVO;
-import com.nexarag.document.model.dto.CreateDocumentRequest;
-import com.nexarag.document.model.dto.ProcessDocumentRequest;
-import com.nexarag.document.model.dto.SplitConfigRequest;
-import com.nexarag.document.model.entity.Document;
 import com.nexarag.document.enums.DocumentStatus;
+import com.nexarag.document.enums.DocumentVersionStatus;
 import com.nexarag.document.enums.FileType;
-import com.nexarag.document.enums.SplitStrategy;
-import com.nexarag.common.exception.ClientException;
-import com.nexarag.common.exception.ServiceException;
-import com.nexarag.infra.enums.ExternalDocumentSourceType;
+import com.nexarag.document.model.dto.CreateDocumentRequest;
+import com.nexarag.document.model.entity.Document;
+import com.nexarag.document.model.entity.DocumentVersionDO;
+import com.nexarag.document.model.vo.DocumentProcessStatusVO;
 import com.nexarag.document.model.vo.DocumentSummaryVO;
-import com.nexarag.document.model.vo.DocumentOverviewVO;
 import com.nexarag.document.service.DocumentChunkService;
 import com.nexarag.document.service.DocumentDeleteTaskService;
-import com.nexarag.infra.config.DocumentPipelineMessagingProperties;
+import com.nexarag.document.service.DocumentVersionService;
+import com.nexarag.document.service.KnowledgeBaseService;
 import org.junit.jupiter.api.Test;
 
-import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyBoolean;
-import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.doThrow;
-import static org.mockito.Mockito.mockingDetails;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /**
- * 文档服务实现测试。
+ * 文档稳定身份服务测试。
  */
 class DocumentServiceImplTest {
 
     @Test
-    void createDocumentShouldUseUploadedStatus() {
-        TestableDocumentServiceImpl documentService = new TestableDocumentServiceImpl();
+    void createDocumentShouldOnlyPersistStableIdentityFields() {
+        TestableDocumentServiceImpl service = new TestableDocumentServiceImpl();
 
-        Document document = documentService.createDocument(new CreateDocumentRequest(
+        Document document = service.createDocument(new CreateDocumentRequest(
                 "测试文档", "描述", "demo.pdf", "original/demo.pdf", "minio://demo.pdf", 100L));
 
-        assertThat(document.getStatus()).isEqualTo(DocumentStatus.UPLOADED);
-        assertThat(document.getOriginalFileName()).isEqualTo("demo.pdf");
-        assertThat(document.getOriginalObjectName()).isEqualTo("original/demo.pdf");
-        assertThat(documentService.savedDocument).isSameAs(document);
+        assertThat(document.getDocumentId()).isNotNull();
+        assertThat(document.getTitle()).isEqualTo("测试文档");
+        assertThat(document.getActiveVersionId()).isNull();
+        assertThat(document.getBuildingVersionId()).isNull();
+        assertThat(document.getActivationGeneration()).isZero();
+        assertThat(service.savedDocument).isSameAs(document);
     }
 
     @Test
-    void submitProcessShouldTransferToQueued() {
-        TestableDocumentServiceImpl documentService = new TestableDocumentServiceImpl();
-        documentService.existingDocument = Document.builder()
-                .documentId(1L)
-                .status(DocumentStatus.UPLOADED)
-                .retryCount(0)
-                .maxRetryCount(3)
-                .build();
-
-        Document document = documentService.submitProcess(1L,
-                new ProcessDocumentRequest(new SplitConfigRequest(SplitStrategy.PARENT_MARKDOWN, 1000, 100)),
-                "process-1");
-
-        assertThat(document.getStatus()).isEqualTo(DocumentStatus.QUEUED);
-        assertThat(document.getQueueStage()).isEqualTo("PIPELINE");
-        assertThat(document.getProcessConfigJson()).contains("PARENT_MARKDOWN");
-        assertThat(document.getRetryCount()).isZero();
-        assertThat(document.getMaxRetryCount()).isEqualTo(5);
-        assertThat(document.getLastRetryTime()).isNull();
-        assertThat(documentService.updatedDocument).isSameAs(document);
-    }
-
-    @Test
-    void submitProcessShouldRejectWhenStatusChangedConcurrently() {
-        TestableDocumentServiceImpl documentService = new TestableDocumentServiceImpl();
-        documentService.updateResult = false;
-        documentService.existingDocument = Document.builder()
-                .documentId(1L)
-                .status(DocumentStatus.UPLOADED)
-                .retryCount(0)
-                .maxRetryCount(3)
-                .build();
-
-        assertThatThrownBy(() -> documentService.submitProcess(1L, null, "process-1"))
-                .isInstanceOf(ClientException.class);
-    }
-
-    @Test
-    void recordProcessFailureShouldAutoRequeueBeforeRetryLimit() {
-        TestableDocumentServiceImpl documentService = new TestableDocumentServiceImpl();
-        documentService.existingDocument = Document.builder()
-                .documentId(1L)
-                .status(DocumentStatus.PARSING)
-                .retryCount(0)
-                .maxRetryCount(3)
-                .build();
-
-        Document document = documentService.recordProcessFailure(1L, "PARSE", "解析失败", "MinerU调用失败");
-
-        assertThat(document.getStatus()).isEqualTo(DocumentStatus.QUEUED);
-        assertThat(document.getQueueStage()).isEqualTo("PIPELINE");
-        assertThat(document.getRetryCount()).isEqualTo(1);
-        assertThat(document.getLastRetryTime()).isNotNull();
-        assertThat(document.getFailureStage()).isEqualTo("PARSE");
-        assertThat(document.getFailureReason()).isEqualTo("解析失败");
-        assertThat(document.getFailureDetail()).isEqualTo("MinerU调用失败");
-        assertThat(documentService.failureUpdatedDocument).isSameAs(document);
-    }
-
-    @Test
-    void recordProcessFailureShouldMarkFailedWhenRetryLimitReached() {
-        TestableDocumentServiceImpl documentService = new TestableDocumentServiceImpl();
-        documentService.existingDocument = Document.builder()
-                .documentId(1L)
-                .status(DocumentStatus.PARSING)
-                .retryCount(3)
-                .maxRetryCount(3)
-                .build();
-
-        Document document = documentService.recordProcessFailure(1L, "PARSE", "解析失败", "MinerU调用失败");
-
-        assertThat(document.getStatus()).isEqualTo(DocumentStatus.FAILED);
-        assertThat(document.getRetryCount()).isEqualTo(3);
-        assertThat(document.getProcessEndTime()).isNotNull();
-        assertThat(document.getFailureStage()).isEqualTo("PARSE");
-        assertThat(document.getFailureReason()).isEqualTo("解析失败");
-        assertThat(document.getFailureDetail()).isEqualTo("MinerU调用失败");
-        assertThat(documentService.failureUpdatedDocument).isSameAs(document);
-    }
-
-    @Test
-    void retryProcessShouldRequeueFailedDocumentAfterAutoRetryLimit() {
-        TestableDocumentServiceImpl documentService = new TestableDocumentServiceImpl();
-        documentService.existingDocument = Document.builder()
-                .documentId(1L)
-                .status(DocumentStatus.FAILED)
-                .retryCount(3)
-                .maxRetryCount(3)
-                .failureStage("PARSE")
-                .failureReason("解析失败")
-                .failureDetail("MinerU调用失败")
-                .build();
-
-        Document document = documentService.retryProcess(1L, "process-2");
-
-        assertThat(document.getStatus()).isEqualTo(DocumentStatus.QUEUED);
-        assertThat(document.getQueueStage()).isEqualTo("PIPELINE");
-        assertThat(document.getRetryCount()).isZero();
-        assertThat(document.getMaxRetryCount()).isEqualTo(5);
-        assertThat(document.getLastRetryTime()).isNull();
-        assertThat(document.getProcessEndTime()).isNull();
-        assertThat(document.getFailureStage()).isNull();
-        assertThat(document.getFailureReason()).isNull();
-        assertThat(document.getFailureDetail()).isNull();
-        assertThat(documentService.retryUpdatedDocument).isSameAs(document);
-    }
-
-    @Test
-    void recordMessageConsumptionShouldRecordFirstAttemptWithoutRetryTime() {
-        TestableDocumentServiceImpl documentService = new TestableDocumentServiceImpl();
-
-        assertThat(documentService.recordMessageConsumption(1L, "process-1", "message-1", 1)).isTrue();
-
-        verify(documentService.updateChain).set(any(), eq(1));
-        verify(documentService.updateChain).set(any(), eq(0));
-        verify(documentService.updateChain).set(any(), eq("message-1"));
-        verify(documentService.updateChain).set(eq(false), any(), isNull());
-    }
-
-    @Test
-    void recordMessageConsumptionShouldRecordRetryCountAndRetryTime() {
-        TestableDocumentServiceImpl documentService = new TestableDocumentServiceImpl();
-
-        assertThat(documentService.recordMessageConsumption(1L, "process-1", "message-1", 3)).isTrue();
-
-        verify(documentService.updateChain).set(any(), eq(3));
-        verify(documentService.updateChain).set(any(), eq(2));
-        verify(documentService.updateChain).set(any(), eq("message-1"));
-        verify(documentService.updateChain).set(eq(true), any(), any(LocalDateTime.class));
-    }
-
-    @Test
-    void markProcessFailedShouldPersistFinalConsumptionAndRetryContext() {
-        TestableDocumentServiceImpl documentService = new TestableDocumentServiceImpl();
-        LocalDateTime failureTime = LocalDateTime.now();
-
-        assertThat(documentService.markProcessFailed(1L, "process-1", "ROCKETMQ_RETRY_EXHAUSTED",
-                "RocketMQ自动重试已达上限", "消息进入死信队列",
-                6, "message-1", failureTime)).isTrue();
-
-        verify(documentService.updateChain).set(any(), eq(6));
-        verify(documentService.updateChain).set(any(), eq(5));
-        verify(documentService.updateChain).set(any(), eq("message-1"));
-        verify(documentService.updateChain).set(eq(true), any(), eq(failureTime));
-    }
-
-    @Test
-    void deleteDocumentShouldCreateCleanupTaskAfterSuccessfulDelete() {
-        TestableDocumentServiceImpl documentService = new TestableDocumentServiceImpl();
-        documentService.existingDocument = Document.builder()
-                .documentId(1L)
-                .status(DocumentStatus.UPLOADED)
-                .build();
-
-        when(documentService.deleteTaskService.createIndexCleanupTask(1L)).thenReturn(99L);
-        var deleted = documentService.deleteDocument(1L);
-
-        assertThat(deleted.deleted()).isTrue();
-        assertThat(deleted.cleanupOutboxId()).isEqualTo(99L);
-        assertThat(documentService.deleteDocumentId).isEqualTo(1L);
-        verify(documentService.documentChunkService).deleteByDocumentId(1L);
-        verify(documentService.deleteTaskService).createStorageCleanupTask(documentService.existingDocument);
-        verify(documentService.deleteTaskService).createIndexCleanupTask(1L);
-        assertThat(mockingDetails(documentService.deleteTaskService).getInvocations()).hasSize(2);
-    }
-
-    @Test
-    void createDocumentShouldAllowExternalSourceWithoutOriginalObject() {
-        TestableDocumentServiceImpl documentService = new TestableDocumentServiceImpl();
-
-        Document document = documentService.createDocument(CreateDocumentRequest.external(
-                "飞书测试文档", "描述", "feishu-docx-abc.md", ExternalDocumentSourceType.FEISHU,
-                "https://tenant.feishu.cn/docx/abc"));
-
-        assertThat(document.getOriginalObjectName()).isNull();
-        assertThat(document.getSourceType()).isEqualTo(ExternalDocumentSourceType.FEISHU);
-        assertThat(document.getSourceUrl()).isEqualTo("https://tenant.feishu.cn/docx/abc");
-        assertThat(document.getFileType()).isEqualTo(com.nexarag.document.enums.FileType.MARKDOWN);
-    }
-
-    @Test
-    void deleteDocumentShouldNotCreateCleanupTaskWhenChunkDeletionFails() {
-        TestableDocumentServiceImpl documentService = new TestableDocumentServiceImpl();
-        documentService.existingDocument = Document.builder()
-                .documentId(1L)
-                .status(DocumentStatus.UPLOADED)
-                .build();
-        ServiceException exception = new ServiceException("删除文档片段失败");
-        doThrow(exception).when(documentService.documentChunkService).deleteByDocumentId(1L);
-
-        assertThatThrownBy(() -> documentService.deleteDocument(1L))
-                .isSameAs(exception);
-
-        assertThat(documentService.deleteDocumentId).isEqualTo(1L);
-        verify(documentService.deleteTaskService, never()).createIndexCleanupTask(1L);
-    }
-
-    @Test
-    void deleteDocumentShouldNotCreateCleanupTaskWhenDeleteFails() {
-        TestableDocumentServiceImpl documentService = new TestableDocumentServiceImpl();
-        documentService.existingDocument = Document.builder()
-                .documentId(1L)
-                .status(DocumentStatus.UPLOADED)
-                .build();
-        documentService.deleteResult = false;
-
-        assertThat(documentService.deleteDocument(1L).deleted()).isFalse();
-
-        verify(documentService.deleteTaskService, never()).createIndexCleanupTask(any());
-    }
-
-    @Test
-    void pageDocumentsShouldReturnSummaryPageVO() {
-        TestableDocumentServiceImpl documentService = new TestableDocumentServiceImpl();
-        Document document = Document.builder()
-                .documentId(1L)
-                .title("测试文档")
-                .originalFileName("demo.pdf")
-                .status(DocumentStatus.UPLOADED)
-                .build();
+    void pageDocumentsShouldProjectActiveVersion() {
+        TestableDocumentServiceImpl service = new TestableDocumentServiceImpl();
+        Document document = Document.builder().documentId(1L).title("测试文档").activeVersionId(11L).build();
         Page<Document> page = Page.of(1, 20);
         page.setTotal(1);
         page.setRecords(List.of(document));
-        documentService.documentPage = page;
+        service.documentPage = page;
+        when(service.documentVersionService.findActiveVersions(List.of(document)))
+                .thenReturn(Map.of(1L, activeVersion(1L, 11L, "v1.md")));
 
-        PageVO<DocumentSummaryVO> result = documentService.pageDocuments(1, 20);
+        var result = service.pageDocuments(1, 20);
 
-        assertThat(result.getTotal()).isEqualTo(1);
-        assertThat(result.getCurrent()).isEqualTo(1);
-        assertThat(result.getSize()).isEqualTo(20);
-        assertThat(result.getRecords()).hasSize(1);
-        assertThat(result.getRecords().getFirst().documentId()).isEqualTo(1L);
+        DocumentSummaryVO summary = result.getRecords().getFirst();
+        assertThat(summary.originalFileName()).isEqualTo("v1.md");
+        assertThat(summary.fileSize()).isEqualTo(2048L);
+        assertThat(summary.status()).isEqualTo(DocumentStatus.INDEXED);
     }
 
     @Test
-    void getOverviewShouldCollectDocumentAndChunkStatistics() {
-        TestableDocumentServiceImpl documentService = new TestableDocumentServiceImpl();
-        documentService.existingDocument = Document.builder()
-                .documentId(1L)
-                .title("测试文档")
-                .description("描述")
-                .originalFileName("demo.pdf")
-                .fileType(FileType.PDF)
-                .fileSize(100L)
-                .status(DocumentStatus.INDEXED)
-                .sourceType(ExternalDocumentSourceType.LOCAL)
-                .processConfigJson("{\"splitConfig\":{\"splitStrategy\":\"PARENT_MARKDOWN\"}}")
-                .createTime(LocalDateTime.of(2026, 8, 13, 10, 0))
-                .updateTime(LocalDateTime.of(2026, 8, 13, 11, 0))
+    void processStatusShouldProjectActiveVersionInsteadOfBuildingVersion() {
+        TestableDocumentServiceImpl service = new TestableDocumentServiceImpl();
+        service.existingDocument = Document.builder().documentId(1L).title("测试文档")
+                .activeVersionId(11L).buildingVersionId(12L).build();
+        when(service.documentVersionService.getActiveVersionOrNull(service.existingDocument))
+                .thenReturn(activeVersion(1L, 11L, "v1.md").toBuilder().processId("v1-process").build());
+
+        DocumentProcessStatusVO status = service.getProcessStatus(1L);
+
+        assertThat(status.processId()).isEqualTo("v1-process");
+        assertThat(status.status()).isEqualTo(DocumentStatus.INDEXED);
+    }
+
+    @Test
+    void deleteDocumentShouldCreateOneIndexCleanupTaskPerVersion() {
+        TestableDocumentServiceImpl service = new TestableDocumentServiceImpl();
+        service.existingDocument = Document.builder().documentId(1L).build();
+        when(service.documentVersionService.markAllVersionsDeleting(1L, "alice"))
+                .thenReturn(List.of(activeVersion(1L, 11L, "v1.md"), activeVersion(1L, 12L, "v2.md")));
+        when(service.deleteTaskService.createVersionIndexCleanupTask(1L, 11L)).thenReturn(99L);
+        when(service.deleteTaskService.createVersionIndexCleanupTask(1L, 12L)).thenReturn(100L);
+
+        var deleted = service.deleteDocument(1L, "alice");
+
+        assertThat(deleted.deleted()).isTrue();
+        assertThat(deleted.cleanupOutboxId()).isEqualTo(99L);
+        verify(service.deleteTaskService).createVersionIndexCleanupTask(1L, 11L);
+        verify(service.deleteTaskService).createVersionIndexCleanupTask(1L, 12L);
+        verify(service.documentVersionService).markAllVersionsDeleting(1L, "alice");
+    }
+
+    private static DocumentVersionDO activeVersion(Long documentId, Long documentVersionId, String fileName) {
+        return DocumentVersionDO.builder()
+                .documentId(documentId)
+                .documentVersionId(documentVersionId)
+                .originalFileName(fileName)
+                .fileType(FileType.MARKDOWN)
+                .fileSize(2048L)
+                .status(DocumentVersionStatus.INDEX_READY)
                 .build();
-        when(documentService.documentChunkService.count(any())).thenReturn(9L, 4L, 1L, 1L, 3L);
-
-        DocumentOverviewVO overview = documentService.getOverview(1L);
-
-        assertThat(overview.documentId()).isEqualTo(1L);
-        assertThat(overview.status()).isEqualTo(DocumentStatus.INDEXED);
-        assertThat(overview.sourceType()).isEqualTo(ExternalDocumentSourceType.LOCAL);
-        assertThat(overview.processConfigJson()).contains("PARENT_MARKDOWN");
-        assertThat(overview.createTime()).isEqualTo(LocalDateTime.of(2026, 8, 13, 10, 0));
-        assertThat(overview.chunkStatistics().total()).isEqualTo(9L);
-        assertThat(overview.chunkStatistics().indexed()).isEqualTo(4L);
-        assertThat(overview.chunkStatistics().failed()).isEqualTo(1L);
-        assertThat(overview.chunkStatistics().skipped()).isEqualTo(1L);
-        assertThat(overview.chunkStatistics().pending()).isEqualTo(3L);
     }
 
     private static class TestableDocumentServiceImpl extends DocumentServiceImpl {
 
         private Document existingDocument;
         private Document savedDocument;
-        private Document updatedDocument;
-        private Document failureUpdatedDocument;
-        private Document retryUpdatedDocument;
-        private Long deleteDocumentId;
-        private boolean deleteResult = true;
         private IPage<Document> documentPage;
-        private boolean updateResult = true;
-        private final LambdaUpdateChainWrapper<Document> updateChain = mock(LambdaUpdateChainWrapper.class);
-        private final DocumentChunkService documentChunkService;
         private final DocumentDeleteTaskService deleteTaskService;
+        private final DocumentVersionService documentVersionService;
 
         private TestableDocumentServiceImpl() {
-            this(mock(DocumentChunkService.class), mock(DocumentDeleteTaskService.class));
+            this(mock(DocumentChunkService.class), mock(DocumentDeleteTaskService.class),
+                    mock(KnowledgeBaseService.class), mock(DocumentVersionService.class));
         }
 
         private TestableDocumentServiceImpl(DocumentChunkService documentChunkService,
-                                            DocumentDeleteTaskService deleteTaskService) {
-            super(messagingProperties(), documentChunkService, deleteTaskService);
-            this.documentChunkService = documentChunkService;
+                                            DocumentDeleteTaskService deleteTaskService,
+                                            KnowledgeBaseService knowledgeBaseService,
+                                            DocumentVersionService documentVersionService) {
+            super(documentChunkService, deleteTaskService, knowledgeBaseService, documentVersionService);
             this.deleteTaskService = deleteTaskService;
-            when(updateChain.eq(any(), any())).thenReturn(updateChain);
-            when(updateChain.notIn(any(), any(Object[].class))).thenReturn(updateChain);
-            when(updateChain.set(any(), any())).thenReturn(updateChain);
-            when(updateChain.set(anyBoolean(), any(), any())).thenReturn(updateChain);
-            when(updateChain.update()).thenReturn(true);
-        }
-
-        private static DocumentPipelineMessagingProperties messagingProperties() {
-            DocumentPipelineMessagingProperties properties = new DocumentPipelineMessagingProperties();
-            properties.setMaxReconsumeTimes(5);
-            return properties;
-        }
-
-        @Override
-        public LambdaUpdateChainWrapper<Document> lambdaUpdate() {
-            return updateChain;
+            this.documentVersionService = documentVersionService;
         }
 
         @Override
@@ -376,33 +140,8 @@ class DocumentServiceImplTest {
         }
 
         @Override
-        public boolean updateById(Document entity) {
-            this.updatedDocument = entity;
-            return true;
-        }
-
-        @Override
-        protected boolean documentStatusUpdateFailed(Document document, DocumentStatus oldStatus) {
-            this.updatedDocument = document;
-            return !updateResult;
-        }
-
-        @Override
-        protected boolean documentFailureUpdateFailed(Document document, DocumentStatus oldStatus) {
-            this.failureUpdatedDocument = document;
-            return !updateResult;
-        }
-
-        @Override
-        protected boolean documentRetryUpdateFailed(Document document, DocumentStatus oldStatus) {
-            this.retryUpdatedDocument = document;
-            return !updateResult;
-        }
-
-        @Override
         protected boolean logicDeleteDocument(Long documentId) {
-            this.deleteDocumentId = documentId;
-            return deleteResult;
+            return true;
         }
 
         @Override

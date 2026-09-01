@@ -12,6 +12,7 @@ import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -91,5 +92,22 @@ class DocumentTaskAdminServiceImplTest {
         assertThat(message.outboxId()).isNotEqualTo(11L);
         assertThat(message.originalObjectName()).isEqualTo("original/demo.pdf");
         assertThat(message.parsedObjectName()).isEqualTo("parsed/demo.md");
+    }
+
+    @Test
+    void shouldRejectLegacyPipelineTaskWithoutDocumentVersionId() {
+        DocumentPipelineOutboxService outboxService = mock(DocumentPipelineOutboxService.class);
+        DocumentTaskOutboxDO failedTask = DocumentTaskOutboxDO.builder()
+                .outboxId(11L)
+                .documentId(1L)
+                .processId("operation-old")
+                .taskType(DocumentTaskType.PROCESS_DOCUMENT)
+                .taskStatus(DocumentTaskStatus.FAILED)
+                .build();
+        when(outboxService.getById(11L)).thenReturn(failedTask);
+        DocumentTaskAdminServiceImpl service = new DocumentTaskAdminServiceImpl(outboxService, new ObjectMapper());
+
+        assertThatThrownBy(() -> service.retryFailedTask(11L))
+                .hasMessageContaining("缺少文档版本边界");
     }
 }
