@@ -169,7 +169,7 @@ class RocketMqDocumentPipelinePublisherTest {
     }
 
     private DocumentPipelineMessage createMessage() {
-        return new DocumentPipelineMessage(DOCUMENT_ID, PROCESS_ID, 1,
+        return new DocumentPipelineMessage(DOCUMENT_ID, 2L, PROCESS_ID, null, 2,
                 LocalDateTime.of(2026, 7, 11, 10, 0));
     }
 }

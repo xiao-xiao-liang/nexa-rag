@@ -5,14 +5,16 @@ import java.time.LocalDateTime;
 /**
  * 文档流水线消息，描述需要进入异步处理流水线的文档及其处理批次。
  *
- * @param documentId 文档ID
- * @param processId 处理批次ID
- * @param outboxId 对应Outbox ID；历史消息允许为空
- * @param schemaVersion 消息结构版本
- * @param createdTime 消息创建时间
+ * @param documentId        文档ID
+ * @param documentVersionId 文档版本ID
+ * @param processId         处理批次ID
+ * @param outboxId          对应Outbox ID；历史消息允许为空
+ * @param schemaVersion     消息结构版本
+ * @param createdTime       消息创建时间
  */
 public record DocumentPipelineMessage(
         Long documentId,
+        Long documentVersionId,
         String processId,
         Long outboxId,
         Integer schemaVersion,
@@ -26,25 +28,22 @@ public record DocumentPipelineMessage(
         if (documentId == null || documentId <= 0) {
             throw new IllegalArgumentException("文档ID必须大于0");
         }
-        // 2. 校验处理批次ID
+        // 2. 文档处理消息必须精确绑定一个文档版本，禁止再按文档ID推断版本。
+        if (documentVersionId == null || documentVersionId <= 0) {
+            throw new IllegalArgumentException("文档版本ID必须大于0");
+        }
+        // 3. 校验处理批次ID
         if (processId == null || processId.isBlank()) {
             throw new IllegalArgumentException("处理批次ID不能为空");
         }
-        // 3. 校验消息结构版本
+        // 4. 校验消息结构版本
         if (schemaVersion == null || schemaVersion <= 0) {
             throw new IllegalArgumentException("消息结构版本必须大于0");
         }
-        // 4. 校验消息创建时间
+        // 5. 校验消息创建时间
         if (createdTime == null) {
             throw new IllegalArgumentException("消息创建时间不能为空");
         }
     }
 
-    /**
-     * 兼容未携带Outbox ID的历史处理消息。
-     */
-    public DocumentPipelineMessage(Long documentId, String processId, Integer schemaVersion,
-                                   LocalDateTime createdTime) {
-        this(documentId, processId, null, schemaVersion, createdTime);
-    }
 }
