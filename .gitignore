@@ -5,3 +5,4 @@ target/
 .vscode/
 *.log
 .worktrees/
+nexa-rag-boot/src/main/resources/application-dev.yml

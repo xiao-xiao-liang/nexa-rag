@@ -17,6 +17,8 @@ server:
 spring:
   application:
     name: nexa-rag
+  profiles:
+    active: dev
   mvc:
     async:
       request-timeout: -1
@@ -44,24 +46,24 @@ spring:
     enabled: false
   data:
     redis:
-      host: 192.168.31.11 # 127.0.0.1
-      port: 6379
-      password: 
+      host: ${NEXA_REDIS_HOST:}
+      port: ${NEXA_REDIS_PORT:}
+      password: ${NEXA_REDIS_PASSWORD:}
       timeout: 3s
   datasource:
     driver-class-name: com.mysql.cj.jdbc.Driver
-    url: jdbc:mysql://192.168.31.11:3306/nexa_rag?useUnicode=true&characterEncoding=utf8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true
-    username: root
-    password:  # root
+    url: ${NEXA_MYSQL_URL:}
+    username: ${NEXA_MYSQL_USERNAME:}
+    password: ${NEXA_MYSQL_PASSWORD:}
   elasticsearch:
-    uris: http://192.168.31.11:9200 # Spring Data Elasticsearch 连接地址。
-    username: elastic # Elasticsearch 用户名。
-    password:  # 123456 # Elasticsearch 密码。
+    uris: ${NEXA_ELASTICSEARCH_URIS:} # Spring Data Elasticsearch 连接地址。
+    username: ${NEXA_ELASTICSEARCH_USERNAME:} # Elasticsearch 用户名。
+    password: ${NEXA_ELASTICSEARCH_PASSWORD:} # Elasticsearch 密码。
     socket-timeout: 30s # Elasticsearch 请求超时时间。
 
 # RocketMQ连接配置。name-server为NameServer地址，多个地址使用分号分隔；producer.group为全局生产者组名称。
 rocketmq:
-  name-server: 118.195.146.161:9876 # RocketMQ NameServer地址，默认连接局域网开发环境。
+  name-server: ${NEXA_ROCKETMQ_NAME_SERVER:} # RocketMQ NameServer地址。
   producer:
     group: nexa-document-pipeline-producer # 文档流水线生产者组，同一应用集群应保持一致。
 
@@ -76,7 +78,7 @@ nexa:
       email: ${BOOTSTRAP_ADMIN_EMAIL:}
     oauth:
       # 对外 HTTPS 基址；平台后台必须为四个回调地址分别精确登记此基址下的固定路径。
-      public-base-url: ${OAUTH_PUBLIC_BASE_URL:https://xiaoxiaoliang.top}
+      public-base-url: ${OAUTH_PUBLIC_BASE_URL:}
       providers:
         qq:
           client-id: ${QQ_APP_ID:}
@@ -174,10 +176,10 @@ nexa:
   # 文件存储配置，用于控制文档原始文件和解析产物的存取位置。
   storage:
     type: MINIO # 存储类型，可选值：MINIO、RUSTFS、OSS、QINIU、LOCAL。
-    endpoint: http://192.168.31.11:9000 # http://127.0.0.1:9000 # 对象存储服务地址。
-    access-key:  # liang  # 对象存储访问密钥。
-    secret-key:  # liang123 # 对象存储访问密钥密码。
-    bucket: nexa-rag # 文档对象存储桶名称。
+    endpoint: ${NEXA_STORAGE_ENDPOINT:} # 对象存储服务地址。
+    access-key: ${NEXA_STORAGE_ACCESS_KEY:} # 对象存储访问密钥。
+    secret-key: ${NEXA_STORAGE_SECRET_KEY:} # 对象存储访问密钥密码。
+    bucket: ${NEXA_STORAGE_BUCKET:} # 文档对象存储桶名称。
     create-bucket: true # 存储桶不存在时是否自动创建，可选值：true、false。
 
   # 文档解析器配置，用于控制 MinerU、Tika 和直通解析器的启停及连接参数。
@@ -244,10 +246,10 @@ nexa:
       parent-context-neighbor-window-count: 1 # 未使用完整父片段时，每侧补充的相邻子片段数量。
     vector:
       type: milvus # 向量索引类型，可选值：milvus。
-      host: 192.168.31.11 # 101.132.158.169 # 向量索引服务地址。
-      port: 19530 # 向量索引服务端口。
-      database-name: nexa_rag # 向量库数据库名称，为空时使用默认数据库。
-      collection-name: nexa_document_chunk # 文档片段向量集合名称。
+      host: ${NEXA_MILVUS_HOST:} # 向量索引服务地址。
+      port: ${NEXA_MILVUS_PORT:} # 向量索引服务端口。
+      database-name: ${NEXA_MILVUS_DATABASE_NAME:} # 向量库数据库名称，为空时使用默认数据库。
+      collection-name: ${NEXA_MILVUS_COLLECTION_NAME:} # 文档片段向量集合名称。
       dimension: 1024 # 必须与当前 Gateway 生效 Embedding 模型返回的向量维度一致。
       username: # 向量索引服务用户名，未启用鉴权时为空。
       password: # 向量索引服务密码，未启用鉴权时为空。
@@ -264,7 +266,7 @@ nexa:
       # 模型注册表刷新消息主题；REDIS_PUB_SUB 模式下发布和订阅都使用该主题。
       refresh-topic: nexa.model.registry.changed
     secret:
-      master-key: = # 模型 API Key 加密主密钥。
+      master-key: ${NEXA_MODEL_MASTER_KEY:} # 模型 API Key 加密主密钥。
     governance:
       # 治理配置绑定模式：CONFIG=按模型配置生效，ROUTE=按业务路由生效；同一时间只生效一种模式。
       binding-mode: CONFIG
