@@ -1,17 +1,8 @@
 package com.nexarag.document.model.entity;
 
-import com.baomidou.mybatisplus.annotation.FieldFill;
-import com.baomidou.mybatisplus.annotation.TableField;
-import com.baomidou.mybatisplus.annotation.TableId;
-import com.baomidou.mybatisplus.annotation.TableLogic;
-import com.baomidou.mybatisplus.annotation.TableName;
-import com.baomidou.mybatisplus.annotation.Version;
+import com.baomidou.mybatisplus.annotation.*;
 import com.nexarag.document.enums.ChunkStatus;
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
-import lombok.Setter;
+import lombok.*;
 
 import java.time.LocalDateTime;
 
@@ -36,6 +27,11 @@ public class DocumentChunk {
      * 文档ID。
      */
     private Long documentId;
+
+    /**
+     * 所属文档版本ID。
+     */
+    private Long documentVersionId;
 
     /**
      * 片段顺序。

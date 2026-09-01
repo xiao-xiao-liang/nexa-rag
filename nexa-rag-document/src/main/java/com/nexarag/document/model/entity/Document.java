@@ -1,25 +1,12 @@
 package com.nexarag.document.model.entity;
 
-import com.baomidou.mybatisplus.annotation.FieldFill;
-import com.baomidou.mybatisplus.annotation.TableField;
-import com.baomidou.mybatisplus.annotation.TableId;
-import com.baomidou.mybatisplus.annotation.TableLogic;
-import com.baomidou.mybatisplus.annotation.TableName;
-import com.baomidou.mybatisplus.annotation.Version;
-import com.nexarag.infra.enums.ExternalDocumentSourceType;
-import com.nexarag.document.enums.DocumentPipelineMessageStatus;
-import com.nexarag.document.enums.DocumentStatus;
-import com.nexarag.document.enums.FileType;
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
-import lombok.Setter;
+import com.baomidou.mybatisplus.annotation.*;
+import lombok.*;
 
 import java.time.LocalDateTime;
 
 /**
- * 文档实体，对应 document 表，保存用户上传文档及处理状态。
+ * 文档稳定身份数据对象，对应 document 表，保存业务归属、版本指针和文档级审计。
  */
 @Getter
 @Setter
@@ -36,6 +23,21 @@ public class Document {
     private Long documentId;
 
     /**
+     * 当前生效文档版本ID。
+     */
+    private Long activeVersionId;
+
+    /**
+     * 正在构建的文档版本ID。
+     */
+    private Long buildingVersionId;
+
+    /**
+     * 当前版本指针的生效代次。
+     */
+    private Long activationGeneration;
+
+    /**
      * 所属知识库ID。
      */
     private Long knowledgeBaseId;
@@ -49,152 +51,6 @@ public class Document {
      * 文档描述。
      */
     private String description;
-
-    /**
-     * 原始文件名。
-     */
-    private String originalFileName;
-
-    /**
-     * 文件类型。
-     */
-    private FileType fileType;
-
-    /**
-     * 文件大小。
-     */
-    private Long fileSize;
-
-    /**
-     * 原始文件地址。
-     */
-    private String originalFileUrl;
-
-    /**
-     * 原始文件对象名。
-     */
-    private String originalObjectName;
-
-    /** 文档来源类型。 */
-    private ExternalDocumentSourceType sourceType;
-
-    /** 外部来源URL。 */
-    private String sourceUrl;
-
-    /**
-     * 解析后文件地址。
-     */
-    private String parsedFileUrl;
-
-    /**
-     * 解析后文件对象名。
-     */
-    private String parsedObjectName;
-
-    /**
-     * 解析后内容类型。
-     */
-    private String parsedContentType;
-
-    /**
-     * 解析附属制品与结构元数据。
-     */
-    private String parsedMetadataJson;
-
-    /**
-     * 文档处理状态。
-     */
-    private DocumentStatus status;
-
-    /**
-     * 文档处理流水号。
-     */
-    private String processId;
-
-    /**
-     * 文档流水线消息状态。
-     */
-    private DocumentPipelineMessageStatus messageStatus;
-
-    /**
-     * 消息消费次数。
-     */
-    private Integer consumedTimes;
-
-    /**
-     * 最近消费消息ID。
-     */
-    private String lastMessageId;
-
-    /**
-     * 排队阶段。
-     */
-    private String queueStage;
-
-    /**
-     * 排队时间。
-     */
-    private LocalDateTime queueTime;
-
-    /**
-     * 处理开始时间。
-     */
-    private LocalDateTime processStartTime;
-
-    /**
-     * 处理结束时间。
-     */
-    private LocalDateTime processEndTime;
-
-    /**
-     * 处理配置快照。
-     */
-    private String processConfigJson;
-
-    /**
-     * 失败阶段。
-     */
-    private String failureStage;
-
-    /**
-     * 失败原因。
-     */
-    private String failureReason;
-
-    /**
-     * 失败详情。
-     */
-    private String failureDetail;
-
-    /**
-     * 已重试次数。
-     */
-    private Integer retryCount;
-
-    /**
-     * 最大重试次数。
-     */
-    private Integer maxRetryCount;
-
-    /**
-     * 最近重试时间。
-     */
-    private LocalDateTime lastRetryTime;
-
-    /**
-     * 清理状态。
-     */
-    private String cleanupStatus;
-
-    /**
-     * 清理重试次数。
-     */
-    private Integer cleanupRetryCount;
-
-    /**
-     * 清理失败原因。
-     */
-    private String cleanupFailureReason;
 
     /**
      * 创建时间。

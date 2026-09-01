@@ -4,14 +4,10 @@ import com.baomidou.mybatisplus.annotation.FieldFill;
 import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
-import com.nexarag.document.enums.OutboxPublishStatus;
 import com.nexarag.document.enums.DocumentTaskStatus;
 import com.nexarag.document.enums.DocumentTaskType;
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
-import lombok.Setter;
+import com.nexarag.document.enums.OutboxPublishStatus;
+import lombok.*;
 
 import java.time.LocalDateTime;
 
@@ -38,6 +34,11 @@ public class DocumentTaskOutboxDO {
     private Long documentId;
 
     /**
+     * 文档版本ID；文档处理及版本清理任务必须携带该字段。
+     */
+    private Long documentVersionId;
+
+    /**
      * 父任务Outbox ID，仅告警任务使用。
      */
     private Long parentOutboxId;
@@ -47,6 +48,11 @@ public class DocumentTaskOutboxDO {
      */
     @TableField("operation_id")
     private String processId;
+
+    /**
+     * 生效代次；仅版本切换投影任务使用。
+     */
+    private Long activationGeneration;
 
     /**
      * 任务类型。

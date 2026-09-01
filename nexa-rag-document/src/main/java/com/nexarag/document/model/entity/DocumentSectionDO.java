@@ -1,16 +1,7 @@
 package com.nexarag.document.model.entity;
 
-import com.baomidou.mybatisplus.annotation.FieldFill;
-import com.baomidou.mybatisplus.annotation.IdType;
-import com.baomidou.mybatisplus.annotation.TableField;
-import com.baomidou.mybatisplus.annotation.TableId;
-import com.baomidou.mybatisplus.annotation.TableLogic;
-import com.baomidou.mybatisplus.annotation.TableName;
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
-import lombok.Setter;
+import com.baomidou.mybatisplus.annotation.*;
+import lombok.*;
 
 import java.time.LocalDateTime;
 
@@ -35,6 +26,11 @@ public class DocumentSectionDO {
      * 文档ID。
      */
     private Long documentId;
+
+    /**
+     * 所属文档版本ID。
+     */
+    private Long documentVersionId;
 
     /**
      * 父章节ID。

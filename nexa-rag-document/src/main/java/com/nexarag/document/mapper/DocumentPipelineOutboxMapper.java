@@ -22,7 +22,8 @@ public interface DocumentPipelineOutboxMapper extends BaseMapper<DocumentTaskOut
      */
     @Select("""
             SELECT
-                outbox_id, document_id, parent_outbox_id, operation_id, task_type, message_key, topic, message_body,
+                outbox_id, document_id, document_version_id, parent_outbox_id, operation_id, activation_generation,
+                task_type, message_key, topic, message_body,
                 publish_status, task_status, publish_retry_count, consume_retry_count, next_retry_time, lock_owner,
                 lock_time, published_time, task_completed_time, publish_failure_reason, task_failure_reason,
                 create_time, update_time
