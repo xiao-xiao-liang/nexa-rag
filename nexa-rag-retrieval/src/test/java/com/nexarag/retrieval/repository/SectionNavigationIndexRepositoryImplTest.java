@@ -13,6 +13,7 @@ import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 
 import java.util.List;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -43,33 +44,35 @@ class SectionNavigationIndexRepositoryImplTest {
                 new KeywordIndexWriteResult("section-11", "navigation-11", true, null)));
         SectionNavigationIndexRepository repository = repository(sectionMapper, keywordIndexClient);
 
-        repository.upsert(1L);
+        repository.upsert(1L, 101L);
 
         ArgumentCaptor<KeywordIndexWriteRequest> captor = ArgumentCaptor.forClass(KeywordIndexWriteRequest.class);
         verify(keywordIndexClient).upsert(captor.capture());
         KeywordIndexWriteRequest request = captor.getValue();
         KeywordIndexDocument document = request.documents().getFirst();
         assertThat(request.indexName()).isEqualTo("nexa_document_section_navigation");
+        assertThat(request.documentVersionId()).isEqualTo(101L);
         assertThat(document.chunkId()).isEqualTo("section-11");
         assertThat(document.sectionId()).isEqualTo(11L);
         assertThat(document.text()).isEqualTo("退款规则");
         assertThat(document.indexContent()).isEqualTo("退款规则\n帮助中心 > 退款规则");
-        verify(keywordIndexClient).deleteByDocumentId(1L, "nexa_document_section_navigation");
+        verify(keywordIndexClient).deleteByDocumentVersionId(1L, 101L, "nexa_document_section_navigation");
     }
 
     @Test
-    void searchAndDeleteShouldUseDedicatedNavigationIndex() {
+    void searchAndVersionDeleteShouldUseDedicatedNavigationIndex() {
         DocumentSectionMapper sectionMapper = mock(DocumentSectionMapper.class);
         KeywordIndexClient keywordIndexClient = mock(KeywordIndexClient.class);
         when(keywordIndexClient.search(any())).thenReturn(List.of(new KeywordIndexSearchResult("section-11", 1L,
-                null, 2, 11L, "退款规则", null, 8.5D)));
-        when(keywordIndexClient.deleteByDocumentId(1L, "nexa_document_section_navigation")).thenReturn(1);
+                101L, null, 2, 11L, "退款规则", null, 8.5D)));
+        when(keywordIndexClient.deleteByDocumentVersionId(1L, 101L,
+                "nexa_document_section_navigation")).thenReturn(1);
         SectionNavigationIndexRepository repository = repository(sectionMapper, keywordIndexClient);
 
-        assertThat(repository.search("退款", 5)).containsExactly(new com.nexarag.retrieval.model.SectionNavigationHit(
-                11L, 1L, 8.5D, "KEYWORD"));
-        assertThat(repository.deleteByDocumentId(1L)).isEqualTo(1);
-        verify(keywordIndexClient).deleteByDocumentId(1L, "nexa_document_section_navigation");
+        assertThat(repository.search("退款", 5, Set.of(101L))).containsExactly(new com.nexarag.retrieval.model.SectionNavigationHit(
+                11L, 1L, 101L, 8.5D, "KEYWORD"));
+        assertThat(repository.deleteByDocumentVersionId(1L, 101L)).isEqualTo(1);
+        verify(keywordIndexClient).deleteByDocumentVersionId(1L, 101L, "nexa_document_section_navigation");
     }
 
     private SectionNavigationIndexRepository repository(DocumentSectionMapper sectionMapper,

@@ -6,11 +6,12 @@ import com.nexarag.document.model.dto.ProcessDocumentRequest;
 import com.nexarag.document.model.entity.Document;
 import com.nexarag.document.model.entity.DocumentChunk;
 import com.nexarag.document.enums.ChunkStatus;
-import com.nexarag.document.enums.DocumentStatus;
 import com.nexarag.document.service.DocumentChunkService;
 import com.nexarag.document.service.DocumentService;
+import com.nexarag.document.service.DocumentVersionService;
+import com.nexarag.document.model.entity.DocumentVersionDO;
+import com.nexarag.document.enums.DocumentVersionStatus;
 import com.nexarag.retrieval.model.*;
-import com.nexarag.retrieval.service.DocumentIndexCleaner;
 import com.nexarag.retrieval.config.IndexConfigResolver;
 import com.nexarag.retrieval.config.RetrievalProperties;
 import com.nexarag.retrieval.dto.res.DocumentIndexResult;
@@ -43,99 +44,44 @@ class DocumentIndexServiceImplTest {
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     @Test
-    void indexDocumentShouldWriteMockIndexesAndMarkDocumentIndexed() {
-        Fixture fixture = new Fixture(DocumentStatus.CHUNKED, null, chunks());
+    void indexDocumentVersionShouldKeepHistoricalIndexesAndActivateOnlyAfterVersionIndexReady() {
+        Fixture fixture = new Fixture(chunks());
+        DocumentVersionDO version = DocumentVersionDO.builder()
+                .documentId(1L)
+                .documentVersionId(2L)
+                .processId("process-1")
+                .status(DocumentVersionStatus.CHUNKED)
+                .build();
+        fixture.chunks.forEach(chunk -> chunk.setDocumentVersionId(2L));
+        when(fixture.documentVersionService.getRequiredVersion(1L, 2L)).thenReturn(version);
+        when(fixture.documentVersionService.markIndexing(1L, 2L, "process-1")).thenReturn(true);
+        when(fixture.documentVersionService.markIndexReady(1L, 2L, "process-1")).thenReturn(true);
 
-        DocumentIndexResult result = fixture.service.indexDocument(1L);
-
-        assertThat(result.success()).isTrue();
-        assertThat(result.indexedChunkCount()).isEqualTo(1);
-        assertThat(result.skippedChunkCount()).isEqualTo(1);
-        assertThat(fixture.document.getStatus()).isEqualTo(DocumentStatus.INDEXED);
-        assertThat(fixture.chunks.getFirst().getStatus()).isEqualTo(ChunkStatus.INDEXED);
-        assertThat(fixture.chunks.getFirst().getVectorId()).isEqualTo("chunk-1");
-        assertThat(fixture.chunks.getFirst().getKeywordIndexId()).isEqualTo("mock-keyword-1-chunk-1");
-        assertThat(fixture.chunks.get(1).getStatus()).isEqualTo(ChunkStatus.SKIP_INDEX);
-        assertThat(result.chunks().getFirst().sectionId()).isEqualTo(11L);
-        assertThat(result.chunks().getFirst().indexContent()).isEqualTo("标题路径 > 测试文本");
-        assertThat(fixture.documentVectorStore.lastChunks)
-                .extracting(IndexableChunk::chunkId)
-                .containsExactly("chunk-1");
-        assertThat(fixture.documentVectorStore.lastChunks.getFirst().text()).isEqualTo("测试文本");
-        assertThat(fixture.documentVectorStore.lastChunks.getFirst().indexContent())
-                .isEqualTo("标题路径 > 测试文本");
-        verify(fixture.navigationIndexRepository).upsert(1L);
-    }
-
-    @Test
-    void indexDocumentShouldSkipExternalIndexWhenIndexDisabled() throws Exception {
-        ProcessDocumentRequest request = new ProcessDocumentRequest(null, null,
-                new IndexConfigRequest(false, true, true));
-        Fixture fixture = new Fixture(DocumentStatus.CHUNKED, objectMapper.writeValueAsString(request), chunks());
-
-        DocumentIndexResult result = fixture.service.indexDocument(1L);
+        DocumentIndexResult result = fixture.service.indexDocument(1L, 2L);
 
         assertThat(result.success()).isTrue();
-        assertThat(result.vectorEnabled()).isFalse();
-        assertThat(result.keywordEnabled()).isFalse();
-        assertThat(fixture.chunks.getFirst().getStatus()).isEqualTo(ChunkStatus.INDEXED);
-        assertThat(fixture.chunks.getFirst().getVectorId()).isNull();
-        assertThat(fixture.chunks.getFirst().getKeywordIndexId()).isNull();
+        assertThat(fixture.documentVectorStore.lastChunks).allMatch(chunk -> chunk.documentVersionId().equals(2L));
+        verify(fixture.documentVersionService).markIndexReady(1L, 2L, "process-1");
     }
 
     @Test
-    void indexDocumentShouldClearVectorsAndWriteNavigationForTitleOnlyDocument() {
-        Fixture fixture = new Fixture(DocumentStatus.CHUNKED, null, List.of());
+    void rebuildDocumentVersionIndexShouldRewriteReadyVersionWithoutChangingItsStatus() {
+        Fixture fixture = new Fixture(chunks());
+        DocumentVersionDO version = DocumentVersionDO.builder()
+                .documentId(1L)
+                .documentVersionId(2L)
+                .processId("process-1")
+                .status(DocumentVersionStatus.INDEX_READY)
+                .build();
+        fixture.chunks.forEach(chunk -> chunk.setDocumentVersionId(2L));
+        when(fixture.documentVersionService.getRequiredVersion(1L, 2L)).thenReturn(version);
 
-        DocumentIndexResult result = fixture.service.indexDocument(1L);
-
-        assertThat(result.indexedChunkCount()).isZero();
-        assertThat(fixture.documentVectorStore.lastChunks).isEmpty();
-        assertThat(fixture.keywordIndexClient.operations())
-                .containsExactly("delete:1:nexa_document_chunk");
-        verify(fixture.navigationIndexRepository).upsert(1L);
-    }
-
-    @Test
-    void indexDocumentShouldReplaceKeywordIndexBeforeWritingNewChunks() {
-        Fixture fixture = new Fixture(DocumentStatus.CHUNKED, null, chunks());
-
-        fixture.service.indexDocument(1L);
-
-        assertThat(fixture.keywordIndexClient.operations())
-                .containsExactly("delete:1:nexa_document_chunk", "upsert:1");
-    }
-
-    @Test
-    void indexDocumentShouldNotWriteNavigationWhenKeywordIndexDisabled() throws Exception {
-        ProcessDocumentRequest request = new ProcessDocumentRequest(null, null,
-                new IndexConfigRequest(true, true, false));
-        Fixture fixture = new Fixture(DocumentStatus.CHUNKED, objectMapper.writeValueAsString(request), chunks());
-
-        fixture.service.indexDocument(1L);
-
-        verify(fixture.navigationIndexRepository, never()).upsert(1L);
-    }
-
-    @Test
-    void indexDocumentShouldReturnSuccessWhenDocumentAlreadyIndexed() {
-        Fixture fixture = new Fixture(DocumentStatus.INDEXED, null, chunks());
-
-        DocumentIndexResult result = fixture.service.indexDocument(1L);
+        DocumentIndexResult result = fixture.service.rebuildDocumentVersionIndex(1L, 2L);
 
         assertThat(result.success()).isTrue();
-        assertThat(result.indexedChunkCount()).isEqualTo(0);
-        verify(fixture.documentService, never()).updateById(any(Document.class));
-    }
-
-    @Test
-    void indexDocumentShouldPropagateVectorStoreExceptionWithoutRequeueing() {
-        Fixture fixture = new Fixture(DocumentStatus.CHUNKED, null, chunks(), new FailingDocumentVectorStore());
-
-        assertThatThrownBy(() -> fixture.service.indexDocument(1L))
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessage("模型服务暂时不可用");
-        verify(fixture.documentService, never()).recordProcessFailure(any(), any(), any(), any());
+        assertThat(fixture.documentVectorStore.lastChunks).allMatch(chunk -> chunk.documentVersionId().equals(2L));
+        verify(fixture.documentVersionService, never()).markIndexing(1L, 2L, "process-1");
+        verify(fixture.documentVersionService, never()).markIndexReady(1L, 2L, "process-1");
     }
 
     private List<DocumentChunk> chunks() {
@@ -166,33 +112,26 @@ class DocumentIndexServiceImplTest {
         private final Document document;
         private final List<DocumentChunk> chunks;
         private final DocumentService documentService;
+        private final DocumentVersionService documentVersionService;
         private final DocumentIndexService service;
         private final StubDocumentVectorStore documentVectorStore;
         private final StubKeywordIndexClient keywordIndexClient;
         private final SectionNavigationIndexRepository navigationIndexRepository;
 
-        private Fixture(DocumentStatus status, String processConfigJson, List<DocumentChunk> chunks) {
-            this(status, processConfigJson, chunks, new StubDocumentVectorStore());
+        private Fixture(List<DocumentChunk> chunks) {
+            this(chunks, new StubDocumentVectorStore());
         }
 
-        private Fixture(DocumentStatus status, String processConfigJson, List<DocumentChunk> chunks,
-                        DocumentVectorStore documentVectorStore) {
+        private Fixture(List<DocumentChunk> chunks, DocumentVectorStore documentVectorStore) {
             this.document = Document.builder()
                     .documentId(1L)
-                    .processId("process-1")
-                    .status(status)
-                    .processConfigJson(processConfigJson)
-                    .retryCount(0)
-                    .maxRetryCount(3)
                     .build();
             this.chunks = chunks;
             this.documentService = mock(DocumentService.class);
+            this.documentVersionService = mock(DocumentVersionService.class);
             DocumentChunkService documentChunkService = mock(DocumentChunkService.class);
             when(documentService.getRequiredDocument(1L)).thenReturn(document);
-            when(documentService.updateById(any(Document.class))).thenReturn(true);
-            when(documentService.markIndexing(1L, "process-1")).thenReturn(true);
-            when(documentService.markIndexed(1L, "process-1")).thenReturn(true);
-            when(documentChunkService.listByDocumentId(1L)).thenReturn(chunks);
+            when(documentChunkService.listByDocumentVersionId(2L)).thenReturn(chunks);
             doAnswer(invocation -> {
                 markChunkIndexed(invocation.getArgument(0), invocation.getArgument(1), invocation.getArgument(2));
                 return null;
@@ -204,19 +143,18 @@ class DocumentIndexServiceImplTest {
             doAnswer(invocation -> {
                 markSkipped();
                 return null;
-            }).when(documentChunkService).markDocumentSkippedChunks(eq(1L));
-            DocumentIndexCleaner cleaner = mock(DocumentIndexCleaner.class);
+            }).when(documentChunkService).markDocumentVersionSkippedChunks(eq(2L));
             this.navigationIndexRepository = mock(SectionNavigationIndexRepository.class);
             this.keywordIndexClient = new StubKeywordIndexClient();
             RetrievalProperties retrievalProperties = new RetrievalProperties();
             retrievalProperties.getKeyword().setType("elasticsearch");
             this.documentVectorStore = documentVectorStore instanceof StubDocumentVectorStore stub ? stub : null;
             this.service = new DocumentIndexServiceImpl(documentService,
+                    documentVersionService,
                     new ChunkIndexRepositoryImpl(documentChunkService),
                     new IndexConfigResolver(objectMapper, retrievalProperties),
                     documentVectorStore,
                     keywordIndexClient,
-                    cleaner,
                     navigationIndexRepository);
         }
 
@@ -257,7 +195,8 @@ class DocumentIndexServiceImplTest {
         private List<IndexableChunk> lastChunks;
 
         @Override
-        public List<VectorIndexWriteResult> replaceDocument(Long documentId, List<IndexableChunk> chunks) {
+        public List<VectorIndexWriteResult> replaceDocumentVersion(Long documentId, Long documentVersionId,
+                                                                    List<IndexableChunk> chunks) {
             lastChunks = chunks;
             return chunks.stream()
                     .map(chunk -> new VectorIndexWriteResult(chunk.chunkId(), chunk.chunkId(), true, null))
@@ -270,7 +209,7 @@ class DocumentIndexServiceImplTest {
         }
 
         @Override
-        public void deleteByDocumentId(Long documentId) {
+        public void deleteByDocumentVersionId(Long documentId, Long documentVersionId) {
         }
     }
 
@@ -280,7 +219,8 @@ class DocumentIndexServiceImplTest {
     private static class FailingDocumentVectorStore implements DocumentVectorStore {
 
         @Override
-        public List<VectorIndexWriteResult> replaceDocument(Long documentId, List<IndexableChunk> chunks) {
+        public List<VectorIndexWriteResult> replaceDocumentVersion(Long documentId, Long documentVersionId,
+                                                                    List<IndexableChunk> chunks) {
             throw new IllegalStateException("模型服务暂时不可用");
         }
 
@@ -290,7 +230,7 @@ class DocumentIndexServiceImplTest {
         }
 
         @Override
-        public void deleteByDocumentId(Long documentId) {
+        public void deleteByDocumentVersionId(Long documentId, Long documentVersionId) {
         }
     }
 
@@ -311,14 +251,8 @@ class DocumentIndexServiceImplTest {
         }
 
         @Override
-        public int deleteByDocumentId(Long documentId) {
-            operations.add("delete:" + documentId + ":default");
-            return 0;
-        }
-
-        @Override
-        public int deleteByDocumentId(Long documentId, String indexName) {
-            operations.add("delete:" + documentId + ":" + indexName);
+        public int deleteByDocumentVersionId(Long documentId, Long documentVersionId, String indexName) {
+            operations.add("delete:" + documentId + ":" + documentVersionId + ":" + indexName);
             return 0;
         }
 

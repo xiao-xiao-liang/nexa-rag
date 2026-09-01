@@ -13,6 +13,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -36,12 +37,12 @@ class ConversationRetrievalServiceImplTest {
         ConversationRetrievalRequest request = new ConversationRetrievalRequest(
                 "退款规则", null, RetrievalScope.INTENT, 10, 0.5D, 1, "tenant-001", List.of());
         RetrievalChunk keywordChunk = new RetrievalChunk("chunk-k1", 1L, 0, null,
-                "退款规则", "知识库", "退款应在七日内申请", 12.0D, "BM25", 1);
+                "退款规则", "知识库", "退款应在七日内申请", 12.0D, "BM25", 1, 2L);
         when(milvusRetriever.retrieve(request)).thenThrow(new IllegalStateException("Milvus不可用"));
         when(bm25Retriever.retrieve(request)).thenReturn(List.of(keywordChunk));
         when(knowledgeBaseService.validateRequestedKnowledgeBases("tenant-001", List.of())).thenReturn(Set.of());
-        when(knowledgeBaseService.filterDocumentIdsInTenantScope("tenant-001", List.of(1L), Set.of()))
-                .thenReturn(Set.of(1L));
+        when(knowledgeBaseService.findActiveVersionIdsInTenantScope("tenant-001", List.of(1L), Set.of()))
+                .thenReturn(Map.of(1L, 2L));
 
         ConversationRetrievalServiceImpl retrievalService = new ConversationRetrievalServiceImpl(
                 List.of(milvusRetriever, bm25Retriever), knowledgeBaseService);
@@ -49,6 +50,6 @@ class ConversationRetrievalServiceImplTest {
 
         assertThat(result).containsExactly(keywordChunk);
         verify(knowledgeBaseService).validateRequestedKnowledgeBases("tenant-001", List.of());
-        verify(knowledgeBaseService).filterDocumentIdsInTenantScope("tenant-001", List.of(1L), Set.of());
+        verify(knowledgeBaseService).findActiveVersionIdsInTenantScope("tenant-001", List.of(1L), Set.of());
     }
 }

@@ -28,12 +28,4 @@ class NoneKeywordIndexClientTest {
         assertThat(results.getFirst().keywordIndexId()).isEqualTo("none:chunk-1");
     }
 
-    @Test
-    void deleteByDocumentIdShouldReturnZero() {
-        NoneKeywordIndexClient client = new NoneKeywordIndexClient();
-
-        int deletedCount = client.deleteByDocumentId(1L);
-
-        assertThat(deletedCount).isZero();
-    }
 }

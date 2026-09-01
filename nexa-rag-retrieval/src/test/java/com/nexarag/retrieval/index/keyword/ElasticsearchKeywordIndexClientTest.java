@@ -81,8 +81,8 @@ class ElasticsearchKeywordIndexClientTest {
         when(documentIndexOperations.createMapping()).thenReturn(Document.create());
         when(indexOperations.exists()).thenReturn(false);
         when(indexOperations.create(any(), any(Document.class))).thenReturn(true);
-        KeywordIndexWriteRequest request = new KeywordIndexWriteRequest("nexa_document_chunk", 1L,
-                List.of(new KeywordIndexDocument("chunk-1", 1L, null, 0, 11L,
+        KeywordIndexWriteRequest request = new KeywordIndexWriteRequest("nexa_document_chunk", 1L, 2L,
+                List.of(new KeywordIndexDocument("chunk-1", 1L, 2L, null, 0, 11L,
                         "测试文本", "一级标题\n测试文本", "{\"source\":\"unit\"}")));
 
         List<KeywordIndexWriteResult> results = client.upsert(request);
@@ -94,6 +94,7 @@ class ElasticsearchKeywordIndexClientTest {
         assertThat(indexedDocumentsCaptor.getValue()).singleElement().satisfies(document -> {
             assertThat(document.id()).isEqualTo("chunk-1");
             assertThat(document.chunkId()).isEqualTo("chunk-1");
+            assertThat(document.documentVersionId()).isEqualTo(2L);
             assertThat(document.sectionId()).isEqualTo(11L);
             assertThat(document.indexContent()).isEqualTo("一级标题\n测试文本");
         });
@@ -101,7 +102,7 @@ class ElasticsearchKeywordIndexClientTest {
 
     @Test
     void searchShouldUseBothContentFieldsAndKeepBm25Score() {
-        KeywordIndexDocumentDO content = new KeywordIndexDocumentDO("chunk-1", 1L, null, 0,
+        KeywordIndexDocumentDO content = new KeywordIndexDocumentDO("chunk-1", 1L, 2L, null, 0,
                 11L, "测试文本", "一级标题\n测试文本", "{\"source\":\"unit\"}");
         when(searchHit.getContent()).thenReturn(content);
         when(searchHit.getScore()).thenReturn(3.25F);
@@ -130,18 +131,22 @@ class ElasticsearchKeywordIndexClientTest {
     }
 
     @Test
-    void deleteByDocumentIdShouldUseDeleteByQueryAndReturnDeletedCount() {
-        when(byQueryResponse.getDeleted()).thenReturn(2L);
+    void deleteByDocumentVersionIdShouldUseDocumentAndVersionAsDeleteBoundary() {
+        when(elasticsearchOperations.indexOps(any(IndexCoordinates.class))).thenReturn(indexOperations);
+        when(indexOperations.exists()).thenReturn(true);
+        when(byQueryResponse.getDeleted()).thenReturn(1L);
         when(elasticsearchOperations.delete(any(DeleteQuery.class), eq(KeywordIndexDocumentDO.class),
                 any(IndexCoordinates.class))).thenReturn(byQueryResponse);
 
-        int deletedCount = client.deleteByDocumentId(1L);
+        int deletedCount = client.deleteByDocumentVersionId(1L, 2L, "nexa_document_chunk");
 
-        assertThat(deletedCount).isEqualTo(2);
+        assertThat(deletedCount).isEqualTo(1);
         verify(elasticsearchOperations).delete(deleteQueryCaptor.capture(), eq(KeywordIndexDocumentDO.class),
                 indexCoordinatesCaptor.capture());
-        assertThat(deleteQueryCaptor.getValue().getQuery()).isInstanceOf(NativeQuery.class);
-        assertThat(indexCoordinatesCaptor.getValue().getIndexName()).isEqualTo("nexa_document_chunk");
+        NativeQuery query = (NativeQuery) deleteQueryCaptor.getValue().getQuery();
+        assertThat(query.getQuery().bool().filter()).hasSize(2);
+        assertThat(query.getQuery().bool().filter()).extracting(filter -> filter.term().field())
+                .containsExactly("document_id", "document_version_id");
     }
 
     private RetrievalProperties properties() {

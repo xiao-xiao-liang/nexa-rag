@@ -4,7 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nexarag.common.exception.ServiceException;
 import com.nexarag.document.model.dto.IndexConfigRequest;
 import com.nexarag.document.model.dto.ProcessDocumentRequest;
-import com.nexarag.document.model.entity.Document;
+import com.nexarag.document.model.entity.DocumentVersionDO;
 import com.nexarag.retrieval.model.IndexConfigSnapshot;
 import org.junit.jupiter.api.Test;
 
@@ -21,9 +21,9 @@ class IndexConfigResolverTest {
 
     @Test
     void resolveShouldUseDefaultConfigWhenProcessConfigIsBlank() {
-        Document document = Document.builder().documentId(1L).build();
+        DocumentVersionDO documentVersion = DocumentVersionDO.builder().documentVersionId(1L).build();
 
-        IndexConfigSnapshot snapshot = resolver.resolve(document);
+        IndexConfigSnapshot snapshot = resolver.resolve(documentVersion);
 
         assertThat(snapshot.enabled()).isTrue();
         assertThat(snapshot.vectorEnabled()).isTrue();
@@ -40,12 +40,12 @@ class IndexConfigResolverTest {
         IndexConfigResolver noneKeywordResolver = new IndexConfigResolver(objectMapper, properties);
         ProcessDocumentRequest request = new ProcessDocumentRequest(null, null,
                 new IndexConfigRequest(true, true, true));
-        Document document = Document.builder()
-                .documentId(1L)
+        DocumentVersionDO documentVersion = DocumentVersionDO.builder()
+                .documentVersionId(1L)
                 .processConfigJson(objectMapper.writeValueAsString(request))
                 .build();
 
-        IndexConfigSnapshot snapshot = noneKeywordResolver.resolve(document);
+        IndexConfigSnapshot snapshot = noneKeywordResolver.resolve(documentVersion);
 
         assertThat(snapshot.enabled()).isTrue();
         assertThat(snapshot.vectorEnabled()).isTrue();
@@ -59,12 +59,12 @@ class IndexConfigResolverTest {
         IndexConfigResolver elasticsearchKeywordResolver = new IndexConfigResolver(objectMapper, properties);
         ProcessDocumentRequest request = new ProcessDocumentRequest(null, null,
                 new IndexConfigRequest(false, false, true));
-        Document document = Document.builder()
-                .documentId(1L)
+        DocumentVersionDO documentVersion = DocumentVersionDO.builder()
+                .documentVersionId(1L)
                 .processConfigJson(objectMapper.writeValueAsString(request))
                 .build();
 
-        IndexConfigSnapshot snapshot = elasticsearchKeywordResolver.resolve(document);
+        IndexConfigSnapshot snapshot = elasticsearchKeywordResolver.resolve(documentVersion);
 
         assertThat(snapshot.enabled()).isFalse();
         assertThat(snapshot.vectorEnabled()).isFalse();
@@ -73,12 +73,12 @@ class IndexConfigResolverTest {
 
     @Test
     void resolveShouldThrowServiceExceptionWhenJsonInvalid() {
-        Document document = Document.builder()
-                .documentId(1L)
+        DocumentVersionDO documentVersion = DocumentVersionDO.builder()
+                .documentVersionId(1L)
                 .processConfigJson("{invalid")
                 .build();
 
-        assertThatThrownBy(() -> resolver.resolve(document))
+        assertThatThrownBy(() -> resolver.resolve(documentVersion))
                 .isInstanceOf(ServiceException.class);
     }
 }

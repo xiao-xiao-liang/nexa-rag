@@ -10,6 +10,7 @@ import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /**
@@ -18,42 +19,24 @@ import static org.mockito.Mockito.when;
 class ChunkIndexRepositoryImplTest {
 
     @Test
-    void listIndexableChunksShouldKeepRawTextAndExposeIndexContent() {
+    void listIndexableChunksForVersionShouldOnlyReadTheTargetVersionAndKeepVersionId() {
         DocumentChunkService documentChunkService = mock(DocumentChunkService.class);
         DocumentChunk chunk = DocumentChunk.builder()
-                .chunkId("chunk_1")
+                .chunkId("chunk_v2")
                 .documentId(1L)
-                .sectionId(11L)
-                .text("原始正文")
-                .indexContent("标题路径 > 原始正文")
+                .documentVersionId(2L)
+                .text("第二版正文")
                 .status(ChunkStatus.PENDING_INDEX)
                 .skipIndex(0)
                 .build();
-        when(documentChunkService.listByDocumentId(1L)).thenReturn(List.of(chunk));
+        when(documentChunkService.listByDocumentVersionId(2L)).thenReturn(List.of(chunk));
 
-        IndexableChunk result = new ChunkIndexRepositoryImpl(documentChunkService).listIndexableChunks(1L).getFirst();
+        ChunkIndexRepositoryImpl repository = new ChunkIndexRepositoryImpl(documentChunkService);
+        IndexableChunk result = repository.listIndexableChunks(1L, 2L).getFirst();
+        repository.markSkipped(1L, 2L);
 
-        assertThat(result.text()).isEqualTo("原始正文");
-        assertThat(result.sectionId()).isEqualTo(11L);
-        assertThat(result.indexContent()).isEqualTo("标题路径 > 原始正文");
-    }
-
-    @Test
-    void listIndexableChunksShouldFallBackToRawTextForLegacyNullIndexContent() {
-        DocumentChunkService documentChunkService = mock(DocumentChunkService.class);
-        DocumentChunk chunk = DocumentChunk.builder()
-                .chunkId("chunk_legacy")
-                .documentId(1L)
-                .text("历史正文")
-                .indexContent(null)
-                .status(ChunkStatus.PENDING_INDEX)
-                .skipIndex(0)
-                .build();
-        when(documentChunkService.listByDocumentId(1L)).thenReturn(List.of(chunk));
-
-        IndexableChunk result = new ChunkIndexRepositoryImpl(documentChunkService).listIndexableChunks(1L).getFirst();
-
-        assertThat(result.text()).isEqualTo("历史正文");
-        assertThat(result.indexContent()).isEqualTo("历史正文");
+        assertThat(result.documentVersionId()).isEqualTo(2L);
+        verify(documentChunkService).listByDocumentVersionId(2L);
+        verify(documentChunkService).markDocumentVersionSkippedChunks(2L);
     }
 }

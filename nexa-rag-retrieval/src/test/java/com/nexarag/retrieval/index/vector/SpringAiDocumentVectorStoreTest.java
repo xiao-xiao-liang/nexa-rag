@@ -28,18 +28,24 @@ import static org.mockito.Mockito.when;
 class SpringAiDocumentVectorStoreTest {
 
     @Test
-    void replaceDocumentShouldDeleteExistingVectorsAndWriteBusinessMetadata() {
+    void replaceDocumentVersionShouldDeleteExistingVectorsAndWriteBusinessMetadata() {
         VectorStore vectorStore = mock(VectorStore.class);
         SpringAiDocumentVectorStore documentVectorStore = new SpringAiDocumentVectorStore(vectorStore, properties(1));
         IndexableChunk chunk = chunk("c728ab1e-fa29-4c6f-8ef6-45fa0bd0b9e7");
 
-        List<VectorIndexWriteResult> results = documentVectorStore.replaceDocument(101L, List.of(chunk));
+        List<VectorIndexWriteResult> results = documentVectorStore.replaceDocumentVersion(101L, 201L, List.of(chunk));
 
         ArgumentCaptor<Filter.Expression> filterCaptor = ArgumentCaptor.forClass(Filter.Expression.class);
         verify(vectorStore).delete(filterCaptor.capture());
-        assertThat(filterCaptor.getValue().type()).isEqualTo(Filter.ExpressionType.EQ);
-        assertThat(((Filter.Key) filterCaptor.getValue().left()).key()).isEqualTo("documentId");
-        assertThat(((Filter.Value) filterCaptor.getValue().right()).value()).isEqualTo(101L);
+        assertThat(filterCaptor.getValue().type()).isEqualTo(Filter.ExpressionType.AND);
+        assertThat(((Filter.Key) ((Filter.Expression) filterCaptor.getValue().left()).left()).key())
+                .isEqualTo("documentId");
+        assertThat(((Filter.Value) ((Filter.Expression) filterCaptor.getValue().left()).right()).value())
+                .isEqualTo(101L);
+        assertThat(((Filter.Key) ((Filter.Expression) filterCaptor.getValue().right()).left()).key())
+                .isEqualTo("documentVersionId");
+        assertThat(((Filter.Value) ((Filter.Expression) filterCaptor.getValue().right()).right()).value())
+                .isEqualTo(201L);
 
         ArgumentCaptor<List<Document>> documentsCaptor = ArgumentCaptor.forClass(List.class);
         verify(vectorStore).add(documentsCaptor.capture());
@@ -47,6 +53,7 @@ class SpringAiDocumentVectorStoreTest {
         assertThat(document.getId()).isEqualTo(chunk.chunkId());
         assertThat(document.getText()).isEqualTo("第一章 > 这是用于索引的文本");
         assertThat(document.getMetadata()).containsEntry("documentId", 101L)
+                .containsEntry("documentVersionId", 201L)
                 .containsEntry("parentChunkId", "a728ab1e-fa29-4c6f-8ef6-45fa0bd0b9e7")
                 .containsEntry("chunkOrder", 2)
                 .containsEntry("sectionId", 15L)
@@ -64,6 +71,7 @@ class SpringAiDocumentVectorStoreTest {
                 .text("索引文本")
                 .metadata(Map.of(
                         "documentId", 101L,
+                        "documentVersionId", 201L,
                         "parentChunkId", "a728ab1e-fa29-4c6f-8ef6-45fa0bd0b9e7",
                         "chunkOrder", 2,
                         "sectionId", 15L,
@@ -76,7 +84,7 @@ class SpringAiDocumentVectorStoreTest {
         List<VectorIndexSearchResult> results = documentVectorStore.search("问题", 5);
 
         assertThat(results).containsExactly(new VectorIndexSearchResult(
-                "c728ab1e-fa29-4c6f-8ef6-45fa0bd0b9e7", 101L,
+                "c728ab1e-fa29-4c6f-8ef6-45fa0bd0b9e7", 101L, 201L,
                 "a728ab1e-fa29-4c6f-8ef6-45fa0bd0b9e7", 2, 15L,
                 "这是原始正文", "{\"source\":\"test\"}", 0.92D));
         ArgumentCaptor<SearchRequest> requestCaptor = ArgumentCaptor.forClass(SearchRequest.class);
@@ -86,11 +94,11 @@ class SpringAiDocumentVectorStoreTest {
     }
 
     @Test
-    void replaceDocumentShouldRespectEmbeddingBatchSize() {
+    void replaceDocumentVersionShouldRespectEmbeddingBatchSize() {
         VectorStore vectorStore = mock(VectorStore.class);
         SpringAiDocumentVectorStore documentVectorStore = new SpringAiDocumentVectorStore(vectorStore, properties(1));
 
-        documentVectorStore.replaceDocument(101L, List.of(
+        documentVectorStore.replaceDocumentVersion(101L, 201L, List.of(
                 chunk("c728ab1e-fa29-4c6f-8ef6-45fa0bd0b9e7"),
                 chunk(UUID.randomUUID().toString())));
 
@@ -98,11 +106,11 @@ class SpringAiDocumentVectorStoreTest {
     }
 
     @Test
-    void replaceDocumentShouldDeleteExistingVectorsWhenNoIndexableChunkRemains() {
+    void replaceDocumentVersionShouldDeleteExistingVectorsWhenNoIndexableChunkRemains() {
         VectorStore vectorStore = mock(VectorStore.class);
         SpringAiDocumentVectorStore documentVectorStore = new SpringAiDocumentVectorStore(vectorStore, properties(10));
 
-        List<VectorIndexWriteResult> results = documentVectorStore.replaceDocument(101L, List.of());
+        List<VectorIndexWriteResult> results = documentVectorStore.replaceDocumentVersion(101L, 201L, List.of());
 
         assertThat(results).isEmpty();
         verify(vectorStore).delete(any(Filter.Expression.class));
@@ -116,7 +124,7 @@ class SpringAiDocumentVectorStoreTest {
     }
 
     private IndexableChunk chunk(String chunkId) {
-        return new IndexableChunk(chunkId, 101L, 2,
+        return new IndexableChunk(chunkId, 101L, 201L, 2,
                 "a728ab1e-fa29-4c6f-8ef6-45fa0bd0b9e7", 15L,
                 "这是原始正文", "第一章 > 这是用于索引的文本", "{\"source\":\"test\"}", 8);
     }
