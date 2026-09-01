@@ -5,8 +5,8 @@ import com.nexarag.retrieval.dto.req.ConversationRetrievalRequest;
 import com.nexarag.retrieval.model.RetrievalChunk;
 import com.nexarag.retrieval.retriever.ConversationRetriever;
 import com.nexarag.retrieval.service.ConversationRetrievalService;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
@@ -14,17 +14,26 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Executor;
 
 /**
  * 对话检索服务实现，负责并行编排已启用的召回通道。
  */
 @Slf4j
 @Service
-@RequiredArgsConstructor
 public class ConversationRetrievalServiceImpl implements ConversationRetrievalService {
 
     private final List<ConversationRetriever> retrievers;
     private final KnowledgeBaseService knowledgeBaseService;
+    private final Executor retrievalTaskExecutor;
+
+    public ConversationRetrievalServiceImpl(List<ConversationRetriever> retrievers,
+                                            KnowledgeBaseService knowledgeBaseService,
+                                            @Qualifier("retrievalTaskExecutor") Executor retrievalTaskExecutor) {
+        this.retrievers = retrievers;
+        this.knowledgeBaseService = knowledgeBaseService;
+        this.retrievalTaskExecutor = retrievalTaskExecutor;
+    }
 
     @Override
     public List<RetrievalChunk> retrieve(ConversationRetrievalRequest request) {
@@ -39,7 +48,8 @@ public class ConversationRetrievalServiceImpl implements ConversationRetrievalSe
 
         // 2. 并行执行所有已装配的检索通道
         List<CompletableFuture<List<RetrievalChunk>>> futures = retrievers.stream()
-                .map(retriever -> CompletableFuture.supplyAsync(() -> retrieveSafely(retriever, scopedRequest)))
+                .map(retriever -> CompletableFuture.supplyAsync(() -> retrieveSafely(retriever, scopedRequest),
+                        retrievalTaskExecutor))
                 .toList();
 
         // 3. 合并并按文档归属过滤三类召回结果，防止跨租户或跨选定知识库泄露

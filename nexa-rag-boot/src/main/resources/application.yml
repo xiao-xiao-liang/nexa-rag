@@ -219,6 +219,8 @@ nexa:
 
   # 检索索引配置，用于控制文档片段向量化、向量索引和关键词索引适配器。
   retrieval:
+    execution:
+      max-concurrency: 32 # 对话检索访问外部向量库、关键词库和模型服务的最大并发任务数。
     embedding:
       type: model # 向量化类型，可选值：model。由 ModelGateway 调用模型。
       route-key: embedding # ModelGateway 向量化路由Key。
