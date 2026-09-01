@@ -1,0 +1,24 @@
+{
+  "properties": [
+    {
+      "name": "sa-token.cookie.path",
+      "type": "java.lang.String",
+      "description": "Sa-Token 认证 Cookie 的 Path 属性。"
+    },
+    {
+      "name": "sa-token.cookie.secure",
+      "type": "java.lang.Boolean",
+      "description": "Sa-Token 认证 Cookie 是否仅通过 HTTPS 发送。"
+    },
+    {
+      "name": "sa-token.cookie.http-only",
+      "type": "java.lang.Boolean",
+      "description": "Sa-Token 认证 Cookie 是否禁止脚本读取。"
+    },
+    {
+      "name": "sa-token.cookie.same-site",
+      "type": "java.lang.String",
+      "description": "Sa-Token 认证 Cookie 的 SameSite 属性。"
+    }
+  ]
+}

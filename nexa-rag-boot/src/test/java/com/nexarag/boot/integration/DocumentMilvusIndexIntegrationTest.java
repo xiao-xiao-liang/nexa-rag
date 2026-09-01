@@ -5,10 +5,11 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nexarag.boot.NexaRagApplication;
 import com.nexarag.document.model.entity.Document;
 import com.nexarag.document.model.entity.DocumentChunk;
+import com.nexarag.document.model.entity.DocumentVersionDO;
 import com.nexarag.document.enums.ChunkStatus;
-import com.nexarag.document.enums.DocumentStatus;
 import com.nexarag.document.service.DocumentChunkService;
 import com.nexarag.document.service.DocumentService;
+import com.nexarag.document.service.DocumentVersionService;
 import com.nexarag.retrieval.dto.res.DocumentIndexResult;
 import com.nexarag.retrieval.service.DocumentIndexService;
 import io.milvus.v2.client.ConnectConfig;
@@ -63,37 +64,39 @@ class DocumentMilvusIndexIntegrationTest {
     private static final String ES_PASSWORD = "";
 
     private final DocumentService documentService;
+    private final DocumentVersionService documentVersionService;
     private final DocumentChunkService documentChunkService;
     private final DocumentIndexService documentIndexService;
     private final ObjectMapper objectMapper;
 
     @Autowired
     DocumentMilvusIndexIntegrationTest(DocumentService documentService,
+                                       DocumentVersionService documentVersionService,
                                        DocumentChunkService documentChunkService,
                                        DocumentIndexService documentIndexService,
                                        ObjectMapper objectMapper) {
         this.documentService = documentService;
+        this.documentVersionService = documentVersionService;
         this.documentChunkService = documentChunkService;
         this.documentIndexService = documentIndexService;
         this.objectMapper = objectMapper;
     }
 
     @Test
-    void indexDocumentShouldEmbedByModelGatewayAndUpsertMilvusAndElasticsearch() {
+    void rebuildActiveDocumentVersionShouldEmbedByModelGatewayAndUpsertMilvusAndElasticsearch() {
         Long documentId = Long.getLong("nexa.integration.document-id", DEFAULT_DOCUMENT_ID);
+        DocumentVersionDO activeVersion = getRequiredActiveVersion(documentId);
+        Long documentVersionId = activeVersion.getDocumentVersionId();
 
-        // 1. 准备可重复执行的文档状态，避免上一轮 INDEXED 状态导致直接短路
-        resetDocumentIndexState(documentId);
+        // 1. 对当前生效版本执行幂等索引回填，不改变版本状态或生效指针。
+        DocumentIndexResult result = documentIndexService.rebuildDocumentVersionIndex(documentId, documentVersionId);
 
-        // 2. 调用检索模块入口，内部通过 ModelGateway 生成真实向量并写入 Milvus 与 Elasticsearch
-        DocumentIndexResult result = documentIndexService.indexDocument(documentId);
-
-        // 3. 验证服务结果和数据库回写状态
+        // 2. 验证服务结果和当前版本片段的索引回写状态。
         assertThat(result.success()).isTrue();
         assertThat(result.vectorEnabled()).isTrue();
         assertThat(result.keywordEnabled()).isTrue();
         assertThat(result.indexedChunkCount()).isPositive();
-        List<DocumentChunk> indexedChunks = documentChunkService.listByDocumentId(documentId).stream()
+        List<DocumentChunk> indexedChunks = documentChunkService.listByDocumentVersionId(documentVersionId).stream()
                 .filter(chunk -> chunk.getStatus() == ChunkStatus.INDEXED)
                 .toList();
         assertThat(indexedChunks).isNotEmpty();
@@ -101,35 +104,18 @@ class DocumentMilvusIndexIntegrationTest {
         assertThat(firstIndexedChunk.getVectorId()).startsWith("milvus:" + COLLECTION_NAME + ":");
         assertThat(firstIndexedChunk.getKeywordIndexId()).startsWith("elasticsearch:" + KEYWORD_INDEX_NAME + ":");
 
-        // 4. 通过 Milvus 主键读取验证真实向量记录已经入库
+        // 3. 通过 Milvus 主键读取验证真实向量记录已经入库。
         assertMilvusContainsChunk(firstIndexedChunk.getChunkId());
 
-        // 5. 通过 Elasticsearch 关键词查询验证真实关键词索引已经可检索
-        assertElasticsearchCanSearchChunk(documentId, firstIndexedChunk);
+        // 4. 通过 Elasticsearch 关键词查询验证指定版本的索引已经可检索。
+        assertElasticsearchCanSearchChunk(documentId, documentVersionId, firstIndexedChunk);
     }
 
-    private void resetDocumentIndexState(Long documentId) {
+    private DocumentVersionDO getRequiredActiveVersion(Long documentId) {
         Document document = documentService.getRequiredDocument(documentId);
-        document.setStatus(DocumentStatus.CHUNKED);
-        document.setFailureStage(null);
-        document.setFailureReason(null);
-        document.setFailureDetail(null);
-        documentService.updateById(document);
-
-        List<DocumentChunk> chunks = documentChunkService.listByDocumentId(documentId);
-        assertThat(chunks).isNotEmpty();
-        for (DocumentChunk chunk : chunks) {
-            // 1. 仅重置需要索引的子片段，跳过索引片段保持 SKIP_INDEX 语义
-            if (Integer.valueOf(1).equals(chunk.getSkipIndex())) {
-                chunk.setStatus(ChunkStatus.SKIP_INDEX);
-            } else {
-                chunk.setStatus(ChunkStatus.PENDING_INDEX);
-            }
-            chunk.setVectorId(null);
-            chunk.setKeywordIndexId(null);
-            chunk.setFailureReason(null);
-        }
-        documentChunkService.updateBatchById(chunks);
+        DocumentVersionDO activeVersion = documentVersionService.getActiveVersionOrNull(document);
+        assertThat(activeVersion).as("测试文档必须存在当前生效版本").isNotNull();
+        return activeVersion;
     }
 
     private void assertMilvusContainsChunk(String chunkId) {
@@ -149,12 +135,14 @@ class DocumentMilvusIndexIntegrationTest {
         }
     }
 
-    private void assertElasticsearchCanSearchChunk(Long documentId, DocumentChunk chunk) {
+    private void assertElasticsearchCanSearchChunk(Long documentId, Long documentVersionId, DocumentChunk chunk) {
         // 1. 刷新索引，保证刚写入的片段可以立即被检索
         sendElasticsearchRequest("POST", "/" + encodePath(KEYWORD_INDEX_NAME) + "/_refresh", null);
 
-        // 2. 按文档ID精确查询，确认该文档片段已进入关键词索引
-        String termQuery = toJson(Map.of("query", Map.of("term", Map.of("document_id", Map.of("value", documentId)))));
+        // 2. 同时按文档和版本精确查询，确认当前版本片段已进入关键词索引。
+        String termQuery = toJson(Map.of("query", Map.of("bool", Map.of("filter", List.of(
+                Map.of("term", Map.of("document_id", Map.of("value", documentId))),
+                Map.of("term", Map.of("document_version_id", Map.of("value", documentVersionId))))))));
         JsonNode termResult = sendElasticsearchRequest("POST", "/" + encodePath(KEYWORD_INDEX_NAME) + "/_search", termQuery);
         assertThat(termResult.at("/hits/total/value").asInt()).isGreaterThan(0);
 

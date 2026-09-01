@@ -56,7 +56,7 @@ spring:
   elasticsearch:
     uris: http://192.168.31.11:9200 # Spring Data Elasticsearch 连接地址。
     username: elastic # Elasticsearch 用户名。
-    password:  # Elasticsearch 密码。
+    password:  # 123456 # Elasticsearch 密码。
     socket-timeout: 30s # Elasticsearch 请求超时时间。
 
 # RocketMQ连接配置。name-server为NameServer地址，多个地址使用分号分隔；producer.group为全局生产者组名称。
@@ -68,7 +68,7 @@ rocketmq:
 nexa:
   auth:
     web:
-      allowed-origin: http://localhost:3000 # https://xiaoxiaoliang.top # Cookie 状态变更请求允许的唯一浏览器源。
+      allowed-origin:  http://localhost:3000 # https://xiaoxiaoliang.top # Cookie 状态变更请求允许的唯一浏览器源。
     email-code-pepper: ${EMAIL_CODE_PEPPER:} # 必填：验证码 HMAC Pepper，仅通过环境变量注入。
     bootstrap-admin:
       enabled: ${BOOTSTRAP_ADMIN_ENABLED:false}
@@ -134,6 +134,10 @@ nexa:
       recipients: "2720370245@qq.com" # 告警邮件收件人，多个以逗号分隔。
   # 文档上传和异步处理流水线配置。
   document:
+    version:
+      backfill:
+        enabled: false # V28 历史 V1 索引元数据回填开关，确认外部索引容量后由运维显式开启。
+        batch-size: 100 # 单次启动最多重写的历史版本数量；重复执行按版本替换索引，结果幂等。
     upload:
       rate-limit:
         enabled: true # 是否启用文档上传入口限流，可选值：true、false。
