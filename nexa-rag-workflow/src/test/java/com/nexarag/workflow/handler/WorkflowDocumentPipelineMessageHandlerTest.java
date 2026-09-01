@@ -1,7 +1,7 @@
 package com.nexarag.workflow.handler;
 
-import com.nexarag.document.model.entity.Document;
-import com.nexarag.document.service.DocumentService;
+import com.nexarag.document.model.entity.DocumentVersionDO;
+import com.nexarag.document.service.DocumentVersionService;
 import com.nexarag.infra.messaging.document.model.DocumentPipelineMessage;
 import com.nexarag.workflow.service.WorkflowGraphRunner;
 import org.junit.jupiter.api.Test;
@@ -21,33 +21,47 @@ class WorkflowDocumentPipelineMessageHandlerTest {
 
     @Test
     void shouldRunGraphForCurrentProcess() {
-        DocumentService documentService = mock(DocumentService.class);
+        DocumentVersionService documentVersionService = mock(DocumentVersionService.class);
         WorkflowGraphRunner graphRunner = mock(WorkflowGraphRunner.class);
-        when(documentService.getRequiredDocument(1L)).thenReturn(
-                Document.builder().documentId(1L).processId("process-1").build());
+        when(documentVersionService.getRequiredVersion(1L, 2L)).thenReturn(
+                DocumentVersionDO.builder().documentId(1L).documentVersionId(2L).processId("process-1").build());
         WorkflowDocumentPipelineMessageHandler handler =
-                new WorkflowDocumentPipelineMessageHandler(documentService, graphRunner);
+                new WorkflowDocumentPipelineMessageHandler(documentVersionService, graphRunner);
 
         handler.handle(message());
 
-        verify(graphRunner).run(java.util.Map.of("documentId", 1L));
+        verify(graphRunner).run(java.util.Map.of("documentId", 1L, "documentVersionId", 2L, "processId", "process-1"));
     }
 
     @Test
     void shouldIgnoreOldProcess() {
-        DocumentService documentService = mock(DocumentService.class);
+        DocumentVersionService documentVersionService = mock(DocumentVersionService.class);
         WorkflowGraphRunner graphRunner = mock(WorkflowGraphRunner.class);
-        when(documentService.getRequiredDocument(1L)).thenReturn(
-                Document.builder().documentId(1L).processId("process-2").build());
+        when(documentVersionService.getRequiredVersion(1L, 2L)).thenReturn(
+                DocumentVersionDO.builder().documentId(1L).documentVersionId(2L).processId("process-2").build());
         WorkflowDocumentPipelineMessageHandler handler =
-                new WorkflowDocumentPipelineMessageHandler(documentService, graphRunner);
+                new WorkflowDocumentPipelineMessageHandler(documentVersionService, graphRunner);
 
         handler.handle(message());
 
         verify(graphRunner, never()).run(anyMap());
     }
 
+    @Test
+    void shouldRejectMissingMessageBoundary() {
+        DocumentVersionService documentVersionService = mock(DocumentVersionService.class);
+        WorkflowGraphRunner graphRunner = mock(WorkflowGraphRunner.class);
+        WorkflowDocumentPipelineMessageHandler handler =
+                new WorkflowDocumentPipelineMessageHandler(documentVersionService, graphRunner);
+
+        handler.handle(null);
+
+        verify(documentVersionService, never()).getRequiredVersion(org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.any());
+        verify(graphRunner, never()).run(anyMap());
+    }
+
     private DocumentPipelineMessage message() {
-        return new DocumentPipelineMessage(1L, "process-1", 1, LocalDateTime.now());
+        return new DocumentPipelineMessage(1L, 2L, "process-1", 101L, 2, LocalDateTime.now());
     }
 }

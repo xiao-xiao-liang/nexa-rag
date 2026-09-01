@@ -2,9 +2,9 @@ package com.nexarag.workflow.node.document;
 
 import com.alibaba.cloud.ai.graph.OverAllState;
 import com.nexarag.common.exception.ServiceException;
-import com.nexarag.document.model.entity.Document;
-import com.nexarag.document.enums.DocumentStatus;
-import com.nexarag.document.service.DocumentService;
+import com.nexarag.document.model.entity.DocumentVersionDO;
+import com.nexarag.document.enums.DocumentVersionStatus;
+import com.nexarag.document.service.DocumentVersionService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
@@ -19,6 +19,7 @@ import static com.nexarag.workflow.constants.DocumentIngestionNodeConstants.INDE
 import static com.nexarag.workflow.constants.DocumentIngestionNodeConstants.PARSING_NODE;
 import static com.nexarag.workflow.constants.DocumentIngestionStateKeys.CURRENT_STATUS;
 import static com.nexarag.workflow.constants.DocumentIngestionStateKeys.DOCUMENT_ID;
+import static com.nexarag.workflow.constants.DocumentIngestionStateKeys.DOCUMENT_VERSION_ID;
 import static com.nexarag.workflow.constants.DocumentIngestionStateKeys.ROUTE_TARGET;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -33,15 +34,16 @@ class DocumentStatusRouterNodeTest {
 
     @ParameterizedTest
     @MethodSource("statusRoutes")
-    void applyShouldRouteByDocumentStatus(DocumentStatus status, String expectedTarget) throws Exception {
-        DocumentService documentService = mock(DocumentService.class);
-        when(documentService.getRequiredDocument(1001L)).thenReturn(Document.builder()
+    void applyShouldRouteByDocumentVersionStatus(DocumentVersionStatus status, String expectedTarget) throws Exception {
+        DocumentVersionService documentVersionService = mock(DocumentVersionService.class);
+        when(documentVersionService.getRequiredVersion(1001L, 2001L)).thenReturn(DocumentVersionDO.builder()
                 .documentId(1001L)
+                .documentVersionId(2001L)
                 .status(status)
                 .build());
-        DocumentStatusRouterNode node = new DocumentStatusRouterNode(documentService);
+        DocumentStatusRouterNode node = new DocumentStatusRouterNode(documentVersionService);
 
-        Map<String, Object> result = node.apply(new OverAllState(Map.of(DOCUMENT_ID, 1001L)));
+        Map<String, Object> result = node.apply(new OverAllState(Map.of(DOCUMENT_ID, 1001L, DOCUMENT_VERSION_ID, 2001L)));
 
         assertThat(result).containsEntry(CURRENT_STATUS, status.name());
         assertThat(result).containsEntry(ROUTE_TARGET, expectedTarget);
@@ -49,7 +51,7 @@ class DocumentStatusRouterNodeTest {
 
     @Test
     void applyShouldRejectMissingDocumentId() {
-        DocumentStatusRouterNode node = new DocumentStatusRouterNode(mock(DocumentService.class));
+        DocumentStatusRouterNode node = new DocumentStatusRouterNode(mock(DocumentVersionService.class));
 
         assertThatThrownBy(() -> node.apply(new OverAllState(Map.of())))
                 .isInstanceOf(ServiceException.class)
@@ -58,15 +60,15 @@ class DocumentStatusRouterNodeTest {
 
     static Stream<Arguments> statusRoutes() {
         return Stream.of(
-                arguments(DocumentStatus.QUEUED, PARSING_NODE),
-                arguments(DocumentStatus.PARSING, PARSING_NODE),
-                arguments(DocumentStatus.PARSED, CHUNKING_NODE),
-                arguments(DocumentStatus.CHUNKING, CHUNKING_NODE),
-                arguments(DocumentStatus.CHUNKED, INDEXING_NODE),
-                arguments(DocumentStatus.INDEXING, INDEXING_NODE),
-                arguments(DocumentStatus.INDEXED, END),
-                arguments(DocumentStatus.FAILED, END),
-                arguments(DocumentStatus.UPLOADED, END)
+                arguments(DocumentVersionStatus.QUEUED, PARSING_NODE),
+                arguments(DocumentVersionStatus.PARSING, PARSING_NODE),
+                arguments(DocumentVersionStatus.PARSED, CHUNKING_NODE),
+                arguments(DocumentVersionStatus.CHUNKING, CHUNKING_NODE),
+                arguments(DocumentVersionStatus.CHUNKED, INDEXING_NODE),
+                arguments(DocumentVersionStatus.INDEXING, INDEXING_NODE),
+                arguments(DocumentVersionStatus.INDEX_READY, END),
+                arguments(DocumentVersionStatus.FAILED, END),
+                arguments(DocumentVersionStatus.UPLOADED, END)
         );
     }
 }

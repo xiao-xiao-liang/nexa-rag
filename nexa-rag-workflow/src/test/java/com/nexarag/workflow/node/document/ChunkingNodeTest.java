@@ -1,10 +1,10 @@
 package com.nexarag.workflow.node.document;
 
 import com.alibaba.cloud.ai.graph.OverAllState;
-import com.nexarag.document.model.entity.Document;
-import com.nexarag.document.enums.DocumentStatus;
+import com.nexarag.document.model.entity.DocumentVersionDO;
+import com.nexarag.document.enums.DocumentVersionStatus;
 import com.nexarag.document.service.DocumentChunkingService;
-import com.nexarag.document.service.DocumentService;
+import com.nexarag.document.service.DocumentVersionService;
 import org.junit.jupiter.api.Test;
 
 import java.util.Map;
@@ -12,6 +12,7 @@ import java.util.Map;
 import static com.alibaba.cloud.ai.graph.StateGraph.END;
 import static com.nexarag.workflow.constants.DocumentIngestionNodeConstants.INDEXING_NODE;
 import static com.nexarag.workflow.constants.DocumentIngestionStateKeys.DOCUMENT_ID;
+import static com.nexarag.workflow.constants.DocumentIngestionStateKeys.DOCUMENT_VERSION_ID;
 import static com.nexarag.workflow.constants.DocumentIngestionStateKeys.ROUTE_TARGET;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -25,45 +26,47 @@ class ChunkingNodeTest {
 
     @Test
     void applyShouldChunkDocumentAndRouteToIndexing() throws Exception {
-        DocumentService documentService = mock(DocumentService.class);
+        DocumentVersionService documentVersionService = mock(DocumentVersionService.class);
         DocumentChunkingService chunkingService = mock(DocumentChunkingService.class);
-        when(chunkingService.chunk(1001L)).thenReturn(8);
-        when(documentService.getRequiredDocument(1001L)).thenReturn(Document.builder()
+        when(chunkingService.chunk(1001L, 2001L)).thenReturn(8);
+        when(documentVersionService.getRequiredVersion(1001L, 2001L)).thenReturn(DocumentVersionDO.builder()
                 .documentId(1001L)
-                .status(DocumentStatus.CHUNKED)
+                .documentVersionId(2001L)
+                .status(DocumentVersionStatus.CHUNKED)
                 .build());
 
-        ChunkingNode node = new ChunkingNode(documentService, chunkingService);
-        Map<String, Object> result = node.apply(new OverAllState(Map.of(DOCUMENT_ID, 1001L)));
+        ChunkingNode node = new ChunkingNode(documentVersionService, chunkingService);
+        Map<String, Object> result = node.apply(new OverAllState(Map.of(DOCUMENT_ID, 1001L, DOCUMENT_VERSION_ID, 2001L)));
 
         assertThat(result).containsEntry(ROUTE_TARGET, INDEXING_NODE);
     }
 
     @Test
     void applyShouldEndWhenChunkingFailureExhausted() throws Exception {
-        DocumentService documentService = mock(DocumentService.class);
+        DocumentVersionService documentVersionService = mock(DocumentVersionService.class);
         DocumentChunkingService chunkingService = mock(DocumentChunkingService.class);
-        when(chunkingService.chunk(1001L)).thenReturn(0);
-        when(documentService.getRequiredDocument(1001L)).thenReturn(Document.builder()
+        when(chunkingService.chunk(1001L, 2001L)).thenReturn(0);
+        when(documentVersionService.getRequiredVersion(1001L, 2001L)).thenReturn(DocumentVersionDO.builder()
                 .documentId(1001L)
-                .status(DocumentStatus.FAILED)
+                .documentVersionId(2001L)
+                .status(DocumentVersionStatus.FAILED)
                 .build());
 
-        ChunkingNode node = new ChunkingNode(documentService, chunkingService);
-        Map<String, Object> result = node.apply(new OverAllState(Map.of(DOCUMENT_ID, 1001L)));
+        ChunkingNode node = new ChunkingNode(documentVersionService, chunkingService);
+        Map<String, Object> result = node.apply(new OverAllState(Map.of(DOCUMENT_ID, 1001L, DOCUMENT_VERSION_ID, 2001L)));
 
         assertThat(result).containsEntry(ROUTE_TARGET, END);
     }
 
     @Test
     void applyShouldPropagateRetryException() {
-        DocumentService documentService = mock(DocumentService.class);
+        DocumentVersionService documentVersionService = mock(DocumentVersionService.class);
         DocumentChunkingService chunkingService = mock(DocumentChunkingService.class);
-        when(chunkingService.chunk(1001L)).thenThrow(new IllegalStateException("切分失败"));
+        when(chunkingService.chunk(1001L, 2001L)).thenThrow(new IllegalStateException("切分失败"));
 
-        ChunkingNode node = new ChunkingNode(documentService, chunkingService);
+        ChunkingNode node = new ChunkingNode(documentVersionService, chunkingService);
 
-        assertThatThrownBy(() -> node.apply(new OverAllState(Map.of(DOCUMENT_ID, 1001L))))
+        assertThatThrownBy(() -> node.apply(new OverAllState(Map.of(DOCUMENT_ID, 1001L, DOCUMENT_VERSION_ID, 2001L))))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("切分失败");
     }

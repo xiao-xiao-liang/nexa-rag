@@ -19,19 +19,23 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 class DocumentIngestionWorkflowRunnerTest {
 
     @Test
-    void runShouldRejectMissingDocumentId() throws Exception {
+    void runShouldRejectMissingDocumentProcessingBoundary() throws Exception {
         DocumentIngestionWorkflowRunner runner = new DocumentIngestionWorkflowRunner(buildNoopGraph());
 
         assertThatThrownBy(() -> runner.run(Map.of()))
                 .isInstanceOf(ServiceException.class)
                 .hasMessageContaining("documentId");
+        assertThatThrownBy(() -> runner.run(Map.of("documentId", 1001L)))
+                .isInstanceOf(ServiceException.class)
+                .hasMessageContaining("documentVersionId");
     }
 
     @Test
-    void runShouldAcceptNumericDocumentId() throws Exception {
+    void runShouldAcceptDocumentProcessingBoundary() throws Exception {
         DocumentIngestionWorkflowRunner runner = new DocumentIngestionWorkflowRunner(buildNoopGraph());
 
-        assertThatCode(() -> runner.run(Map.of("documentId", 1001L)))
+        assertThatCode(() -> runner.run(Map.of("documentId", 1001L, "documentVersionId", 2001L,
+                        "processId", "process-1")))
                 .doesNotThrowAnyException();
     }
 

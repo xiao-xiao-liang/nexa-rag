@@ -5,8 +5,10 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nexarag.document.model.dto.ParseConfigRequest;
 import com.nexarag.document.model.dto.ProcessDocumentRequest;
 import com.nexarag.document.model.entity.Document;
-import com.nexarag.document.enums.DocumentStatus;
+import com.nexarag.document.model.entity.DocumentVersionDO;
+import com.nexarag.document.enums.DocumentVersionStatus;
 import com.nexarag.document.enums.FileType;
+import com.nexarag.document.service.DocumentVersionService;
 import com.nexarag.document.service.DocumentService;
 import com.nexarag.infra.parser.model.DocumentParseRequest;
 import com.nexarag.infra.parser.model.ParsedArtifact;
@@ -22,6 +24,7 @@ import java.util.Map;
 
 import static com.nexarag.workflow.constants.DocumentIngestionNodeConstants.CHUNKING_NODE;
 import static com.nexarag.workflow.constants.DocumentIngestionStateKeys.DOCUMENT_ID;
+import static com.nexarag.workflow.constants.DocumentIngestionStateKeys.DOCUMENT_VERSION_ID;
 import static com.nexarag.workflow.constants.DocumentIngestionStateKeys.ROUTE_TARGET;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -42,12 +45,13 @@ class ParsingNodeTest {
     @Test
     void applyShouldParseQueuedDocumentAndRouteToChunking() throws Exception {
         DocumentService documentService = mock(DocumentService.class);
+        DocumentVersionService documentVersionService = mock(DocumentVersionService.class);
         DocumentParseService parseService = mock(DocumentParseService.class);
         ExternalDocumentSourceService sourceService = mock(ExternalDocumentSourceService.class);
         FileStorageService fileStorageService = mock(FileStorageService.class);
-        Document document = buildQueuedDocument();
-        when(documentService.getRequiredDocument(1001L)).thenReturn(document);
-        when(documentService.updateById(any(Document.class))).thenReturn(true);
+        DocumentVersionDO documentVersion = buildQueuedDocument();
+        when(documentVersionService.getRequiredVersion(1001L, 2001L)).thenReturn(documentVersion);
+        when(documentVersionService.updateById(any(DocumentVersionDO.class))).thenReturn(true);
         when(parseService.parse(any(DocumentParseRequest.class))).thenReturn(ParsedArtifact.builder()
                 .contentType("text/markdown")
                 .objectKey("parsed/1001/demo.md")
@@ -60,13 +64,13 @@ class ParsingNodeTest {
         when(fileStorageService.resolveUrl("parsed/1001/demo.md"))
                 .thenReturn("http://127.0.0.1/parsed/1001/demo.md");
 
-        ParsingNode node = new ParsingNode(documentService, parseService, sourceService, fileStorageService, objectMapper);
-        Map<String, Object> result = node.apply(new OverAllState(Map.of(DOCUMENT_ID, 1001L)));
+        ParsingNode node = new ParsingNode(documentService, documentVersionService, parseService, sourceService, fileStorageService, objectMapper);
+        Map<String, Object> result = node.apply(new OverAllState(Map.of(DOCUMENT_ID, 1001L, DOCUMENT_VERSION_ID, 2001L)));
 
-        assertThat(document.getStatus()).isEqualTo(DocumentStatus.PARSED);
-        assertThat(document.getParsedObjectName()).isEqualTo("parsed/1001/demo.md");
-        assertThat(document.getParsedFileUrl()).isEqualTo("http://127.0.0.1/parsed/1001/demo.md");
-        assertThat(objectMapper.readTree(document.getParsedMetadataJson())
+        assertThat(documentVersion.getStatus()).isEqualTo(DocumentVersionStatus.PARSED);
+        assertThat(documentVersion.getParsedObjectName()).isEqualTo("parsed/1001/demo.md");
+        assertThat(documentVersion.getParsedFileUrl()).isEqualTo("http://127.0.0.1/parsed/1001/demo.md");
+        assertThat(objectMapper.readTree(documentVersion.getParsedMetadataJson())
                 .at("/structureArtifacts/0/objectKey"))
                 .hasToString("\"parsed/1001/structure/mineru-middle.json\"");
         assertThat(result).containsEntry(ROUTE_TARGET, CHUNKING_NODE);
@@ -77,36 +81,38 @@ class ParsingNodeTest {
     @Test
     void applyShouldPropagateParseFailureToMessageConsumer() throws Exception {
         DocumentService documentService = mock(DocumentService.class);
+        DocumentVersionService documentVersionService = mock(DocumentVersionService.class);
         DocumentParseService parseService = mock(DocumentParseService.class);
         ExternalDocumentSourceService sourceService = mock(ExternalDocumentSourceService.class);
         FileStorageService fileStorageService = mock(FileStorageService.class);
-        Document document = buildQueuedDocument();
-        when(documentService.getRequiredDocument(1001L)).thenReturn(document);
-        when(documentService.updateById(any(Document.class))).thenReturn(true);
+        DocumentVersionDO documentVersion = buildQueuedDocument();
+        when(documentVersionService.getRequiredVersion(1001L, 2001L)).thenReturn(documentVersion);
+        when(documentVersionService.updateById(any(DocumentVersionDO.class))).thenReturn(true);
         IllegalStateException failure = new IllegalStateException("解析失败");
         when(parseService.parse(any(DocumentParseRequest.class))).thenThrow(failure);
 
-        ParsingNode node = new ParsingNode(documentService, parseService, sourceService, fileStorageService, objectMapper);
+        ParsingNode node = new ParsingNode(documentService, documentVersionService, parseService, sourceService, fileStorageService, objectMapper);
 
-        assertThatThrownBy(() -> node.apply(new OverAllState(Map.of(DOCUMENT_ID, 1001L))))
+        assertThatThrownBy(() -> node.apply(new OverAllState(Map.of(DOCUMENT_ID, 1001L, DOCUMENT_VERSION_ID, 2001L))))
                 .isSameAs(failure);
-        verify(documentService, never()).recordProcessFailure(any(), any(), any(), any());
     }
 
     @Test
     void applyShouldSkipParseWhenDocumentAlreadyParsed() throws Exception {
         DocumentService documentService = mock(DocumentService.class);
+        DocumentVersionService documentVersionService = mock(DocumentVersionService.class);
         DocumentParseService parseService = mock(DocumentParseService.class);
         ExternalDocumentSourceService sourceService = mock(ExternalDocumentSourceService.class);
         FileStorageService fileStorageService = mock(FileStorageService.class);
-        Document document = Document.builder()
+        DocumentVersionDO documentVersion = DocumentVersionDO.builder()
                 .documentId(1001L)
-                .status(DocumentStatus.PARSED)
+                .documentVersionId(2001L)
+                .status(DocumentVersionStatus.PARSED)
                 .build();
-        when(documentService.getRequiredDocument(1001L)).thenReturn(document);
+        when(documentVersionService.getRequiredVersion(1001L, 2001L)).thenReturn(documentVersion);
 
-        ParsingNode node = new ParsingNode(documentService, parseService, sourceService, fileStorageService, objectMapper);
-        Map<String, Object> result = node.apply(new OverAllState(Map.of(DOCUMENT_ID, 1001L)));
+        ParsingNode node = new ParsingNode(documentService, documentVersionService, parseService, sourceService, fileStorageService, objectMapper);
+        Map<String, Object> result = node.apply(new OverAllState(Map.of(DOCUMENT_ID, 1001L, DOCUMENT_VERSION_ID, 2001L)));
 
         assertThat(result).containsEntry(ROUTE_TARGET, CHUNKING_NODE);
         verify(parseService, never()).parse(any(DocumentParseRequest.class));
@@ -115,33 +121,37 @@ class ParsingNodeTest {
     @Test
     void applyShouldReadExternalSourceInsteadOfFileParser() throws Exception {
         DocumentService documentService = mock(DocumentService.class);
+        DocumentVersionService documentVersionService = mock(DocumentVersionService.class);
         DocumentParseService parseService = mock(DocumentParseService.class);
         ExternalDocumentSourceService sourceService = mock(ExternalDocumentSourceService.class);
         FileStorageService fileStorageService = mock(FileStorageService.class);
-        Document document = buildQueuedDocument();
-        document.setSourceType(ExternalDocumentSourceType.YUQUE);
-        document.setSourceUrl("https://www.yuque.com/a/b");
+        DocumentVersionDO documentVersion = buildQueuedDocument();
+        documentVersion.setSourceType(ExternalDocumentSourceType.YUQUE);
+        documentVersion.setSourceUrl("https://www.yuque.com/a/b");
+        when(documentVersionService.getRequiredVersion(1001L, 2001L)).thenReturn(documentVersion);
+        when(documentVersionService.updateById(any(DocumentVersionDO.class))).thenReturn(true);
+        Document document = Document.builder().documentId(1001L).title("外部文档").build();
         when(documentService.getRequiredDocument(1001L)).thenReturn(document);
-        when(documentService.updateById(any(Document.class))).thenReturn(true);
         ParsedArtifact artifact = ParsedArtifact.builder().contentType("text/markdown")
                 .objectKey("parsed/1001/content.md").build();
         when(sourceService.readAndPersist(any())).thenReturn(new SourceArtifactBO(artifact, "语雀标题", null, Map.of()));
         when(fileStorageService.resolveUrl(artifact.objectKey())).thenReturn("http://127.0.0.1/parsed/1001/content.md");
 
-        ParsingNode node = new ParsingNode(documentService, parseService, sourceService, fileStorageService, objectMapper);
-        node.apply(new OverAllState(Map.of(DOCUMENT_ID, 1001L)));
+        ParsingNode node = new ParsingNode(documentService, documentVersionService, parseService, sourceService, fileStorageService, objectMapper);
+        node.apply(new OverAllState(Map.of(DOCUMENT_ID, 1001L, DOCUMENT_VERSION_ID, 2001L)));
 
         verify(sourceService).readAndPersist(any());
         verify(parseService, never()).parse(any());
-        assertThat(document.getStatus()).isEqualTo(DocumentStatus.PARSED);
+        assertThat(documentVersion.getStatus()).isEqualTo(DocumentVersionStatus.PARSED);
     }
 
-    private Document buildQueuedDocument() throws Exception {
+    private DocumentVersionDO buildQueuedDocument() throws Exception {
         ProcessDocumentRequest processRequest = new ProcessDocumentRequest(null,
                 new ParseConfigRequest(true, false), null);
-        return Document.builder()
+        return DocumentVersionDO.builder()
                 .documentId(1001L)
-                .status(DocumentStatus.QUEUED)
+                .documentVersionId(2001L)
+                .status(DocumentVersionStatus.QUEUED)
                 .originalFileName("demo.docx")
                 .fileType(FileType.WORD)
                 .originalObjectName("original/1001/demo.docx")

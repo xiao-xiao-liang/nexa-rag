@@ -29,12 +29,13 @@ class SectionExpansionNodeTenantContextTest {
         SectionExpansionRetriever retriever = mock(SectionExpansionRetriever.class);
         KnowledgeBaseService knowledgeBaseService = mock(KnowledgeBaseService.class);
         RetrievalChunk chunk = new RetrievalChunk("chunk-001", 1L, null, null, null, null,
-                "正文", 1D, "SECTION_EXPANSION", 1);
+                "正文", 1D, "SECTION_EXPANSION", 1, 101L);
         when(knowledgeBaseService.validateRequestedKnowledgeBases("tenant-001", List.of()))
                 .thenReturn(Set.of());
-        when(retriever.retrieve("退款规则")).thenReturn(List.of(chunk));
-        when(knowledgeBaseService.filterDocumentIdsInTenantScope("tenant-001", List.of(1L), Set.of()))
-                .thenReturn(Set.of(1L));
+        when(knowledgeBaseService.listActiveVersionIdsInTenantScope("tenant-001", Set.of())).thenReturn(Set.of(101L));
+        when(retriever.retrieve("退款规则", Set.of(101L))).thenReturn(List.of(chunk));
+        when(knowledgeBaseService.findActiveVersionIdsInTenantScope("tenant-001", List.of(1L), Set.of()))
+                .thenReturn(Map.of(1L, 101L));
 
         Map<String, Object> result = new SectionExpansionNode(retriever, knowledgeBaseService)
                 .apply(new OverAllState(Map.of(TENANT_ID, "tenant-001", REWRITTEN_QUESTION, "退款规则",
@@ -42,6 +43,7 @@ class SectionExpansionNodeTenantContextTest {
 
         assertThat(result.get(FUSED_RETRIEVAL_RESULTS)).isEqualTo(List.of(chunk));
         verify(knowledgeBaseService).validateRequestedKnowledgeBases("tenant-001", List.of());
-        verify(knowledgeBaseService).filterDocumentIdsInTenantScope("tenant-001", List.of(1L), Set.of());
+        verify(knowledgeBaseService).listActiveVersionIdsInTenantScope("tenant-001", Set.of());
+        verify(knowledgeBaseService).findActiveVersionIdsInTenantScope("tenant-001", List.of(1L), Set.of());
     }
 }

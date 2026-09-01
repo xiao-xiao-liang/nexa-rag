@@ -3,6 +3,7 @@ package com.nexarag.workflow.service.chat;
 import com.alibaba.cloud.ai.graph.CompiledGraph;
 import com.alibaba.cloud.ai.graph.RunnableConfig;
 import com.alibaba.cloud.ai.graph.StateGraph;
+import com.nexarag.auth.tenant.TenantAccessGuard;
 import com.nexarag.model.prompt.domain.PromptExecutionSnapshot;
 import com.nexarag.model.toolkits.prompt.PromptReleaseResolver;
 import com.nexarag.workflow.request.ChatWorkflowRequest;
@@ -36,7 +37,7 @@ class ChatWorkflowRunnerTest {
         PromptReleaseResolver resolver = mock(PromptReleaseResolver.class);
         PromptExecutionSnapshot snapshot = PromptExecutionSnapshot.of(Map.of());
         when(resolver.resolve(any(), org.mockito.ArgumentMatchers.eq("u1"))).thenReturn(snapshot);
-        ChatWorkflowRunner runner = new ChatWorkflowRunner(graph, resolver);
+        ChatWorkflowRunner runner = new ChatWorkflowRunner(graph, resolver, mock(TenantAccessGuard.class));
         ChatWorkflowRequest request = new ChatWorkflowRequest("u1", null, "你好", "g1", "t1");
 
         StepVerifier.create(runner.stream(request.toInitialState())).verifyComplete();
