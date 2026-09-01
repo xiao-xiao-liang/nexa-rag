@@ -3,9 +3,10 @@ package com.nexarag.document.messaging;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nexarag.common.exception.ClientException;
 import com.nexarag.document.messaging.consumer.RocketMqDocumentPipelineConsumer;
-import com.nexarag.document.service.DocumentService;
-import com.nexarag.document.model.entity.Document;
-import com.nexarag.document.enums.DocumentStatus;
+import com.nexarag.document.enums.DocumentVersionStatus;
+import com.nexarag.document.model.entity.DocumentVersionDO;
+import com.nexarag.document.service.DocumentVersionService;
+import com.nexarag.document.service.DocumentPipelineOutboxService;
 import com.nexarag.document.service.impl.DocumentProcessFailureService;
 import com.nexarag.infra.messaging.document.DocumentPipelineMessageHandler;
 import com.nexarag.infra.config.DocumentPipelineMessagingProperties;
@@ -20,6 +21,7 @@ import java.time.LocalDateTime;
 
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.doThrow;
@@ -36,19 +38,22 @@ class RocketMqDocumentPipelineConsumerTest {
     @Test
     void shouldRecordConsumptionAndDelegateCurrentProcess() throws Exception {
         Fixture fixture = fixture();
-        when(fixture.documentService.recordMessageConsumption(1L, "process-1", "message-1", 2))
+        when(fixture.documentVersionService.recordMessageConsumption(1L, 2L, "process-1", "message-1", 2))
                 .thenReturn(true);
+        when(fixture.outboxService.markTaskProcessing(101L, 2)).thenReturn(true);
 
         fixture.consumer.onMessage(messageExt(fixture.objectMapper, 1));
 
+        verify(fixture.outboxService).markTaskProcessing(101L, 2);
         verify(fixture.messageHandler).handle(any(DocumentPipelineMessage.class));
-        verify(fixture.documentService).markMessageCompleted(1L, "process-1");
+        verify(fixture.documentVersionService).markMessageCompleted(1L, 2L, "process-1");
+        verify(fixture.outboxService).markTaskSucceeded(101L);
     }
 
     @Test
     void shouldAckOldProcessWithoutCallingHandler() throws Exception {
         Fixture fixture = fixture();
-        when(fixture.documentService.recordMessageConsumption(any(), anyString(), anyString(), any(Integer.class)))
+        when(fixture.documentVersionService.recordMessageConsumption(any(), any(), anyString(), anyString(), any(Integer.class)))
                 .thenReturn(false);
 
         fixture.consumer.onMessage(messageExt(fixture.objectMapper, 0));
@@ -59,20 +64,20 @@ class RocketMqDocumentPipelineConsumerTest {
     @Test
     void shouldRethrowRetryableException() throws Exception {
         Fixture fixture = fixture();
-        when(fixture.documentService.recordMessageConsumption(any(), anyString(), anyString(), any(Integer.class)))
+        when(fixture.documentVersionService.recordMessageConsumption(any(), any(), anyString(), anyString(), any(Integer.class)))
                 .thenReturn(true);
         IllegalStateException failure = new IllegalStateException("临时网络异常");
         doThrow(failure).when(fixture.messageHandler).handle(any());
 
         assertThatThrownBy(() -> fixture.consumer.onMessage(messageExt(fixture.objectMapper, 0)))
                 .isSameAs(failure);
-        verify(fixture.failureService).recordFailure(1L, "PARSING", "临时网络异常", failure.toString());
+        verify(fixture.failureService).recordFailure(1L, 2L, "process-1", "PARSING", "临时网络异常", failure.toString());
     }
 
     @Test
     void shouldPublishFailureTopicForNonRetryableException() throws Exception {
         Fixture fixture = fixture();
-        when(fixture.documentService.recordMessageConsumption(any(), anyString(), anyString(), any(Integer.class)))
+        when(fixture.documentVersionService.recordMessageConsumption(any(), any(), anyString(), anyString(), any(Integer.class)))
                 .thenReturn(true);
         doThrow(new ClientException("处理配置非法")).when(fixture.messageHandler).handle(any());
         SendResult sendResult = new SendResult();
@@ -88,18 +93,22 @@ class RocketMqDocumentPipelineConsumerTest {
 
     private Fixture fixture() {
         ObjectMapper objectMapper = new ObjectMapper().findAndRegisterModules();
-        DocumentService documentService = mock(DocumentService.class);
+        DocumentVersionService documentVersionService = mock(DocumentVersionService.class);
+        DocumentPipelineOutboxService outboxService = mock(DocumentPipelineOutboxService.class);
         DocumentPipelineMessageHandler messageHandler = mock(DocumentPipelineMessageHandler.class);
         RocketMQTemplate rocketMQTemplate = mock(RocketMQTemplate.class);
         DocumentProcessFailureService failureService = mock(DocumentProcessFailureService.class);
         DocumentPipelineMessagingProperties properties = new DocumentPipelineMessagingProperties();
-        when(documentService.getRequiredDocument(1L)).thenReturn(Document.builder()
+        when(outboxService.markTaskProcessing(any(Long.class), anyInt())).thenReturn(true);
+        when(documentVersionService.getRequiredVersion(1L, 2L)).thenReturn(DocumentVersionDO.builder()
                 .documentId(1L)
-                .status(DocumentStatus.PARSING)
+                .documentVersionId(2L)
+                .status(DocumentVersionStatus.PARSING)
                 .build());
         RocketMqDocumentPipelineConsumer consumer = new RocketMqDocumentPipelineConsumer(
-                objectMapper, documentService, messageHandler, rocketMQTemplate, properties, failureService);
-        return new Fixture(objectMapper, documentService, messageHandler, rocketMQTemplate, properties, failureService, consumer);
+                objectMapper, documentVersionService, outboxService, messageHandler, rocketMQTemplate, properties, failureService);
+        return new Fixture(objectMapper, documentVersionService, outboxService, messageHandler, rocketMQTemplate, properties,
+                failureService, consumer);
     }
 
     private MessageExt messageExt(ObjectMapper objectMapper, int reconsumeTimes) throws Exception {
@@ -107,12 +116,13 @@ class RocketMqDocumentPipelineConsumerTest {
         messageExt.setMsgId("message-1");
         messageExt.setReconsumeTimes(reconsumeTimes);
         messageExt.setBody(objectMapper.writeValueAsBytes(
-                new DocumentPipelineMessage(1L, "process-1", 1, LocalDateTime.now())));
+                new DocumentPipelineMessage(1L, 2L, "process-1", 101L, 2, LocalDateTime.now())));
         return messageExt;
     }
 
     private record Fixture(ObjectMapper objectMapper,
-                           DocumentService documentService,
+                           DocumentVersionService documentVersionService,
+                           DocumentPipelineOutboxService outboxService,
                            DocumentPipelineMessageHandler messageHandler,
                            RocketMQTemplate rocketMQTemplate,
                            DocumentPipelineMessagingProperties properties,

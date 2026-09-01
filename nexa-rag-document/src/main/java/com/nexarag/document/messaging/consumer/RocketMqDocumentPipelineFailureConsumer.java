@@ -1,6 +1,7 @@
 package com.nexarag.document.messaging.consumer;
 
 import com.nexarag.document.service.impl.DocumentProcessFailureService;
+import com.nexarag.document.constants.DocumentMessagingConstants;
 import com.nexarag.infra.messaging.document.model.DocumentPipelineFailureMessage;
 import lombok.RequiredArgsConstructor;
 import org.apache.rocketmq.spring.annotation.RocketMQMessageListener;
@@ -15,8 +16,8 @@ import org.springframework.stereotype.Component;
 @RequiredArgsConstructor
 @ConditionalOnProperty(prefix = "nexa.document.pipeline.messaging", name = "type", havingValue = "rocketmq")
 @RocketMQMessageListener(
-        topic = "${nexa.document.pipeline.messaging.failure-topic:nexa-document-pipeline-failure}",
-        consumerGroup = "${nexa.document.pipeline.messaging.failure-consumer-group:nexa-document-pipeline-failure-handler}")
+        topic = DocumentMessagingConstants.PIPELINE_FAILURE_TOPIC,
+        consumerGroup = DocumentMessagingConstants.PIPELINE_FAILURE_CONSUMER_GROUP)
 public class RocketMqDocumentPipelineFailureConsumer
         implements RocketMQListener<DocumentPipelineFailureMessage> {
 

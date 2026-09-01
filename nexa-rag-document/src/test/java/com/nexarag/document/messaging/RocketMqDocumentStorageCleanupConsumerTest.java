@@ -2,16 +2,21 @@ package com.nexarag.document.messaging;
 
 import com.nexarag.document.messaging.consumer.RocketMqDocumentStorageCleanupConsumer;
 import com.nexarag.document.service.DocumentPipelineOutboxService;
+import com.nexarag.document.service.DocumentVersionCleanupService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nexarag.infra.messaging.document.task.DocumentStorageCleanupMessage;
+import com.nexarag.infra.messaging.document.task.DocumentVersionStorageCleanupMessage;
 import com.nexarag.infra.storage.service.FileStorageService;
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.apache.rocketmq.common.message.MessageExt;
 
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
+import java.util.Arrays;
 
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -24,6 +29,13 @@ import static org.mockito.ArgumentMatchers.eq;
  * 文档对象存储清理消费者测试。
  */
 class RocketMqDocumentStorageCleanupConsumerTest {
+
+    @Test
+    void shouldMarkFullDependencyConstructorForSpringInjection() {
+        assertThat(Arrays.stream(RocketMqDocumentStorageCleanupConsumer.class.getConstructors())
+                .filter(constructor -> constructor.getParameterCount() == 4)
+                .anyMatch(constructor -> constructor.isAnnotationPresent(Autowired.class))).isTrue();
+    }
 
     @Test
     void shouldDeleteDistinctOriginalAndParsedObjectsBeforeCompletingTask() throws Exception {
@@ -125,6 +137,31 @@ class RocketMqDocumentStorageCleanupConsumerTest {
         consumer.onMessage(messageExt(1));
 
         verify(outboxService).markTaskProcessing(101L, 2);
+    }
+
+    @Test
+    void shouldDeleteOnlyVersionObjectsThenPhysicallyCleanupVersionData() throws Exception {
+        FileStorageService fileStorageService = mock(FileStorageService.class);
+        DocumentPipelineOutboxService outboxService = mock(DocumentPipelineOutboxService.class);
+        DocumentVersionCleanupService versionCleanupService = mock(DocumentVersionCleanupService.class);
+        ObjectMapper objectMapper = mock(ObjectMapper.class);
+        when(outboxService.markTaskProcessing(101L, 1)).thenReturn(true);
+        when(objectMapper.readValue(any(byte[].class), eq(DocumentVersionStorageCleanupMessage.class))).thenReturn(
+                new DocumentVersionStorageCleanupMessage(101L, 1L, 2L, "operation-1",
+                        "CLEAN_DOCUMENT_VERSION_STORAGE", 1, "original/v2.pdf", "parsed/v2.md",
+                        LocalDateTime.of(2026, 8, 30, 21, 0)));
+        when(objectMapper.readTree(any(byte[].class))).thenReturn(new ObjectMapper().readTree("{\"documentVersionId\":2}"));
+        RocketMqDocumentStorageCleanupConsumer consumer = new RocketMqDocumentStorageCleanupConsumer(objectMapper,
+                fileStorageService, outboxService, versionCleanupService);
+        MessageExt messageExt = new MessageExt();
+        messageExt.setBody("{\"documentVersionId\":2}".getBytes(StandardCharsets.UTF_8));
+
+        consumer.onMessage(messageExt);
+
+        verify(fileStorageService).delete("original/v2.pdf");
+        verify(fileStorageService).delete("parsed/v2.md");
+        verify(versionCleanupService).cleanup(1L, 2L);
+        verify(outboxService).markTaskSucceeded(101L);
     }
 
     private MessageExt messageExt(int reconsumeTimes) {

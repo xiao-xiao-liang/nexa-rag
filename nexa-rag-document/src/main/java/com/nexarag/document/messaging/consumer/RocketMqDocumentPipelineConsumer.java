@@ -3,11 +3,13 @@ package com.nexarag.document.messaging.consumer;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nexarag.common.exception.ClientException;
 import com.nexarag.common.exception.ServiceException;
-import com.nexarag.document.service.DocumentService;
+import com.nexarag.document.service.DocumentPipelineOutboxService;
+import com.nexarag.document.service.DocumentVersionService;
 import com.nexarag.document.service.impl.DocumentProcessFailureService;
+import com.nexarag.document.constants.DocumentMessagingConstants;
+import com.nexarag.infra.config.DocumentPipelineMessagingProperties;
 import com.nexarag.infra.messaging.document.DocumentPipelineMessageHandler;
 import com.nexarag.infra.messaging.document.DocumentPipelineNonRetryableException;
-import com.nexarag.infra.config.DocumentPipelineMessagingProperties;
 import com.nexarag.infra.messaging.document.model.DocumentPipelineFailureMessage;
 import com.nexarag.infra.messaging.document.model.DocumentPipelineMessage;
 import lombok.RequiredArgsConstructor;
@@ -33,15 +35,14 @@ import java.time.LocalDateTime;
 @RequiredArgsConstructor
 @ConditionalOnProperty(prefix = "nexa.document.pipeline.messaging", name = "type", havingValue = "rocketmq")
 @RocketMQMessageListener(
-        topic = "${nexa.document.pipeline.messaging.topic:nexa-document-pipeline}",
-        consumerGroup = "${nexa.document.pipeline.messaging.consumer-group:nexa-document-pipeline-worker}",
-        maxReconsumeTimes = 5)
+        topic = DocumentMessagingConstants.PIPELINE_TOPIC,
+        consumerGroup = DocumentMessagingConstants.PIPELINE_CONSUMER_GROUP,
+        maxReconsumeTimes = DocumentMessagingConstants.MAX_RECONSUME_TIMES)
 public class RocketMqDocumentPipelineConsumer implements RocketMQListener<MessageExt> {
 
-    private static final int MAX_FAILURE_DETAIL_LENGTH = 4000;
-
     private final ObjectMapper objectMapper;
-    private final DocumentService documentService;
+    private final DocumentVersionService documentVersionService;
+    private final DocumentPipelineOutboxService outboxService;
     private final DocumentPipelineMessageHandler messageHandler;
     private final RocketMQTemplate rocketMQTemplate;
     private final DocumentPipelineMessagingProperties properties;
@@ -52,25 +53,34 @@ public class RocketMqDocumentPipelineConsumer implements RocketMQListener<Messag
         DocumentPipelineMessage message = deserialize(messageExt);
         int consumedTimes = messageExt.getReconsumeTimes() + 1;
 
-        // 1. 记录当前轮次消费上下文，旧轮次或终态消息直接确认
-        boolean currentProcess = documentService.recordMessageConsumption(
-                message.documentId(), message.processId(), messageExt.getMsgId(), consumedTimes);
+        // 1. 领取Outbox任务，已进入终态的重复消息直接确认
+        if (!outboxService.markTaskProcessing(message.outboxId(), consumedTimes)) {
+            return;
+        }
+
+        // 2. 记录当前轮次消费上下文，旧轮次或终态消息直接确认
+        boolean currentProcess = documentVersionService.recordMessageConsumption(message.documentId(),
+                message.documentVersionId(), message.processId(), messageExt.getMsgId(), consumedTimes);
         if (!currentProcess) {
-            log.info("忽略旧轮次或终态文档消息，documentId={}，processId={}，messageId={}",
-                    message.documentId(), message.processId(), messageExt.getMsgId());
+            outboxService.markTaskSucceeded(message.outboxId());
+            log.info("忽略旧轮次或终态文档版本消息，documentId={}，documentVersionId={}，processId={}，messageId={}",
+                    message.documentId(), message.documentVersionId(), message.processId(), messageExt.getMsgId());
             return;
         }
 
         try {
-            // 2. 委托工作流执行当前文档处理轮次
+            // 3. 委托工作流执行当前文档处理轮次并完成Outbox任务
             messageHandler.handle(message);
-            documentService.markMessageCompleted(message.documentId(), message.processId());
+            documentVersionService.markMessageCompleted(message.documentId(), message.documentVersionId(), message.processId());
+            outboxService.markTaskSucceeded(message.outboxId());
         } catch (ClientException | DocumentPipelineNonRetryableException exception) {
-            // 3. 永久性业务异常直接发布失败主题，避免无效重试
-            publishFailure(message, messageExt, consumedTimes, currentFailureStage(message.documentId()), exception);
+            // 4. 永久性业务异常直接发布失败主题，避免无效重试
+            publishFailure(message, messageExt, consumedTimes,
+                    currentFailureStage(message.documentId(), message.documentVersionId()), exception);
         } catch (RuntimeException exception) {
-            // 4. 可重试异常先独立回写失败上下文，再交由 RocketMQ 重投
-            failureService.recordFailure(message.documentId(), currentFailureStage(message.documentId()), exception.getMessage(),
+            // 5. 可重试异常先独立回写失败上下文，再交由 RocketMQ 重投
+            failureService.recordFailure(message.documentId(), message.documentVersionId(), message.processId(),
+                    currentFailureStage(message.documentId(), message.documentVersionId()), exception.getMessage(),
                     truncate(exception.toString()));
             throw exception;
         }
@@ -89,22 +99,23 @@ public class RocketMqDocumentPipelineConsumer implements RocketMQListener<Messag
                                 int consumedTimes, String failureStage, RuntimeException exception) {
         String failureDetail = truncate(exception.toString());
         DocumentPipelineFailureMessage failureMessage = new DocumentPipelineFailureMessage(
-                message.outboxId(), message.documentId(), message.processId(), failureStage,
+                message.outboxId(), message.documentId(), message.documentVersionId(), message.processId(), failureStage,
                 exception.getMessage(), failureDetail, consumedTimes, messageExt.getMsgId(), LocalDateTime.now());
         org.springframework.messaging.Message<DocumentPipelineFailureMessage> rocketMqMessage =
                 MessageBuilder.withPayload(failureMessage)
-                        .setHeader(RocketMQHeaders.KEYS, message.documentId() + ":" + message.processId())
+                        .setHeader(RocketMQHeaders.KEYS, message.documentId() + ":" + message.documentVersionId()
+                                + ":" + message.processId())
                         .build();
         try {
             SendResult result = rocketMQTemplate.syncSend(properties.getFailureTopic(), rocketMqMessage);
             if (result == null || result.getSendStatus() != SendStatus.SEND_OK) {
                 throw new ServiceException("发布文档流水线失败消息未成功，documentId=" + message.documentId());
             }
-            log.warn("文档流水线不可重试异常已转入失败主题，documentId={}，processId={}，messageId={}",
-                    message.documentId(), message.processId(), messageExt.getMsgId(), exception);
+            log.warn("文档版本流水线不可重试异常已转入失败主题，documentId={}，documentVersionId={}，processId={}，messageId={}",
+                    message.documentId(), message.documentVersionId(), message.processId(), messageExt.getMsgId(), exception);
         } catch (RuntimeException publishException) {
-            log.error("发布文档流水线失败消息异常，documentId={}，processId={}",
-                    message.documentId(), message.processId(), publishException);
+            log.error("发布文档版本流水线失败消息异常，documentId={}，documentVersionId={}，processId={}",
+                    message.documentId(), message.documentVersionId(), message.processId(), publishException);
             throw publishException;
         }
     }
@@ -112,14 +123,14 @@ public class RocketMqDocumentPipelineConsumer implements RocketMQListener<Messag
     /**
      * 获取异常发生时文档已推进到的处理状态，用作失败阶段。
      */
-    private String currentFailureStage(Long documentId) {
-        return documentService.getRequiredDocument(documentId).getStatus().name();
+    private String currentFailureStage(Long documentId, Long documentVersionId) {
+        return documentVersionService.getRequiredVersion(documentId, documentVersionId).getStatus().name();
     }
 
     private String truncate(String detail) {
-        if (detail == null || detail.length() <= MAX_FAILURE_DETAIL_LENGTH) {
+        if (detail == null || detail.length() <= DocumentMessagingConstants.MAX_FAILURE_DETAIL_LENGTH) {
             return detail;
         }
-        return detail.substring(0, MAX_FAILURE_DETAIL_LENGTH);
+        return detail.substring(0, DocumentMessagingConstants.MAX_FAILURE_DETAIL_LENGTH);
     }
 }

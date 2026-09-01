@@ -30,13 +30,14 @@ class RocketMqDocumentPipelineDeadLetterConsumerTest {
         messageExt.setMsgId("message-1");
         messageExt.setReconsumeTimes(6);
         messageExt.setBody(objectMapper.writeValueAsBytes(
-                new DocumentPipelineMessage(1L, "process-1", 1, LocalDateTime.now())));
+                new DocumentPipelineMessage(1L, 2L, "process-1", 101L, 2, LocalDateTime.now())));
 
         consumer.onMessage(messageExt);
 
         ArgumentCaptor<DocumentPipelineFailureMessage> captor =
                 ArgumentCaptor.forClass(DocumentPipelineFailureMessage.class);
         verify(failureService).markFinalFailure(captor.capture());
+        assertThat(captor.getValue().documentVersionId()).isEqualTo(2L);
         assertThat(captor.getValue().consumedTimes()).isEqualTo(6);
         assertThat(captor.getValue().messageId()).isEqualTo("message-1");
     }

@@ -3,6 +3,7 @@ package com.nexarag.document.messaging.consumer;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nexarag.common.exception.ServiceException;
 import com.nexarag.document.service.impl.DocumentProcessFailureService;
+import com.nexarag.document.constants.DocumentMessagingConstants;
 import com.nexarag.infra.messaging.document.model.DocumentPipelineFailureMessage;
 import com.nexarag.infra.messaging.document.model.DocumentPipelineMessage;
 import lombok.RequiredArgsConstructor;
@@ -23,8 +24,8 @@ import java.time.LocalDateTime;
 @RequiredArgsConstructor
 @ConditionalOnProperty(prefix = "nexa.document.pipeline.messaging", name = "type", havingValue = "rocketmq")
 @RocketMQMessageListener(
-        topic = "%DLQ%${nexa.document.pipeline.messaging.consumer-group:nexa-document-pipeline-worker}",
-        consumerGroup = "${nexa.document.pipeline.messaging.failure-consumer-group:nexa-document-pipeline-failure-handler}-dlq")
+        topic = DocumentMessagingConstants.PIPELINE_DEAD_LETTER_TOPIC,
+        consumerGroup = DocumentMessagingConstants.PIPELINE_DEAD_LETTER_CONSUMER_GROUP)
 public class RocketMqDocumentPipelineDeadLetterConsumer implements RocketMQListener<MessageExt> {
 
     private final ObjectMapper objectMapper;
@@ -37,7 +38,8 @@ public class RocketMqDocumentPipelineDeadLetterConsumer implements RocketMQListe
             DocumentPipelineMessage message = objectMapper.readValue(messageExt.getBody(), DocumentPipelineMessage.class);
             int consumedTimes = Math.max(messageExt.getReconsumeTimes(), 1);
             DocumentPipelineFailureMessage failureMessage = new DocumentPipelineFailureMessage(
-                    message.outboxId(), message.documentId(), message.processId(), "ROCKETMQ_RETRY_EXHAUSTED",
+                    message.outboxId(), message.documentId(), message.documentVersionId(), message.processId(),
+                    "ROCKETMQ_RETRY_EXHAUSTED",
                     "RocketMQ自动重试已达上限", "消息进入死信队列",
                     consumedTimes, messageExt.getMsgId(), LocalDateTime.now());
 
