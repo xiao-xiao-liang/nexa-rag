@@ -4,7 +4,6 @@ import com.nexarag.common.exception.ServiceException;
 import com.nexarag.retrieval.config.RetrievalProperties;
 import com.nexarag.retrieval.dto.req.KeywordIndexSearchRequest;
 import com.nexarag.retrieval.dto.req.KeywordIndexWriteRequest;
-import com.nexarag.retrieval.model.KeywordIndexDocument;
 import com.nexarag.retrieval.model.KeywordIndexSearchResult;
 import com.nexarag.retrieval.model.KeywordIndexWriteResult;
 import lombok.RequiredArgsConstructor;
@@ -24,9 +23,7 @@ import org.springframework.util.StringUtils;
 
 import java.util.List;
 
-import static com.nexarag.retrieval.constants.DocumentIndexFieldConstants.DOCUMENT_ID;
-import static com.nexarag.retrieval.constants.DocumentIndexFieldConstants.INDEX_CONTENT;
-import static com.nexarag.retrieval.constants.DocumentIndexFieldConstants.TEXT;
+import static com.nexarag.retrieval.constants.DocumentIndexFieldConstants.*;
 
 /**
  * 基于 Spring Data Elasticsearch 的关键词索引客户端。
@@ -85,7 +82,7 @@ public class ElasticsearchKeywordIndexClient implements KeywordIndexClient {
         }
 
         // 1. 同时检索新索引字段和历史正文，兼容未完成重建的旧文档。
-        NativeQuery query = buildSearchQuery(request.query(), request.topK());
+        NativeQuery query = buildSearchQuery(request.query(), request.topK(), request.activeVersionIds());
         String indexName = resolveIndexName(request.indexName());
         List<SearchHit<KeywordIndexDocumentDO>> searchHits = elasticsearchOperations
                 .search(query, KeywordIndexDocumentDO.class, IndexCoordinates.of(indexName))
@@ -98,47 +95,37 @@ public class ElasticsearchKeywordIndexClient implements KeywordIndexClient {
     }
 
     /**
-     * 按文档ID删除默认 Elasticsearch 关键词索引中的记录。
+     * 按文档和版本ID删除指定 Elasticsearch 索引中的记录。
      *
-     * @param documentId 文档ID
+     * @param documentId        文档ID
+     * @param documentVersionId 文档版本ID
+     * @param indexName         索引名称，为空时使用默认正文索引
      * @return 删除数量
      */
     @Override
-    public int deleteByDocumentId(Long documentId) {
-        return deleteByDocumentId(documentId, null);
-    }
-
-    /**
-     * 按文档ID删除指定 Elasticsearch 索引中的记录。
-     *
-     * @param documentId 文档ID
-     * @param indexName  索引名称，为空时使用默认正文索引
-     * @return 删除数量
-     */
-    @Override
-    public int deleteByDocumentId(Long documentId, String indexName) {
-        if (documentId == null) {
+    public int deleteByDocumentVersionId(Long documentId, Long documentVersionId, String indexName) {
+        if (documentId == null || documentVersionId == null) {
             return 0;
         }
 
-        // 1. 通过 Spring Data delete_by_query 清理指定文档的全部片段。
+        // 1. 使用文档与版本双条件删除，禁止清理同文档的历史版本索引
         String resolvedIndexName = resolveIndexName(indexName);
         IndexCoordinates indexCoordinates = IndexCoordinates.of(resolvedIndexName);
         if (!elasticsearchOperations.indexOps(indexCoordinates).exists()) {
-            log.info("Elasticsearch 关键词索引不存在，跳过清理，文档ID：{}，indexName={}", documentId, resolvedIndexName);
+            log.info("Elasticsearch 关键词索引不存在，跳过版本清理，文档ID：{}，文档版本ID：{}，indexName={}",
+                    documentId, documentVersionId, resolvedIndexName);
             return 0;
         }
         NativeQuery query = NativeQuery.builder()
-                .withQuery(queryBuilder -> queryBuilder.term(term -> term
-                        .field(DOCUMENT_ID)
-                        .value(documentId)))
+                .withQuery(queryBuilder -> queryBuilder.bool(bool -> bool
+                        .filter(filter -> filter.term(term -> term.field(DOCUMENT_ID).value(documentId)))
+                        .filter(filter -> filter.term(term -> term.field(DOCUMENT_VERSION_ID).value(documentVersionId)))))
                 .build();
         ByQueryResponse response = elasticsearchOperations.delete(DeleteQuery.builder(query).build(),
                 KeywordIndexDocumentDO.class, indexCoordinates);
         int deletedCount = Math.toIntExact(response.getDeleted());
-
-        // 2. 记录真实删除数量，供异步索引清理任务排查。
-        log.info("Elasticsearch 关键词索引清理完成，文档ID：{}，indexName={}，删除数量：{}", documentId, resolvedIndexName, deletedCount);
+        log.info("Elasticsearch 关键词索引版本清理完成，文档ID：{}，文档版本ID：{}，indexName={}，删除数量：{}",
+                documentId, documentVersionId, resolvedIndexName, deletedCount);
         return deletedCount;
     }
 
@@ -167,19 +154,26 @@ public class ElasticsearchKeywordIndexClient implements KeywordIndexClient {
         log.info("Elasticsearch 关键词索引创建完成，indexName={}", indexCoordinates.getIndexName());
     }
 
-    private NativeQuery buildSearchQuery(String queryText, int topK) {
+    private NativeQuery buildSearchQuery(String queryText, int topK, java.util.Set<Long> activeVersionIds) {
         return NativeQuery.builder()
-                .withQuery(queryBuilder -> queryBuilder.bool(bool -> bool
-                        .should(should -> should.match(match -> match.field(INDEX_CONTENT).query(queryText)))
-                        .should(should -> should.match(match -> match.field(TEXT).query(queryText)))
-                        .minimumShouldMatch("1")))
+                .withQuery(queryBuilder -> queryBuilder.bool(bool -> {
+                    bool
+                            .should(should -> should.match(match -> match.field(INDEX_CONTENT).query(queryText)))
+                            .should(should -> should.match(match -> match.field(TEXT).query(queryText)))
+                            .minimumShouldMatch("1");
+                    if (activeVersionIds != null && !activeVersionIds.isEmpty()) {
+                        bool.filter(filter -> filter.terms(terms -> terms.field(DOCUMENT_VERSION_ID)
+                                .terms(values -> values.value(activeVersionIds.stream().map(co.elastic.clients.elasticsearch._types.FieldValue::of).toList()))));
+                    }
+                    return bool;
+                }))
                 .withPageable(PageRequest.of(0, topK))
                 .build();
     }
 
     private KeywordIndexSearchResult toSearchResult(SearchHit<KeywordIndexDocumentDO> searchHit) {
         KeywordIndexDocumentDO document = searchHit.getContent();
-        return new KeywordIndexSearchResult(document.chunkId(), document.documentId(), document.parentChunkId(),
+        return new KeywordIndexSearchResult(document.chunkId(), document.documentId(), document.documentVersionId(), document.parentChunkId(),
                 document.chunkOrder(), document.sectionId(), document.text(), document.metadataJson(),
                 searchHit.getScore());
     }

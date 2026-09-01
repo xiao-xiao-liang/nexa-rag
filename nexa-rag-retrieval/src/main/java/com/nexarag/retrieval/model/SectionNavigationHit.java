@@ -8,5 +8,14 @@ package com.nexarag.retrieval.model;
  * @param score      导航相关度分数
  * @param channel    命中通道
  */
-public record SectionNavigationHit(Long sectionId, Long documentId, double score, String channel) {
+public record SectionNavigationHit(
+        Long sectionId,
+        Long documentId,
+        Long documentVersionId,
+        double score,
+        String channel
+) {
+    public SectionNavigationHit(Long sectionId, Long documentId, double score, String channel) {
+        this(sectionId, documentId, null, score, channel);
+    }
 }

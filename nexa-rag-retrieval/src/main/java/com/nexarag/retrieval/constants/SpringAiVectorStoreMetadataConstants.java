@@ -6,6 +6,7 @@ package com.nexarag.retrieval.constants;
 public final class SpringAiVectorStoreMetadataConstants {
 
     public static final String DOCUMENT_ID = "documentId";
+    public static final String DOCUMENT_VERSION_ID = "documentVersionId";
     public static final String PARENT_CHUNK_ID = "parentChunkId";
     public static final String CHUNK_ORDER = "chunkOrder";
     public static final String SECTION_ID = "sectionId";

@@ -31,42 +31,32 @@ public interface KeywordIndexClient {
     List<KeywordIndexWriteResult> upsert(KeywordIndexWriteRequest request);
 
     /**
-     * 按文档替换指定关键词索引中的全部正文记录。
-     *
-     * <p>文档重处理会生成新的 chunkId，必须先清除旧记录再写入新片段，
-     * 避免 Elasticsearch 保留已失效的正文片段。</p>
+     * 按文档版本替换关键词索引，保留同一文档的其他历史版本。
      *
      * @param request 关键词索引替换请求
      * @return 写入结果列表
      */
-    default List<KeywordIndexWriteResult> replaceDocument(KeywordIndexWriteRequest request) {
-        if (request == null || request.documentId() == null) {
-            throw new IllegalArgumentException("关键词索引替换请求或文档ID不能为空");
+    default List<KeywordIndexWriteResult> replaceDocumentVersion(KeywordIndexWriteRequest request) {
+        if (request == null || request.documentId() == null || request.documentVersionId() == null) {
+            throw new IllegalArgumentException("关键词索引版本替换请求、文档ID或文档版本ID不能为空");
         }
 
-        // 1. 先清理当前文档的旧关键词记录
-        deleteByDocumentId(request.documentId(), request.indexName());
+        // 1. 先清理当前版本的旧关键词记录
+        deleteByDocumentVersionId(request.documentId(), request.documentVersionId(), request.indexName());
 
-        // 2. 写入本次切分生成的新关键词片段
+        // 2. 写入本次版本处理生成的新关键词片段
         return upsert(request);
     }
 
     /**
-     * 按文档ID删除关键词索引。
+     * 按文档和版本ID删除指定关键词索引中的记录。
      *
-     * @param documentId 文档ID
+     * @param documentId        文档ID
+     * @param documentVersionId 文档版本ID
+     * @param indexName         索引名称，为空时使用默认正文索引
      * @return 删除数量
      */
-    int deleteByDocumentId(Long documentId);
-
-    /**
-     * 按文档ID删除指定关键词索引中的记录。
-     *
-     * @param documentId 文档ID
-     * @param indexName  索引名称，为空时使用默认正文索引
-     * @return 删除数量
-     */
-    default int deleteByDocumentId(Long documentId, String indexName) {
-        return deleteByDocumentId(documentId);
+    default int deleteByDocumentVersionId(Long documentId, Long documentVersionId, String indexName) {
+        throw new UnsupportedOperationException("当前关键词索引不支持按文档版本删除");
     }
 }

@@ -3,10 +3,10 @@ package com.nexarag.retrieval.config;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nexarag.common.exception.ServiceException;
+import com.nexarag.document.enums.DocumentErrorCode;
 import com.nexarag.document.model.dto.IndexConfigRequest;
 import com.nexarag.document.model.dto.ProcessDocumentRequest;
-import com.nexarag.document.model.entity.Document;
-import com.nexarag.document.enums.DocumentErrorCode;
+import com.nexarag.document.model.entity.DocumentVersionDO;
 import com.nexarag.retrieval.model.IndexConfigSnapshot;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
@@ -23,18 +23,25 @@ public class IndexConfigResolver {
     private final RetrievalProperties retrievalProperties;
 
     /**
-     * 解析文档索引配置。
+     * 从不可变文档版本处理快照中解析索引配置。
      *
-     * @param document 文档实体
+     * @param documentVersion 文档版本
      * @return 索引运行配置快照
      */
-    public IndexConfigSnapshot resolve(Document document) {
-        if (document == null || !StringUtils.hasText(document.getProcessConfigJson())) {
+    public IndexConfigSnapshot resolve(DocumentVersionDO documentVersion) {
+        if (documentVersion == null) {
+            return defaultSnapshot();
+        }
+        return resolve(documentVersion.getProcessConfigJson(), documentVersion.getDocumentId());
+    }
+
+    private IndexConfigSnapshot resolve(String processConfigJson, Long documentId) {
+        if (!StringUtils.hasText(processConfigJson)) {
             return defaultSnapshot();
         }
         try {
             // 1. 读取文档处理配置快照
-            ProcessDocumentRequest request = objectMapper.readValue(document.getProcessConfigJson(), ProcessDocumentRequest.class);
+            ProcessDocumentRequest request = objectMapper.readValue(processConfigJson, ProcessDocumentRequest.class);
             IndexConfigRequest indexConfig = request.indexConfig();
             if (indexConfig == null) {
                 return defaultSnapshot();
@@ -48,7 +55,7 @@ public class IndexConfigResolver {
             return new IndexConfigSnapshot(enabled, vectorEnabled, keywordEnabled,
                     null, defaultVectorCollection(), defaultKeywordIndexName());
         } catch (JsonProcessingException exception) {
-            throw new ServiceException("解析文档索引配置失败，documentId=" + document.getDocumentId(), exception,
+            throw new ServiceException("解析文档索引配置失败，documentId=" + documentId, exception,
                     DocumentErrorCode.DOCUMENT_PROCESS_CONFIG_INVALID);
         }
     }

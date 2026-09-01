@@ -7,6 +7,7 @@ public final class DocumentIndexFieldConstants {
 
     public static final String CHUNK_ID = "chunk_id";
     public static final String DOCUMENT_ID = "document_id";
+    public static final String DOCUMENT_VERSION_ID = "document_version_id";
     public static final String PARENT_CHUNK_ID = "parent_chunk_id";
     public static final String CHUNK_ORDER = "chunk_order";
     public static final String SECTION_ID = "section_id";

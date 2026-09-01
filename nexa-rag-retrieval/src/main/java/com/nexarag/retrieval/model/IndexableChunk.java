@@ -5,19 +5,21 @@ import lombok.Builder;
 /**
  * 可索引片段快照，用于隔离 retrieval 模块内部处理与 document 实体直接修改。
  *
- * @param chunkId       片段ID
- * @param documentId    文档ID
- * @param chunkOrder    片段顺序
- * @param parentChunkId 父片段ID
- * @param sectionId     所属章节ID
- * @param text          片段文本
- * @param indexContent  用于索引的片段内容
- * @param metadataJson  元数据JSON
- * @param tokenCount    Token数量
+ * @param chunkId           片段ID
+ * @param documentId        文档ID
+ * @param documentVersionId 文档版本ID
+ * @param chunkOrder        片段顺序
+ * @param parentChunkId     父片段ID
+ * @param sectionId         所属章节ID
+ * @param text              片段文本
+ * @param indexContent      用于索引的片段内容
+ * @param metadataJson      元数据JSON
+ * @param tokenCount        Token数量
  */
 @Builder
 public record IndexableChunk(String chunkId,
                              Long documentId,
+                             Long documentVersionId,
                              Integer chunkOrder,
                              String parentChunkId,
                              Long sectionId,
@@ -36,6 +38,14 @@ public record IndexableChunk(String chunkId,
                           String text,
                           String metadataJson,
                           Integer tokenCount) {
-        this(chunkId, documentId, chunkOrder, parentChunkId, null, text, text, metadataJson, tokenCount);
+        this(chunkId, documentId, null, chunkOrder, parentChunkId, null, text, text, metadataJson, tokenCount);
+    }
+
+    /**
+     * 兼容尚未写入版本ID的既有索引调用方。
+     */
+    public IndexableChunk(String chunkId, Long documentId, Integer chunkOrder, String parentChunkId,
+                          Long sectionId, String text, String indexContent, String metadataJson, Integer tokenCount) {
+        this(chunkId, documentId, null, chunkOrder, parentChunkId, sectionId, text, indexContent, metadataJson, tokenCount);
     }
 }

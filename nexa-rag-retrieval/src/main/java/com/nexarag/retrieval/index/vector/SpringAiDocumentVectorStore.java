@@ -20,7 +20,7 @@ import java.util.List;
 import java.util.Map;
 
 import static com.nexarag.retrieval.constants.SpringAiVectorStoreMetadataConstants.*;
-import static org.springframework.ai.vectorstore.filter.Filter.ExpressionType.EQ;
+import static org.springframework.ai.vectorstore.filter.Filter.ExpressionType.*;
 
 /**
  * 基于 Spring AI VectorStore 的文档片段向量存储实现。
@@ -38,44 +38,29 @@ public class SpringAiDocumentVectorStore implements DocumentVectorStore {
     private final RetrievalProperties retrievalProperties;
 
     /**
-     * 删除当前文档已有向量后，写入全部待索引片段。
+     * 删除指定文档版本已有向量后，写入该版本的全部待索引片段。
      *
-     * @param documentId 文档ID
-     * @param chunks 当前待索引片段
+     * @param documentId        文档ID
+     * @param documentVersionId 文档版本ID
+     * @param chunks            当前待索引片段
      * @return 写入成功的片段结果
      */
     @Override
-    public List<VectorIndexWriteResult> replaceDocument(Long documentId, List<IndexableChunk> chunks) {
-        // 1. 校验文档和片段归属，避免跨文档删除或写入
-        validateDocumentChunks(documentId, chunks);
+    public List<VectorIndexWriteResult> replaceDocumentVersion(Long documentId, Long documentVersionId,
+                                                               List<IndexableChunk> chunks) {
+        // 1. 校验版本边界，禁止同一文档的历史版本互相覆盖
+        validateDocumentVersionChunks(documentId, documentVersionId, chunks);
 
-        // 2. 先清理当前文档已有向量，使框架 insert 语义满足业务替换语义
-        deleteByDocumentId(documentId);
-        if (chunks.isEmpty()) {
-            return List.of();
-        }
-
-        // 3. 按模型批量限制写入，任一批失败由异常向上交给既有任务重试
-        int batchSize = retrievalProperties.getEmbedding().getMaxBatchSize();
-        if (batchSize <= 0) {
-            throw new IllegalStateException("nexa.retrieval.embedding.max-batch-size必须大于0");
-        }
-        for (int start = 0; start < chunks.size(); start += batchSize) {
-            int end = Math.min(start + batchSize, chunks.size());
-            vectorStore.add(chunks.subList(start, end).stream().map(this::toDocument).toList());
-        }
-
-        // 4. Spring AI Document.id 与业务 chunkId 相同，直接作为向量索引ID回写
-        return chunks.stream()
-                .map(chunk -> new VectorIndexWriteResult(chunk.chunkId(), chunk.chunkId(), true, null))
-                .toList();
+        // 2. 仅清理当前版本，再复用统一批量写入逻辑
+        deleteByDocumentVersionId(documentId, documentVersionId);
+        return writeChunks(chunks);
     }
 
     /**
      * 按文本查询并恢复业务检索结果。
      *
      * @param query 查询文本
-     * @param topK 最大候选数量
+     * @param topK  最大候选数量
      * @return 业务片段检索结果
      */
     @Override
@@ -102,17 +87,32 @@ public class SpringAiDocumentVectorStore implements DocumentVectorStore {
         return results;
     }
 
+    @Override
+    public List<VectorIndexSearchResult> search(String query, int topK, java.util.Set<Long> activeVersionIds) {
+        if (!StringUtils.hasText(query) || topK <= 0 || activeVersionIds == null || activeVersionIds.isEmpty())
+            return List.of();
+        List<Document> documents = vectorStore.similaritySearch(SearchRequest.builder().query(query).topK(topK)
+                .similarityThresholdAll().filterExpression(new Filter.Expression(IN, new Filter.Key(DOCUMENT_VERSION_ID),
+                        new Filter.Value(activeVersionIds))).build());
+        return documents.stream().map(this::toSearchResult).flatMap(java.util.Optional::stream).toList();
+    }
+
     /**
-     * 按文档ID删除向量记录。
+     * 按文档和版本ID删除向量记录。
      *
-     * @param documentId 文档ID
+     * @param documentId        文档ID
+     * @param documentVersionId 文档版本ID
      */
     @Override
-    public void deleteByDocumentId(Long documentId) {
-        if (documentId == null) {
+    public void deleteByDocumentVersionId(Long documentId, Long documentVersionId) {
+        if (documentId == null || documentVersionId == null) {
             return;
         }
-        vectorStore.delete(new Filter.Expression(EQ, new Filter.Key(DOCUMENT_ID), new Filter.Value(documentId)));
+        Filter.Expression documentFilter = new Filter.Expression(EQ, new Filter.Key(DOCUMENT_ID),
+                new Filter.Value(documentId));
+        Filter.Expression versionFilter = new Filter.Expression(EQ, new Filter.Key(DOCUMENT_VERSION_ID),
+                new Filter.Value(documentVersionId));
+        vectorStore.delete(new Filter.Expression(AND, documentFilter, versionFilter));
     }
 
     private void validateDocumentChunks(Long documentId, List<IndexableChunk> chunks) {
@@ -129,12 +129,44 @@ public class SpringAiDocumentVectorStore implements DocumentVectorStore {
         }
     }
 
+    private void validateDocumentVersionChunks(Long documentId, Long documentVersionId, List<IndexableChunk> chunks) {
+        validateDocumentChunks(documentId, chunks);
+        if (documentVersionId == null) {
+            throw new IllegalArgumentException("文档版本ID不能为空");
+        }
+        boolean inconsistentVersion = chunks.stream()
+                .anyMatch(chunk -> !documentVersionId.equals(chunk.documentVersionId()));
+        if (inconsistentVersion) {
+            throw new IllegalArgumentException("待索引片段与文档版本ID不一致，documentVersionId=" + documentVersionId);
+        }
+    }
+
+    private List<VectorIndexWriteResult> writeChunks(List<IndexableChunk> chunks) {
+        if (chunks.isEmpty()) {
+            return List.of();
+        }
+
+        // 1. 按模型批量限制写入，任一批失败由异常向上交给既有任务重试
+        int batchSize = retrievalProperties.getEmbedding().getMaxBatchSize();
+        if (batchSize <= 0) {
+            throw new IllegalStateException("nexa.retrieval.embedding.max-batch-size必须大于0");
+        }
+        for (int start = 0; start < chunks.size(); start += batchSize) {
+            int end = Math.min(start + batchSize, chunks.size());
+            vectorStore.add(chunks.subList(start, end).stream().map(this::toDocument).toList());
+        }
+        return chunks.stream()
+                .map(chunk -> new VectorIndexWriteResult(chunk.chunkId(), chunk.chunkId(), true, null))
+                .toList();
+    }
+
     private Document toDocument(IndexableChunk chunk) {
         if (!StringUtils.hasText(chunk.chunkId()) || !StringUtils.hasText(chunk.indexContent())) {
             throw new IllegalArgumentException("向量索引片段缺少chunkId或indexContent");
         }
         Map<String, Object> metadata = new HashMap<>();
         metadata.put(DOCUMENT_ID, chunk.documentId());
+        putIfNotNull(metadata, DOCUMENT_VERSION_ID, chunk.documentVersionId());
         putIfNotNull(metadata, PARENT_CHUNK_ID, chunk.parentChunkId());
         putIfNotNull(metadata, CHUNK_ORDER, chunk.chunkOrder());
         putIfNotNull(metadata, SECTION_ID, chunk.sectionId());
@@ -151,10 +183,11 @@ public class SpringAiDocumentVectorStore implements DocumentVectorStore {
         try {
             Map<String, Object> metadata = document.getMetadata();
             Long documentId = requiredLong(metadata);
+            Long documentVersionId = optionalLong(metadata, DOCUMENT_VERSION_ID);
             Integer chunkOrder = optionalInteger(metadata);
             Long sectionId = optionalLong(metadata, SECTION_ID);
             String text = optionalString(metadata, TEXT, document.getText());
-            return java.util.Optional.of(new VectorIndexSearchResult(document.getId(), documentId,
+            return java.util.Optional.of(new VectorIndexSearchResult(document.getId(), documentId, documentVersionId,
                     optionalString(metadata, PARENT_CHUNK_ID, null), chunkOrder,
                     sectionId, text, optionalString(metadata, METADATA_JSON, null),
                     document.getScore() == null ? 0D : document.getScore()));

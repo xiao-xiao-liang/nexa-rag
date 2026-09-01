@@ -40,15 +40,4 @@ public class NoneKeywordIndexClient implements KeywordIndexClient {
                 .toList();
     }
 
-    /**
-     * 空关键词索引没有外部数据需要清理。
-     *
-     * @param documentId 文档ID
-     * @return 删除数量
-     */
-    @Override
-    public int deleteByDocumentId(Long documentId) {
-        // 1. keyword.type=none 不写外部索引，因此删除数量固定为0
-        return 0;
-    }
 }

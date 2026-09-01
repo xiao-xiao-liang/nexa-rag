@@ -12,27 +12,38 @@ import java.util.List;
 public interface DocumentVectorStore {
 
     /**
-     * 用当前文档的完整片段替换其已有向量记录。
+     * 用指定文档版本的完整片段替换其已有向量记录，不影响同一文档的历史版本。
      *
-     * @param documentId 文档ID
-     * @param chunks 当前待索引片段
+     * @param documentId        文档ID
+     * @param documentVersionId 文档版本ID
+     * @param chunks            当前待索引片段
      * @return 每个片段的写入结果
      */
-    List<VectorIndexWriteResult> replaceDocument(Long documentId, List<IndexableChunk> chunks);
+    default List<VectorIndexWriteResult> replaceDocumentVersion(Long documentId, Long documentVersionId,
+                                                                List<IndexableChunk> chunks) {
+        throw new UnsupportedOperationException("当前向量存储不支持按文档版本替换索引");
+    }
 
     /**
      * 按文本查询相似片段。
      *
      * @param query 查询文本
-     * @param topK 最大候选数量
+     * @param topK  最大候选数量
      * @return 业务片段检索结果
      */
     List<VectorIndexSearchResult> search(String query, int topK);
 
+    default List<VectorIndexSearchResult> search(String query, int topK, java.util.Set<Long> activeVersionIds) {
+        return search(query, topK);
+    }
+
     /**
-     * 删除指定文档的全部向量记录。
+     * 删除指定文档版本的全部向量记录。
      *
-     * @param documentId 文档ID
+     * @param documentId        文档ID
+     * @param documentVersionId 文档版本ID
      */
-    void deleteByDocumentId(Long documentId);
+    default void deleteByDocumentVersionId(Long documentId, Long documentVersionId) {
+        throw new UnsupportedOperationException("当前向量存储不支持按文档版本删除索引");
+    }
 }

@@ -6,14 +6,7 @@ import org.springframework.data.elasticsearch.annotations.Document;
 import org.springframework.data.elasticsearch.annotations.Field;
 import org.springframework.data.elasticsearch.annotations.FieldType;
 
-import static com.nexarag.retrieval.constants.DocumentIndexFieldConstants.CHUNK_ID;
-import static com.nexarag.retrieval.constants.DocumentIndexFieldConstants.CHUNK_ORDER;
-import static com.nexarag.retrieval.constants.DocumentIndexFieldConstants.DOCUMENT_ID;
-import static com.nexarag.retrieval.constants.DocumentIndexFieldConstants.INDEX_CONTENT;
-import static com.nexarag.retrieval.constants.DocumentIndexFieldConstants.METADATA_JSON;
-import static com.nexarag.retrieval.constants.DocumentIndexFieldConstants.PARENT_CHUNK_ID;
-import static com.nexarag.retrieval.constants.DocumentIndexFieldConstants.SECTION_ID;
-import static com.nexarag.retrieval.constants.DocumentIndexFieldConstants.TEXT;
+import static com.nexarag.retrieval.constants.DocumentIndexFieldConstants.*;
 
 /**
  * Elasticsearch 关键词索引文档对象。
@@ -26,6 +19,7 @@ public record KeywordIndexDocumentDO(
         @Id String id,
         @Field(name = CHUNK_ID, type = FieldType.Keyword) String chunkId,
         @Field(name = DOCUMENT_ID, type = FieldType.Long) Long documentId,
+        @Field(name = DOCUMENT_VERSION_ID, type = FieldType.Long) Long documentVersionId,
         @Field(name = PARENT_CHUNK_ID, type = FieldType.Keyword) String parentChunkId,
         @Field(name = CHUNK_ORDER, type = FieldType.Integer) Integer chunkOrder,
         @Field(name = SECTION_ID, type = FieldType.Long) Long sectionId,
@@ -41,15 +35,23 @@ public record KeywordIndexDocumentDO(
      */
     public static KeywordIndexDocumentDO from(KeywordIndexDocument document) {
         return new KeywordIndexDocumentDO(document.chunkId(), document.chunkId(), document.documentId(),
-                document.parentChunkId(), document.chunkOrder(), document.sectionId(), document.text(),
+                document.documentVersionId(), document.parentChunkId(), document.chunkOrder(), document.sectionId(), document.text(),
                 document.indexContent(), document.metadataJson());
     }
 
     /**
      * 用于测试和检索结果构造，始终令 Elasticsearch 文档ID与业务片段ID一致。
      */
+    public KeywordIndexDocumentDO(String chunkId, Long documentId, Long documentVersionId, String parentChunkId, Integer chunkOrder,
+                                  Long sectionId, String text, String indexContent, String metadataJson) {
+        this(chunkId, chunkId, documentId, documentVersionId, parentChunkId, chunkOrder, sectionId, text, indexContent, metadataJson);
+    }
+
+    /**
+     * 兼容未写入文档版本ID的既有 Elasticsearch 文档构造方式。
+     */
     public KeywordIndexDocumentDO(String chunkId, Long documentId, String parentChunkId, Integer chunkOrder,
                                   Long sectionId, String text, String indexContent, String metadataJson) {
-        this(chunkId, chunkId, documentId, parentChunkId, chunkOrder, sectionId, text, indexContent, metadataJson);
+        this(chunkId, documentId, null, parentChunkId, chunkOrder, sectionId, text, indexContent, metadataJson);
     }
 }
