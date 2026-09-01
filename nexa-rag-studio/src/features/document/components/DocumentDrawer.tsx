@@ -33,11 +33,11 @@ interface DocumentDrawerProps {
 }
 
 export const DocumentDrawer: React.FC<DocumentDrawerProps> = ({
-  documentId,
-  knowledgeBaseId = DEFAULT_KNOWLEDGE_BASE_ID,
-  onClose,
-  onReloadList,
-}) => {
+                                                                documentId,
+                                                                knowledgeBaseId = DEFAULT_KNOWLEDGE_BASE_ID,
+                                                                onClose,
+                                                                onReloadList,
+                                                              }) => {
   const [activeTab, setActiveTab] = useState<"overview" | "chunks" | "process" | "task">("overview");
   const [overview, setOverview] = useState<DocumentOverviewVO | null>(null);
   const [processStatus, setProcessStatus] = useState<DocumentProcessStatusVO | null>(null);

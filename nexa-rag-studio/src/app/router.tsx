@@ -9,7 +9,7 @@ import { DocumentDetailPage } from "../features/document/DocumentDetailPage";
 import { ModelPage } from "../features/model/ModelPage";
 import { PromptPage } from "../features/prompt/PromptPage";
 import { CrmOrderPage } from "../features/crm/CrmOrderPage";
-import { LoginPage } from "../features/auth/LoginPage";
+import { LoginPage } from "@/features/auth";
 import { authStore, useAuthStore } from "../features/auth/store/authStore";
 import { authApi } from "../lib/api";
 
@@ -98,66 +98,66 @@ export const AppRouter: React.FC = () => {
     <BrowserRouter>
       <SessionBootstrap>
         <Routes>
-        {/* 独立公开认证页面 (全屏无顶部导航外壳，已登录自动跳转主页) */}
-        <Route
-          path="/login"
-          element={
-            <PublicOnlyRoute>
-              <LoginPage />
-            </PublicOnlyRoute>
-          }
-        />
+          {/* 独立公开认证页面 (全屏无顶部导航外壳，已登录自动跳转主页) */}
+          <Route
+            path="/login"
+            element={
+              <PublicOnlyRoute>
+                <LoginPage />
+              </PublicOnlyRoute>
+            }
+          />
 
-        {/* 业务主系统页面 (包裹在 RequireAuth 与 AppShell 中，未登录全量拦截) */}
-        <Route
-          path="/*"
-          element={
-            <RequireAuth>
-              <AppShell>
-                <Routes>
-                  <Route path="/" element={<Navigate to="/home" replace />} />
-                  <Route path="/home" element={<HomePage />} />
-                  <Route path="/chat" element={<ChatPage />} />
-                  <Route path="/chat/:conversationId" element={<ChatPage />} />
-                  <Route path="/knowledge-base" element={<KnowledgeBaseManagePage />} />
-                  <Route path="/knowledge-base/:knowledgeBaseId" element={<DocumentPage />} />
-                  <Route
-                    path="/knowledge-base/:knowledgeBaseId/documents/:documentId"
-                    element={<DocumentDetailPage />}
-                  />
+          {/* 业务主系统页面 (包裹在 RequireAuth 与 AppShell 中，未登录全量拦截) */}
+          <Route
+            path="/*"
+            element={
+              <RequireAuth>
+                <AppShell>
+                  <Routes>
+                    <Route path="/" element={<Navigate to="/home" replace />} />
+                    <Route path="/home" element={<HomePage />} />
+                    <Route path="/chat" element={<ChatPage />} />
+                    <Route path="/chat/:conversationId" element={<ChatPage />} />
+                    <Route path="/knowledge-base" element={<KnowledgeBaseManagePage />} />
+                    <Route path="/knowledge-base/:knowledgeBaseId" element={<DocumentPage />} />
+                    <Route
+                      path="/knowledge-base/:knowledgeBaseId/documents/:documentId"
+                      element={<DocumentDetailPage />}
+                    />
 
-                  {/* 仅 ADMIN 管理员角色及具备相应权限才可访问的路由 */}
-                  <Route
-                    path="/models/*"
-                    element={
+                    {/* 仅 ADMIN 管理员角色及具备相应权限才可访问的路由 */}
+                    <Route
+                      path="/models/*"
+                      element={
                         <RequirePermission permission="model:manage">
                           <ModelPage />
                         </RequirePermission>
-                    }
-                  />
-                  <Route
-                    path="/prompts"
-                    element={
+                      }
+                    />
+                    <Route
+                      path="/prompts"
+                      element={
                         <RequirePermission permission="prompt:manage">
                           <PromptPage />
                         </RequirePermission>
-                    }
-                  />
-                  <Route
-                    path="/crm"
-                    element={
+                      }
+                    />
+                    <Route
+                      path="/crm"
+                      element={
                         <RequirePermission permission="crm:view">
                           <CrmOrderPage />
                         </RequirePermission>
-                    }
-                  />
+                      }
+                    />
 
-                  <Route path="*" element={<Navigate to="/home" replace />} />
-                </Routes>
-              </AppShell>
-            </RequireAuth>
-          }
-        />
+                    <Route path="*" element={<Navigate to="/home" replace />} />
+                  </Routes>
+                </AppShell>
+              </RequireAuth>
+            }
+          />
         </Routes>
       </SessionBootstrap>
     </BrowserRouter>

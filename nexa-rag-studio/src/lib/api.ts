@@ -1,5 +1,4 @@
 import {
-  Result,
   ChatConversationVO,
   ConversationPageVO,
   ConversationHistoryPageVO,
@@ -43,7 +42,7 @@ import {
   EmailPasswordLoginDTO,
   RegisterAccountDTO,
   PasswordResetDTO,
-} from "../types";
+} from "@/types";
 import { normalizeChatStreamEvent } from "./chat-stream-event";
 
 const API_BASE = "/api";
