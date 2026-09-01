@@ -2,7 +2,7 @@ import React, { useRef, useState, useEffect, useLayoutEffect, useCallback } from
 import { Plus, AtSign, Mic, Square } from "lucide-react";
 import { FeishuTooltip } from "../ui/tooltip";
 import { SendFilledIcon } from "./FeishuChatIcons";
-import { cn } from "../../lib/utils";
+import { cn } from "@/lib/utils.ts";
 
 export interface ChatInputBoxProps {
   value: string;
@@ -17,15 +17,15 @@ export interface ChatInputBoxProps {
 
 /** 1:1 飞书 Floating Omnibox 输入框 (支持内容自适应撑起、2s自动隐藏滚动条、@实体、+附件、快捷键与生成控制) */
 export const ChatInputBox: React.FC<ChatInputBoxProps> = ({
-  value,
-  onChange,
-  onSend,
-  onCancel,
-  isGenerating = false,
-  placeholder = "输入你的问题，按 Enter 发送，可通过 @ 引用人员、文档、数据表和技能",
-  onAddAttachment,
-  onVoiceInput,
-}) => {
+                                                            value,
+                                                            onChange,
+                                                            onSend,
+                                                            onCancel,
+                                                            isGenerating = false,
+                                                            placeholder = "输入你的问题，按 Enter 发送，可通过 @ 引用人员、文档、数据表和技能",
+                                                            onAddAttachment,
+                                                            onVoiceInput,
+                                                          }) => {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [isScrollbarVisible, setIsScrollbarVisible] = useState(false);
   const hideTimerRef = useRef<NodeJS.Timeout | null>(null);
@@ -124,7 +124,7 @@ export const ChatInputBox: React.FC<ChatInputBoxProps> = ({
       <div
         onMouseMove={showScrollbarWithTimer}
         onMouseLeave={handleMouseLeave}
-        className="max-w-[760px] mx-auto rounded-[18px] border border-[#DEE0E3] bg-white p-3.5 transition-all focus-within:border-[#3370FF] shadow-[0_2px_12px_rgba(0,0,0,0.03)]"
+        className="max-w-190 mx-auto rounded-[18px] border border-[#DEE0E3] bg-white p-3.5 transition-all shadow-[0_2px_12px_rgba(0,0,0,0.03)]"
       >
         <textarea
           ref={textareaRef}
@@ -138,7 +138,7 @@ export const ChatInputBox: React.FC<ChatInputBoxProps> = ({
           disabled={isGenerating}
           style={{ minHeight: "44px" }}
           className={cn(
-            "w-full resize-none bg-transparent text-[14px] leading-[22px] text-[#1F2329] outline-none placeholder:text-[#8F959E] feishu-chat-textarea transition-all",
+            "w-full resize-none bg-transparent text-[14px] leading-5.5 text-feishu-text-primary outline-none feishu-chat-textarea transition-all",
             !isScrollbarVisible && "scrollbar-hidden"
           )}
         />
@@ -148,7 +148,7 @@ export const ChatInputBox: React.FC<ChatInputBoxProps> = ({
             <FeishuTooltip title="添加附件或技能" side="top" sideOffset={6}>
               <button
                 type="button"
-                className="hover:text-[#1F2329] p-0.5 rounded transition-colors cursor-pointer"
+                className="hover:text-feishu-text-primary p-0.5 rounded transition-colors cursor-pointer"
                 onClick={handleAddAttachment}
               >
                 <Plus className="w-4 h-4 stroke-[2.2]" />
@@ -157,7 +157,7 @@ export const ChatInputBox: React.FC<ChatInputBoxProps> = ({
             <FeishuTooltip title="引用人员、文档或数据表" side="top" sideOffset={6}>
               <button
                 type="button"
-                className="hover:text-[#1F2329] p-0.5 rounded transition-colors cursor-pointer"
+                className="hover:text-feishu-text-primary p-0.5 rounded transition-colors cursor-pointer"
                 onClick={handleMention}
               >
                 <AtSign className="w-4 h-4 stroke-[2.2]" />
@@ -170,7 +170,7 @@ export const ChatInputBox: React.FC<ChatInputBoxProps> = ({
               <button
                 type="button"
                 onClick={handleVoice}
-                className="text-[#646A73] hover:text-[#1F2329] p-1 rounded transition-colors cursor-pointer"
+                className="text-[#646A73] hover:text-feishu-text-primary p-1 rounded transition-colors cursor-pointer"
               >
                 <Mic className="w-4 h-4" />
               </button>
@@ -192,7 +192,7 @@ export const ChatInputBox: React.FC<ChatInputBoxProps> = ({
                 disabled={!value.trim()}
                 className={`w-7 h-7 rounded-full flex items-center justify-center transition-colors cursor-pointer ${
                   value.trim()
-                    ? "bg-[#3370FF] hover:bg-[#2A62EA] text-white"
+                    ? "bg-feishu-blue hover:bg-[#2A62EA] text-white"
                     : "bg-[#F2F3F5] text-[#C9CDD4] cursor-not-allowed"
                 }`}
                 title="发送"

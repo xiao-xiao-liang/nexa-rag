@@ -13,12 +13,12 @@ export interface ChatHeaderProps {
 
 /** 1:1 飞书智能体纯白沉浸式顶栏 (无边框、立体彩色 Logo 与快捷动作) */
 export const ChatHeader: React.FC<ChatHeaderProps> = ({
-  title = "未命名智能体",
-  subtitle = "内容由 AI 生成",
-  onNewConversation,
-  onShare,
-  onSettings,
-}) => {
+                                                        title = "未命名智能体",
+                                                        subtitle = "内容由 AI 生成",
+                                                        onNewConversation,
+                                                        onShare,
+                                                        onSettings,
+                                                      }) => {
   const handleShare = () => {
     if (onShare) {
       onShare();
@@ -40,10 +40,10 @@ export const ChatHeader: React.FC<ChatHeaderProps> = ({
       <div className="flex items-center gap-3">
         <FeishuAgentCubeLogo />
         <div className="flex flex-col">
-          <h1 className="text-[14px] font-semibold text-[#1F2329] leading-[22px]">
+          <h1 className="text-[14px] font-semibold text-feishu-text-primary leading-5.5">
             {title}
           </h1>
-          <span className="text-[12px] text-[#8F959E] leading-[18px]">
+          <span className="text-[12px] text-feishu-text-muted leading-4.5">
             {subtitle}
           </span>
         </div>
@@ -53,7 +53,7 @@ export const ChatHeader: React.FC<ChatHeaderProps> = ({
         <FeishuTooltip title="分享当前对话" side="bottom" sideOffset={6}>
           <button
             type="button"
-            className="flex items-center gap-1 hover:text-[#1F2329] transition-colors cursor-pointer"
+            className="flex items-center gap-1 hover:text-feishu-text-primary transition-colors cursor-pointer"
             onClick={handleShare}
           >
             <Share2 className="w-3.5 h-3.5" />
@@ -65,7 +65,7 @@ export const ChatHeader: React.FC<ChatHeaderProps> = ({
           <button
             type="button"
             onClick={onNewConversation}
-            className="flex items-center gap-1 hover:text-[#1F2329] transition-colors cursor-pointer"
+            className="flex items-center gap-1 hover:text-feishu-text-primary transition-colors cursor-pointer"
           >
             <MessageSquarePlus className="w-3.5 h-3.5" />
             <span>新对话</span>
@@ -76,7 +76,7 @@ export const ChatHeader: React.FC<ChatHeaderProps> = ({
           <button
             type="button"
             onClick={handleSettings}
-            className="p-1 text-[#646A73] hover:text-[#1F2329] hover:bg-[#F2F3F5] rounded transition-colors cursor-pointer"
+            className="p-1 text-[#646A73] hover:text-feishu-text-primary hover:bg-[#F2F3F5] rounded transition-colors cursor-pointer"
           >
             <Settings className="w-4 h-4" />
           </button>
