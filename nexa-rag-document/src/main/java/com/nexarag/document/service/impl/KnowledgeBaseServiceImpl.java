@@ -8,21 +8,18 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.nexarag.common.exception.ClientException;
 import com.nexarag.common.web.PageVO;
-import com.nexarag.document.converter.DocumentConverter;
 import com.nexarag.document.converter.KnowledgeBaseConverter;
 import com.nexarag.document.enums.DocumentErrorCode;
-import com.nexarag.document.enums.DocumentStatus;
 import com.nexarag.document.mapper.DocumentMapper;
 import com.nexarag.document.mapper.KnowledgeBaseMapper;
+import com.nexarag.document.model.bo.KnowledgeBaseDocumentStatisticsBO;
 import com.nexarag.document.model.dataobject.KnowledgeBaseDO;
 import com.nexarag.document.model.dto.CreateKnowledgeBaseDTO;
 import com.nexarag.document.model.dto.UpdateKnowledgeBaseDTO;
 import com.nexarag.document.model.entity.Document;
-import com.nexarag.document.model.entity.DocumentVersionDO;
 import com.nexarag.document.model.vo.KnowledgeBaseDetailVO;
 import com.nexarag.document.model.vo.KnowledgeBaseStatisticsVO;
 import com.nexarag.document.model.vo.KnowledgeBaseSummaryVO;
-import com.nexarag.document.service.DocumentVersionService;
 import com.nexarag.document.service.KnowledgeBaseService;
 import com.nexarag.document.tenant.CurrentTenantProvider;
 import lombok.RequiredArgsConstructor;
@@ -49,7 +46,6 @@ public class KnowledgeBaseServiceImpl extends ServiceImpl<KnowledgeBaseMapper, K
     private final KnowledgeBaseMapper knowledgeBaseMapper;
     private final DocumentMapper documentMapper;
     private final CurrentTenantProvider currentTenantProvider;
-    private final DocumentVersionService documentVersionService;
 
     /**
      * 在当前租户创建知识库。
@@ -426,29 +422,13 @@ public class KnowledgeBaseServiceImpl extends ServiceImpl<KnowledgeBaseMapper, K
         if (knowledgeBaseIds == null || knowledgeBaseIds.isEmpty()) {
             return Map.of();
         }
-        List<Document> documents = documentMapper.selectList(new LambdaQueryWrapper<Document>()
-                .in(Document::getKnowledgeBaseId, knowledgeBaseIds));
-        Map<Long, DocumentVersionDO> activeVersions = documentVersionService.findActiveVersions(documents);
-        Map<Long, long[]> countersByKnowledgeBaseId = new HashMap<>();
-        for (Document document : documents) {
-            long[] counters = countersByKnowledgeBaseId.computeIfAbsent(document.getKnowledgeBaseId(),
-                    ignored -> new long[5]);
-            counters[0]++;
-            DocumentStatus activeStatus = DocumentConverter.toDocumentStatus(activeVersions.get(document.getDocumentId()));
-            switch (activeStatus) {
-                case UPLOADED -> counters[1]++;
-                case QUEUED, PARSING, PARSED, CHUNKING, CHUNKED, INDEXING -> counters[2]++;
-                case INDEXED -> counters[3]++;
-                case FAILED -> counters[4]++;
-                case null -> {
-                    // 历史脏数据仅计入总数，避免影响知识库列表可用性。
-                }
-            }
-        }
         Map<Long, KnowledgeBaseStatisticsVO> statisticsByKnowledgeBaseId = new HashMap<>();
-        countersByKnowledgeBaseId.forEach((knowledgeBaseId, counters) -> statisticsByKnowledgeBaseId.put(
-                knowledgeBaseId, new KnowledgeBaseStatisticsVO(counters[0], counters[1], counters[2], counters[3],
-                        counters[4])));
+        for (KnowledgeBaseDocumentStatisticsBO statistics
+                : documentMapper.aggregateStatisticsByKnowledgeBaseIds(knowledgeBaseIds)) {
+            statisticsByKnowledgeBaseId.put(statistics.knowledgeBaseId(), new KnowledgeBaseStatisticsVO(
+                    statistics.totalCount(), statistics.pendingCount(), statistics.processingCount(),
+                    statistics.indexedCount(), statistics.failedCount()));
+        }
         return statisticsByKnowledgeBaseId;
     }
 

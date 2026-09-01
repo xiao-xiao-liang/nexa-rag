@@ -1,16 +1,49 @@
 package com.nexarag.document.mapper;
 
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
+import com.nexarag.document.model.bo.KnowledgeBaseDocumentStatisticsBO;
 import com.nexarag.document.model.entity.Document;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
+import org.apache.ibatis.annotations.Select;
 import org.apache.ibatis.annotations.Update;
+
+import java.util.Collection;
+import java.util.List;
 
 /**
  * 文档 Mapper。
  */
 @Mapper
 public interface DocumentMapper extends BaseMapper<Document> {
+
+    /**
+     * 聚合指定知识库中全部文档及其当前生效版本的处理状态。
+     *
+     * @param knowledgeBaseIds 知识库ID集合
+     * @return 每个知识库一条统计结果
+     */
+    @Select("""
+            <script>
+            SELECT d.knowledge_base_id AS knowledgeBaseId,
+                   COUNT(1) AS totalCount,
+                   SUM(CASE WHEN dv.status = 'UPLOADED' THEN 1 ELSE 0 END) AS pendingCount,
+                   SUM(CASE WHEN dv.status IN ('QUEUED', 'PARSING', 'PARSED', 'CHUNKING', 'CHUNKED', 'INDEXING')
+                            THEN 1 ELSE 0 END) AS processingCount,
+                   SUM(CASE WHEN dv.status = 'INDEX_READY' THEN 1 ELSE 0 END) AS indexedCount,
+                   SUM(CASE WHEN dv.status = 'FAILED' THEN 1 ELSE 0 END) AS failedCount
+            FROM document d
+            LEFT JOIN document_version dv ON dv.document_version_id = d.active_version_id
+            WHERE d.del_flag = 0
+              AND d.knowledge_base_id IN
+              <foreach collection='knowledgeBaseIds' item='knowledgeBaseId' open='(' separator=',' close=')'>
+                #{knowledgeBaseId}
+              </foreach>
+            GROUP BY d.knowledge_base_id
+            </script>
+            """)
+    List<KnowledgeBaseDocumentStatisticsBO> aggregateStatisticsByKnowledgeBaseIds(
+            @Param("knowledgeBaseIds") Collection<Long> knowledgeBaseIds);
 
     /**
      * 在文档尚无构建中版本时原子占用构建指针。
