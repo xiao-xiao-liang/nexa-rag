@@ -4,11 +4,10 @@ import com.baomidou.mybatisplus.core.toolkit.IdWorker;
 import com.nexarag.auth.constants.EmailVerificationConstants;
 import com.nexarag.auth.enums.EmailVerificationPurpose;
 import com.nexarag.auth.enums.AuthErrorCode;
-import com.nexarag.auth.mail.transaction.AuthEmailTransactionMessagePublisher;
-import com.nexarag.auth.mail.transaction.CreateEmailChallengeCommand;
-import com.nexarag.auth.mapper.EmailVerificationChallengeMapper;
-import com.nexarag.auth.model.dataobject.EmailVerificationChallengeDO;
+import com.nexarag.auth.mail.AuthEmailMessagePublisher;
 import com.nexarag.auth.model.vo.EmailChallengeVO;
+import com.nexarag.auth.redis.EmailChallengeReservation;
+import com.nexarag.auth.redis.EmailVerificationRedisStore;
 import com.nexarag.auth.service.EmailChallengeService;
 import com.nexarag.auth.service.EmailVerificationCodeHasher;
 import com.nexarag.common.exception.ClientException;
@@ -36,7 +35,7 @@ import java.util.Locale;
 import java.util.Objects;
 
 /**
- * 使用 Redis 保存验证码哈希、使用数据库保存挑战元数据的邮箱验证码实现。
+ * 使用 Redis 状态机保存验证码挑战的邮箱验证码实现。
  */
 @Service
 @Slf4j
@@ -73,9 +72,9 @@ public class EmailChallengeServiceImpl implements EmailChallengeService {
             return 1
             """, Long.class);
 
-    private final EmailVerificationChallengeMapper challengeMapper;
+    private final EmailVerificationRedisStore emailVerificationRedisStore;
     private final StringRedisTemplate redisTemplate;
-    private final AuthEmailTransactionMessagePublisher transactionMessagePublisher;
+    private final AuthEmailMessagePublisher emailMessagePublisher;
     private final EmailVerificationCodeHasher verificationCodeHasher;
     private final SecureRandom secureRandom = new SecureRandom();
 
@@ -100,11 +99,19 @@ public class EmailChallengeServiceImpl implements EmailChallengeService {
             LocalDateTime now = LocalDateTime.now();
             LocalDateTime expiresTime = now.plusMinutes(EmailVerificationConstants.CODE_TTL_MINUTES);
 
-            // 3. 发送 RocketMQ 事务消息；本地挑战事务提交成功后，消费者才会发送 SMTP 邮件
-            transactionMessagePublisher.publish(new CreateEmailChallengeCommand(challengeId, userId, email.trim(),
-                    normalizedEmail, purpose, contextHash, verificationCode,
-                    verificationCodeHasher.hash(contextHash, verificationCode), expiresTime, now));
-            log.info("认证邮箱验证码事务消息已提交，challengeId={}，purpose={}，email={}", challengeId, purpose.name(),
+            // 3. 先在 Redis 创建挑战，再同步发布普通消息，避免邮件先于验证码状态到达
+            boolean created = emailVerificationRedisStore.create(challengeId, contextHash,
+                    verificationCodeHasher.hash(contextHash, verificationCode), expiresTime);
+            if (!created) {
+                throw new ClientException("验证码创建服务暂不可用");
+            }
+            try {
+                emailMessagePublisher.publish(challengeId, email.trim(), purpose, verificationCode);
+            } catch (RuntimeException exception) {
+                emailVerificationRedisStore.invalidateCurrent(challengeId, contextHash);
+                throw exception;
+            }
+            log.info("认证邮箱验证码已创建并发布普通邮件消息，challengeId={}，purpose={}，email={}", challengeId, purpose.name(),
                     maskEmail(normalizedEmail));
             return new EmailChallengeVO(challengeId, expiresTime);
         } catch (RuntimeException exception) {
@@ -120,34 +127,19 @@ public class EmailChallengeServiceImpl implements EmailChallengeService {
     @Transactional(noRollbackFor = ClientException.class)
     public void verifyAndConsume(Long challengeId, String email, EmailVerificationPurpose purpose, Long userId,
                                  String verificationCode) {
-        // 1. 读取挑战元数据并验证上下文；最终消费由条件更新原子裁决
+        // 1. 使用 Redis Lua 脚本原子校验上下文、失败次数与活动状态，并预占成功验证码
         String normalizedEmail = normalizeEmail(email);
         requirePurpose(purpose);
         if (challengeId == null) {
             throw invalidCode();
         }
-        EmailVerificationChallengeDO challenge = challengeMapper.selectById(challengeId);
-        LocalDateTime now = LocalDateTime.now();
         String contextHash = contextHash(normalizedEmail, purpose, userId);
-        if (!isActiveChallenge(challenge, normalizedEmail, purpose, userId, contextHash, now)) {
+        EmailChallengeReservation reservation = emailVerificationRedisStore.reserve(challengeId, contextHash,
+                verificationCodeHasher.hash(contextHash, verificationCode));
+        if (reservation == null) {
             throw invalidCode();
         }
-
-        // 2. 验证 Redis 中仅存的验证码哈希，失败时原子累计尝试次数
-        String actualCodeHash = redisTemplate.opsForValue().get(challengeKey(challengeId));
-        if (!verificationCodeHasher.matches(contextHash, verificationCode, actualCodeHash)) {
-            challengeMapper.incrementVerifyAttemptsIfActive(challengeId, now,
-                    EmailVerificationConstants.MAX_VERIFY_ATTEMPTS);
-            throw invalidCode();
-        }
-
-        // 3. 完整上下文条件更新保证验证码只能成功消费一次
-        int consumed = challengeMapper.consumeIfActive(challengeId, normalizedEmail, purpose.name(), userId,
-                contextHash, now, EmailVerificationConstants.MAX_VERIFY_ATTEMPTS);
-        if (consumed != 1) {
-            throw invalidCode();
-        }
-        deleteChallengeHashAfterCommit(challengeId);
+        registerChallengeCompletion(reservation, contextHash);
     }
 
     /**
@@ -174,24 +166,6 @@ public class EmailChallengeServiceImpl implements EmailChallengeService {
      */
     private void releaseSendQuota(String resendKey, String dailyKey) {
         redisTemplate.execute(RELEASE_SEND_SCRIPT, List.of(resendKey, dailyKey));
-    }
-
-    /**
-     * 判断挑战是否属于当前请求并仍处于可验证状态。
-     */
-    private boolean isActiveChallenge(EmailVerificationChallengeDO challenge, String emailKey,
-                                      EmailVerificationPurpose purpose, Long userId, String contextHash,
-                                      LocalDateTime now) {
-        return challenge != null
-                && Objects.equals(challenge.getEmailKey(), emailKey)
-                && Objects.equals(challenge.getPurposeCode(), purpose.name())
-                && Objects.equals(challenge.getUserId(), userId)
-                && isSameHash(contextHash, challenge.getContextHash())
-                && challenge.getConsumedTime() == null
-                && challenge.getInvalidatedTime() == null
-                && challenge.getExpiresTime().isAfter(now)
-                && challenge.getVerifyAttempts() != null
-                && challenge.getVerifyAttempts() < EmailVerificationConstants.MAX_VERIFY_ATTEMPTS;
     }
 
     /**
@@ -247,14 +221,6 @@ public class EmailChallengeServiceImpl implements EmailChallengeService {
     }
 
     /**
-     * 常量时间比较两个哈希值。
-     */
-    private boolean isSameHash(String expected, String actual) {
-        return actual != null && MessageDigest.isEqual(expected.getBytes(StandardCharsets.UTF_8),
-                actual.getBytes(StandardCharsets.UTF_8));
-    }
-
-    /**
      * 获取当前上海自然日键。
      */
     private String currentDateKey() {
@@ -270,24 +236,24 @@ public class EmailChallengeServiceImpl implements EmailChallengeService {
     }
 
     /**
-     * 构造挑战验证码的 Redis 键。
+     * 将验证码消费与调用方数据库事务绑定：提交后删除，回滚后恢复活动状态。
      */
-    private String challengeKey(Long challengeId) {
-        return EmailVerificationConstants.CHALLENGE_KEY_PREFIX + challengeId;
-    }
-
-    /**
-     * 仅在数据库消费记录提交后删除 Redis 验证材料，允许多验证码事务整体回滚。
-     */
-    private void deleteChallengeHashAfterCommit(Long challengeId) {
+    private void registerChallengeCompletion(EmailChallengeReservation reservation, String contextHash) {
         if (!TransactionSynchronizationManager.isSynchronizationActive()) {
-            redisTemplate.delete(challengeKey(challengeId));
+            emailVerificationRedisStore.consumeAfterCommit(reservation, contextHash);
             return;
         }
         TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
             @Override
             public void afterCommit() {
-                redisTemplate.delete(challengeKey(challengeId));
+                emailVerificationRedisStore.consumeAfterCommit(reservation, contextHash);
+            }
+
+            @Override
+            public void afterCompletion(int status) {
+                if (status != TransactionSynchronization.STATUS_COMMITTED) {
+                    emailVerificationRedisStore.releaseAfterRollback(reservation, contextHash);
+                }
             }
         });
     }

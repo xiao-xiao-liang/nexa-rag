@@ -70,7 +70,8 @@ rocketmq:
 nexa:
   auth:
     web:
-      allowed-origin:  http://localhost:3000 # https://xiaoxiaoliang.top # Cookie 状态变更请求允许的唯一浏览器源。
+#      allowed-origin:  http://localhost:3000 # Cookie 状态变更请求允许的唯一浏览器源。
+      allowed-origin:  https://xiaoxiaoliang.top # Cookie 状态变更请求允许的唯一浏览器源。
     email-code-pepper: ${EMAIL_CODE_PEPPER:} # 必填：验证码 HMAC Pepper，仅通过环境变量注入。
     bootstrap-admin:
       enabled: ${BOOTSTRAP_ADMIN_ENABLED:false}
@@ -99,10 +100,9 @@ nexa:
       tencent-sk: ${TENCENT_IP_LOCATION_SK:}
       amap-key: ${AMAP_IP_LOCATION_KEY:}
     mail:
-      transaction:
-        topic: nexa-auth-email # 认证验证码 RocketMQ 事务消息主题。
-        consumer-group: nexa-auth-email-worker # 认证邮件投递消费者组。
-        message-master-key: ${MESSAGE_MASTER_KEY:} # 必填：Base64 编码的 AES-256 密钥，禁止写入仓库。
+      topic: nexa-auth-email # 认证验证码 RocketMQ 普通消息主题。
+      consumer-group: nexa-auth-email-worker # 认证邮件投递消费者组。
+      message-master-key: ${MESSAGE_MASTER_KEY:} # 必填：Base64 编码的 AES-256 密钥，禁止写入仓库。
   chat:
     workflow:
       scheduler:
