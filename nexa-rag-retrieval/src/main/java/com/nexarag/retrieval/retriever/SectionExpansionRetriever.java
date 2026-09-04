@@ -52,6 +52,15 @@ public class SectionExpansionRetriever {
             return List.of();
         }
 
+        try {
+            return doRetrieve(question, activeVersionIds);
+        } catch (RuntimeException exception) {
+            log.warn("章节扩展检索执行失败，安全降级为空结果，question={}", question, exception);
+            return List.of();
+        }
+    }
+
+    private List<RetrievalChunk> doRetrieve(String question, Set<Long> activeVersionIds) {
         // 1. 导航索引仅定位候选章节，不能直接进入回答证据集合
         List<SectionNavigationHit> navigationHits = sectionNavigationIndexRepository.search(question,
                         retrievalProperties.getCandidate().getExpansionCandidateLimit(), activeVersionIds).stream()

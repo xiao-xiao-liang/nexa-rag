@@ -41,22 +41,22 @@ class SpringAiDocumentVectorStoreTest {
         assertThat(((Filter.Key) ((Filter.Expression) filterCaptor.getValue().left()).left()).key())
                 .isEqualTo("documentId");
         assertThat(((Filter.Value) ((Filter.Expression) filterCaptor.getValue().left()).right()).value())
-                .isEqualTo(101L);
+                .isEqualTo("101");
         assertThat(((Filter.Key) ((Filter.Expression) filterCaptor.getValue().right()).left()).key())
                 .isEqualTo("documentVersionId");
         assertThat(((Filter.Value) ((Filter.Expression) filterCaptor.getValue().right()).right()).value())
-                .isEqualTo(201L);
+                .isEqualTo("201");
 
         ArgumentCaptor<List<Document>> documentsCaptor = ArgumentCaptor.forClass(List.class);
         verify(vectorStore).add(documentsCaptor.capture());
         Document document = documentsCaptor.getValue().getFirst();
         assertThat(document.getId()).isEqualTo(chunk.chunkId());
         assertThat(document.getText()).isEqualTo("第一章 > 这是用于索引的文本");
-        assertThat(document.getMetadata()).containsEntry("documentId", 101L)
-                .containsEntry("documentVersionId", 201L)
+        assertThat(document.getMetadata()).containsEntry("documentId", "101")
+                .containsEntry("documentVersionId", "201")
                 .containsEntry("parentChunkId", "a728ab1e-fa29-4c6f-8ef6-45fa0bd0b9e7")
                 .containsEntry("chunkOrder", 2)
-                .containsEntry("sectionId", 15L)
+                .containsEntry("sectionId", "15")
                 .containsEntry("text", "这是原始正文")
                 .containsEntry("metadataJson", "{\"source\":\"test\"}")
                 .doesNotContainKey("chunkId");
@@ -66,15 +66,17 @@ class SpringAiDocumentVectorStoreTest {
     @Test
     void searchShouldRestoreBusinessResultFromDocumentIdAndMetadata() {
         VectorStore vectorStore = mock(VectorStore.class);
+        long snowflakeDocumentId = 2092463974161399809L;
+        long snowflakeVersionId = 2092463974161399810L;
         when(vectorStore.similaritySearch(any(SearchRequest.class))).thenReturn(List.of(Document.builder()
                 .id("c728ab1e-fa29-4c6f-8ef6-45fa0bd0b9e7")
                 .text("索引文本")
                 .metadata(Map.of(
-                        "documentId", 101L,
-                        "documentVersionId", 201L,
+                        "documentId", String.valueOf(snowflakeDocumentId),
+                        "documentVersionId", String.valueOf(snowflakeVersionId),
                         "parentChunkId", "a728ab1e-fa29-4c6f-8ef6-45fa0bd0b9e7",
                         "chunkOrder", 2,
-                        "sectionId", 15L,
+                        "sectionId", "15",
                         "text", "这是原始正文",
                         "metadataJson", "{\"source\":\"test\"}"))
                 .score(0.92D)
@@ -84,13 +86,30 @@ class SpringAiDocumentVectorStoreTest {
         List<VectorIndexSearchResult> results = documentVectorStore.search("问题", 5);
 
         assertThat(results).containsExactly(new VectorIndexSearchResult(
-                "c728ab1e-fa29-4c6f-8ef6-45fa0bd0b9e7", 101L, 201L,
+                "c728ab1e-fa29-4c6f-8ef6-45fa0bd0b9e7", snowflakeDocumentId, snowflakeVersionId,
                 "a728ab1e-fa29-4c6f-8ef6-45fa0bd0b9e7", 2, 15L,
                 "这是原始正文", "{\"source\":\"test\"}", 0.92D));
         ArgumentCaptor<SearchRequest> requestCaptor = ArgumentCaptor.forClass(SearchRequest.class);
         verify(vectorStore).similaritySearch(requestCaptor.capture());
         assertThat(requestCaptor.getValue().getQuery()).isEqualTo("问题");
         assertThat(requestCaptor.getValue().getTopK()).isEqualTo(5);
+    }
+
+    @Test
+    void searchWithActiveVersionIdsShouldPassStringFilterValues() {
+        VectorStore vectorStore = mock(VectorStore.class);
+        long snowflakeVersionId = 2092463974161399810L;
+        when(vectorStore.similaritySearch(any(SearchRequest.class))).thenReturn(List.of());
+        SpringAiDocumentVectorStore documentVectorStore = new SpringAiDocumentVectorStore(vectorStore, properties(10));
+
+        documentVectorStore.search("问题", 5, java.util.Set.of(snowflakeVersionId));
+
+        ArgumentCaptor<SearchRequest> requestCaptor = ArgumentCaptor.forClass(SearchRequest.class);
+        verify(vectorStore).similaritySearch(requestCaptor.capture());
+        Filter.Expression filter = (Filter.Expression) requestCaptor.getValue().getFilterExpression();
+        assertThat(filter.type()).isEqualTo(Filter.ExpressionType.IN);
+        assertThat(((Filter.Key) filter.left()).key()).isEqualTo("documentVersionId");
+        assertThat(((Filter.Value) filter.right()).value()).isEqualTo(java.util.Set.of(String.valueOf(snowflakeVersionId)));
     }
 
     @Test

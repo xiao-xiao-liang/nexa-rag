@@ -57,4 +57,18 @@ class SectionExpansionRetrieverFixtureTest {
 
         assertThat(retriever.retrieve("退款规则", Set.of(2001L))).isEmpty();
     }
+
+    @Test
+    void retrieveShouldReturnEmptyListWhenUnderlyingRepositoryThrowsException() {
+        SectionNavigationIndexRepository navigationRepository = mock(SectionNavigationIndexRepository.class);
+        SectionContentRepository contentRepository = mock(SectionContentRepository.class);
+        RetrievalProperties properties = new RetrievalProperties();
+        org.mockito.Mockito.when(navigationRepository.search(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.anyInt(), org.mockito.ArgumentMatchers.any()))
+                .thenThrow(new RuntimeException("Connection is closed"));
+        SectionExpansionRetriever retriever = new SectionExpansionRetriever(navigationRepository, contentRepository, properties);
+
+        List<RetrievalChunk> result = retriever.retrieve("用户问题", Set.of(101L));
+
+        assertThat(result).isEmpty();
+    }
 }

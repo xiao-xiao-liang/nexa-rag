@@ -45,7 +45,7 @@ class ConversationRetrievalServiceImplTest {
                 .thenReturn(Map.of(1L, 2L));
 
         ConversationRetrievalServiceImpl retrievalService = new ConversationRetrievalServiceImpl(
-                List.of(milvusRetriever, bm25Retriever), knowledgeBaseService);
+                List.of(milvusRetriever, bm25Retriever), knowledgeBaseService, Runnable::run);
         List<RetrievalChunk> result = retrievalService.retrieve(request);
 
         assertThat(result).containsExactly(keywordChunk);

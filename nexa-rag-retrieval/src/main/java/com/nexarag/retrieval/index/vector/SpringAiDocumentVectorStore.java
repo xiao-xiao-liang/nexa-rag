@@ -51,6 +51,9 @@ public class SpringAiDocumentVectorStore implements DocumentVectorStore {
         // 1. 校验版本边界，禁止同一文档的历史版本互相覆盖
         validateDocumentVersionChunks(documentId, documentVersionId, chunks);
 
+        log.info("Milvus 开始替换文档版本向量，documentId={}，documentVersionId={}，待索引片段数={}",
+                documentId, documentVersionId, chunks.size());
+
         // 2. 仅清理当前版本，再复用统一批量写入逻辑
         deleteByDocumentVersionId(documentId, documentVersionId);
         return writeChunks(chunks);
@@ -69,6 +72,7 @@ public class SpringAiDocumentVectorStore implements DocumentVectorStore {
             return List.of();
         }
 
+        long start = System.currentTimeMillis();
         // 1. 委托 VectorStore 执行向量化和相似度检索
         List<Document> documents = vectorStore.similaritySearch(SearchRequest.builder()
                 .query(query)
@@ -76,6 +80,8 @@ public class SpringAiDocumentVectorStore implements DocumentVectorStore {
                 .similarityThresholdAll()
                 .build());
         if (documents.isEmpty()) {
+            log.info("Milvus 向量检索完成，query='{}'，topK={}，原始命中数=0，耗时={}ms",
+                    query, topK, System.currentTimeMillis() - start);
             return List.of();
         }
 
@@ -84,17 +90,28 @@ public class SpringAiDocumentVectorStore implements DocumentVectorStore {
         for (Document document : documents) {
             toSearchResult(document).ifPresent(results::add);
         }
+        log.info("Milvus 向量检索完成，query：'{}'，topK：{}，原始命中数：{}，解析有效数：{}，耗时：{}ms",
+                query, topK, documents.size(), results.size(), System.currentTimeMillis() - start);
         return results;
     }
 
     @Override
     public List<VectorIndexSearchResult> search(String query, int topK, java.util.Set<Long> activeVersionIds) {
-        if (!StringUtils.hasText(query) || topK <= 0 || activeVersionIds == null || activeVersionIds.isEmpty())
+        if (!StringUtils.hasText(query) || topK <= 0 || activeVersionIds == null || activeVersionIds.isEmpty()) {
             return List.of();
+        }
+        long start = System.currentTimeMillis();
+        java.util.Set<String> versionIdStrings = activeVersionIds.stream()
+                .filter(java.util.Objects::nonNull)
+                .map(String::valueOf)
+                .collect(java.util.stream.Collectors.toSet());
         List<Document> documents = vectorStore.similaritySearch(SearchRequest.builder().query(query).topK(topK)
                 .similarityThresholdAll().filterExpression(new Filter.Expression(IN, new Filter.Key(DOCUMENT_VERSION_ID),
-                        new Filter.Value(activeVersionIds))).build());
-        return documents.stream().map(this::toSearchResult).flatMap(java.util.Optional::stream).toList();
+                        new Filter.Value(versionIdStrings))).build());
+        List<VectorIndexSearchResult> results = documents.stream().map(this::toSearchResult).flatMap(java.util.Optional::stream).toList();
+        log.info("Milvus 向量检索完成，query：'{}'，topK：{}，生效版本数：{}，原始命中数：{}，解析有效数：{}，耗时：{}ms",
+                query, topK, activeVersionIds.size(), documents.size(), results.size(), System.currentTimeMillis() - start);
+        return results;
     }
 
     /**
@@ -108,10 +125,11 @@ public class SpringAiDocumentVectorStore implements DocumentVectorStore {
         if (documentId == null || documentVersionId == null) {
             return;
         }
+        log.info("Milvus 清理历史文档版本向量，documentId：{}，documentVersionId：{}", documentId, documentVersionId);
         Filter.Expression documentFilter = new Filter.Expression(EQ, new Filter.Key(DOCUMENT_ID),
-                new Filter.Value(documentId));
+                new Filter.Value(String.valueOf(documentId)));
         Filter.Expression versionFilter = new Filter.Expression(EQ, new Filter.Key(DOCUMENT_VERSION_ID),
-                new Filter.Value(documentVersionId));
+                new Filter.Value(String.valueOf(documentVersionId)));
         vectorStore.delete(new Filter.Expression(AND, documentFilter, versionFilter));
     }
 
@@ -151,10 +169,16 @@ public class SpringAiDocumentVectorStore implements DocumentVectorStore {
         if (batchSize <= 0) {
             throw new IllegalStateException("nexa.retrieval.embedding.max-batch-size必须大于0");
         }
+        long totalStart = System.currentTimeMillis();
         for (int start = 0; start < chunks.size(); start += batchSize) {
+            long batchStart = System.currentTimeMillis();
             int end = Math.min(start + batchSize, chunks.size());
             vectorStore.add(chunks.subList(start, end).stream().map(this::toDocument).toList());
+            log.info("Milvus 向量索引批次写入完成，批次=[{}-{}]/{}，当前批分块数：{}，耗时：{}ms",
+                    start, end, chunks.size(), end - start, System.currentTimeMillis() - batchStart);
         }
+        log.info("Milvus 文档版本向量索引全部写入成功，总分块数：{}，总耗时：{}ms",
+                chunks.size(), System.currentTimeMillis() - totalStart);
         return chunks.stream()
                 .map(chunk -> new VectorIndexWriteResult(chunk.chunkId(), chunk.chunkId(), true, null))
                 .toList();
@@ -165,11 +189,15 @@ public class SpringAiDocumentVectorStore implements DocumentVectorStore {
             throw new IllegalArgumentException("向量索引片段缺少chunkId或indexContent");
         }
         Map<String, Object> metadata = new HashMap<>(8);
-        metadata.put(DOCUMENT_ID, chunk.documentId());
-        putIfNotNull(metadata, DOCUMENT_VERSION_ID, chunk.documentVersionId());
+        metadata.put(DOCUMENT_ID, String.valueOf(chunk.documentId()));
+        if (chunk.documentVersionId() != null) {
+            metadata.put(DOCUMENT_VERSION_ID, String.valueOf(chunk.documentVersionId()));
+        }
         putIfNotNull(metadata, PARENT_CHUNK_ID, chunk.parentChunkId());
         putIfNotNull(metadata, CHUNK_ORDER, chunk.chunkOrder());
-        putIfNotNull(metadata, SECTION_ID, chunk.sectionId());
+        if (chunk.sectionId() != null) {
+            metadata.put(SECTION_ID, String.valueOf(chunk.sectionId()));
+        }
         putIfNotNull(metadata, TEXT, chunk.text());
         putIfNotNull(metadata, METADATA_JSON, chunk.metadataJson());
         return new Document(chunk.chunkId(), chunk.indexContent(), metadata);
@@ -213,11 +241,11 @@ public class SpringAiDocumentVectorStore implements DocumentVectorStore {
 
     private Long optionalLong(Map<String, Object> metadata, String key) {
         Object value = metadata == null ? null : metadata.get(key);
-        if (value instanceof Number number) {
-            return number.longValue();
-        }
         if (value instanceof String text && StringUtils.hasText(text)) {
             return Long.valueOf(text);
+        }
+        if (value instanceof Number number) {
+            return number.longValue();
         }
         return null;
     }

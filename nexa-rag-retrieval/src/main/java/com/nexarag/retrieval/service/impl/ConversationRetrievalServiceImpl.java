@@ -59,10 +59,15 @@ public class ConversationRetrievalServiceImpl implements ConversationRetrievalSe
         }
         java.util.Map<Long, Long> activeVersionIdsByDocument = knowledgeBaseService.findActiveVersionIdsInTenantScope(tenantId,
                 result.stream().map(RetrievalChunk::documentId).toList(), knowledgeBaseIds);
-        return result.stream()
+        List<RetrievalChunk> filtered = result.stream()
                 .filter(chunk -> activeVersionIdsByDocument.containsKey(chunk.documentId()))
                 .filter(chunk -> activeVersionIdsByDocument.get(chunk.documentId()).equals(chunk.documentVersionId()))
                 .toList();
+        if (!result.isEmpty() && filtered.isEmpty()) {
+            log.warn("对话检索候选经租户与版本校验后被全部过滤，tenantId={}，原始候选数={}，文档ID列表={}",
+                    tenantId, result.size(), result.stream().map(RetrievalChunk::documentId).toList());
+        }
+        return filtered;
     }
 
     private String requireTenantId(String tenantId) {

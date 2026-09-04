@@ -46,4 +46,24 @@ class SectionExpansionNodeTenantContextTest {
         verify(knowledgeBaseService).listActiveVersionIdsInTenantScope("tenant-001", Set.of());
         verify(knowledgeBaseService).findActiveVersionIdsInTenantScope("tenant-001", List.of(1L), Set.of());
     }
+
+    @Test
+    void applyShouldFallbackToInitialChunksWhenExpansionFails() {
+        SectionExpansionRetriever retriever = mock(SectionExpansionRetriever.class);
+        KnowledgeBaseService knowledgeBaseService = mock(KnowledgeBaseService.class);
+        RetrievalChunk initialChunk = new RetrievalChunk("c-0", 1L, null, null, null, null, "初始", 0.9D, "BM25", 1, 101L);
+
+        when(knowledgeBaseService.validateRequestedKnowledgeBases("tenant-001", List.of())).thenReturn(Set.of());
+        when(knowledgeBaseService.listActiveVersionIdsInTenantScope("tenant-001", Set.of())).thenReturn(Set.of(101L));
+        when(retriever.retrieve("退款规则", Set.of(101L))).thenThrow(new RuntimeException("ES Connection is closed"));
+
+        Map<String, Object> result = new SectionExpansionNode(retriever, knowledgeBaseService)
+                .apply(new OverAllState(Map.of(
+                        TENANT_ID, "tenant-001",
+                        REWRITTEN_QUESTION, "退款规则",
+                        RETRIEVAL_KNOWLEDGE_BASE_IDS, List.of(),
+                        FUSED_RETRIEVAL_RESULTS, List.of(initialChunk))));
+
+        assertThat(result.get(FUSED_RETRIEVAL_RESULTS)).isEqualTo(List.of(initialChunk));
+    }
 }
