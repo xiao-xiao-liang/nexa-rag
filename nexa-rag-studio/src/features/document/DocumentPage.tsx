@@ -1,12 +1,8 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { useNavigate, useParams, Link } from "react-router-dom";
 import {
-  FileText,
   Plus,
   RefreshCw,
-  FileCode,
-  FileSpreadsheet,
-  Globe,
   ArrowLeft,
   ChevronRight,
   BookOpen,
@@ -25,6 +21,9 @@ import {
 } from "../../components/ui/feishu-table";
 import { DocumentUploadModal } from "./components/DocumentUploadModal";
 import { DocumentDrawer } from "./components/DocumentDrawer";
+import { FeishuDocIcon } from "../../components/ui/FeishuDocIcon";
+import { feishuDialog } from "../../components/ui/FeishuDialog";
+import { feishuToast } from "../../components/ui/FeishuToast";
 
 export const DocumentPage: React.FC = () => {
   const navigate = useNavigate();
@@ -101,50 +100,9 @@ export const DocumentPage: React.FC = () => {
     return { total, indexed, processing, failed };
   }, [documents, totalCount]);
 
-  // 渲染飞书风格文件类型彩色图标
+  // 渲染飞书风格文件类型彩色 SVG 图标 (1:1 thesvg.org 矢量资产)
   const renderFileIcon = (fileType?: FileType, fileName?: string) => {
-    const typeStr = fileType ? String(fileType).toUpperCase() : "";
-    const lower = (fileName || "").toLowerCase();
-    if (typeStr === "PDF" || lower.endsWith(".pdf")) {
-      return (
-        <div className="w-7 h-7 rounded-[6px] bg-[#FFF2F0] text-[#F53F3F] flex items-center justify-center shrink-0">
-          <FileText className="w-4 h-4" />
-        </div>
-      );
-    }
-    if (typeStr === "MARKDOWN" || lower.endsWith(".md") || lower.endsWith(".markdown")) {
-      return (
-        <div className="w-7 h-7 rounded-[6px] bg-[#E8F3FF] text-[#3370FF] flex items-center justify-center shrink-0">
-          <FileCode className="w-4 h-4" />
-        </div>
-      );
-    }
-    if (typeStr === "WORD" || lower.endsWith(".docx") || lower.endsWith(".doc")) {
-      return (
-        <div className="w-7 h-7 rounded-[6px] bg-[#E8F4FF] text-[#1456F0] flex items-center justify-center shrink-0">
-          <FileText className="w-4 h-4" />
-        </div>
-      );
-    }
-    if (typeStr === "EXCEL" || lower.endsWith(".xlsx") || lower.endsWith(".xls") || lower.endsWith(".csv")) {
-      return (
-        <div className="w-7 h-7 rounded-[6px] bg-[#E8F7EC] text-[#00B42A] flex items-center justify-center shrink-0">
-          <FileSpreadsheet className="w-4 h-4" />
-        </div>
-      );
-    }
-    if (typeStr === "PPT" || lower.endsWith(".pptx") || lower.endsWith(".ppt")) {
-      return (
-        <div className="w-7 h-7 rounded-[6px] bg-[#FFF7E8] text-[#FF7D00] flex items-center justify-center shrink-0">
-          <FileText className="w-4 h-4" />
-        </div>
-      );
-    }
-    return (
-      <div className="w-7 h-7 rounded-[6px] bg-[#F2F3F5] text-[#646A75] flex items-center justify-center shrink-0">
-        <Globe className="w-4 h-4" />
-      </div>
-    );
+    return <FeishuDocIcon fileName={fileName} format={fileType} size={20} />;
   };
 
   // 渲染后端 9 大流转状态对应飞书胶囊标签
@@ -315,15 +273,9 @@ export const DocumentPage: React.FC = () => {
     {
       key: "actions",
       title: "操作",
-      width: 220,
+      width: 160,
       render: (_, record) => (
         <div className="flex items-center justify-start gap-1">
-          <FeishuActionLink
-            onClick={() => navigate(`/knowledge-base/${knowledgeBaseId}/documents/${record.documentId}`)}
-          >
-            分块探查
-          </FeishuActionLink>
-
           <FeishuActionLink
             onClick={() => setSelectedDocId(record.documentId)}
           >
@@ -333,8 +285,13 @@ export const DocumentPage: React.FC = () => {
           {record.status === "FAILED" && (
             <FeishuActionLink
               onClick={async () => {
-                await documentApi.retryDocument(record.documentId, knowledgeBaseId);
-                loadDocuments();
+                try {
+                  await documentApi.retryDocument(record.documentId, knowledgeBaseId);
+                  feishuToast.success("已触发表单重试");
+                  loadDocuments();
+                } catch (err: any) {
+                  feishuToast.error(`重试失败: ${err?.message || "服务端异常"}`);
+                }
               }}
             >
               重试
@@ -343,11 +300,22 @@ export const DocumentPage: React.FC = () => {
 
           <FeishuActionLink
             variant="danger"
-            onClick={async () => {
-              if (confirm(`确定要删除文档吗？`)) {
-                await documentApi.deleteDocument(record.documentId, knowledgeBaseId);
-                loadDocuments();
-              }
+            onClick={() => {
+              const docName = record.title || record.originalFileName || record.fileName || "未命名文档";
+              feishuDialog.danger({
+                title: "删除文档",
+                content: `确定要删除文档「${docName}」吗？删除后将清理全部索引与关联数据，此操作不可撤销。`,
+                okText: "删除",
+                onOk: async () => {
+                  try {
+                    await documentApi.deleteDocument(record.documentId, knowledgeBaseId);
+                    feishuToast.success("文档已成功删除");
+                    loadDocuments();
+                  } catch (err: any) {
+                    feishuToast.error(`删除失败: ${err?.message || "服务端异常"}`);
+                  }
+                },
+              });
             }}
           >
             删除

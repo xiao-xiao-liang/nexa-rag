@@ -9,6 +9,7 @@ import { AccountPasswordFormValues, OAuthProvider, BrandVariant } from "../../ty
 interface AccountPasswordFormProps {
   variant?: BrandVariant;
   onSubmit?: (values: AccountPasswordFormValues) => void;
+  onSwitchVerifyCode?: () => void;
   onForgotPassword?: () => void;
   onSelectThirdParty?: (provider: OAuthProvider) => void;
   loading?: boolean;
@@ -18,12 +19,13 @@ interface AccountPasswordFormProps {
  * 账号名 + 密码登录表单
  */
 export const AccountPasswordForm: React.FC<AccountPasswordFormProps> = ({
-                                                                          variant = "feishu",
-                                                                          onSubmit,
-                                                                          onForgotPassword,
-                                                                          onSelectThirdParty,
-                                                                          loading = false,
-                                                                        }) => {
+  variant = "feishu",
+  onSubmit,
+  onSwitchVerifyCode,
+  onForgotPassword,
+  onSelectThirdParty,
+  loading = false,
+}) => {
   const [accountName, setAccountName] = useState("");
   const [password, setPassword] = useState("");
   const [agreePolicy, setAgreePolicy] = useState(false);

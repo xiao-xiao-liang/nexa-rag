@@ -452,7 +452,7 @@ export const LoginPage: React.FC = () => {
             {/* 卡片主标题 (.enter-credential__title-text: 24px, 600字重, 36px行高, 距离 Tab 间距 24px) */}
             <div className="mb-6 pr-10">
               <h2 className="text-[24px] font-semibold text-feishu-text-primary leading-9">
-                {brandVariant === "lark" ? "欢迎使用 Lark" : "使用豆包或飞书账号登录"}
+                {brandVariant === "lark" ? "欢迎使用 Lark" : "欢迎使用 NexaRAG"}
               </h2>
             </div>
 

@@ -18,6 +18,7 @@ import {
 } from "../ui/dropdown-menu";
 import { authApi } from "../../lib/api";
 import { authStore, useAuthStore } from "../../features/auth/store/authStore";
+import websiteLogo from "../../assets/website_logo_100x100.png";
 
 // --- 飞书原装 1:1 Universe Design 顶栏矢量图标 ---
 
@@ -51,12 +52,11 @@ export const SideExpandOutlinedIcon = ({ className = "" }: { className?: string 
 );
 
 export const FeishuBitableLogo = () => (
-  <svg width="22" height="22" viewBox="0 0 22 22" fill="none" className="shrink-0">
-    <path
-      d="M4.88 11L2 14.72 7.28 20 11 17.12 14.72 20 20 14.72 17.12 11 20 7.28 14.72 2 11 4.88 7.28 2 2 7.28 4.88 11zM11 4.88L17.12 11 11 17.12 4.88 11 11 4.88z"
-      fill="#8046F3"
-    />
-  </svg>
+  <img
+    src={websiteLogo}
+    alt="Logo"
+    className="w-[24px] h-[24px] object-contain shrink-0"
+  />
 );
 
 export const FileLinkBitableOutlinedIcon = () => (

@@ -23,30 +23,30 @@ export const AuthHeroVisual: React.FC<AuthHeroVisualProps> = ({
 }) => {
   const isLark = variant === "lark";
 
-  const title = isLark ? "你的一站式工作平台" : "先进团队 先用飞书";
+  const title = isLark ? "你的一站式工作平台" : "先进团队 先用 NexaRAG";
   const subtitle = isLark ? "人、事、信息，一处搞定" : "字节跳动旗下 AI 工作平台";
 
   return (
     <div
-      className={`web-login-right relative flex flex-col items-center justify-center w-[520px] min-w-[520px] max-w-[520px] h-full bg-[#f3f4fb] bg-gradient-to-b from-[#f3f4fb] to-[#eaedf7] select-none px-[20px] overflow-hidden ${className}`}
+      className={`web-login-right relative flex flex-col items-center justify-center w-130 min-w-130 max-w-130 h-full bg-[#f3f4fb] bg-linear-to-b from-[#f3f4fb] to-[#eaedf7] select-none px-5 overflow-hidden ${className}`}
     >
       {/* 居中插画卡片根节点 (.passport-lottie-root) */}
-      <div className="passport-lottie-root relative flex flex-col items-center w-[420px] max-w-[420px] text-center">
+      <div className="passport-lottie-root relative flex flex-col items-center w-105 max-w-105 text-center">
         {/* 固定高清单帧插画 (.lottie-content) */}
-        <div className="lottie-content relative w-[420px] flex items-center justify-center">
+        <div className="lottie-content relative w-105 flex items-center justify-center">
           <img
             src={heroImg}
             alt="Feishu Collaboration Hero"
-            className="lottie-bg w-[420px] h-auto object-contain select-none pointer-events-none drop-shadow-sm"
+            className="lottie-bg w-105 h-auto object-contain select-none pointer-events-none drop-shadow-sm"
           />
         </div>
 
         {/* 标语文案 (.login-slogan) */}
-        <div className="login-slogan mt-[24px]">
-          <h2 className="login-slogan-title text-[24px] font-semibold text-[#1f2329] leading-[40px] text-center tracking-[-0.2px]">
+        <div className="login-slogan mt-6">
+          <h2 className="login-slogan-title text-[24px] font-semibold text-feishu-text-primary leading-10 text-center tracking-[-0.2px]">
             {title}
           </h2>
-          <p className="login-slogan-subtitle min-h-[24px] mt-[12px] mb-[38px] text-[16px] font-normal text-[#646a73] leading-[24px] text-center">
+          <p className="login-slogan-subtitle min-h-6 mt-3 mb-9.5 text-[16px] font-normal text-[#646a73] leading-6 text-center">
             {subtitle}
           </p>
         </div>
