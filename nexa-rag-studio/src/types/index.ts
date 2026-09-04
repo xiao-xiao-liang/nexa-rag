@@ -276,7 +276,9 @@ export type DocumentVersionOperationType =
 export interface DocumentVersionVO {
   documentVersionId: number | string;
   revisionNo: number;
+  active: boolean;
   originalFileName: string;
+  fileSize?: number;
   status: DocumentVersionStatus;
   failureStage?: string;
   failureReason?: string;

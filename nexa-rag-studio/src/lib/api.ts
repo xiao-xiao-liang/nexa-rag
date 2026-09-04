@@ -18,6 +18,8 @@ import {
   ProcessDocumentRequest,
   DocumentProcessStatusVO,
   UploadDocumentResponse,
+  DocumentVersionVO,
+  DocumentVersionOperationLogVO,
   PageVO,
   ModelProviderCatalogResponse,
   ModelConfigResponse,
@@ -426,6 +428,100 @@ export const documentApi = {
         method: "POST",
         body: formData,
       }
+    );
+  },
+
+  async uploadDocumentVersion(
+    documentId: number | string,
+    file: File,
+    request?: { title?: string },
+    knowledgeBaseId: number | string = DEFAULT_KNOWLEDGE_BASE_ID
+  ): Promise<UploadDocumentResponse> {
+    const formData = new FormData();
+    formData.append("file", file);
+    if (request) {
+      formData.append(
+        "request",
+        new Blob([JSON.stringify(request)], { type: "application/json" })
+      );
+    }
+    return await fetchJson<UploadDocumentResponse>(
+      `/knowledge-bases/${knowledgeBaseId}/documents/${documentId}/versions`,
+      {
+        method: "POST",
+        body: formData,
+      }
+    );
+  },
+
+  async listDocumentVersions(
+    documentId: number | string,
+    pageNum = 1,
+    pageSize = 20,
+    knowledgeBaseId: number | string = DEFAULT_KNOWLEDGE_BASE_ID
+  ): Promise<PageVO<DocumentVersionVO>> {
+    return await fetchJson<PageVO<DocumentVersionVO>>(
+      `/knowledge-bases/${knowledgeBaseId}/documents/${documentId}/versions?pageNum=${pageNum}&pageSize=${pageSize}`
+    );
+  },
+
+  async getDocumentVersion(
+    documentId: number | string,
+    documentVersionId: number | string,
+    knowledgeBaseId: number | string = DEFAULT_KNOWLEDGE_BASE_ID
+  ): Promise<DocumentVersionVO> {
+    return await fetchJson<DocumentVersionVO>(
+      `/knowledge-bases/${knowledgeBaseId}/documents/${documentId}/versions/${documentVersionId}`
+    );
+  },
+
+  async activateDocumentVersion(
+    documentId: number | string,
+    documentVersionId: number | string,
+    knowledgeBaseId: number | string = DEFAULT_KNOWLEDGE_BASE_ID
+  ): Promise<void> {
+    await fetchJson<void>(
+      `/knowledge-bases/${knowledgeBaseId}/documents/${documentId}/versions/${documentVersionId}/activate`,
+      {
+        method: "POST",
+      }
+    );
+  },
+
+  async retryDocumentVersion(
+    documentId: number | string,
+    documentVersionId: number | string,
+    knowledgeBaseId: number | string = DEFAULT_KNOWLEDGE_BASE_ID
+  ): Promise<DocumentVersionVO> {
+    return await fetchJson<DocumentVersionVO>(
+      `/knowledge-bases/${knowledgeBaseId}/documents/${documentId}/versions/${documentVersionId}/retry`,
+      {
+        method: "POST",
+      }
+    );
+  },
+
+  async deleteDocumentVersion(
+    documentId: number | string,
+    documentVersionId: number | string,
+    knowledgeBaseId: number | string = DEFAULT_KNOWLEDGE_BASE_ID
+  ): Promise<void> {
+    await fetchJson<void>(
+      `/knowledge-bases/${knowledgeBaseId}/documents/${documentId}/versions/${documentVersionId}`,
+      {
+        method: "DELETE",
+      }
+    );
+  },
+
+  async listDocumentVersionOperationLogs(
+    documentId: number | string,
+    pageNum = 1,
+    pageSize = 20,
+    knowledgeBaseId: number | string = DEFAULT_KNOWLEDGE_BASE_ID
+  ): Promise<PageVO<DocumentVersionOperationLogVO>> {
+    return await fetchJson<PageVO<DocumentVersionOperationLogVO>>(
+      `/knowledge-bases/${knowledgeBaseId}/documents/${documentId}/version-operation-logs?pageNum=${pageNum}&pageSize=${pageSize}`
     );
   },
 
