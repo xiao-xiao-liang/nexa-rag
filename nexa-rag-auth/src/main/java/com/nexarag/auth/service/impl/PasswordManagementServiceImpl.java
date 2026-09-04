@@ -4,9 +4,7 @@ import com.nexarag.auth.context.UserContext;
 import com.nexarag.auth.enums.UserStatus;
 import com.nexarag.auth.enums.AuthErrorCode;
 import com.nexarag.auth.mapper.AuthUserMapper;
-import com.nexarag.auth.mapper.EmailCredentialMapper;
 import com.nexarag.auth.model.dataobject.AuthUserDO;
-import com.nexarag.auth.model.dataobject.EmailCredentialDO;
 import com.nexarag.auth.model.dto.EmailCodeSendDTO;
 import com.nexarag.auth.model.dto.PasswordSetDTO;
 import com.nexarag.auth.model.vo.EmailChallengeVO;
@@ -25,7 +23,6 @@ import java.util.Locale;
 public class PasswordManagementServiceImpl implements PasswordManagementService {
 
     private final AuthUserMapper authUserMapper;
-    private final EmailCredentialMapper emailCredentialMapper;
     private final PasswordService passwordService;
     private final PasswordCredentialMutationService credentialMutationService;
 
@@ -91,8 +88,7 @@ public class PasswordManagementServiceImpl implements PasswordManagementService 
      */
     private AuthUserDO requireCurrentUserWithBoundEmail(String email) {
         AuthUserDO user = currentActiveUser();
-        EmailCredentialDO emailCredential = emailCredentialMapper.selectByEmailKey(normalizeEmail(email));
-        if (emailCredential == null || !user.getUserId().equals(emailCredential.getUserId())) {
+        if (!normalizeEmail(email).equals(user.getEmail())) {
             throw authenticationFailed();
         }
         return user;

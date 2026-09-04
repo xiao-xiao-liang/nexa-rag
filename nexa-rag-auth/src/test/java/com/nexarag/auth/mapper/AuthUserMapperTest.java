@@ -35,6 +35,10 @@ class AuthUserMapperTest {
                 .contains("FROM auth_user", "account_name_key");
         assertThat(selectSql(authUserMapper, "selectByUserIdForUpdate"))
                 .contains("FROM auth_user", "FOR UPDATE");
+        assertThat(selectSql(authUserMapper, "selectByEmail"))
+                .contains("FROM auth_user", "email = #{email}");
+        assertThat(selectSql(authUserMapper, "selectByEmailForUpdate"))
+                .contains("FROM auth_user", "email = #{email}", "FOR UPDATE");
         assertThat(selectSql(authUserMapper, "selectPermissionCodesByUserId"))
                 .contains("auth_role_permission", "auth_permission");
         assertThat(selectSql(tenantMemberMapper, "selectActiveByTenantIdAndUserIdForUpdate"))

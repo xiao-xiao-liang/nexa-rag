@@ -3,10 +3,8 @@ package com.nexarag.auth.service.impl;
 import com.nexarag.auth.enums.EmailVerificationPurpose;
 import com.nexarag.auth.enums.UserStatus;
 import com.nexarag.auth.mapper.AuthUserMapper;
-import com.nexarag.auth.mapper.EmailCredentialMapper;
 import com.nexarag.auth.mapper.PasswordCredentialMapper;
 import com.nexarag.auth.model.dataobject.AuthUserDO;
-import com.nexarag.auth.model.dataobject.EmailCredentialDO;
 import com.nexarag.auth.model.dataobject.PasswordCredentialDO;
 import com.nexarag.auth.model.dto.PasswordResetDTO;
 import com.nexarag.auth.service.EmailChallengeService;
@@ -29,19 +27,16 @@ class PasswordCredentialMutationServiceTest {
      */
     @Test
     void shouldPersistPrecomputedHashAfterConsumingResetChallenge() {
-        EmailCredentialMapper emailCredentialMapper = mock(EmailCredentialMapper.class);
         AuthUserMapper authUserMapper = mock(AuthUserMapper.class);
         PasswordCredentialMapper passwordCredentialMapper = mock(PasswordCredentialMapper.class);
         EmailChallengeService emailChallengeService = mock(EmailChallengeService.class);
         SessionService sessionService = mock(SessionService.class);
-        PasswordCredentialMutationService service = new PasswordCredentialMutationService(emailCredentialMapper,
-                authUserMapper, passwordCredentialMapper, emailChallengeService, sessionService);
-        EmailCredentialDO emailCredential = new EmailCredentialDO(1L, "user@example.com", "user@example.com",
-                java.time.LocalDateTime.now(), java.time.LocalDateTime.now(), java.time.LocalDateTime.now());
+        PasswordCredentialMutationService service = new PasswordCredentialMutationService(authUserMapper,
+                passwordCredentialMapper, emailChallengeService, sessionService);
         AuthUserDO user = new AuthUserDO(1L, "user", "user", 2L, UserStatus.ACTIVE.getCode(), "tenant",
                 java.time.LocalDateTime.now(), java.time.LocalDateTime.now());
-        when(emailCredentialMapper.selectByEmailKeyForUpdate("user@example.com")).thenReturn(emailCredential);
-        when(authUserMapper.selectByUserIdForUpdate(1L)).thenReturn(user);
+        user.setEmail("user@example.com");
+        when(authUserMapper.selectByEmailForUpdate("user@example.com")).thenReturn(user);
         when(passwordCredentialMapper.selectByUserIdForUpdate(1L)).thenReturn(null);
         PasswordResetDTO request = new PasswordResetDTO();
         request.setEmail("user@example.com");

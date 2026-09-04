@@ -8,11 +8,9 @@ import com.nexarag.auth.enums.TenantMemberStatus;
 import com.nexarag.auth.enums.UserStatus;
 import com.nexarag.auth.enums.AuthErrorCode;
 import com.nexarag.auth.mapper.AuthUserMapper;
-import com.nexarag.auth.mapper.EmailCredentialMapper;
 import com.nexarag.auth.mapper.TenantInvitationMapper;
 import com.nexarag.auth.mapper.TenantMemberMapper;
 import com.nexarag.auth.model.dataobject.AuthUserDO;
-import com.nexarag.auth.model.dataobject.EmailCredentialDO;
 import com.nexarag.auth.model.dataobject.TenantInvitationDO;
 import com.nexarag.auth.model.dataobject.TenantMemberDO;
 import com.nexarag.auth.model.dto.TenantInvitationCreateDTO;
@@ -34,7 +32,6 @@ public class TenantInvitationServiceImpl implements TenantInvitationService {
     private final TenantInvitationMapper invitationMapper;
     private final TenantMemberMapper tenantMemberMapper;
     private final AuthUserMapper authUserMapper;
-    private final EmailCredentialMapper emailCredentialMapper;
     private final AccountNamePolicy accountNamePolicy;
     private final SecurityAuditService securityAuditService;
 
@@ -141,8 +138,7 @@ public class TenantInvitationServiceImpl implements TenantInvitationService {
         if (target == null || target.isBlank()) throw new ClientException(AuthErrorCode.TENANT_OPERATION_INVALID);
         AuthUserDO user;
         if (target.contains("@")) {
-            EmailCredentialDO credential = emailCredentialMapper.selectByEmailKey(target.trim().toLowerCase(Locale.ROOT));
-            user = credential == null ? null : authUserMapper.selectById(credential.getUserId());
+            user = authUserMapper.selectByEmail(target.trim().toLowerCase(Locale.ROOT));
         } else {
             user = authUserMapper.selectByAccountNameKey(accountNamePolicy.normalizeAndValidate(target));
         }

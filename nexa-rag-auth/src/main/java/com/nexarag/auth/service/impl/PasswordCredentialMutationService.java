@@ -4,10 +4,8 @@ import com.nexarag.auth.enums.EmailVerificationPurpose;
 import com.nexarag.auth.enums.UserStatus;
 import com.nexarag.auth.enums.AuthErrorCode;
 import com.nexarag.auth.mapper.AuthUserMapper;
-import com.nexarag.auth.mapper.EmailCredentialMapper;
 import com.nexarag.auth.mapper.PasswordCredentialMapper;
 import com.nexarag.auth.model.dataobject.AuthUserDO;
-import com.nexarag.auth.model.dataobject.EmailCredentialDO;
 import com.nexarag.auth.model.dataobject.PasswordCredentialDO;
 import com.nexarag.auth.model.dto.PasswordResetDTO;
 import com.nexarag.auth.model.dto.PasswordSetDTO;
@@ -29,7 +27,6 @@ import java.util.Locale;
 @RequiredArgsConstructor
 public class PasswordCredentialMutationService {
 
-    private final EmailCredentialMapper emailCredentialMapper;
     private final AuthUserMapper authUserMapper;
     private final PasswordCredentialMapper passwordCredentialMapper;
     private final EmailChallengeService emailChallengeService;
@@ -79,8 +76,7 @@ public class PasswordCredentialMutationService {
     public void setPassword(Long userId, PasswordSetDTO setDTO, String passwordHash) {
         // 1. 锁定当前用户和邮箱归属，防止会话过期或邮箱换绑后的竞态写入
         AuthUserDO user = requireActiveUserById(userId);
-        EmailCredentialDO emailCredential = emailCredentialMapper.selectByEmailKeyForUpdate(normalizeEmail(setDTO.getEmail()));
-        if (emailCredential == null || !user.getUserId().equals(emailCredential.getUserId())) {
+        if (!normalizeEmail(setDTO.getEmail()).equals(user.getEmail())) {
             throw authenticationFailed();
         }
 
@@ -91,8 +87,7 @@ public class PasswordCredentialMutationService {
     }
 
     private AuthUserDO requireActiveUserByBoundEmail(String email) {
-        EmailCredentialDO emailCredential = emailCredentialMapper.selectByEmailKeyForUpdate(normalizeEmail(email));
-        AuthUserDO user = emailCredential == null ? null : authUserMapper.selectByUserIdForUpdate(emailCredential.getUserId());
+        AuthUserDO user = authUserMapper.selectByEmailForUpdate(normalizeEmail(email));
         if (!isActive(user)) {
             throw authenticationFailed();
         }

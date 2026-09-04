@@ -20,48 +20,86 @@ import java.time.LocalDateTime;
 @TableName("auth_user")
 public class AuthUserDO {
 
-    /** 稳定用户ID。 */
+    /**
+     * 稳定用户ID。
+     */
     @TableId(value = "user_id", type = IdType.INPUT)
     private Long userId;
 
-    /** 用户可修改的展示账号名。 */
+    /**
+     * 用户可修改的展示账号名。
+     */
     private String accountName;
 
-    /** 第三方登录返回的原始展示名称。 */
+    /**
+     * 第三方登录返回的原始展示名称。
+     */
     private String displayName;
 
-    /** 用于唯一匹配的账号名规范化键。 */
+    /**
+     * 用于唯一匹配的账号名规范化键。
+     */
     private String accountNameKey;
 
-    /** 全局角色ID。 */
+    /**
+     * 全局角色ID。
+     */
     private Long roleId;
 
-    /** 用户状态：0启用、1禁用。 */
+    /**
+     * 用户状态：0启用、1禁用。
+     */
     private Integer status;
 
-    /** 登录后的默认当前租户ID。 */
+    /**
+     * 登录后的默认当前租户ID。
+     */
     private String defaultTenantId;
 
-    /** 创建时间。 */
+    /**
+     * 已验证且规范化的邮箱地址。
+     */
+    private String email;
+
+    /**
+     * 当前邮箱验证完成时间。
+     */
+    private LocalDateTime emailVerifiedTime;
+
+    /**
+     * 创建时间。
+     */
     private LocalDateTime createTime;
 
-    /** 更新时间。 */
+    /**
+     * 更新时间。
+     */
     private LocalDateTime updateTime;
 
     /**
      * 兼容未设置第三方展示名称的既有创建调用。
      *
-     * @param userId 用户ID
-     * @param accountName 账号名
-     * @param accountNameKey 账号名规范化键
-     * @param roleId 全局角色ID
-     * @param status 用户状态
+     * @param userId          用户ID
+     * @param accountName     账号名
+     * @param accountNameKey  账号名规范化键
+     * @param roleId          全局角色ID
+     * @param status          用户状态
      * @param defaultTenantId 默认租户ID
-     * @param createTime 创建时间
-     * @param updateTime 更新时间
+     * @param createTime      创建时间
+     * @param updateTime      更新时间
      */
     public AuthUserDO(Long userId, String accountName, String accountNameKey, Long roleId, Integer status,
                       String defaultTenantId, LocalDateTime createTime, LocalDateTime updateTime) {
-        this(userId, accountName, null, accountNameKey, roleId, status, defaultTenantId, createTime, updateTime);
+        this(userId, accountName, null, accountNameKey, roleId, status, defaultTenantId, null, null,
+                createTime, updateTime);
+    }
+
+    /**
+     * 兼容仅包含第三方展示名称的既有创建调用。
+     */
+    public AuthUserDO(Long userId, String accountName, String displayName, String accountNameKey, Long roleId,
+                      Integer status, String defaultTenantId, LocalDateTime createTime, LocalDateTime updateTime) {
+        this(userId, accountName, displayName, accountNameKey, roleId, status, defaultTenantId, null, null,
+                createTime, updateTime);
     }
 }

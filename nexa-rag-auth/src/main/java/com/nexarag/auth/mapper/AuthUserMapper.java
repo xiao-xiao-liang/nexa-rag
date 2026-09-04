@@ -22,7 +22,7 @@ public interface AuthUserMapper extends BaseMapper<AuthUserDO> {
      */
     @Select("""
             SELECT user_id, account_name, display_name, account_name_key, role_id, status, default_tenant_id,
-                   create_time, update_time
+                   email, email_verified_time, create_time, update_time
             FROM auth_user
             WHERE account_name_key = #{accountNameKey}
             LIMIT 1
@@ -37,7 +37,7 @@ public interface AuthUserMapper extends BaseMapper<AuthUserDO> {
      */
     @Select("""
             SELECT user_id, account_name, display_name, account_name_key, role_id, status, default_tenant_id,
-                   create_time, update_time
+                   email, email_verified_time, create_time, update_time
             FROM auth_user
             WHERE account_name_key = #{accountNameKey}
             FOR UPDATE
@@ -52,12 +52,60 @@ public interface AuthUserMapper extends BaseMapper<AuthUserDO> {
      */
     @Select("""
             SELECT user_id, account_name, display_name, account_name_key, role_id, status, default_tenant_id,
-                   create_time, update_time
+                   email, email_verified_time, create_time, update_time
             FROM auth_user
             WHERE user_id = #{userId}
             FOR UPDATE
             """)
     AuthUserDO selectByUserIdForUpdate(@Param("userId") Long userId);
+
+    /**
+     * 按规范化邮箱查询用户。
+     *
+     * @param email 规范化邮箱地址
+     * @return 用户；不存在时返回 null
+     */
+    @Select("""
+            SELECT user_id, account_name, display_name, account_name_key, role_id, status, default_tenant_id,
+                   email, email_verified_time, create_time, update_time
+            FROM auth_user
+            WHERE email = #{email}
+            LIMIT 1
+            """)
+    AuthUserDO selectByEmail(@Param("email") String email);
+
+    /**
+     * 按规范化邮箱锁定用户，用于邮箱归属变更和登录最终确认。
+     *
+     * @param email 规范化邮箱地址
+     * @return 已锁定用户；不存在时返回 null
+     */
+    @Select("""
+            SELECT user_id, account_name, display_name, account_name_key, role_id, status, default_tenant_id,
+                   email, email_verified_time, create_time, update_time
+            FROM auth_user
+            WHERE email = #{email}
+            FOR UPDATE
+            """)
+    AuthUserDO selectByEmailForUpdate(@Param("email") String email);
+
+    /**
+     * 按用户 ID 游标分页读取已绑定邮箱，用于低峰重建 BloomFilter。
+     *
+     * @param lastUserId 上一页最大用户 ID；首次传 0
+     * @param limit      单页条数
+     * @return 当前页已绑定邮箱的用户
+     */
+    @Select("""
+            SELECT user_id, account_name, display_name, account_name_key, role_id, status, default_tenant_id,
+                   email, email_verified_time, create_time, update_time
+            FROM auth_user
+            WHERE user_id > #{lastUserId}
+              AND email IS NOT NULL
+            ORDER BY user_id
+            LIMIT #{limit}
+            """)
+    List<AuthUserDO> selectEmailUsersAfterUserId(@Param("lastUserId") long lastUserId, @Param("limit") long limit);
 
     /**
      * 查询启用用户通过其全局角色获得的权限编码。

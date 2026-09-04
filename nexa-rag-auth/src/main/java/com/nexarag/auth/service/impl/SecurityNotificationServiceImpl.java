@@ -1,7 +1,7 @@
 package com.nexarag.auth.service.impl;
 
 import com.nexarag.auth.constants.SecurityNotificationConstants;
-import com.nexarag.auth.mapper.EmailCredentialMapper;
+import com.nexarag.auth.mapper.AuthUserMapper;
 import com.nexarag.auth.service.SecurityNotificationService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -19,7 +19,7 @@ import org.springframework.stereotype.Service;
 @RequiredArgsConstructor
 public class SecurityNotificationServiceImpl implements SecurityNotificationService {
 
-    private final EmailCredentialMapper emailCredentialMapper;
+    private final AuthUserMapper authUserMapper;
     private final JavaMailSender mailSender;
 
     @Value("${spring.mail.username:}")
@@ -36,15 +36,15 @@ public class SecurityNotificationServiceImpl implements SecurityNotificationServ
     public void notifyUser(Long userId, String eventSummary) {
         try {
             // 1. 查询接收邮箱并校验发件配置。
-            var credential = emailCredentialMapper.selectById(userId);
-            if (credential == null || from == null || from.isBlank()) {
+            var user = authUserMapper.selectById(userId);
+            if (user == null || user.getEmail() == null || from == null || from.isBlank()) {
                 return;
             }
 
             // 2. 组装并投递安全提醒邮件。
             SimpleMailMessage message = new SimpleMailMessage();
             message.setFrom(from);
-            message.setTo(credential.getEmail());
+            message.setTo(user.getEmail());
             message.setSubject("NexaRAG 账号安全通知");
             message.setText("账号安全操作：" + eventSummary + "\n如非本人操作，请及时检查账号安全。");
             mailSender.send(message);

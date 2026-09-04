@@ -35,11 +35,13 @@ class AuthCredentialSchemaMigrationTest {
                 "sa_token_session_key_hash CHAR(64) NOT NULL", "idx_auth_email_challenge_expire");
         assertThat(migrationSql).doesNotContain("code_hash", "verification_code", "password VARCHAR");
 
-        // 3. 验证全量 Schema 与增量迁移同步维护。
+        // 3. 验证全量 Schema 仅保留长期凭据和安全审计表；挑战与邮箱凭据已由 V30 删除。
         assertThat(schemaSql).contains("CREATE TABLE auth_password_credential",
-                "CREATE TABLE auth_email_credential", "CREATE TABLE auth_external_identity",
-                "CREATE TABLE auth_email_verification_challenge", "CREATE TABLE auth_device_session",
-                "CREATE TABLE auth_security_audit_event");
+                "CREATE TABLE auth_external_identity", "CREATE TABLE auth_device_session",
+                "CREATE TABLE auth_security_audit_event", "email VARCHAR(320) NULL",
+                "uk_auth_user_email", "uk_auth_external_identity_user_provider")
+                .doesNotContain("CREATE TABLE auth_email_credential",
+                        "CREATE TABLE auth_email_verification_challenge");
     }
 
     @Test
@@ -49,6 +51,31 @@ class AuthCredentialSchemaMigrationTest {
 
         assertThat(migrationSql).contains("ALTER TABLE auth_user", "display_name VARCHAR(128) NULL");
         assertThat(schemaSql).contains("display_name VARCHAR(128) NULL");
+    }
+
+    /**
+     * 验证用户邮箱字段回填和第三方身份约束由独立迁移完成。
+     *
+     * @throws IOException 读取数据库脚本失败时抛出
+     */
+    @Test
+    void shouldExpandAuthUserEmailAndIdentityConstraints() throws IOException {
+        String migrationSql = readDatabaseScript("migration/V29__expand_auth_user_email_and_identity_constraints.sql");
+
+        assertThat(migrationSql).contains("ADD COLUMN email VARCHAR(320) NULL",
+                "ADD COLUMN email_verified_time DATETIME NULL",
+                "UPDATE auth_user user INNER JOIN auth_email_credential credential",
+                "UNIQUE KEY uk_auth_user_email (email)",
+                "UNIQUE KEY uk_auth_external_identity_user_provider (user_id, provider_code)");
+    }
+
+    /** 验证收缩迁移只删除不再使用的邮箱凭据和验证码挑战表。 */
+    @Test
+    void shouldDropLegacyEmailCredentialTablesAfterSwitch() throws IOException {
+        String migrationSql = readDatabaseScript("migration/V30__drop_legacy_auth_email_credential_tables.sql");
+
+        assertThat(migrationSql).contains("DROP TABLE IF EXISTS auth_email_verification_challenge",
+                "DROP TABLE IF EXISTS auth_email_credential");
     }
 
     /**

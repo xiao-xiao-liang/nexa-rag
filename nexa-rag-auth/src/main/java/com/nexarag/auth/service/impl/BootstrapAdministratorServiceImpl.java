@@ -8,13 +8,12 @@ import com.nexarag.auth.enums.TenantMemberStatus;
 import com.nexarag.auth.enums.UserStatus;
 import com.nexarag.auth.mapper.AuthRoleMapper;
 import com.nexarag.auth.mapper.AuthUserMapper;
-import com.nexarag.auth.mapper.EmailCredentialMapper;
 import com.nexarag.auth.mapper.TenantMemberMapper;
 import com.nexarag.auth.model.dataobject.AuthRoleDO;
 import com.nexarag.auth.model.dataobject.AuthUserDO;
-import com.nexarag.auth.model.dataobject.EmailCredentialDO;
 import com.nexarag.auth.model.dataobject.TenantMemberDO;
 import com.nexarag.auth.service.AccountNamePolicy;
+import com.nexarag.auth.service.AuthIdentityBloomFilterService;
 import com.nexarag.auth.service.BootstrapAdministratorService;
 import com.nexarag.common.exception.ServiceException;
 import lombok.RequiredArgsConstructor;
@@ -41,8 +40,8 @@ public class BootstrapAdministratorServiceImpl implements BootstrapAdministrator
     private final AccountNamePolicy accountNamePolicy;
     private final AuthUserMapper authUserMapper;
     private final AuthRoleMapper authRoleMapper;
-    private final EmailCredentialMapper emailCredentialMapper;
     private final TenantMemberMapper tenantMemberMapper;
+    private final AuthIdentityBloomFilterService bloomFilterService;
 
     /**
      * {@inheritDoc}
@@ -78,15 +77,14 @@ public class BootstrapAdministratorServiceImpl implements BootstrapAdministrator
             if (!isExpectedBootstrapUser(historicalUser, accountNameKey)) {
                 throw new ServiceException("默认管理员历史用户与当前部署账号名不一致");
             }
-            ensureBootstrapEmailCredential(emailKey);
+            ensureBootstrapEmail(emailKey);
             return;
         }
         AuthUserDO accountNameUser = authUserMapper.selectByAccountNameKeyForUpdate(accountNameKey);
         if (accountNameUser != null) {
             throw new ServiceException("默认管理员账号名已被其他用户占用");
         }
-        EmailCredentialDO emailCredential = emailCredentialMapper.selectByEmailKeyForUpdate(emailKey);
-        if (emailCredential != null) {
+        if (authUserMapper.selectByEmailForUpdate(emailKey) != null) {
             throw new ServiceException("默认管理员预置邮箱已被其他用户占用");
         }
         AuthRoleDO administratorRole = authRoleMapper.selectByRoleCode(GlobalRoleCode.ADMIN.name());
@@ -95,11 +93,10 @@ public class BootstrapAdministratorServiceImpl implements BootstrapAdministrator
         }
 
         LocalDateTime now = LocalDateTime.now();
+        bloomFilterService.recordEmailOwner(BOOTSTRAP_ADMINISTRATOR_USER_ID, emailKey);
         authUserMapper.insert(new AuthUserDO(BOOTSTRAP_ADMINISTRATOR_USER_ID, accountName, null, accountNameKey,
-                administratorRole.getRoleId(), UserStatus.ACTIVE.getCode(), TenantConstants.DEFAULT_TENANT_ID, now, now));
-        // 配置邮箱由部署管理员控制，初始化时即作为管理员账号的唯一邮箱凭据预占，避免被普通注册抢占。
-        emailCredentialMapper.insert(new EmailCredentialDO(BOOTSTRAP_ADMINISTRATOR_USER_ID,
-                properties.getEmail().trim(), emailKey, now, now, now));
+                administratorRole.getRoleId(), UserStatus.ACTIVE.getCode(), TenantConstants.DEFAULT_TENANT_ID,
+                emailKey, now, now, now));
         tenantMemberMapper.insert(new TenantMemberDO(TenantConstants.DEFAULT_TENANT_ID,
                 BOOTSTRAP_ADMINISTRATOR_USER_ID, TenantMemberRole.OWNER.getCode(),
                 TenantMemberStatus.ACTIVE.getCode(), now, now));
@@ -107,21 +104,27 @@ public class BootstrapAdministratorServiceImpl implements BootstrapAdministrator
     }
 
     /**
-     * 为早期已创建但未预占邮箱的默认管理员补齐唯一邮箱凭据。
+     * 为早期已创建但未预占邮箱的默认管理员补齐唯一邮箱。
      */
-    private void ensureBootstrapEmailCredential(String emailKey) {
-        EmailCredentialDO emailCredential = emailCredentialMapper.selectByEmailKeyForUpdate(emailKey);
-        if (emailCredential != null) {
-            if (emailCredential.getUserId() == null
-                    || emailCredential.getUserId() != BOOTSTRAP_ADMINISTRATOR_USER_ID) {
-                throw new ServiceException("默认管理员预置邮箱已被其他用户占用");
+    private void ensureBootstrapEmail(String emailKey) {
+        AuthUserDO user = authUserMapper.selectByUserIdForUpdate(BOOTSTRAP_ADMINISTRATOR_USER_ID);
+        if (user.getEmail() != null) {
+            if (!emailKey.equals(user.getEmail())) {
+                throw new ServiceException("默认管理员预置邮箱与历史绑定不一致");
             }
             return;
         }
+        AuthUserDO emailUser = authUserMapper.selectByEmailForUpdate(emailKey);
+        if (emailUser != null && !Long.valueOf(BOOTSTRAP_ADMINISTRATOR_USER_ID).equals(emailUser.getUserId())) {
+            throw new ServiceException("默认管理员预置邮箱已被其他用户占用");
+        }
         LocalDateTime now = LocalDateTime.now();
-        emailCredentialMapper.insert(new EmailCredentialDO(BOOTSTRAP_ADMINISTRATOR_USER_ID,
-                properties.getEmail().trim(), emailKey, now, now, now));
-        log.info("默认管理员历史邮箱凭据已补齐，userId={}", BOOTSTRAP_ADMINISTRATOR_USER_ID);
+        bloomFilterService.recordEmailOwner(BOOTSTRAP_ADMINISTRATOR_USER_ID, emailKey);
+        user.setEmail(emailKey);
+        user.setEmailVerifiedTime(now);
+        user.setUpdateTime(now);
+        authUserMapper.updateById(user);
+        log.info("默认管理员历史邮箱已补齐，userId={}", BOOTSTRAP_ADMINISTRATOR_USER_ID);
     }
 
     /**

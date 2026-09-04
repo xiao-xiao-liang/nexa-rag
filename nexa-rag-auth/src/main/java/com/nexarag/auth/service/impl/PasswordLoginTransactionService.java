@@ -3,11 +3,9 @@ package com.nexarag.auth.service.impl;
 import com.nexarag.auth.enums.TenantMemberStatus;
 import com.nexarag.auth.enums.UserStatus;
 import com.nexarag.auth.mapper.AuthUserMapper;
-import com.nexarag.auth.mapper.EmailCredentialMapper;
 import com.nexarag.auth.mapper.PasswordCredentialMapper;
 import com.nexarag.auth.mapper.TenantMemberMapper;
 import com.nexarag.auth.model.dataobject.AuthUserDO;
-import com.nexarag.auth.model.dataobject.EmailCredentialDO;
 import com.nexarag.auth.model.dataobject.PasswordCredentialDO;
 import com.nexarag.auth.model.dataobject.TenantMemberDO;
 import com.nexarag.auth.model.vo.LoginSessionVO;
@@ -35,7 +33,6 @@ public class PasswordLoginTransactionService {
     private static final int PASSWORD_LOCK_MINUTES = 15;
 
     private final AuthUserMapper authUserMapper;
-    private final EmailCredentialMapper emailCredentialMapper;
     private final PasswordCredentialMapper passwordCredentialMapper;
     private final TenantMemberMapper tenantMemberMapper;
     private final SessionService sessionService;
@@ -55,14 +52,13 @@ public class PasswordLoginTransactionService {
     @Transactional
     public PasswordLoginCompletion complete(Long userId, String emailKey, String verifiedPasswordHash,
                                             boolean passwordMatched, String upgradedPasswordHash) {
-        // 1. 锁定当前用户、可选邮箱凭据和密码凭据，确认事务外读取结果仍然有效
+        // 1. 锁定当前用户和密码凭据，确认事务外读取结果仍然有效
         AuthUserDO user = userId == null ? null : authUserMapper.selectByUserIdForUpdate(userId);
         if (!isActive(user)) {
             return PasswordLoginCompletion.failed();
         }
         if (emailKey != null) {
-            EmailCredentialDO emailCredential = emailCredentialMapper.selectByEmailKeyForUpdate(emailKey);
-            if (emailCredential == null || !userId.equals(emailCredential.getUserId())) {
+            if (!emailKey.equals(user.getEmail())) {
                 return PasswordLoginCompletion.failed();
             }
         }

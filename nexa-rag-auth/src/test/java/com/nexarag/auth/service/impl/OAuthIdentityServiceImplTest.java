@@ -2,13 +2,13 @@ package com.nexarag.auth.service.impl;
 
 import com.nexarag.auth.enums.OAuthProvider;
 import com.nexarag.auth.mapper.AuthUserMapper;
-import com.nexarag.auth.mapper.EmailCredentialMapper;
 import com.nexarag.auth.mapper.ExternalIdentityMapper;
 import com.nexarag.auth.mapper.PasswordCredentialMapper;
 import com.nexarag.auth.mapper.TenantMemberMapper;
 import com.nexarag.auth.model.dataobject.AuthUserDO;
 import com.nexarag.auth.model.dataobject.ExternalIdentityDO;
 import com.nexarag.auth.service.AuthUserProvisioningService;
+import com.nexarag.auth.service.AuthIdentityBloomFilterService;
 import com.nexarag.auth.service.CurrentUserProfileService;
 import com.nexarag.auth.service.OAuthAccountNameGenerator;
 import com.nexarag.auth.service.SecurityAuditService;
@@ -17,6 +17,7 @@ import org.junit.jupiter.api.Test;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -31,6 +32,7 @@ class OAuthIdentityServiceImplTest {
     @Test
     void shouldAutomaticallyProvisionUserForUnboundOAuthIdentity() {
         ExternalIdentityMapper identityMapper = mock(ExternalIdentityMapper.class);
+        AuthIdentityBloomFilterService bloomFilterService = mock(AuthIdentityBloomFilterService.class);
         AuthUserProvisioningService provisioningService = mock(AuthUserProvisioningService.class);
         OAuthAccountNameGenerator accountNameGenerator = mock(OAuthAccountNameGenerator.class);
         AuthUserDO user = new AuthUserDO();
@@ -42,13 +44,17 @@ class OAuthIdentityServiceImplTest {
         when(provisioningService.createDefaultTenantUser("octocat", "octocat")).thenReturn(user);
 
         OAuthIdentityServiceImpl service = new OAuthIdentityServiceImpl(identityMapper, mock(AuthUserMapper.class),
-                mock(TenantMemberMapper.class), mock(EmailCredentialMapper.class), mock(PasswordCredentialMapper.class),
+                mock(TenantMemberMapper.class), mock(PasswordCredentialMapper.class),
                 provisioningService, accountNameGenerator, mock(SessionService.class), mock(SecurityAuditService.class),
-                mock(CurrentUserProfileService.class));
+                mock(CurrentUserProfileService.class), bloomFilterService);
 
         service.loginOrRegister(OAuthProvider.GITHUB, "subject-1", "octocat", null);
 
         verify(provisioningService).createDefaultTenantUser("octocat", "octocat");
         verify(identityMapper).insert(any(ExternalIdentityDO.class));
+        var order = inOrder(bloomFilterService, identityMapper);
+        order.verify(bloomFilterService).recordExternalUserProvider(100L, "github");
+        order.verify(bloomFilterService).recordExternalSubject("github", "subject-1");
+        order.verify(identityMapper).insert(any(ExternalIdentityDO.class));
     }
 }

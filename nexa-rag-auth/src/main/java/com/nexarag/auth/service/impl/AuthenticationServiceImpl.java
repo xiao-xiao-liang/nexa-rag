@@ -5,11 +5,9 @@ import com.nexarag.auth.enums.UserStatus;
 import com.nexarag.auth.enums.EmailVerificationPurpose;
 import com.nexarag.auth.enums.AuthErrorCode;
 import com.nexarag.auth.mapper.AuthUserMapper;
-import com.nexarag.auth.mapper.EmailCredentialMapper;
 import com.nexarag.auth.mapper.PasswordCredentialMapper;
 import com.nexarag.auth.mapper.TenantMemberMapper;
 import com.nexarag.auth.model.dataobject.AuthUserDO;
-import com.nexarag.auth.model.dataobject.EmailCredentialDO;
 import com.nexarag.auth.model.dataobject.PasswordCredentialDO;
 import com.nexarag.auth.model.dataobject.TenantMemberDO;
 import com.nexarag.auth.model.dto.AccountPasswordLoginDTO;
@@ -40,7 +38,6 @@ import java.util.Locale;
 public class AuthenticationServiceImpl implements AuthenticationService {
 
     private final AuthUserMapper authUserMapper;
-    private final EmailCredentialMapper emailCredentialMapper;
     private final PasswordCredentialMapper passwordCredentialMapper;
     private final TenantMemberMapper tenantMemberMapper;
     private final EmailChallengeService emailChallengeService;
@@ -73,8 +70,7 @@ public class AuthenticationServiceImpl implements AuthenticationService {
             throw authenticationFailed();
         }
         String emailKey = normalizeEmail(loginDTO.getEmail());
-        EmailCredentialDO emailCredential = emailCredentialMapper.selectByEmailKey(emailKey);
-        AuthUserDO user = emailCredential == null ? null : authUserMapper.selectById(emailCredential.getUserId());
+        AuthUserDO user = authUserMapper.selectByEmail(emailKey);
         return loginByUserPassword(user, emailKey, loginDTO.getPassword());
     }
 
@@ -103,12 +99,11 @@ public class AuthenticationServiceImpl implements AuthenticationService {
     @Override
     @Transactional(noRollbackFor = ClientException.class)
     public LoginSessionVO loginByEmailCode(EmailCodeLoginDTO loginDTO) {
-        // 1. 重新锁定当前邮箱凭据，确保验证码不能在邮箱换绑后继续使用
+        // 1. 重新锁定当前用户，确保验证码不能在邮箱换绑后继续使用
         if (loginDTO == null) {
             throw authenticationFailed();
         }
-        EmailCredentialDO emailCredential = emailCredentialMapper.selectByEmailKeyForUpdate(normalizeEmail(loginDTO.getEmail()));
-        AuthUserDO user = emailCredential == null ? null : authUserMapper.selectByUserIdForUpdate(emailCredential.getUserId());
+        AuthUserDO user = authUserMapper.selectByEmailForUpdate(normalizeEmail(loginDTO.getEmail()));
         if (!isActiveUser(user)) {
             throw authenticationFailed();
         }
@@ -124,8 +119,7 @@ public class AuthenticationServiceImpl implements AuthenticationService {
      */
     private EmailChallengeVO sendEmailLoginCodeInternal(String email) {
         String emailKey = normalizeEmail(email);
-        EmailCredentialDO emailCredential = emailCredentialMapper.selectByEmailKey(emailKey);
-        AuthUserDO user = emailCredential == null ? null : authUserMapper.selectById(emailCredential.getUserId());
+        AuthUserDO user = authUserMapper.selectByEmail(emailKey);
         if (!isActiveUser(user)) {
             throw authenticationFailed();
         }
@@ -137,8 +131,7 @@ public class AuthenticationServiceImpl implements AuthenticationService {
      */
     private EmailChallengeVO sendPasswordResetCodeInternal(String email) {
         String emailKey = normalizeEmail(email);
-        EmailCredentialDO emailCredential = emailCredentialMapper.selectByEmailKey(emailKey);
-        AuthUserDO user = emailCredential == null ? null : authUserMapper.selectById(emailCredential.getUserId());
+        AuthUserDO user = authUserMapper.selectByEmail(emailKey);
         if (!isActiveUser(user)) {
             throw authenticationFailed();
         }

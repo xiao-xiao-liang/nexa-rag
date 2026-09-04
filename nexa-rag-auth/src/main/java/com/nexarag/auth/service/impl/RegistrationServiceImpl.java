@@ -3,12 +3,11 @@ package com.nexarag.auth.service.impl;
 import com.nexarag.auth.enums.EmailVerificationPurpose;
 import com.nexarag.auth.enums.AuthErrorCode;
 import com.nexarag.auth.mapper.AuthUserMapper;
-import com.nexarag.auth.mapper.EmailCredentialMapper;
 import com.nexarag.auth.model.dataobject.AuthUserDO;
-import com.nexarag.auth.model.dataobject.EmailCredentialDO;
 import com.nexarag.auth.model.dto.RegisterAccountDTO;
 import com.nexarag.auth.model.vo.LoginSessionVO;
 import com.nexarag.auth.service.AccountNamePolicy;
+import com.nexarag.auth.service.AuthIdentityBloomFilterService;
 import com.nexarag.auth.service.AuthUserProvisioningService;
 import com.nexarag.auth.service.EmailChallengeService;
 import com.nexarag.auth.service.CurrentUserProfileService;
@@ -36,10 +35,10 @@ public class RegistrationServiceImpl implements RegistrationService {
     private final AuthUserProvisioningService authUserProvisioningService;
     private final EmailChallengeService emailChallengeService;
     private final AuthUserMapper authUserMapper;
-    private final EmailCredentialMapper emailCredentialMapper;
     private final SessionService sessionService;
     private final CurrentUserProfileService currentUserProfileService;
     private final SecurityAuditService securityAuditService;
+    private final AuthIdentityBloomFilterService bloomFilterService;
 
     /**
      * {@inheritDoc}
@@ -54,8 +53,7 @@ public class RegistrationServiceImpl implements RegistrationService {
         String accountNameKey = accountNamePolicy.normalizeAndValidate(registerDTO.getAccountName());
         String accountName = registerDTO.getAccountName().trim();
         String emailKey = normalizeEmail(registerDTO.getEmail());
-        if (authUserMapper.selectByAccountNameKey(accountNameKey) != null
-                || emailCredentialMapper.selectByEmailKey(emailKey) != null) {
+        if (authUserMapper.selectByAccountNameKey(accountNameKey) != null || authUserMapper.selectByEmail(emailKey) != null) {
             throw new ClientException(AuthErrorCode.REGISTRATION_CONFLICT);
         }
         // 2. 单次消费注册验证码，消费动作会加入当前事务
@@ -66,8 +64,11 @@ public class RegistrationServiceImpl implements RegistrationService {
         try {
             AuthUserDO user = authUserProvisioningService.createDefaultTenantUser(accountName);
             LocalDateTime now = LocalDateTime.now();
-            emailCredentialMapper.insert(new EmailCredentialDO(user.getUserId(), registerDTO.getEmail().trim(), emailKey,
-                    now, now, now));
+            bloomFilterService.recordEmailOwner(user.getUserId(), emailKey);
+            user.setEmail(emailKey);
+            user.setEmailVerifiedTime(now);
+            user.setUpdateTime(now);
+            authUserMapper.updateById(user);
             sessionService.establishLoginAfterCommit(user.getUserId(), user.getDefaultTenantId(), true);
             securityAuditService.recordSuccess(user.getUserId(), "ACCOUNT_REGISTER_LOGIN", "注册账号并自动登录");
             return currentUserProfileService.getProfile(user.getUserId(), user.getDefaultTenantId());

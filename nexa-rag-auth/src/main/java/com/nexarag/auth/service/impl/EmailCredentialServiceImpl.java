@@ -5,14 +5,13 @@ import com.nexarag.auth.enums.EmailVerificationPurpose;
 import com.nexarag.auth.enums.UserStatus;
 import com.nexarag.auth.enums.AuthErrorCode;
 import com.nexarag.auth.mapper.AuthUserMapper;
-import com.nexarag.auth.mapper.EmailCredentialMapper;
 import com.nexarag.auth.model.dataobject.AuthUserDO;
-import com.nexarag.auth.model.dataobject.EmailCredentialDO;
 import com.nexarag.auth.model.dto.EmailChangeDTO;
 import com.nexarag.auth.model.dto.EmailCodeSendDTO;
 import com.nexarag.auth.model.dto.EmailVerificationDTO;
 import com.nexarag.auth.model.vo.EmailChallengeVO;
 import com.nexarag.auth.service.EmailChallengeService;
+import com.nexarag.auth.service.AuthIdentityBloomFilterService;
 import com.nexarag.auth.service.EmailCredentialService;
 import com.nexarag.auth.service.RecentVerificationService;
 import com.nexarag.common.exception.ClientException;
@@ -32,9 +31,9 @@ import java.util.Locale;
 public class EmailCredentialServiceImpl implements EmailCredentialService {
 
     private final AuthUserMapper authUserMapper;
-    private final EmailCredentialMapper emailCredentialMapper;
     private final EmailChallengeService emailChallengeService;
     private final RecentVerificationService recentVerificationService;
+    private final AuthIdentityBloomFilterService bloomFilterService;
 
     /**
      * {@inheritDoc}
@@ -48,18 +47,17 @@ public class EmailCredentialServiceImpl implements EmailCredentialService {
         }
         AuthUserDO user = requireCurrentActiveUser();
         String emailKey = normalizeEmail(sendDTO.getEmail());
-        EmailCredentialDO currentCredential = emailCredentialMapper.selectByUserIdForUpdate(user.getUserId());
 
         // 2. 旧邮箱必须是当前凭据；新邮箱不得已被任何账号占用
         if (sendDTO.getPurpose() == EmailVerificationPurpose.CHANGE_EMAIL_OLD) {
-            if (currentCredential == null || !currentCredential.getEmailKey().equals(emailKey)) {
+            if (!emailKey.equals(user.getEmail())) {
                 throw authenticationFailed();
             }
         } else {
-            if (currentCredential != null && currentCredential.getEmailKey().equals(emailKey)) {
+            if (emailKey.equals(user.getEmail())) {
                 throw new ClientException(AuthErrorCode.EMAIL_CONFLICT);
             }
-            if (emailCredentialMapper.selectByEmailKeyForUpdate(emailKey) != null) {
+            if (authUserMapper.selectByEmailForUpdate(emailKey) != null) {
                 throw new ClientException(AuthErrorCode.EMAIL_CONFLICT);
             }
         }
@@ -80,18 +78,18 @@ public class EmailCredentialServiceImpl implements EmailCredentialService {
         if (verificationDTO == null) {
             throw authenticationFailed();
         }
-        if (emailCredentialMapper.selectByUserIdForUpdate(user.getUserId()) != null) {
+        if (user.getEmail() != null) {
             throw new ClientException(AuthErrorCode.EMAIL_CONFLICT);
         }
 
         // 2. 验证新邮箱归属并写入唯一凭据
         String emailKey = normalizeEmail(verificationDTO.getEmail());
-        if (emailCredentialMapper.selectByEmailKeyForUpdate(emailKey) != null) {
+        if (authUserMapper.selectByEmailForUpdate(emailKey) != null) {
             throw new ClientException(AuthErrorCode.EMAIL_CONFLICT);
         }
         emailChallengeService.verifyAndConsume(verificationDTO.getChallengeId(), verificationDTO.getEmail(),
                 EmailVerificationPurpose.CHANGE_EMAIL_NEW, user.getUserId(), verificationDTO.getVerificationCode());
-        insertEmailCredential(user.getUserId(), verificationDTO.getEmail(), emailKey);
+        updateUserEmail(user, emailKey);
     }
 
     /**
@@ -106,15 +104,14 @@ public class EmailCredentialServiceImpl implements EmailCredentialService {
                 || changeDTO.getNewEmailVerification() == null) {
             throw authenticationFailed();
         }
-        EmailCredentialDO credential = emailCredentialMapper.selectByUserIdForUpdate(user.getUserId());
         EmailVerificationDTO oldVerification = changeDTO.getOldEmailVerification();
         EmailVerificationDTO newVerification = changeDTO.getNewEmailVerification();
         String oldEmailKey = normalizeEmail(oldVerification.getEmail());
         String newEmailKey = normalizeEmail(newVerification.getEmail());
-        if (credential == null || !credential.getEmailKey().equals(oldEmailKey) || oldEmailKey.equals(newEmailKey)) {
+        if (!oldEmailKey.equals(user.getEmail()) || oldEmailKey.equals(newEmailKey)) {
             throw authenticationFailed();
         }
-        if (emailCredentialMapper.selectByEmailKeyForUpdate(newEmailKey) != null) {
+        if (authUserMapper.selectByEmailForUpdate(newEmailKey) != null) {
             throw new ClientException(AuthErrorCode.EMAIL_CONFLICT);
         }
 
@@ -124,13 +121,9 @@ public class EmailCredentialServiceImpl implements EmailCredentialService {
         emailChallengeService.verifyAndConsume(newVerification.getChallengeId(), newVerification.getEmail(),
                 EmailVerificationPurpose.CHANGE_EMAIL_NEW, user.getUserId(), newVerification.getVerificationCode());
 
-        // 3. 替换唯一邮箱凭据；旧邮箱立即不再具备登录与重置资格
-        credential.setEmail(newVerification.getEmail().trim());
-        credential.setEmailKey(newEmailKey);
-        credential.setVerifiedTime(LocalDateTime.now());
-        credential.setUpdateTime(LocalDateTime.now());
+        // 3. 替换 auth_user 上的唯一邮箱；旧邮箱立即不再具备登录与重置资格
         try {
-            emailCredentialMapper.updateById(credential);
+            updateUserEmail(user, newEmailKey);
         } catch (DuplicateKeyException exception) {
             throw new ClientException(AuthErrorCode.EMAIL_CONFLICT);
         }
@@ -152,12 +145,16 @@ public class EmailCredentialServiceImpl implements EmailCredentialService {
     }
 
     /**
-     * 写入首个已验证邮箱凭据。
+     * 写入当前用户的已验证邮箱。
      */
-    private void insertEmailCredential(Long userId, String email, String emailKey) {
+    private void updateUserEmail(AuthUserDO user, String emailKey) {
         LocalDateTime now = LocalDateTime.now();
         try {
-            emailCredentialMapper.insert(new EmailCredentialDO(userId, email.trim(), emailKey, now, now, now));
+            bloomFilterService.recordEmailOwner(user.getUserId(), emailKey);
+            user.setEmail(emailKey);
+            user.setEmailVerifiedTime(now);
+            user.setUpdateTime(now);
+            authUserMapper.updateById(user);
         } catch (DuplicateKeyException exception) {
             throw new ClientException(AuthErrorCode.EMAIL_CONFLICT);
         }
