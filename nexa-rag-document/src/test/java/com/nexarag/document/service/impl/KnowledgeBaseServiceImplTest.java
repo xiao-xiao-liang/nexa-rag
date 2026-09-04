@@ -28,19 +28,14 @@ class KnowledgeBaseServiceImplTest {
         KnowledgeBaseMapper knowledgeBaseMapper = mock(KnowledgeBaseMapper.class);
         DocumentMapper documentMapper = mock(DocumentMapper.class);
         CurrentTenantProvider tenantProvider = mock(CurrentTenantProvider.class);
-        DocumentVersionService documentVersionService = mock(DocumentVersionService.class);
         KnowledgeBaseServiceImpl service = new KnowledgeBaseServiceImpl(knowledgeBaseMapper, documentMapper,
-                tenantProvider, documentVersionService);
+                tenantProvider);
         KnowledgeBaseDO knowledgeBase = KnowledgeBaseDO.builder().knowledgeBaseId(1L).tenantId("tenant-1")
                 .name("知识库").isDefault(0).build();
-        Document document = Document.builder().documentId(11L).knowledgeBaseId(1L)
-                .activeVersionId(101L).build();
         when(tenantProvider.getRequiredTenantId()).thenReturn("tenant-1");
         when(knowledgeBaseMapper.selectOne(any())).thenReturn(knowledgeBase);
-        when(documentMapper.selectList(any())).thenReturn(List.of(document));
-        when(documentVersionService.findActiveVersions(List.of(document))).thenReturn(Map.of(11L,
-                DocumentVersionDO.builder().documentId(11L).documentVersionId(101L)
-                        .status(DocumentVersionStatus.INDEX_READY).build()));
+        when(documentMapper.aggregateStatisticsByKnowledgeBaseIds(any())).thenReturn(List.of(
+                new com.nexarag.document.model.bo.KnowledgeBaseDocumentStatisticsBO(1L, 1L, 0L, 0L, 1L, 0L)));
 
         var detail = service.getDetail(1L);
 
