@@ -545,10 +545,13 @@ CREATE TABLE auth_user (
     role_id BIGINT NOT NULL COMMENT '全局角色ID',
     status TINYINT NOT NULL DEFAULT 0 COMMENT '用户状态：0启用、1禁用',
     default_tenant_id VARCHAR(64) NOT NULL COMMENT '默认租户ID',
+    email VARCHAR(320) NULL COMMENT '已验证且规范化的邮箱地址',
+    email_verified_time DATETIME NULL COMMENT '当前邮箱验证完成时间',
     create_time DATETIME NOT NULL COMMENT '创建时间',
     update_time DATETIME NOT NULL COMMENT '更新时间',
     PRIMARY KEY (user_id),
     UNIQUE KEY uk_auth_user_account_name_key (account_name_key),
+    UNIQUE KEY uk_auth_user_email (email),
     KEY idx_auth_user_role (role_id),
     KEY idx_auth_user_status (status),
     KEY idx_auth_user_default_tenant (default_tenant_id)
@@ -593,17 +596,6 @@ CREATE TABLE auth_password_credential (
     KEY idx_auth_password_credential_locked_until (password_locked_until)
 ) COMMENT='本地密码凭据表';
 
-CREATE TABLE auth_email_credential (
-    user_id BIGINT NOT NULL COMMENT '用户ID',
-    email VARCHAR(320) NOT NULL COMMENT '展示邮箱地址',
-    email_key VARCHAR(320) NOT NULL COMMENT '规范化邮箱键',
-    verified_time DATETIME NOT NULL COMMENT '验证成功时间',
-    create_time DATETIME NOT NULL COMMENT '创建时间',
-    update_time DATETIME NOT NULL COMMENT '更新时间',
-    PRIMARY KEY (user_id),
-    UNIQUE KEY uk_auth_email_credential_email_key (email_key)
-) COMMENT='当前已验证邮箱凭据表';
-
 CREATE TABLE auth_external_identity (
     external_identity_id BIGINT NOT NULL COMMENT '第三方身份ID',
     user_id BIGINT NOT NULL COMMENT '用户ID',
@@ -614,25 +606,9 @@ CREATE TABLE auth_external_identity (
     update_time DATETIME NOT NULL COMMENT '更新时间',
     PRIMARY KEY (external_identity_id),
     UNIQUE KEY uk_auth_external_identity_provider_subject (provider_code, provider_subject),
+    UNIQUE KEY uk_auth_external_identity_user_provider (user_id, provider_code),
     KEY idx_auth_external_identity_user (user_id)
 ) COMMENT='第三方身份绑定表';
-
-CREATE TABLE auth_email_verification_challenge (
-    challenge_id BIGINT NOT NULL COMMENT '邮箱验证码挑战ID',
-    user_id BIGINT NULL COMMENT '关联用户ID',
-    email_key VARCHAR(320) NOT NULL COMMENT '规范化邮箱键',
-    purpose_code VARCHAR(32) NOT NULL COMMENT '用途编码',
-    context_hash CHAR(64) NOT NULL COMMENT '用途上下文哈希',
-    expires_time DATETIME NOT NULL COMMENT '过期时间',
-    verify_attempts INT NOT NULL DEFAULT 0 COMMENT '验证尝试次数',
-    consumed_time DATETIME NULL COMMENT '消费时间',
-    invalidated_time DATETIME NULL COMMENT '重发或撤销失效时间',
-    create_time DATETIME NOT NULL COMMENT '创建时间',
-    PRIMARY KEY (challenge_id),
-    KEY idx_auth_email_challenge_lookup (email_key, purpose_code, create_time),
-    KEY idx_auth_email_challenge_user (user_id, purpose_code, create_time),
-    KEY idx_auth_email_challenge_expire (expires_time)
-) COMMENT='邮箱验证码挑战表';
 
 CREATE TABLE auth_device_session (
     device_session_id BIGINT NOT NULL COMMENT '设备会话记录ID',
