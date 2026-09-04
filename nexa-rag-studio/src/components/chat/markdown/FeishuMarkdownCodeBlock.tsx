@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { FeishuCopyButton } from "../FeishuCopyButton";
+import { feishuToast } from "../../ui/FeishuToast";
 
 export interface FeishuCodeBlockProps {
   inline?: boolean;
@@ -35,7 +36,11 @@ export const FeishuCodeBlock: React.FC<FeishuCodeBlockProps> = ({
 
   // 代码块渲染 (fenced code block)
   const handleCopy = () => {
-    navigator.clipboard.writeText(codeString);
+    navigator.clipboard.writeText(codeString).then(() => {
+      feishuToast.success("复制成功");
+    }).catch(() => {
+      feishuToast.error("复制失败");
+    });
     setIsCopied(true);
     setTimeout(() => setIsCopied(false), 2000);
   };

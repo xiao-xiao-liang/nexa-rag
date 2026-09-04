@@ -10,9 +10,10 @@ import {
   FeishuAgentCubeLogo,
 } from "../../components/chat";
 import { FEISHU_FONT_FAMILY } from "../../components/ui/feishu-table";
-import { Sparkles, Table2, FileText, Globe } from "lucide-react";
+import { Sparkles, Table2, FileText, Globe, AlertCircle, RotateCw, X } from "lucide-react";
 import { emptyHistoryCache, getHistoryEntry, prependHistoryPage, putHistoryPage, removeHistoryEntry, touchHistoryEntry } from "./chat-history-cache";
 import { applyCitationSnapshot } from "../../lib/chat-stream-event";
+import { feishuToast } from "../../components/ui/FeishuToast";
 
 export const ChatPage: React.FC = () => {
   const { conversationId: urlConversationId } = useParams<{ conversationId?: string }>();
@@ -28,6 +29,7 @@ export const ChatPage: React.FC = () => {
   const [generationId, setGenerationId] = useState<string | null>(null);
   const [copiedMsgId, setCopiedMsgId] = useState<string | null>(null);
   const [elapsedSeconds, setElapsedSeconds] = useState(1);
+  const [dismissedFailedMsgId, setDismissedFailedMsgId] = useState<string | null>(null);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
   const [isLoadingOlderHistory, setIsLoadingOlderHistory] = useState(false);
@@ -442,10 +444,17 @@ export const ChatPage: React.FC = () => {
 
       if (event.type === "COMPLETE" || event.type === "CANCELLED" || event.type === "ERROR") {
         terminalRef.current = true;
-        const status = event.type === "COMPLETE" ? "COMPLETED" : event.type;
+        const status = event.type === "COMPLETE" ? "COMPLETED" : (event.type === "ERROR" ? "FAILED" : event.type);
         setMessages((prev) => {
           const messagesWithTerminalState = prev.map((message) => message.messageId === targetMessageId
-            ? { ...message, status, operations: event.operations || message.operations, connectionState: undefined }
+            ? {
+                ...message,
+                status,
+                operations: event.operations || message.operations,
+                connectionState: undefined,
+                failureCode: event.type === "ERROR" ? (event.errorCode != null ? String(event.errorCode) : message.failureCode) : message.failureCode,
+                failureMessage: event.type === "ERROR" ? event.errorMessage || message.failureMessage : message.failureMessage,
+              }
             : message);
           const nextMessages = applyCitationSnapshot(messagesWithTerminalState, targetMessageId, event.citations);
           const conversationId = generationConversationIdRef.current;
@@ -526,10 +535,41 @@ export const ChatPage: React.FC = () => {
   };
 
   const handleCopy = (msgId: string, text: string) => {
-    navigator.clipboard.writeText(text);
+    navigator.clipboard.writeText(text).then(() => {
+      feishuToast.success("复制成功");
+    }).catch(() => {
+      feishuToast.error("复制失败");
+    });
     setCopiedMsgId(msgId);
     setTimeout(() => setCopiedMsgId(null), 2000);
   };
+
+  const handleRegenerate = (failedMessageId: string) => {
+    if (isGenerating) return;
+    const index = messages.findIndex((m) => m.messageId === failedMessageId);
+    if (index === -1) return;
+    for (let i = index - 1; i >= 0; i--) {
+      if (messages[i].role.toLowerCase() === "user") {
+        handleSend(messages[i].content);
+        return;
+      }
+    }
+  };
+
+  // 获取当前会话中最后一条助手消息，判断其是否生成失败
+  const lastMessage = messages[messages.length - 1];
+  const isLastAssistantFailed =
+    Boolean(lastMessage &&
+    (lastMessage.role || "").toLowerCase() === "assistant" &&
+    (lastMessage.status === "FAILED" || lastMessage.status === "ERROR"));
+  const failedAssistantMessage = isLastAssistantFailed ? lastMessage : null;
+  const isErrorDismissed = Boolean(failedAssistantMessage && dismissedFailedMsgId === failedAssistantMessage.messageId);
+
+  useEffect(() => {
+    if (failedAssistantMessage && !isErrorDismissed) {
+      scrollToBottom(true);
+    }
+  }, [failedAssistantMessage, isErrorDismissed, scrollToBottom]);
 
   const activeConversation = conversations.find((c) => c.conversationId === activeConversationId);
   const currentTitle = activeConversation?.title || "飞书知识问答";
@@ -662,6 +702,7 @@ export const ChatPage: React.FC = () => {
                   isGenerating={isGenerating && index === messages.length - 1}
                   isCopied={copiedMsgId === msg.messageId}
                   onCopy={handleCopy}
+                  onRegenerate={handleRegenerate}
                   elapsedSeconds={elapsedSeconds}
                 />
               ))}
@@ -670,14 +711,59 @@ export const ChatPage: React.FC = () => {
           )}
         </div>
 
-        {/* 底部输入框 (解耦组件) */}
-        <ChatInputBox
-          value={inputContent}
-          onChange={setInputContent}
-          onSend={() => handleSend()}
-          onCancel={handleCancelGeneration}
-          isGenerating={isGenerating}
-        />
+        {/* 底部输入框与操作区域 */}
+        <div className="shrink-0 bg-white select-none">
+          {/* 回答生成中断卡片：横向排版置于输入框上方，右侧重新生成按钮，减少竖向空间占用且不遮挡文字 */}
+          {failedAssistantMessage && !isErrorDismissed && (
+            <div className="px-7 pb-2">
+              <div className="max-w-190 mx-auto px-3.5 py-2 rounded-[10px] bg-[#FFF0F0] border border-[#FFC2C2] flex items-center justify-between gap-3 shadow-2xs">
+                <div className="flex items-center gap-2 min-w-0 flex-1">
+                  <div className="text-[#D03050] shrink-0">
+                    <AlertCircle className="w-4 h-4" />
+                  </div>
+                  <div className="flex items-center gap-1.5 min-w-0 text-[13px] leading-tight">
+                    <span className="font-medium text-[#1F2329] shrink-0">回答生成中断</span>
+                    <span className="text-[#8F959E] shrink-0">·</span>
+                    <span
+                      className="text-[12px] text-[#646A73] truncate"
+                      title={failedAssistantMessage.failureMessage || "对话工作流执行失败，请稍后重试"}
+                    >
+                      {failedAssistantMessage.failureMessage || "对话工作流执行失败，请稍后重试"}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => handleRegenerate(failedAssistantMessage.messageId)}
+                    className="inline-flex items-center gap-1.5 px-2.5 py-1 text-[12px] font-medium text-[#3370FF] hover:text-[#285FD9] hover:bg-[#3370FF]/10 rounded-[6px] transition-colors cursor-pointer"
+                  >
+                    <RotateCw className="w-3.5 h-3.5" />
+                    <span>重新生成</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setDismissedFailedMsgId(failedAssistantMessage.messageId)}
+                    className="p-1 text-[#8F959E] hover:text-[#1F2329] hover:bg-black/5 rounded-[4px] transition-colors cursor-pointer"
+                    title="关闭提示"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* 底部输入框 (解耦组件) */}
+          <ChatInputBox
+            value={inputContent}
+            onChange={setInputContent}
+            onSend={() => handleSend()}
+            onCancel={handleCancelGeneration}
+            isGenerating={isGenerating}
+          />
+        </div>
       </div>
     </div>
   );

@@ -18,6 +18,8 @@ import com.nexarag.document.service.DocumentService;
 import com.nexarag.document.service.DocumentVersionService;
 import com.nexarag.document.service.KnowledgeBaseService;
 import com.nexarag.infra.enums.ExternalDocumentSourceType;
+import com.nexarag.workflow.error.ChatErrorDetail;
+import com.nexarag.workflow.error.ChatErrorResolver;
 import com.nexarag.workflow.request.ChatWorkflowRequest;
 import com.nexarag.workflow.service.WorkflowService;
 import com.nexarag.workflow.stream.*;
@@ -95,10 +97,9 @@ public class ChatController {
                 })
                 .onErrorResume(exception -> {
                     log.error("Chat SSE 请求执行失败，generationId={}，traceId={}", generationId, traceId, exception);
-                    String errorCode = exception instanceof AbstractException abstractException
-                            ? abstractException.getErrorCode() : "CHAT_WORKFLOW_ERROR";
-                    String errorMessage = exception instanceof AbstractException abstractException
-                            ? abstractException.getErrorMessage() : "对话工作流执行失败，请稍后重试";
+                    ChatErrorDetail errorDetail = ChatErrorResolver.resolve(exception);
+                    String errorCode = errorDetail.errorCode();
+                    String errorMessage = errorDetail.errorMessage();
                     try {
                         if (!taskManager.fail(generationId, errorCode, errorMessage)) {
                             eventPublisher.complete(generationId);

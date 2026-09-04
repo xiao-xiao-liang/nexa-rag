@@ -39,6 +39,8 @@ export interface ChatMessageVO {
   operations?: ChatToolOperation[];
   citations?: ChatCitationSummaryVO[];
   connectionState?: 'STREAMING' | 'RECONNECTING' | 'BACKGROUND_RUNNING';
+  failureCode?: string;
+  failureMessage?: string;
   createdTime?: string;
   updatedTime?: string;
 }

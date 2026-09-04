@@ -6,6 +6,7 @@ import { FeishuChatSkeleton } from "./FeishuChatSkeleton";
 import { FeishuMarkdown, parseFeishuMessageContent } from "./markdown";
 import { FileLinkBitableOutlinedIcon } from "./FeishuChatIcons";
 import { shouldShowToolExecutionBox } from "./tool-execution-state";
+import { feishuToast } from "../ui/FeishuToast";
 
 export interface ChatMessageItemProps {
   message: ChatMessageVO;
@@ -13,6 +14,7 @@ export interface ChatMessageItemProps {
   isGenerating?: boolean;
   isCopied?: boolean;
   onCopy?: (msgId: string, text: string) => void;
+  onRegenerate?: (msgId: string) => void;
   elapsedSeconds?: number;
 }
 
@@ -91,6 +93,7 @@ export const ChatMessageItem: React.FC<ChatMessageItemProps> = ({
   isGenerating = false,
   isCopied = false,
   onCopy,
+  onRegenerate,
   elapsedSeconds = 1,
 }) => {
   // 大小写安全匹配用户角色 (兼容 "user"、"USER"、"User")
@@ -122,7 +125,11 @@ export const ChatMessageItem: React.FC<ChatMessageItemProps> = ({
     if (onCopy) {
       onCopy(message.messageId, text);
     } else {
-      navigator.clipboard.writeText(text);
+      navigator.clipboard.writeText(text).then(() => {
+        feishuToast.success("复制成功");
+      }).catch(() => {
+        feishuToast.error("复制失败");
+      });
     }
   };
 
@@ -179,26 +186,29 @@ export const ChatMessageItem: React.FC<ChatMessageItemProps> = ({
           showHeader={!hasOperations}
         />
       ) : (
-
         <>
           {/* 正文：严格 1:1 飞书官方 Markdown Component Renderer */}
-          <FeishuMarkdown
-            messageId={message.messageId}
-            content={content}
-            isGenerating={isGenerating}
-            citationIds={(message.citations ?? []).map((item) => item.citationId)}
-          />
+          {content ? (
+            <FeishuMarkdown
+              messageId={message.messageId}
+              content={content}
+              isGenerating={isGenerating}
+              citationIds={(message.citations ?? []).map((item) => item.citationId)}
+            />
+          ) : null}
 
           {/* 助手消息底部操作栏 (默认透明，hover 显现：左对齐，先复制按钮后时间) */}
-          <div className="flex items-center gap-1.5 h-5 opacity-0 group-hover:opacity-100 transition-opacity duration-150 pt-1">
-            <FeishuCopyButton
-              onCopy={() => handleCopyText(copyableText)}
-              isCopied={isCopied}
-            />
-            <span className="text-[12px] leading-[20px] text-[rgba(31,35,41,0.6)] select-none">
-              {displayTime}
-            </span>
-          </div>
+          {content ? (
+            <div className="flex items-center gap-1.5 h-5 opacity-0 group-hover:opacity-100 transition-opacity duration-150 pt-1">
+              <FeishuCopyButton
+                onCopy={() => handleCopyText(copyableText)}
+                isCopied={isCopied}
+              />
+              <span className="text-[12px] leading-[20px] text-[rgba(31,35,41,0.6)] select-none">
+                {displayTime}
+              </span>
+            </div>
+          ) : null}
         </>
       )}
     </div>
