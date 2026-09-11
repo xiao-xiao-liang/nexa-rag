@@ -31,6 +31,16 @@ public interface DocumentService extends IService<Document> {
     Document createDocument(Long knowledgeBaseId, CreateDocumentRequest request);
 
     /**
+     * 在指定知识库中创建文档记录，并写入创建人审计信息。
+     *
+     * @param knowledgeBaseId 知识库ID
+     * @param request 文档创建请求
+     * @param operator  当前登录账号名
+     * @return 文档实体
+     */
+    Document createDocument(Long knowledgeBaseId, CreateDocumentRequest request, String operator);
+
+    /**
      * 分页查询文档摘要列表。
      *
      * @param pageNum  页码

@@ -254,7 +254,7 @@ export const DocumentPage: React.FC = () => {
       dataType: "user",
       width: 120,
       render: (val) => (
-        <FeishuTag>{val || "系统管理员"}</FeishuTag>
+        <FeishuTag>{val || "—"}</FeishuTag>
       ),
     },
     {

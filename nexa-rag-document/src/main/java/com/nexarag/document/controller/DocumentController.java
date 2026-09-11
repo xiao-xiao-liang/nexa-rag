@@ -45,7 +45,8 @@ public class DocumentController {
     public Result<DocumentDetailVO> createDocument(@PathVariable Long knowledgeBaseId,
                                                    @Valid @RequestBody CreateDocumentRequest request) {
         knowledgeBaseService.getRequiredKnowledgeBase(knowledgeBaseId);
-        Document document = documentService.createDocument(knowledgeBaseId, request);
+        Document document = documentService.createDocument(knowledgeBaseId, request,
+                currentUserAccountNameProvider.getCurrentAccountName());
         return Results.success(documentService.getDocumentDetail(document.getDocumentId()));
     }
 

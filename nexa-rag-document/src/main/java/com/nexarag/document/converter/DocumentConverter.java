@@ -7,6 +7,7 @@ import com.nexarag.document.model.entity.Document;
 import com.nexarag.document.model.entity.DocumentChunk;
 import com.nexarag.document.model.entity.DocumentVersionDO;
 import com.nexarag.document.model.vo.*;
+import org.springframework.util.StringUtils;
 
 /**
  * 文档对象转换器。
@@ -29,7 +30,7 @@ public final class DocumentConverter {
                 activeVersion == null ? null : activeVersion.getFileType(),
                 activeVersion == null ? null : activeVersion.getFileSize(),
                 toDocumentStatus(activeVersion),
-                document.getCreateBy(), activeVersion == null ? null : activeVersion.getUpdateTime());
+                ownerAccountName(document, activeVersion), activeVersion == null ? null : activeVersion.getUpdateTime());
     }
 
     /**
@@ -108,6 +109,23 @@ public final class DocumentConverter {
             case FAILED -> DocumentStatus.FAILED;
             case DELETING -> null;
         };
+    }
+
+    /**
+     * 解析文档所有者账号名。
+     *
+     * <p>历史稳定文档可能未保存创建人；这类记录回退至其当前生效版本的创建人，
+     * 保证列表仍展示实际提交账号，而不伪造系统账户。</p>
+     *
+     * @param document 文档稳定身份记录
+     * @param activeVersion 当前生效版本
+     * @return 所有者账号名；无法确认时返回 {@code null}
+     */
+    private static String ownerAccountName(Document document, DocumentVersionDO activeVersion) {
+        if (StringUtils.hasText(document.getCreateBy())) {
+            return document.getCreateBy();
+        }
+        return activeVersion == null ? null : activeVersion.getCreateBy();
     }
 
     /**

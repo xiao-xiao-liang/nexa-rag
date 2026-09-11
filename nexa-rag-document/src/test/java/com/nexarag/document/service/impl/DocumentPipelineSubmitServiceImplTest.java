@@ -73,7 +73,8 @@ class DocumentPipelineSubmitServiceImplTest {
         CreateDocumentRequest createRequest = new CreateDocumentRequest(
                 "测试", null, "demo.pdf", "original/demo.pdf", "http://demo", 1L);
         ProcessDocumentRequest processRequest = new ProcessDocumentRequest(null, null, null);
-        when(documentService.createDocument(10L, createRequest)).thenReturn(com.nexarag.document.model.entity.Document.builder()
+        when(documentService.createDocument(10L, createRequest, "alice"))
+                .thenReturn(com.nexarag.document.model.entity.Document.builder()
                 .documentId(1L).build());
         when(documentVersionService.createNextVersion(org.mockito.ArgumentMatchers.eq(1L),
                 org.mockito.ArgumentMatchers.any(), anyString(), org.mockito.ArgumentMatchers.eq("alice")))
@@ -86,7 +87,7 @@ class DocumentPipelineSubmitServiceImplTest {
         assertThat(result.getProcessId()).isNotBlank();
         assertThat(result.getStatus()).isEqualTo(DocumentVersionStatus.QUEUED);
         assertThat(result.getDocumentVersionId()).isEqualTo(101L);
-        verify(documentService).createDocument(10L, createRequest);
+        verify(documentService).createDocument(10L, createRequest, "alice");
         ArgumentCaptor<com.nexarag.document.model.dto.DocumentVersionUploadDTO> uploadCaptor =
                 ArgumentCaptor.forClass(com.nexarag.document.model.dto.DocumentVersionUploadDTO.class);
         verify(documentVersionService).createNextVersion(org.mockito.ArgumentMatchers.eq(1L), uploadCaptor.capture(),

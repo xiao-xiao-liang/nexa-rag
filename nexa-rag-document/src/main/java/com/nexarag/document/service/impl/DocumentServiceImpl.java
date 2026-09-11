@@ -45,12 +45,18 @@ public class DocumentServiceImpl extends ServiceImpl<DocumentMapper, Document> i
 
     @Override
     public Document createDocument(CreateDocumentRequest request) {
-        return createDocument(null, request);
+        return createDocument(null, request, null);
     }
 
     @Override
     @Transactional(rollbackFor = Exception.class)
     public Document createDocument(Long knowledgeBaseId, CreateDocumentRequest request) {
+        return createDocument(knowledgeBaseId, request, null);
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public Document createDocument(Long knowledgeBaseId, CreateDocumentRequest request, String operator) {
         if (knowledgeBaseId != null) {
             // 1. 锁定有效知识库，避免与删除操作并发写入孤立文档。
             knowledgeBaseService.lockRequiredActiveKnowledgeBase(knowledgeBaseId);
@@ -62,6 +68,8 @@ public class DocumentServiceImpl extends ServiceImpl<DocumentMapper, Document> i
                 .title(request.title())
                 .description(request.description())
                 .activationGeneration(0L)
+                .createBy(operator)
+                .updateBy(operator)
                 .build();
 
         // 3. 保存文档记录

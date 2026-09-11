@@ -47,7 +47,7 @@ public class DocumentPipelineSubmitServiceImpl implements DocumentPipelineSubmit
     public DocumentVersionDO createAndSubmit(Long knowledgeBaseId, CreateDocumentRequest createRequest,
                                               ProcessDocumentRequest processRequest, String operator) {
         // 1. 创建稳定文档身份，不向 document 写入文件和处理生命周期字段。
-        Document document = documentService.createDocument(knowledgeBaseId, createRequest);
+        Document document = documentService.createDocument(knowledgeBaseId, createRequest, operator);
 
         // 2. 首个文件快照、处理配置和 Outbox 均由 V1 承担。
         return queueNewVersion(document, toVersionUpload(createRequest), processRequest, operator);

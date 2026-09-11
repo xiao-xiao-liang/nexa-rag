@@ -33,14 +33,16 @@ class DocumentServiceImplTest {
     void createDocumentShouldOnlyPersistStableIdentityFields() {
         TestableDocumentServiceImpl service = new TestableDocumentServiceImpl();
 
-        Document document = service.createDocument(new CreateDocumentRequest(
-                "测试文档", "描述", "demo.pdf", "original/demo.pdf", "minio://demo.pdf", 100L));
+        Document document = service.createDocument(1L, new CreateDocumentRequest(
+                "测试文档", "描述", "demo.pdf", "original/demo.pdf", "minio://demo.pdf", 100L), "alice");
 
         assertThat(document.getDocumentId()).isNotNull();
         assertThat(document.getTitle()).isEqualTo("测试文档");
         assertThat(document.getActiveVersionId()).isNull();
         assertThat(document.getBuildingVersionId()).isNull();
         assertThat(document.getActivationGeneration()).isZero();
+        assertThat(document.getCreateBy()).isEqualTo("alice");
+        assertThat(document.getUpdateBy()).isEqualTo("alice");
         assertThat(service.savedDocument).isSameAs(document);
     }
 
@@ -53,7 +55,7 @@ class DocumentServiceImplTest {
         page.setRecords(List.of(document));
         service.documentPage = page;
         when(service.documentVersionService.findActiveVersions(List.of(document)))
-                .thenReturn(Map.of(1L, activeVersion(1L, 11L, "v1.md")));
+                .thenReturn(Map.of(1L, activeVersion(1L, 11L, "v1.md").toBuilder().createBy("alice").build()));
 
         var result = service.pageDocuments(1, 20);
 
@@ -61,6 +63,7 @@ class DocumentServiceImplTest {
         assertThat(summary.originalFileName()).isEqualTo("v1.md");
         assertThat(summary.fileSize()).isEqualTo(2048L);
         assertThat(summary.status()).isEqualTo(DocumentStatus.INDEXED);
+        assertThat(summary.createBy()).isEqualTo("alice");
     }
 
     @Test
