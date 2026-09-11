@@ -74,6 +74,8 @@ class RegistryFirstModelRouterTest {
         assertThat(decision.profileName()).isEqualTo("chat.dashscope.primary");
         assertThat(decision.profile().getProvider()).isEqualTo("DASHSCOPE");
         assertThat(decision.profile().getModelName()).isEqualTo("deepseek-v4-pro");
+        assertThat(decision.profile().getContextWindowTokens()).isEqualTo(32768);
+        assertThat(decision.profile().getReservedOutputTokens()).isEqualTo(2048);
         assertThat(decision.configId()).isEqualTo(1L);
     }
 
@@ -111,6 +113,7 @@ class RegistryFirstModelRouterTest {
                 .modelName("deepseek-v4-pro")
                 .timeoutMs(60000)
                 .maxRetries(0)
+                .extraConfig("{\"contextWindowTokens\":32768,\"reservedOutputTokens\":2048}")
                 .enabled(true)
                 .build();
     }

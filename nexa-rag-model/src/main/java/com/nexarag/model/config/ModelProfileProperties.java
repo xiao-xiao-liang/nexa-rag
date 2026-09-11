@@ -57,4 +57,16 @@ public class ModelProfileProperties {
      * 最大输出 Token。
      */
     private Integer maxTokens;
+
+    /**
+     * 模型完整上下文窗口大小，单位 Token；0 表示未配置。
+     */
+    @Builder.Default
+    private int contextWindowTokens = 0;
+
+    /**
+     * 为模型输出预留的 Token 数；0 表示由回答工作流使用保守默认值。
+     */
+    @Builder.Default
+    private int reservedOutputTokens = 0;
 }

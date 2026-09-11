@@ -9,6 +9,14 @@ import com.nexarag.model.gateway.chat.ChatModelMessage;
 import com.nexarag.model.toolkits.prompt.PromptBuilder;
 import com.nexarag.retrieval.model.RetrievalChunk;
 import com.nexarag.workflow.citation.CitationSetFactory;
+import com.nexarag.workflow.config.ModelInputEvidenceProperties;
+import com.nexarag.workflow.service.ModelInputEvidenceSelector;
+import com.nexarag.model.config.ModelProfileProperties;
+import com.nexarag.model.enums.ModelRouteStrategy;
+import com.nexarag.model.route.ModelRouteContext;
+import com.nexarag.model.route.ModelRouteDecision;
+import com.nexarag.model.route.ModelRoutePlan;
+import com.nexarag.model.route.ModelRouter;
 import com.nexarag.workflow.stream.ChatGenerationAccumulator;
 import com.nexarag.workflow.stream.ChatGenerationEventPublisher;
 import com.nexarag.workflow.stream.ChatGenerationTaskManager;
@@ -52,7 +60,7 @@ class AnswerGenerationNodeCitationTest {
         when(modelGateway.streamChat(any())).thenReturn(Flux.never());
         AnswerGenerationNode node = new AnswerGenerationNode(modelGateway, promptBuilder,
                 mock(ChatGenerationTaskManager.class), eventPublisher, new CitationSetFactory(), messageService,
-                new ChatCitationSetCodec());
+                new ChatCitationSetCodec(), new ModelInputEvidenceSelector(modelRouter(), new ModelInputEvidenceProperties()));
 
         Map<String, Object> result = node.apply(new OverAllState(Map.of(
                 CONVERSATION_ID, "c1",
@@ -73,5 +81,16 @@ class AnswerGenerationNodeCitationTest {
         ordered.verify(messageService).updateGeneratingAssistantReferences(eq("m1"), any());
         ordered.verify(eventPublisher).publish(any(ChatStreamEvent.class));
         ordered.verify(modelGateway).streamChat(any());
+    }
+
+    private ModelRouter modelRouter() {
+        return new ModelRouter() {
+            @Override
+            public ModelRoutePlan plan(ModelRouteContext context) {
+                return new ModelRoutePlan(context.routeKey(), ModelRouteStrategy.PRIMARY_BACKUP, List.of(
+                        new ModelRouteDecision("chat", ModelProfileProperties.builder()
+                                .contextWindowTokens(32768).reservedOutputTokens(2048).build(), false)));
+            }
+        };
     }
 }

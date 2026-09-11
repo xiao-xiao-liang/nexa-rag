@@ -22,6 +22,7 @@ import com.nexarag.workflow.stream.ChatWorkflowStreamingUtil;
 import com.nexarag.workflow.stream.ChatStreamEvent;
 import com.nexarag.workflow.stream.ChatStreamEventType;
 import com.nexarag.workflow.citation.CitationSetFactory;
+import com.nexarag.workflow.service.ModelInputEvidenceSelector;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -44,6 +45,7 @@ import static com.nexarag.workflow.constants.ChatWorkflowStateKeys.REWRITTEN_QUE
 import static com.nexarag.workflow.constants.ChatWorkflowStateKeys.TRACE_ID;
 import static com.nexarag.workflow.constants.ChatWorkflowStateKeys.USER_ID;
 import static com.nexarag.workflow.constants.ChatWorkflowStateKeys.PROMPT_EXECUTION_SNAPSHOT;
+import static com.nexarag.workflow.constants.ChatWorkflowStateKeys.PARENT_CONTEXT_FALLBACK_RESULTS;
 import static com.nexarag.workflow.constants.ChatWorkflowStateKeys.TOOL_FAILURE_SUMMARIES;
 import static com.nexarag.chat.constants.ChatModelRouteConstants.CHAT_ANSWER_ROUTE_KEY;
 
@@ -63,6 +65,7 @@ public class AnswerGenerationNode implements NodeAction {
     private final CitationSetFactory citationSetFactory;
     private final ConversationMessageService messageService;
     private final ChatCitationSetCodec citationSetCodec;
+    private final ModelInputEvidenceSelector modelInputEvidenceSelector;
 
     @Override
     public Map<String, Object> apply(OverAllState state) {
@@ -71,8 +74,17 @@ public class AnswerGenerationNode implements NodeAction {
         ChatGenerationAccumulator accumulator = state.value(GENERATION_ACCUMULATOR,
                 new ChatGenerationAccumulator());
 
-        // 1. 先固定引用编号并发布公开摘要，确保正文首个分片前客户端已经拿到编号。
-        List<RetrievalChunk> chunks = state.value(ACCEPTED_EVIDENCE_RESULTS, List.of());
+        // 1. 先按当前模型路由的输入窗口选择完整证据；超窗父片段仅回退直接 Rerank 命中子片段。
+        List<RetrievalChunk> acceptedChunks = state.value(ACCEPTED_EVIDENCE_RESULTS, List.of());
+        List<RetrievalChunk> directHitChunks = state.value(PARENT_CONTEXT_FALLBACK_RESULTS, List.of());
+        List<String> toolFailureSummaries = state.value(TOOL_FAILURE_SUMMARIES, List.of());
+        int staticPromptTokens = promptTokenCount(promptBuilder.buildAnswerMessages(snapshot(state),
+                state.value(REWRITTEN_QUESTION, ""), summary(state), historyMessages(state),
+                evidence(List.of(), emptyCitationSet(), toolFailureSummaries)));
+        List<RetrievalChunk> chunks = modelInputEvidenceSelector.select(acceptedChunks, directHitChunks,
+                staticPromptTokens, CHAT_ANSWER_ROUTE_KEY);
+
+        // 2. 固定引用编号并发布公开摘要，确保正文首个分片前客户端已经拿到编号。
         ChatCitationSetDTO citationSet = new ChatCitationSetDTO(ChatCitationSetDTO.CURRENT_VERSION,
                 citationSetFactory.create(chunks));
         String assistantMessageId = state.value(ASSISTANT_MESSAGE_ID, "");
@@ -85,7 +97,7 @@ public class AnswerGenerationNode implements NodeAction {
                 .map(citation -> new ChatCitationSummaryVO(citation.citationId()))
                 .toList()));
 
-        // 2. 调用最终回答模型并绑定取消句柄
+        // 3. 调用最终回答模型并绑定取消句柄
         log.info("准备调用模型生成回答，traceId={}，已接纳正文数={}", state.value(TRACE_ID, ""), chunks.size());
         Flux<com.nexarag.model.gateway.chat.ChatModelStreamResponse> modelStream = modelGateway.streamChat(
                 ChatModelRequest.builder()
@@ -95,11 +107,11 @@ public class AnswerGenerationNode implements NodeAction {
                         .routeKey(CHAT_ANSWER_ROUTE_KEY)
                         .messages(promptBuilder.buildAnswerMessages(snapshot(state),
                                 state.value(REWRITTEN_QUESTION, ""), summary(state), historyMessages(state),
-                                evidence(chunks, citationSet, state.value(TOOL_FAILURE_SUMMARIES, List.of()))))
+                                evidence(chunks, citationSet, toolFailureSummaries)))
                         .build())
                 .doOnSubscribe(subscription -> taskManager.bind(generationId, subscription::cancel));
 
-        // 3. 返回 GraphFlux，使 Graph 在流结束后继续执行持久化节点
+        // 4. 返回 GraphFlux，使 Graph 在流结束后继续执行持久化节点
         GraphFlux<?> graphFlux = GraphFlux.of(ANSWER_GENERATION_NODE, MODEL_STREAM_RESULT,
                 ChatWorkflowStreamingUtil.toGraphStream(AnswerGenerationNode.class, state, modelStream, accumulator,
                         eventPublisher::publish));
@@ -136,5 +148,15 @@ public class AnswerGenerationNode implements NodeAction {
             return evidence;
         }
         return evidence + "\n\n工具执行状态：" + String.join("；", toolFailureSummaries);
+    }
+
+    private ChatCitationSetDTO emptyCitationSet() {
+        return new ChatCitationSetDTO(ChatCitationSetDTO.CURRENT_VERSION, List.of());
+    }
+
+    private int promptTokenCount(List<ChatModelMessage> messages) {
+        return messages.stream().map(ChatModelMessage::content)
+                .mapToInt(modelInputEvidenceSelector::estimateTokens)
+                .sum();
     }
 }

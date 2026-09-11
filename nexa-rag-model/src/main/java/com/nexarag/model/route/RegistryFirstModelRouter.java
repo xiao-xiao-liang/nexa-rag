@@ -1,5 +1,7 @@
 package com.nexarag.model.route;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nexarag.common.exception.ServiceException;
 import com.nexarag.model.config.ModelProfileProperties;
 import com.nexarag.model.entity.ModelConfig;
@@ -10,6 +12,7 @@ import com.nexarag.model.enums.ModelRouteStrategy;
 import com.nexarag.model.registry.ModelRegistry;
 import com.nexarag.model.toolkits.ModelSecretEncryptor;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.util.CollectionUtils;
 
 import java.util.Comparator;
@@ -19,7 +22,10 @@ import java.util.List;
  * 数据库优先模型路由器，优先使用模型注册表快照，未命中时回退本地配置路由。
  */
 @RequiredArgsConstructor
+@Slf4j
 public class RegistryFirstModelRouter implements ModelRouter {
+
+    private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
     private final ModelRegistry modelRegistry;
     private final ModelRouter fallbackRouter;
@@ -98,6 +104,7 @@ public class RegistryFirstModelRouter implements ModelRouter {
     }
 
     private ModelProfileProperties toProfile(ModelConfig config) {
+        JsonNode extraConfig = parseExtraConfig(config.getExtraConfig(), config.getConfigKey());
         return ModelProfileProperties.builder()
                 .provider(config.getProvider().name())
                 .baseUrl(config.getBaseUrl())
@@ -105,7 +112,34 @@ public class RegistryFirstModelRouter implements ModelRouter {
                 .apiKey(decryptApiKey(config.getApiKeyCipher()))
                 .modelName(config.getModelName())
                 .timeoutMs(config.getTimeoutMs() == null ? 60000L : config.getTimeoutMs().longValue())
+                .contextWindowTokens(positiveInt(extraConfig, "contextWindowTokens"))
+                .reservedOutputTokens(positiveInt(extraConfig, "reservedOutputTokens"))
                 .build();
+    }
+
+    /**
+     * 解析模型扩展配置。配置无效时保持兼容，交由调用侧的保守默认值兜底。
+     *
+     * @param extraConfig 数据库中的扩展配置 JSON
+     * @param configKey 模型配置标识
+     * @return JSON 根节点；无效时返回空节点
+     */
+    private JsonNode parseExtraConfig(String extraConfig, String configKey) {
+        if (extraConfig == null || extraConfig.isBlank()) {
+            return OBJECT_MAPPER.createObjectNode();
+        }
+        try {
+            JsonNode node = OBJECT_MAPPER.readTree(extraConfig);
+            return node != null && node.isObject() ? node : OBJECT_MAPPER.createObjectNode();
+        } catch (Exception exception) {
+            log.warn("模型扩展配置不是有效 JSON，将使用保守的上下文窗口默认值，configKey={}", configKey);
+            return OBJECT_MAPPER.createObjectNode();
+        }
+    }
+
+    private int positiveInt(JsonNode extraConfig, String fieldName) {
+        JsonNode value = extraConfig.get(fieldName);
+        return value != null && value.canConvertToInt() && value.asInt() > 0 ? value.asInt() : 0;
     }
 
     private String decryptApiKey(String apiKeyCipher) {

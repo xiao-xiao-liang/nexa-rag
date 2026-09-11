@@ -47,6 +47,29 @@ const DEFAULT_BASE_URLS: Record<string, { baseUrl: string; endpointPath: string;
   },
 };
 
+const readPositiveInteger = (value: unknown): number => {
+  const numberValue = Number(value);
+  return Number.isInteger(numberValue) && numberValue > 0 ? numberValue : 0;
+};
+
+const parseContextLimits = (value?: string) => {
+  if (!value?.trim()) {
+    return { contextWindowTokens: 0, reservedOutputTokens: 0 };
+  }
+  try {
+    const config = JSON.parse(value);
+    if (!config || Array.isArray(config) || typeof config !== "object") {
+      return { contextWindowTokens: 0, reservedOutputTokens: 0 };
+    }
+    return {
+      contextWindowTokens: readPositiveInteger(config.contextWindowTokens),
+      reservedOutputTokens: readPositiveInteger(config.reservedOutputTokens),
+    };
+  } catch {
+    return { contextWindowTokens: 0, reservedOutputTokens: 0 };
+  }
+};
+
 export const ModelConfigModal: React.FC<ModelConfigModalProps> = ({
   isOpen,
   onClose,
@@ -68,6 +91,8 @@ export const ModelConfigModal: React.FC<ModelConfigModalProps> = ({
   const [maxRetries, setMaxRetries] = useState(2);
   const [enabled, setEnabled] = useState(true);
   const [extraConfig, setExtraConfig] = useState("");
+  const [contextWindowTokens, setContextWindowTokens] = useState(0);
+  const [reservedOutputTokens, setReservedOutputTokens] = useState(0);
   const [remark, setRemark] = useState("");
 
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -90,6 +115,9 @@ export const ModelConfigModal: React.FC<ModelConfigModalProps> = ({
       setMaxRetries(config.maxRetries ?? 2);
       setEnabled(config.enabled !== false && config.status !== "INACTIVE");
       setExtraConfig(config.extraConfig || "");
+      const contextLimits = parseContextLimits(config.extraConfig);
+      setContextWindowTokens(contextLimits.contextWindowTokens);
+      setReservedOutputTokens(contextLimits.reservedOutputTokens);
       setRemark(config.remark || "");
     } else {
       setConfigKey("");
@@ -104,6 +132,8 @@ export const ModelConfigModal: React.FC<ModelConfigModalProps> = ({
       setMaxRetries(2);
       setEnabled(true);
       setExtraConfig("");
+      setContextWindowTokens(0);
+      setReservedOutputTokens(0);
       setRemark("");
     }
     setTestResult(null);
@@ -167,6 +197,31 @@ export const ModelConfigModal: React.FC<ModelConfigModalProps> = ({
       return;
     }
 
+    let normalizedExtraConfig: string | undefined;
+    try {
+      const parsedConfig = extraConfig.trim() ? JSON.parse(extraConfig) : {};
+      if (!parsedConfig || Array.isArray(parsedConfig) || typeof parsedConfig !== "object") {
+        throw new Error("扩展配置必须是 JSON 对象");
+      }
+      if (contextWindowTokens > 0) {
+        parsedConfig.contextWindowTokens = contextWindowTokens;
+      } else {
+        delete parsedConfig.contextWindowTokens;
+      }
+      if (reservedOutputTokens > 0) {
+        parsedConfig.reservedOutputTokens = reservedOutputTokens;
+      } else {
+        delete parsedConfig.reservedOutputTokens;
+      }
+      normalizedExtraConfig = Object.keys(parsedConfig).length > 0 ? JSON.stringify(parsedConfig) : undefined;
+    } catch (error) {
+      if (contextWindowTokens > 0 || reservedOutputTokens > 0) {
+        setErrorMessage("现有扩展配置不是 JSON 对象，无法写入模型窗口参数");
+        return;
+      }
+      normalizedExtraConfig = extraConfig.trim() || undefined;
+    }
+
     setIsSubmitting(true);
     setErrorMessage(null);
 
@@ -183,7 +238,7 @@ export const ModelConfigModal: React.FC<ModelConfigModalProps> = ({
           enabled,
           timeoutMs: Number(timeoutMs) || 30000,
           maxRetries: Number(maxRetries) || 0,
-          extraConfig: extraConfig.trim() || undefined,
+          extraConfig: normalizedExtraConfig,
           remark: remark.trim() || undefined,
         };
         await modelApi.updateConfig(config.configId, updateData);
@@ -198,7 +253,7 @@ export const ModelConfigModal: React.FC<ModelConfigModalProps> = ({
           modelName: modelName.trim(),
           timeoutMs: Number(timeoutMs) || 30000,
           maxRetries: Number(maxRetries) || 0,
-          extraConfig: extraConfig.trim() || undefined,
+          extraConfig: normalizedExtraConfig,
           remark: remark.trim() || undefined,
         };
         await modelApi.createConfig(createData);
@@ -383,6 +438,39 @@ export const ModelConfigModal: React.FC<ModelConfigModalProps> = ({
               />
             </div>
           </div>
+
+          {modelType === "CHAT" && (
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-[13px] font-medium text-[#1F2329] mb-1.5">
+                  上下文窗口 (Token)
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  value={String(contextWindowTokens || "")}
+                  onChange={(e) => setContextWindowTokens(readPositiveInteger(e.target.value))}
+                  placeholder="例如: 32768"
+                  className="w-full h-[36px] px-3 text-[14px] bg-white border border-[#DEE0E3] rounded-[6px] focus:border-[#3370FF] outline-none text-[#1F2329] placeholder:text-[#8F959E]"
+                />
+                <p className="mt-1 text-[12px] text-[#8F959E]">完整上下文长度；未填写时按 8192 Token 兜底，建议按模型官方规格填写。</p>
+              </div>
+              <div>
+                <label className="block text-[13px] font-medium text-[#1F2329] mb-1.5">
+                  预留输出 (Token)
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  value={String(reservedOutputTokens || "")}
+                  onChange={(e) => setReservedOutputTokens(readPositiveInteger(e.target.value))}
+                  placeholder="例如: 2048"
+                  className="w-full h-[36px] px-3 text-[14px] bg-white border border-[#DEE0E3] rounded-[6px] focus:border-[#3370FF] outline-none text-[#1F2329] placeholder:text-[#8F959E]"
+                />
+                <p className="mt-1 text-[12px] text-[#8F959E]">为空时会按保守的 1024 Token 预留。</p>
+              </div>
+            </div>
+          )}
 
           <div>
             <label className="block text-[13px] font-medium text-[#1F2329] mb-1.5">

@@ -109,6 +109,10 @@ nexa:
         max-concurrency: 16 # 对话工作流最大并发数，避免长连接模型流耗尽通用阻塞线程池。
         queue-capacity: 1000 # 等待调度的工作流最大数量，超出时快速失败而非无限堆积。
         thread-name-prefix: chat-workflow # 便于线程转储和监控定位。
+    model-input:
+      fallback-context-window-tokens: 8192 # 模型未声明上下文窗口时的兜底输入窗口；生产环境应优先在模型配置中填写真实值。
+      fallback-reserved-output-tokens: 1024 # 模型未声明输出预留时的默认预留，单位 Token。
+      input-safety-margin-tokens: 512 # 提示词与证据预算之外的输入安全余量，单位 Token。
   cloud-document:
     yuque:
       token: ${NEXA_SOURCE_YUQUE_TOKEN:}
