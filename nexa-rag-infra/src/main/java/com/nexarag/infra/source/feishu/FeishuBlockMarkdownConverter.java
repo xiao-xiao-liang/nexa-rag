@@ -64,13 +64,24 @@ public class FeishuBlockMarkdownConverter {
      * @return 标准 Markdown 内容
      */
     public String convert(List<JsonNode> blocks) {
+        return convert(blocks, Map.of());
+    }
+
+    /**
+     * 按页面根节点的子节点顺序转换全部 Block，并写入已处理媒体的本地引用或占位符。
+     *
+     * @param blocks       飞书接口返回的扁平 Block 列表
+     * @param mediaResults 以 Block ID 索引的媒体处理结果
+     * @return 标准 Markdown 内容
+     */
+    public String convert(List<JsonNode> blocks, Map<String, FeishuBlockMediaDownloadResultBO> mediaResults) {
         if (blocks == null || blocks.isEmpty()) {
             return "";
         }
 
         // 1. 建立 Block 索引，后续按照 children 指针恢复文档树。
         Map<String, JsonNode> blocksById = indexBlocks(blocks);
-        RenderContext context = new RenderContext(blocksById);
+        RenderContext context = new RenderContext(blocksById, mediaResults);
         List<String> lines = new ArrayList<>();
 
         // 2. 优先从页面根节点遍历；异常快照没有根节点时再按顶层节点容错处理。
@@ -86,6 +97,16 @@ public class FeishuBlockMarkdownConverter {
                     .forEach(lines::add);
         }
         return String.join("\n\n", lines);
+    }
+
+    /**
+     * 判断 Block 集合是否要求整篇文档回退。
+     *
+     * @param blocks 飞书接口返回的 Block 列表
+     * @return 仅 Block 集合为空时返回 {@code true}；媒体和未知 Block 由资源级占位符处理
+     */
+    public boolean requiresFallback(List<JsonNode> blocks) {
+        return blocks == null;
     }
 
     private Map<String, JsonNode> indexBlocks(List<JsonNode> blocks) {
@@ -128,7 +149,7 @@ public class FeishuBlockMarkdownConverter {
         if (blockType == TABLE_CELL_BLOCK_TYPE) {
             return "";
         }
-        return renderContentBlock(block, blockType);
+        return renderContentBlock(block, blockType, context);
     }
 
     private boolean isContainerBlock(int blockType) {
@@ -158,7 +179,7 @@ public class FeishuBlockMarkdownConverter {
         return String.join("\n\n", children);
     }
 
-    private String renderContentBlock(JsonNode block, int blockType) {
+    private String renderContentBlock(JsonNode block, int blockType, RenderContext context) {
         String text = extractText(block);
         if (blockType >= HEADING_START_BLOCK_TYPE && blockType <= HEADING_END_BLOCK_TYPE) {
             return StringUtils.hasText(text) ? "#".repeat(Math.min(blockType - 2, MAX_MARKDOWN_HEADING_LEVEL)) + " " + text : "";
@@ -167,7 +188,11 @@ public class FeishuBlockMarkdownConverter {
             if (blockType == DIVIDER_BLOCK_TYPE) {
                 return "---";
             }
-            return nonTextPlaceholder(blockType);
+            FeishuBlockMediaDownloadResultBO mediaResult = context.getMediaResult(block.path("block_id").asText());
+            if (mediaResult != null) {
+                return renderMediaBlock(blockType, mediaResult);
+            }
+            return NON_TEXT_BLOCK_LABELS.containsKey(blockType) ? nonTextPlaceholder(blockType) : "";
         }
         return switch (blockType) {
             case BULLET_BLOCK_TYPE -> "- " + text;
@@ -177,6 +202,18 @@ public class FeishuBlockMarkdownConverter {
             case TODO_BLOCK_TYPE -> "- [ ] " + text;
             default -> text;
         };
+    }
+
+    private String renderMediaBlock(int blockType, FeishuBlockMediaDownloadResultBO mediaResult) {
+        if (mediaResult.status() == FeishuBlockMediaDownloadResultBO.Status.DOWNLOADED) {
+            if (blockType == 27) {
+                return "![飞书图片](" + mediaResult.relativePath() + ")";
+            }
+            return "[飞书附件](" + mediaResult.relativePath() + ")";
+        }
+        String label = blockType == 27 ? "飞书图片" : "飞书附件";
+        return "[" + label + "未获取：block_id=" + mediaResult.blockId() + "，reason="
+                + mediaResult.failureReason() + "]";
     }
 
     private String renderTable(JsonNode tableBlock, RenderContext context) {
@@ -276,9 +313,12 @@ public class FeishuBlockMarkdownConverter {
 
         private final Map<String, JsonNode> blocksById;
         private final Set<String> renderedBlockIds = new HashSet<>();
+        private final Map<String, FeishuBlockMediaDownloadResultBO> mediaResults;
 
-        private RenderContext(Map<String, JsonNode> blocksById) {
+        private RenderContext(Map<String, JsonNode> blocksById,
+                              Map<String, FeishuBlockMediaDownloadResultBO> mediaResults) {
             this.blocksById = new HashMap<>(blocksById);
+            this.mediaResults = mediaResults == null ? Map.of() : Map.copyOf(mediaResults);
         }
 
         private JsonNode getBlock(String blockId) {
@@ -287,6 +327,10 @@ public class FeishuBlockMarkdownConverter {
 
         private boolean markRendered(String blockId) {
             return StringUtils.hasText(blockId) && renderedBlockIds.add(blockId);
+        }
+
+        private FeishuBlockMediaDownloadResultBO getMediaResult(String blockId) {
+            return mediaResults.get(blockId);
         }
     }
 }

@@ -9,6 +9,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * Markdown 图片资源地址文件重写器，避免将整份 Markdown 加载到内存。
@@ -25,30 +26,37 @@ public class MarkdownAssetFileRewriter {
      * @throws IOException 文件读取或写入失败时抛出
      */
     public void rewrite(Path input, Path output, Map<String, String> assetUrls) throws IOException {
+        rewrite(input, output, assetUrls, Set.of());
+    }
+
+    /**
+     * 将 Markdown 中已映射图片和链接重写为对象存储访问地址，并替换上传失败的资源引用。
+     */
+    public void rewrite(Path input, Path output, Map<String, String> assetUrls, Set<String> failedAssetPaths)
+            throws IOException {
         // 1. 逐行读取和写入，避免正文规模影响堆内存
         try (BufferedReader reader = Files.newBufferedReader(input, StandardCharsets.UTF_8);
              BufferedWriter writer = Files.newBufferedWriter(output, StandardCharsets.UTF_8)) {
             String line;
             while ((line = reader.readLine()) != null) {
-                writer.write(rewriteLine(line, assetUrls));
+                writer.write(rewriteLine(line, assetUrls, failedAssetPaths));
                 writer.newLine();
             }
         }
     }
 
-    private String rewriteLine(String line, Map<String, String> assetUrls) {
-        if (line == null || line.isEmpty() || assetUrls == null || assetUrls.isEmpty()) {
+    private String rewriteLine(String line, Map<String, String> assetUrls, Set<String> failedAssetPaths) {
+        if (line == null || line.isEmpty()) {
             return line;
         }
         StringBuilder rewritten = new StringBuilder(line.length());
         int cursor = 0;
         while (cursor < line.length()) {
-            int imageStart = line.indexOf("![", cursor);
-            if (imageStart < 0) {
+            int targetStart = line.indexOf("](", cursor);
+            if (targetStart < 0) {
                 rewritten.append(line, cursor, line.length());
                 break;
             }
-            int targetStart = line.indexOf("](", imageStart + 2);
             int targetEnd = targetStart < 0 ? -1 : line.indexOf(')', targetStart + 2);
             if (targetStart < 0 || targetEnd < 0) {
                 rewritten.append(line, cursor, line.length());
@@ -57,6 +65,15 @@ public class MarkdownAssetFileRewriter {
             rewritten.append(line, cursor, targetStart + 2);
             String originalTarget = line.substring(targetStart + 2, targetEnd);
             String replacementTarget = assetUrls.get(originalTarget);
+            if (failedAssetPaths != null && failedAssetPaths.contains(originalTarget)) {
+                int linkStart = line.lastIndexOf('[', targetStart);
+                if (linkStart >= cursor) {
+                    rewritten.setLength(Math.max(0, rewritten.length() - (targetStart + 2 - linkStart)));
+                    rewritten.append("[媒体资源未发布：path=").append(originalTarget).append("]");
+                    cursor = targetEnd + 1;
+                    continue;
+                }
+            }
             rewritten.append(replacementTarget == null ? originalTarget : replacementTarget);
             cursor = targetEnd;
         }

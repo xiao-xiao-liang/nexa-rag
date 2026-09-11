@@ -53,18 +53,24 @@ class ExternalDocumentSourceServiceImplTest {
         when(workspaceFactory.create(1001L)).thenReturn(workspace);
         when(reader.read(request, workspace)).thenReturn(new SourceReadResultBO(sourcePath,
                 "application/vnd.openxmlformats-officedocument.wordprocessingml.document", DocumentFormat.WORD,
-                "source.docx", "标题", "abc", "rev-1", Map.<String, Object>of("platform", "feishu")));
+                "source.docx", "标题", "abc", "rev-1", Map.<String, Object>of(
+                        "reader", "FEISHU_EXPORT_TASK",
+                        "blockFallbackReason", "UNSUPPORTED_BLOCK_TYPE")));
         when(objectNameResolver.resolveSourceSnapshotObjectName(1001L, ".docx"))
                 .thenReturn("source-snapshots/1001/source.docx");
         ParsedArtifact parsedArtifact = ParsedArtifact.builder().objectKey("parsed/1001/content.md")
-                .contentType("text/markdown").metadata(Map.of("parser", "pandoc")).build();
+                .contentType("text/markdown").metadata(Map.of("parser", "passthrough")).build();
         when(documentParseService.parseStaged(any(), any())).thenReturn(parsedArtifact);
 
         ExternalDocumentSourceService service = new ExternalDocumentSourceServiceImpl(
                 List.of(reader), storageService, objectNameResolver, workspaceFactory, documentParseService);
         SourceArtifactBO artifact = service.readAndPersist(request);
 
-        assertThat(artifact.parsedArtifact()).isSameAs(parsedArtifact);
+        assertThat(artifact.parsedArtifact()).isNotSameAs(parsedArtifact);
+        assertThat(artifact.parsedArtifact().metadata())
+                .containsEntry("reader", "FEISHU_EXPORT_TASK")
+                .containsEntry("blockFallbackReason", "UNSUPPORTED_BLOCK_TYPE")
+                .containsEntry("parser", "passthrough");
         assertThat(artifact.sourceSnapshotObjectName()).isEqualTo("source-snapshots/1001/source.docx");
         verify(storageService).saveAs(eq("source-snapshots/1001/source.docx"), any(), anyLong(),
                 eq("application/vnd.openxmlformats-officedocument.wordprocessingml.document"));

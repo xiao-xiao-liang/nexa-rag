@@ -16,20 +16,20 @@ import static org.mockito.Mockito.mock;
 class PassthroughArtifactParserTest {
 
     @Test
-    void supportedFormatsShouldContainMarkdownAndExcelOnly() {
+    void supportedFormatsShouldContainExcelOnly() {
         PassthroughArtifactParser parser = new PassthroughArtifactParser();
 
-        assertThat(parser.supportedFormats()).containsExactlyInAnyOrder(DocumentFormat.MARKDOWN, DocumentFormat.EXCEL);
+        assertThat(parser.supportedFormats()).containsExactly(DocumentFormat.EXCEL);
     }
 
     @Test
     void handleShouldReturnOriginalFileAsParsedFile() {
         PassthroughArtifactParser parser = new PassthroughArtifactParser();
 
-        ParsedArtifact result = parser.handle(artifact(DocumentFormat.MARKDOWN), mock(StagedDocumentBO.class));
+        ParsedArtifact result = parser.handle(artifact(DocumentFormat.EXCEL), mock(StagedDocumentBO.class));
 
-        assertThat(result.objectKey()).isEqualTo("original/demo.md");
-        assertThat(result.contentType()).isEqualTo(ParsedContentTypes.TEXT_MARKDOWN);
+        assertThat(result.objectKey()).isEqualTo("original/demo.xlsx");
+        assertThat(result.contentType()).isEqualTo(ParsedContentTypes.EXCEL);
         assertThat(result.metadata()).containsEntry("passthrough", true);
     }
 
@@ -37,9 +37,9 @@ class PassthroughArtifactParserTest {
         return DocumentArtifactDTO.builder()
                 .documentId(1L)
                 .format(format)
-                .originalFileName("demo.md")
-                .originalObjectName("original/demo.md")
-                .originalFileUrl("http://127.0.0.1:9000/nexa-rag/original/demo.md")
+                .originalFileName("demo.xlsx")
+                .originalObjectName("original/demo.xlsx")
+                .originalFileUrl("http://127.0.0.1:9000/nexa-rag/original/demo.xlsx")
                 .build();
     }
 }

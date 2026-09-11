@@ -18,7 +18,7 @@ class MarkdownAssetFileRewriterTest {
     Path tempDir;
 
     @Test
-    void rewriteShouldReplaceOnlyMappedMarkdownImageTarget() throws Exception {
+    void rewriteShouldReplaceMappedImageAndAttachmentTargets() throws Exception {
         Path input = tempDir.resolve("content.md");
         Path output = tempDir.resolve("rewritten.md");
         Files.writeString(input, "![架构](assets/a.png)\n[链接](assets/a.png)\n![未映射](assets/b.png)");
@@ -28,7 +28,7 @@ class MarkdownAssetFileRewriterTest {
 
         String rewrittenMarkdown = Files.readString(output);
         assertThat(rewrittenMarkdown).contains("![架构](https://storage/parsed/1/assets/a.png)")
-                .contains("[链接](assets/a.png)")
+                .contains("[链接](https://storage/parsed/1/assets/a.png)")
                 .contains("![未映射](assets/b.png)");
     }
 }

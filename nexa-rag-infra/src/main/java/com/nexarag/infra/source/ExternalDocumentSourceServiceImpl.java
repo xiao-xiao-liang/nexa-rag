@@ -21,7 +21,9 @@ import org.springframework.util.StringUtils;
 import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * 外部来源读取服务实现，将平台导出的原始文件流式保存为快照，并复用工作区文件完成解析。
@@ -68,7 +70,8 @@ public class ExternalDocumentSourceServiceImpl implements ExternalDocumentSource
                     .build();
             ParsedArtifact parsedArtifact = documentParseService.parseStaged(artifactDTO,
                     new StagedDocumentBO(result.sourcePath(), workspace));
-            return new SourceArtifactBO(parsedArtifact, result.title(), snapshotName, result.metadata());
+            ParsedArtifact artifactWithSourceMetadata = mergeMetadata(parsedArtifact, result.metadata());
+            return new SourceArtifactBO(artifactWithSourceMetadata, result.title(), snapshotName, result.metadata());
         } catch (ServiceException exception) {
             throw exception;
         } catch (Exception exception) {
@@ -102,5 +105,23 @@ public class ExternalDocumentSourceServiceImpl implements ExternalDocumentSource
     private String resolveExtension(String originalFileName) {
         int extensionIndex = originalFileName.lastIndexOf('.');
         return extensionIndex >= 0 ? originalFileName.substring(extensionIndex) : ".bin";
+    }
+
+    /**
+     * 合并来源读取和解析元数据；同名字段以解析器最终结果为准。
+     */
+    private ParsedArtifact mergeMetadata(ParsedArtifact parsedArtifact, Map<String, Object> sourceMetadata) {
+        Map<String, Object> metadata = new LinkedHashMap<>();
+        if (sourceMetadata != null) {
+            metadata.putAll(sourceMetadata);
+        }
+        if (parsedArtifact.metadata() != null) {
+            metadata.putAll(parsedArtifact.metadata());
+        }
+        return ParsedArtifact.builder()
+                .objectKey(parsedArtifact.objectKey())
+                .contentType(parsedArtifact.contentType())
+                .metadata(Map.copyOf(metadata))
+                .build();
     }
 }

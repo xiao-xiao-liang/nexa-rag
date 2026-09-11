@@ -41,6 +41,52 @@ public class CloudDocumentProperties {
         /** 飞书 DOCX 导出任务配置。 */
         private ExportProperties export = new ExportProperties();
 
+        /** 飞书 Docx Block API 读取配置。 */
+        private BlockReadProperties blockRead = new BlockReadProperties();
+
+        /** 飞书 Docx Block 媒体资源下载配置。 */
+        private BlockMediaProperties blockMedia = new BlockMediaProperties();
+
+        /**
+         * 飞书 Docx Block API 分页读取与内存边界配置。
+         */
+        @Getter
+        @Setter
+        public static class BlockReadProperties {
+
+            /** 是否优先按飞书原生 Block 结构生成 Markdown。 */
+            private boolean enabled = true;
+
+            /** 单页读取的最大 Block 数。 */
+            private int pageSize = 100;
+
+            /** 单篇文档允许累计读取的最大 Block 数。 */
+            private int maxBlockCount = 2_000;
+
+            /** 单篇文档允许累计读取的 Block JSON 最大字节数。 */
+            private long maxJsonBytes = 8L * 1024 * 1024;
+        }
+
+        /**
+         * 飞书 Docx Block 媒体资源下载边界。
+         */
+        @Getter
+        @Setter
+        public static class BlockMediaProperties {
+
+            /** 是否下载 Block 中引用的媒体资源。 */
+            private boolean enabled = true;
+
+            /** 单个资源最大允许字节数。 */
+            private long maxSingleAssetBytes = 20L * 1024 * 1024;
+
+            /** 单篇文档全部媒体资源最大允许字节数。 */
+            private long maxTotalAssetBytes = 100L * 1024 * 1024;
+
+            /** 最多持久化的资源失败明细数。 */
+            private int maxFailureDetails = 100;
+        }
+
         /**
          * 飞书 DOCX 导出任务配置。
          */

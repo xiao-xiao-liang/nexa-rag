@@ -115,6 +115,16 @@ nexa:
     feishu:
       app-id: ${NEXA_SOURCE_FEISHU_APP_ID:}
       app-secret: ${NEXA_SOURCE_FEISHU_APP_SECRET:}
+      block-read:
+        enabled: true # 优先按飞书原生 Block 结构生成 Markdown。
+        page-size: 100 # 单页 Block 数，限制单次响应内存。
+        max-block-count: 2000 # 超过该数量回退 DOCX/Pandoc。
+        max-json-bytes: 8388608 # Block JSON 累计上限 8 MiB，超过后回退。
+      block-media:
+        enabled: true # 下载图片和附件失败时仅写资源级占位符，不回退整篇文档。
+        max-single-asset-bytes: 20971520 # 单个媒体资源最大 20 MiB。
+        max-total-asset-bytes: 104857600 # 单篇文档的媒体资源最大 100 MiB。
+        max-failure-details: 100 # 最多记录 100 条资源级失败明细。
       export:
         timeout: 120s
         poll-interval: 2s

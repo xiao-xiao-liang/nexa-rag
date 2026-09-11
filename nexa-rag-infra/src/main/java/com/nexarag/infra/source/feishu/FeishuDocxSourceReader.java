@@ -1,10 +1,12 @@
 package com.nexarag.infra.source.feishu;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nexarag.common.error.BaseErrorCode;
 import com.nexarag.common.exception.ServiceException;
 import com.nexarag.infra.config.ArtifactProcessingProperties;
 import com.nexarag.infra.config.CloudDocumentProperties;
+import com.nexarag.infra.constants.ParsedContentTypes;
 import com.nexarag.infra.enums.ExternalDocumentSourceType;
 import com.nexarag.infra.messaging.document.DocumentPipelineNonRetryableException;
 import com.nexarag.infra.parser.model.DocumentFormat;
@@ -24,11 +26,17 @@ import java.io.InputStream;
 import java.net.HttpURLConnection;
 import java.net.URI;
 import java.net.URL;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.HashSet;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 
 import static org.springframework.http.HttpHeaders.AUTHORIZATION;
 
@@ -48,6 +56,9 @@ public class FeishuDocxSourceReader implements ExternalDocumentSourceReader {
     private final CloudDocumentProperties cloudDocumentProperties;
     private final ArtifactProcessingProperties artifactProcessingProperties;
     private final BoundedFileTransfer boundedFileTransfer;
+    private final FeishuBlockMarkdownConverter blockMarkdownConverter;
+    private final FeishuBlockMediaDownloader blockMediaDownloader;
+    private final ObjectMapper objectMapper;
 
     @Override
     public boolean supports(ExternalDocumentSourceType sourceType) {
@@ -74,7 +85,7 @@ public class FeishuDocxSourceReader implements ExternalDocumentSourceReader {
     }
 
     /**
-     * 创建 DOCX 导出任务、轮询其状态，并将结果流式下载到工作区。
+     * 优先从 Docx Block API 生成 Markdown，无法保真或超过边界时回退 DOCX 导出。
      */
     @Override
     public SourceReadResultBO read(SourceReadRequestDTO request, ArtifactWorkspace workspace) {
@@ -85,21 +96,221 @@ public class FeishuDocxSourceReader implements ExternalDocumentSourceReader {
         String documentId = resolveDocxDocumentId(client, accessToken, request.sourceUrl(),
                 validateAndExtractDocumentId(request.sourceUrl()));
 
-        // 2. 查询文档信息并创建 DOCX 导出任务。
+        // 2. 查询文档信息，优先按原生 Block 结构生成 Markdown。
         JsonNode document = requiredResponse(client.get().uri("/open-apis/docx/v1/documents/{documentId}", documentId)
                 .header(AUTHORIZATION, "Bearer " + accessToken).retrieve().body(JsonNode.class), documentId)
                 .path("data").path("document");
-        String ticket = createExportTask(client, accessToken, documentId);
-        String fileToken = awaitExportedFileToken(client, accessToken, ticket, documentId, request.documentId());
+        BlockReadAttempt blockReadAttempt = tryReadMarkdownFromBlocks(client, accessToken, documentId,
+                request.documentId());
+        if (blockReadAttempt.success()) {
+            MediaResolution mediaResolution = resolveMedia(accessToken, documentId, blockReadAttempt.blocks(), workspace);
+            String markdown = blockMarkdownConverter.convert(blockReadAttempt.blocks(), mediaResolution.results());
+            return readAsBlockMarkdown(markdown, document, documentId, request.documentId(), workspace,
+                    mediaResolution.metadata());
+        }
 
-        // 3. 将导出的 DOCX 直接流式写入工作区。
+        // 3. Block 路径不可用时保留原有 DOCX/Pandoc 链路。
+        log.info("飞书Block读取回退DOCX导出，documentId={}，externalDocumentId={}，reason={}",
+                request.documentId(), documentId, blockReadAttempt.fallbackReason());
+        return readAsDocxExport(client, accessToken, document, documentId, request.documentId(), workspace,
+                blockReadAttempt.fallbackReason());
+    }
+
+    /**
+     * 分页读取受限 Block 集合，并转换为 Markdown。
+     */
+    private BlockReadAttempt tryReadMarkdownFromBlocks(RestClient client, String accessToken,
+                                                       String externalDocumentId, Long documentId) {
+        CloudDocumentProperties.FeishuProperties.BlockReadProperties properties =
+                cloudDocumentProperties.getFeishu().getBlockRead();
+        if (properties == null || !properties.isEnabled()) {
+            return BlockReadAttempt.fallback("BLOCK_READ_DISABLED");
+        }
+        validateBlockReadProperties(properties);
+
+        List<JsonNode> blocks = new ArrayList<>();
+        Set<String> pageTokens = new HashSet<>();
+        long jsonBytes = 0L;
+        String pageToken = null;
+        try {
+            while (true) {
+                JsonNode response = getBlocksPage(client, accessToken, externalDocumentId,
+                        properties.getPageSize(), pageToken);
+                JsonNode data = response.path("data");
+                JsonNode items = data.path("items");
+                if (!items.isArray()) {
+                    throw new ServiceException("飞书Block响应缺少items，documentId=" + documentId,
+                            BaseErrorCode.REMOTE_ERROR);
+                }
+
+                for (JsonNode block : items) {
+                    byte[] blockJson = objectMapper.writeValueAsBytes(block);
+                    if (jsonBytes > properties.getMaxJsonBytes() - blockJson.length) {
+                        return BlockReadAttempt.fallback("BLOCK_JSON_LIMIT_EXCEEDED");
+                    }
+                    jsonBytes += blockJson.length;
+                    blocks.add(block);
+                    if (blocks.size() > properties.getMaxBlockCount()) {
+                        return BlockReadAttempt.fallback("BLOCK_COUNT_LIMIT_EXCEEDED");
+                    }
+                }
+                if (!data.path("has_more").asBoolean(false)) {
+                    break;
+                }
+                String nextPageToken = data.path("page_token").asText(null);
+                if (!StringUtils.hasText(nextPageToken) || !pageTokens.add(nextPageToken)) {
+                    return BlockReadAttempt.fallback("INVALID_BLOCK_PAGINATION");
+                }
+                pageToken = nextPageToken;
+            }
+            return blocks.isEmpty() ? BlockReadAttempt.fallback("EMPTY_BLOCK_MARKDOWN") : BlockReadAttempt.success(blocks);
+        } catch (Exception exception) {
+            log.warn("飞书Block API读取失败，将回退DOCX导出，documentId={}，externalDocumentId={}",
+                    documentId, externalDocumentId, exception);
+            return BlockReadAttempt.fallback("BLOCK_API_UNAVAILABLE");
+        }
+    }
+
+    /**
+     * 请求单页 Docx Block 列表。
+     */
+    private JsonNode getBlocksPage(RestClient client, String accessToken, String documentId,
+                                   int pageSize, String pageToken) {
+        JsonNode response = client.get().uri(uriBuilder -> {
+                    uriBuilder.path("/open-apis/docx/v1/documents/{documentId}/blocks")
+                            .queryParam("page_size", pageSize);
+                    if (StringUtils.hasText(pageToken)) {
+                        uriBuilder.queryParam("page_token", pageToken);
+                    }
+                    return uriBuilder.build(documentId);
+                })
+                .header(AUTHORIZATION, "Bearer " + accessToken)
+                .retrieve().body(JsonNode.class);
+        return requiredResponse(response, documentId);
+    }
+
+    /**
+     * 将 Block 转换结果写入工作区。
+     */
+    private SourceReadResultBO readAsBlockMarkdown(String markdown, JsonNode document, String externalDocumentId,
+                                                   Long documentId, ArtifactWorkspace workspace,
+                                                   Map<String, Object> mediaMetadata) {
+        byte[] content = markdown.getBytes(StandardCharsets.UTF_8);
+        long maxWorkspaceBytes = artifactProcessingProperties.getMaxWorkspaceBytes();
+        if (maxWorkspaceBytes <= 0) {
+            throw new ServiceException("文档解析工作区大小限制必须大于零");
+        }
+        if (content.length > maxWorkspaceBytes) {
+            throw new ServiceException("飞书Block Markdown超过工作区大小限制，documentId=" + documentId,
+                    BaseErrorCode.SERVICE_ERROR);
+        }
+        Path sourcePath = workspace.resolve("source.md");
+        try {
+            Files.createDirectories(sourcePath.getParent());
+            Files.write(sourcePath, content);
+        } catch (Exception exception) {
+            throw new ServiceException("写入飞书Block Markdown失败，documentId=" + documentId, exception,
+                    BaseErrorCode.SERVICE_ERROR);
+        }
+        log.info("飞书Block Markdown生成成功，documentId={}，externalDocumentId={}，revisionId={}", documentId,
+                externalDocumentId, document.path("revision_id").asText(null));
+        Map<String, Object> metadata = new LinkedHashMap<>();
+        metadata.put("sourceType", "FEISHU");
+        metadata.put("reader", "FEISHU_BLOCK_API");
+        metadata.put("media", mediaMetadata);
+        return new SourceReadResultBO(sourcePath, ParsedContentTypes.TEXT_MARKDOWN, DocumentFormat.MARKDOWN,
+                "source.md", document.path("title").asText(null), externalDocumentId,
+                document.path("revision_id").asText(null),
+                Map.copyOf(metadata));
+    }
+
+    /**
+     * 逐项下载媒体资源。单项失败以占位符和元数据保留，不影响 Block Markdown 主链路。
+     */
+    private MediaResolution resolveMedia(String accessToken, String externalDocumentId, List<JsonNode> blocks,
+                                         ArtifactWorkspace workspace) {
+        CloudDocumentProperties.FeishuProperties.BlockMediaProperties properties =
+                cloudDocumentProperties.getFeishu().getBlockMedia();
+        long totalLimit = properties == null ? 0L : properties.getMaxTotalAssetBytes();
+        long downloadedBytes = 0L;
+        int discoveredCount = 0;
+        int downloadedCount = 0;
+        int skippedCount = 0;
+        int failedCount = 0;
+        Map<String, FeishuBlockMediaDownloadResultBO> results = new LinkedHashMap<>();
+        List<Map<String, String>> failureDetails = new ArrayList<>();
+        Set<String> visitedBlockIds = new HashSet<>();
+        for (JsonNode block : blocks) {
+            int blockType = block.path("block_type").asInt();
+            if (!isMediaBlock(blockType)) {
+                continue;
+            }
+            String blockId = block.path("block_id").asText();
+            if (!StringUtils.hasText(blockId) || !visitedBlockIds.add(blockId)) {
+                continue;
+            }
+            discoveredCount++;
+            String mediaToken = extractMediaToken(block, blockType);
+            long remainingBytes = totalLimit - downloadedBytes;
+            FeishuBlockMediaDownloadResultBO result = blockMediaDownloader.download(accessToken, externalDocumentId,
+                    blockId, blockType, mediaToken, workspace.root(), remainingBytes);
+            results.put(blockId, result);
+            if (result.status() == FeishuBlockMediaDownloadResultBO.Status.DOWNLOADED) {
+                downloadedCount++;
+                downloadedBytes += result.size();
+            } else if (result.status() == FeishuBlockMediaDownloadResultBO.Status.SKIPPED) {
+                skippedCount++;
+                addFailureDetail(failureDetails, properties, result);
+            } else {
+                failedCount++;
+                addFailureDetail(failureDetails, properties, result);
+            }
+            log.info("飞书Block媒体处理完成，externalDocumentId={}，blockId={}，blockType={}，status={}，size={}，reason={}",
+                    externalDocumentId, blockId, blockType, result.status(), result.size(), result.failureReason());
+        }
+        Map<String, Object> metadata = Map.of("discoveredCount", discoveredCount, "downloadedCount", downloadedCount,
+                "failedCount", failedCount, "skippedCount", skippedCount, "failureDetails", List.copyOf(failureDetails));
+        return new MediaResolution(Map.copyOf(results), metadata);
+    }
+
+    private boolean isMediaBlock(int blockType) {
+        return blockType == 23 || blockType == 27;
+    }
+
+    private String extractMediaToken(JsonNode block, int blockType) {
+        JsonNode media = blockType == 27 ? block.path("image") : block.path("file");
+        String token = media.path("token").asText();
+        return StringUtils.hasText(token) ? token : block.path("token").asText();
+    }
+
+    private void addFailureDetail(List<Map<String, String>> failureDetails,
+                                  CloudDocumentProperties.FeishuProperties.BlockMediaProperties properties,
+                                  FeishuBlockMediaDownloadResultBO result) {
+        int maxFailureDetails = properties == null ? 0 : properties.getMaxFailureDetails();
+        if (maxFailureDetails > 0 && failureDetails.size() < maxFailureDetails) {
+            failureDetails.add(Map.of("blockId", result.blockId(), "blockType", String.valueOf(result.blockType()),
+                    "status", result.status().name(), "reason", result.failureReason()));
+        }
+    }
+
+    /**
+     * 创建 DOCX 导出任务、轮询其状态，并将结果流式下载到工作区。
+     */
+    private SourceReadResultBO readAsDocxExport(RestClient client, String accessToken, JsonNode document,
+                                                String externalDocumentId, Long documentId,
+                                                ArtifactWorkspace workspace, String fallbackReason) {
+        String ticket = createExportTask(client, accessToken, externalDocumentId);
+        String fileToken = awaitExportedFileToken(client, accessToken, ticket, externalDocumentId, documentId);
+
         Path sourcePath = workspace.resolve("source.docx");
-        downloadToFile(accessToken, fileToken, sourcePath, request.documentId());
-        log.info("飞书DOCX导出成功，documentId={}，externalDocumentId={}，revisionId={}", request.documentId(),
-                documentId, document.path("revision_id").asText(null));
+        downloadToFile(accessToken, fileToken, sourcePath, documentId);
+        log.info("飞书DOCX导出成功，documentId={}，externalDocumentId={}，revisionId={}", documentId,
+                externalDocumentId, document.path("revision_id").asText(null));
         return new SourceReadResultBO(sourcePath, DOCX_CONTENT_TYPE, DocumentFormat.WORD, "source.docx",
-                document.path("title").asText(null), documentId, document.path("revision_id").asText(null),
-                Map.of("sourceType", "FEISHU", "reader", "FEISHU_EXPORT_TASK"));
+                document.path("title").asText(null), externalDocumentId,
+                document.path("revision_id").asText(null),
+                Map.of("sourceType", "FEISHU", "reader", "FEISHU_EXPORT_TASK",
+                        "blockFallbackReason", fallbackReason));
     }
 
     /**
@@ -253,6 +464,14 @@ public class FeishuDocxSourceReader implements ExternalDocumentSourceReader {
         }
     }
 
+    private void validateBlockReadProperties(
+            CloudDocumentProperties.FeishuProperties.BlockReadProperties properties) {
+        if (properties.getPageSize() <= 0 || properties.getMaxBlockCount() <= 0
+                || properties.getMaxJsonBytes() <= 0) {
+            throw new ServiceException("飞书Block读取配置不合法");
+        }
+    }
+
     private void sleep(Duration duration, Long documentId) {
         try {
             Thread.sleep(duration);
@@ -273,5 +492,24 @@ public class FeishuDocxSourceReader implements ExternalDocumentSourceReader {
         }
         String normalizedHost = host.toLowerCase(Locale.ROOT);
         return FEISHU_ROOT_DOMAIN.equals(normalizedHost) || normalizedHost.endsWith("." + FEISHU_ROOT_DOMAIN);
+    }
+
+    /**
+     * Block 读取结果，成功时携带 Markdown，失败时携带可观测的回退原因。
+     */
+    private record BlockReadAttempt(boolean success, List<JsonNode> blocks, String fallbackReason) {
+
+        private static BlockReadAttempt success(List<JsonNode> blocks) {
+            return new BlockReadAttempt(true, List.copyOf(blocks), null);
+        }
+
+        private static BlockReadAttempt fallback(String fallbackReason) {
+            return new BlockReadAttempt(false, List.of(), fallbackReason);
+        }
+    }
+
+    /** Block 媒体处理结果与用于来源元数据的汇总信息。 */
+    private record MediaResolution(Map<String, FeishuBlockMediaDownloadResultBO> results,
+                                   Map<String, Object> metadata) {
     }
 }
