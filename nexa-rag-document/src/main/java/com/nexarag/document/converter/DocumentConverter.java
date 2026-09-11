@@ -1,6 +1,8 @@
 package com.nexarag.document.converter;
 
 import com.baomidou.mybatisplus.core.metadata.IPage;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nexarag.common.web.PageVO;
 import com.nexarag.document.enums.DocumentStatus;
 import com.nexarag.document.model.entity.Document;
@@ -9,10 +11,15 @@ import com.nexarag.document.model.entity.DocumentVersionDO;
 import com.nexarag.document.model.vo.*;
 import org.springframework.util.StringUtils;
 
+import java.util.ArrayList;
+import java.util.List;
+
 /**
  * 文档对象转换器。
  */
 public final class DocumentConverter {
+
+    private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
     private DocumentConverter() {
     }
@@ -135,8 +142,41 @@ public final class DocumentConverter {
      * @return 文档片段响应
      */
     public static DocumentChunkVO toChunkVO(DocumentChunk chunk) {
+        ChunkDisplayMetadata metadata = parseChunkDisplayMetadata(chunk);
         return new DocumentChunkVO(chunk.getChunkId(), chunk.getDocumentId(), chunk.getChunkOrder(),
-                chunk.getText(), chunk.getStatus());
+                chunk.getText(), chunk.getStatus(), chunk.getParentChunkId(),
+                Integer.valueOf(1).equals(chunk.getSkipIndex()) && metadata.parent(), metadata.displayOnlyHeading(),
+                metadata.childIndex(), metadata.headingPath());
+    }
+
+    private static ChunkDisplayMetadata parseChunkDisplayMetadata(DocumentChunk chunk) {
+        if (chunk == null || !StringUtils.hasText(chunk.getMetadataJson())) {
+            return ChunkDisplayMetadata.empty();
+        }
+        try {
+            JsonNode metadata = OBJECT_MAPPER.readTree(chunk.getMetadataJson());
+            List<String> headingPath = new ArrayList<>();
+            metadata.path("titlePath").forEach(node -> {
+                String title = node.asText().trim();
+                if (StringUtils.hasText(title)) {
+                    headingPath.add(title);
+                }
+            });
+            return new ChunkDisplayMetadata(metadata.path("parent").asBoolean(false),
+                    metadata.path("displayOnlyHeading").asBoolean(false),
+                    metadata.hasNonNull("childIndex") ? metadata.path("childIndex").asInt() : null,
+                    List.copyOf(headingPath));
+        } catch (Exception exception) {
+            return ChunkDisplayMetadata.empty();
+        }
+    }
+
+    private record ChunkDisplayMetadata(boolean parent, boolean displayOnlyHeading, Integer childIndex,
+                                        List<String> headingPath) {
+
+        private static ChunkDisplayMetadata empty() {
+            return new ChunkDisplayMetadata(false, false, null, List.of());
+        }
     }
 
     /**

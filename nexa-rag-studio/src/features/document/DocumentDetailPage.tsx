@@ -83,6 +83,7 @@ export const DocumentDetailPage: React.FC = () => {
   const [selectedChunk, setSelectedChunk] = useState<DocumentChunkVO | null>(null);
   const [cachedChunk, setCachedChunk] = useState<DocumentChunkVO | null>(null);
   const [searchKeyword, setSearchKeyword] = useState("");
+  const [showStructureChunks, setShowStructureChunks] = useState(false);
 
   useEffect(() => {
     if (selectedChunk) {
@@ -410,15 +411,23 @@ export const DocumentDetailPage: React.FC = () => {
 
   // 过滤后的分块列表
   const filteredChunks = useMemo(() => {
-    if (!searchKeyword.trim()) return chunks;
+    const visibleChunks = showStructureChunks
+      ? chunks
+      : chunks.filter((chunk) => !chunk.parentContext && !chunk.displayOnlyHeading);
+    if (!searchKeyword.trim()) return visibleChunks;
     const query = searchKeyword.toLowerCase();
-    return chunks.filter(
+    return visibleChunks.filter(
       (c) =>
         (c.text || c.content || "").toLowerCase().includes(query) ||
         String(c.chunkOrder ?? c.chunkIndex ?? "").includes(query) ||
         String(c.chunkId).includes(query)
     );
-  }, [chunks, searchKeyword]);
+  }, [chunks, searchKeyword, showStructureChunks]);
+
+  const hiddenStructureChunkCount = useMemo(
+    () => chunks.filter((chunk) => chunk.parentContext || chunk.displayOnlyHeading).length,
+    [chunks],
+  );
 
   // 统计总字符数与 Token 数
   const stats = useMemo(() => {
@@ -881,14 +890,25 @@ export const DocumentDetailPage: React.FC = () => {
           )}
 
           {activeTab === "chunks" && (
-            <FeishuInput
-              value={searchKeyword}
-              onChange={(val) => setSearchKeyword(val)}
-              onClear={() => setSearchKeyword("")}
-              placeholder="搜索分块正文、序号..."
-              prefix={<Search className="w-3.5 h-3.5 text-[#8F959E]" />}
-              containerClassName="w-56 h-[28px] rounded-[6px]"
-            />
+            <div className="flex items-center gap-2">
+              {hiddenStructureChunkCount > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setShowStructureChunks((value) => !value)}
+                  className="text-[12px] text-[#646A75] hover:text-[#3370FF] transition-colors"
+                >
+                  {showStructureChunks ? "隐藏结构块" : `显示 ${hiddenStructureChunkCount} 个结构块`}
+                </button>
+              )}
+              <FeishuInput
+                value={searchKeyword}
+                onChange={(val) => setSearchKeyword(val)}
+                onClear={() => setSearchKeyword("")}
+                placeholder="搜索分块正文、序号..."
+                prefix={<Search className="w-3.5 h-3.5 text-[#8F959E]" />}
+                containerClassName="w-56 h-[28px] rounded-[6px]"
+              />
+            </div>
           )}
         </div>
 
@@ -1080,6 +1100,24 @@ export const DocumentDetailPage: React.FC = () => {
               </div>
 
               <div className="p-4 flex-1 overflow-y-auto custom-scrollbar leading-6 font-sans selection:bg-[#E8F4FF]">
+                {displayChunk.headingPath && displayChunk.headingPath.length > 0 && (
+                  <div className="mb-3 text-[12px] text-[#646A75] bg-[#F8F9FA] rounded px-2.5 py-2">
+                    标题层级：{displayChunk.headingPath.join(" / ")}
+                  </div>
+                )}
+                <div className="mb-3 flex items-center gap-2 text-[12px] text-[#646A75]">
+                  <span>{displayChunk.parentContext ? "完整父上下文" : displayChunk.displayOnlyHeading ? "结构标题" : "可索引子分块"}</span>
+                  {displayChunk.childIndex != null && <span>子块 #{displayChunk.childIndex}</span>}
+                  {displayChunk.parentChunkId && (
+                    <button
+                      type="button"
+                      onClick={() => setSelectedChunk(chunks.find((chunk) => chunk.chunkId === displayChunk.parentChunkId) || null)}
+                      className="text-[#3370FF] hover:underline"
+                    >
+                      查看完整父上下文
+                    </button>
+                  )}
+                </div>
                 <FeishuMarkdown
                   content={displayChunk.text || displayChunk.content || ""}
                   className="text-feishu-text-primary"

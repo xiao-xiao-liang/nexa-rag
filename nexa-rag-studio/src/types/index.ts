@@ -232,6 +232,11 @@ export interface DocumentChunkVO {
   chunkIndex?: number;
   tokenCount?: number;
   vectorIndexed?: boolean;
+  parentChunkId?: string;
+  parentContext?: boolean;
+  displayOnlyHeading?: boolean;
+  childIndex?: number;
+  headingPath?: string[];
 }
 
 export interface SplitConfigRequest {
