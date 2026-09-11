@@ -9,6 +9,7 @@ import java.util.List;
 import java.util.Map;
 
 import static com.nexarag.workflow.constants.ChatWorkflowStateKeys.RERANKED_RETRIEVAL_RESULTS;
+import static com.nexarag.workflow.constants.ChatWorkflowStateKeys.PARENT_CONTEXT_FALLBACK_RESULTS;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -30,5 +31,6 @@ class ParentContextExpansionNodeTest {
                 RERANKED_RETRIEVAL_RESULTS, List.of(rankedChunk))));
 
         assertThat(result.get(RERANKED_RETRIEVAL_RESULTS)).isEqualTo(List.of(parentChunk));
+        assertThat(result.get(PARENT_CONTEXT_FALLBACK_RESULTS)).isEqualTo(List.of(rankedChunk));
     }
 }

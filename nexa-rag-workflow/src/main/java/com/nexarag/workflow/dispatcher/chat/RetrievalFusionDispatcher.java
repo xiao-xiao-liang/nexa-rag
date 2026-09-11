@@ -69,10 +69,9 @@ public class RetrievalFusionDispatcher implements EdgeAction {
         state.updateState(Map.of(
                 RETRIEVAL_ROUND, round + 1,
                 EVIDENCE_EXPANSION_REASON, expansionReason));
-        log.info("检索候选触发章节扩展，traceId={}，候选数={}，nextRound={}，原因={}，正文上限={}，Token预算={}",
+        log.info("检索候选触发章节扩展，traceId={}，候选数={}，nextRound={}，原因={}，正文上限={}",
                 state.value(TRACE_ID, ""), results.size(), round + 1, expansionReason,
-                retrievalProperties.getCandidate().getExpansionEvidenceLimit(),
-                retrievalProperties.getCandidate().getEvidenceTokenBudget());
+                retrievalProperties.getCandidate().getExpansionEvidenceLimit());
 
         // 2. 返回章节扩展节点执行唯一一次受限正文补充
         return SECTION_EXPANSION_NODE;

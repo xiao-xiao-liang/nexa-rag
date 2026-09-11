@@ -14,6 +14,8 @@ public final class ChatWorkflowStateKeys {
     public static final String INTENT_RESULT = "intentResult";
     public static final String FUSED_RETRIEVAL_RESULTS = "fusedRetrievalResults";
     public static final String RERANKED_RETRIEVAL_RESULTS = "rerankedRetrievalResults";
+    /** 父子上下文替换前的原始重排序正文，用于父片段超出模型窗口时回退。 */
+    public static final String PARENT_CONTEXT_FALLBACK_RESULTS = "parentContextFallbackResults";
     public static final String ACCEPTED_EVIDENCE_RESULTS = "acceptedEvidenceResults";
     public static final String CITATION_SET = "citationSet";
     public static final String EVIDENCE_QUALITY = "evidenceQuality";

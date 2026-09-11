@@ -15,8 +15,8 @@ import java.util.stream.Collectors;
 /**
  * 父子片段上下文扩展器。
  *
- * <p>该组件只消费重排序后的子片段：命中足够集中且父片段可纳入证据预算时，返回完整父片段；
- * 否则保留命中片段并补充其相邻兄弟片段。最终 Token 预算仍由工作流的证据质量评估器统一控制。</p>
+ * <p>该组件只消费重排序后的子片段：父片段与命中子片段版本一致时，始终返回完整父片段；
+ * 父片段缺失或版本不一致时，才保留命中片段并补充其相邻兄弟片段。</p>
  */
 @Component
 @Slf4j
@@ -25,8 +25,6 @@ public class ParentContextExpansionRetriever {
 
     public static final String PARENT_CONTEXT_CHANNEL = "PARENT_CONTEXT";
     public static final String PARENT_NEIGHBOR_CHANNEL = "PARENT_NEIGHBOR";
-
-    private static final int CHARACTERS_PER_TOKEN = 4;
 
     private final DocumentChunkService documentChunkService;
     private final RetrievalProperties retrievalProperties;
@@ -81,7 +79,7 @@ public class ParentContextExpansionRetriever {
             List<RetrievalChunk> versionMatchedParentHits = parentHits.stream()
                     .filter(hit -> belongsToSameVersion(parent, hit))
                     .toList();
-            if (shouldUseFullParent(parent, versionMatchedParentHits.size())) {
+            if (shouldUseFullParent(parent, versionMatchedParentHits)) {
                 addIfAbsent(result, addedChunkIds, toParentContext(parent, versionMatchedParentHits));
                 continue;
             }
@@ -93,17 +91,9 @@ public class ParentContextExpansionRetriever {
         return List.copyOf(result);
     }
 
-    private boolean shouldUseFullParent(DocumentChunk parent, int hitCount) {
-        if (parent == null || !StringUtils.hasText(parent.getText())) {
-            return false;
-        }
-        int parentTokens = estimateTokens(parent.getText());
-        RetrievalProperties.Candidate candidate = retrievalProperties.getCandidate();
-        if (parentTokens <= candidate.getParentContextFullParentMaxTokens()) {
-            return true;
-        }
-        return hitCount >= candidate.getParentContextFullParentMinimumHits()
-                && parentTokens <= candidate.getEvidenceTokenBudget();
+    private boolean shouldUseFullParent(DocumentChunk parent, List<RetrievalChunk> versionMatchedParentHits) {
+        return parent != null && StringUtils.hasText(parent.getText())
+                && versionMatchedParentHits != null && !versionMatchedParentHits.isEmpty();
     }
 
     private RetrievalChunk toParentContext(DocumentChunk parent, List<RetrievalChunk> parentHits) {
@@ -154,10 +144,6 @@ public class ParentContextExpansionRetriever {
         if (addedChunkIds.add(identity)) {
             target.add(chunk);
         }
-    }
-
-    private int estimateTokens(String text) {
-        return Math.max(1, (text.length() + CHARACTERS_PER_TOKEN - 1) / CHARACTERS_PER_TOKEN);
     }
 
     private boolean belongsToSameVersion(DocumentChunk chunk, RetrievalChunk hit) {

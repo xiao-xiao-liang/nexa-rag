@@ -28,4 +28,17 @@ class EvidenceQualityEvaluatorTest {
         assertThat(quality.sufficient()).isTrue();
         assertThat(quality.reason()).isEqualTo("SHORT_BODY_ACCEPTED");
     }
+
+    @Test
+    void acceptShouldKeepCompleteParentEvenWhenItExceedsPreviousEvidenceBudget() {
+        RetrievalProperties properties = new RetrievalProperties();
+        EvidenceQualityEvaluator evaluator = new EvidenceQualityEvaluator(properties);
+        RetrievalChunk parent = new RetrievalChunk("parent-1", 1L, 0, null, "测试文档", "知识库",
+                "完整父分块".repeat(10_000), 0.9D, "PARENT_CONTEXT", 1, 101L);
+
+        EvidenceQuality quality = evaluator.accept(List.of(parent));
+
+        assertThat(quality.acceptedChunks()).containsExactly(parent);
+        assertThat(quality.sufficient()).isTrue();
+    }
 }

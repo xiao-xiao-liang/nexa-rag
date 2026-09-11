@@ -7,11 +7,10 @@ import com.nexarag.workflow.constants.WorkflowConstants;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 
-import java.util.ArrayList;
 import java.util.List;
 
 /**
- * 回答证据质量评估器，统一判断是否需要章节扩展以及哪些原始正文可进入最终回答。
+ * 回答证据质量评估器，统一判断是否需要章节扩展以及哪些正文可进入最终回答。
  */
 @Component
 public class EvidenceQualityEvaluator {
@@ -48,7 +47,8 @@ public class EvidenceQualityEvaluator {
     }
 
     /**
-     * 仅接纳原始正文，并在不截断正文的前提下遵守 Token 预算。
+     * 接纳全部正文。模型输入窗口由最终回答节点按照实际模型路由统一控制，
+     * 此处不得以固定全局预算提前丢弃完整父片段。
      *
      * @param rankedChunks 重排序结果
      * @return 可供回答使用的证据质量结果
@@ -59,25 +59,11 @@ public class EvidenceQualityEvaluator {
             return EvidenceQuality.insufficient("NO_RAW_BODY");
         }
 
-        // 1. 只整体接纳未超过预算的原始正文，禁止截断或改写正文
-        int tokenBudget = retrievalProperties.getCandidate().getEvidenceTokenBudget();
-        int usedTokens = 0;
-        List<RetrievalChunk> accepted = new ArrayList<>();
-        for (RetrievalChunk body : bodies) {
-            int bodyTokens = estimateTokens(body);
-            if (bodyTokens > tokenBudget - usedTokens) {
-                continue;
-            }
-            accepted.add(body);
-            usedTokens += bodyTokens;
-        }
-        if (accepted.isEmpty()) {
-            return EvidenceQuality.insufficient("TOKEN_BUDGET");
-        }
-        // 2. 短正文只用于触发章节扩展，扩展后仍无更多正文时不能丢弃已经命中的原始证据。
-        String reason = usedTokens < retrievalProperties.getCandidate().getExpansionMinimumBodyTokens()
+        int estimatedTokens = bodies.stream().mapToInt(this::estimateTokens).sum();
+        // 短正文只用于触发章节扩展，扩展后仍无更多正文时不能丢弃已经命中的原始证据。
+        String reason = estimatedTokens < retrievalProperties.getCandidate().getExpansionMinimumBodyTokens()
                 ? "SHORT_BODY_ACCEPTED" : "ACCEPTED";
-        return new EvidenceQuality(List.copyOf(accepted), true, reason, usedTokens);
+        return new EvidenceQuality(List.copyOf(bodies), true, reason, estimatedTokens);
     }
 
     private List<RetrievalChunk> bodyChunks(List<RetrievalChunk> chunks) {

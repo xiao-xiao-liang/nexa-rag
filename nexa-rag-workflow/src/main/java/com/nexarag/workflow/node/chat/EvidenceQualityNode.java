@@ -18,7 +18,7 @@ import static com.nexarag.workflow.constants.ChatWorkflowStateKeys.RERANKED_RETR
 import static com.nexarag.workflow.constants.ChatWorkflowStateKeys.TRACE_ID;
 
 /**
- * 证据质量节点，仅接纳预算内的原始正文；证据不足时清空上下文以触发现有的保守拒答提示词。
+ * 证据质量节点，仅接纳正文；模型输入窗口在最终回答节点中按实际模型路由控制。
  */
 @Component
 @Slf4j
@@ -35,7 +35,7 @@ public class EvidenceQualityNode implements NodeAction {
      */
     @Override
     public Map<String, Object> apply(OverAllState state) {
-        // 1. 评估重排序候选，导航记录和超预算正文均不能进入回答上下文
+        // 1. 评估重排序候选，导航记录不能进入回答上下文
         List<RetrievalChunk> rankedChunks = state.value(RERANKED_RETRIEVAL_RESULTS, List.of());
         EvidenceQuality quality = evidenceQualityEvaluator.accept(rankedChunks);
 

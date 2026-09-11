@@ -196,12 +196,6 @@ public class RetrievalProperties {
         private int expansionEvidenceLimit = 3;
 
         /**
-         * 证据正文的 Token 预算。
-         */
-        @Min(1)
-        private int evidenceTokenBudget = 1800;
-
-        /**
          * 初始正文证据不足此 Token 数时触发章节扩展。
          */
         @Min(1)
@@ -223,18 +217,6 @@ public class RetrievalProperties {
          * 是否在重排序后按父子片段关系扩展回答上下文。
          */
         private boolean parentContextExpansionEnabled = true;
-
-        /**
-         * 单次可直接使用完整父片段的估算 Token 上限。
-         */
-        @Min(1)
-        private int parentContextFullParentMaxTokens = 800;
-
-        /**
-         * 同一父片段至少命中多少个子片段时，可放宽为完整父片段。
-         */
-        @Min(1)
-        private int parentContextFullParentMinimumHits = 2;
 
         /**
          * 未使用完整父片段时，单个命中子片段两侧最多补充的兄弟片段数量。

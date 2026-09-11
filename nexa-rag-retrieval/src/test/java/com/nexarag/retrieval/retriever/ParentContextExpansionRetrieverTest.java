@@ -17,7 +17,7 @@ import static org.mockito.Mockito.when;
 class ParentContextExpansionRetrieverTest {
 
     @Test
-    void expandShouldUseFullParentWhenParentFitsConfiguredLimit() {
+    void expandShouldUseFullParentWhenParentMatchesHitVersion() {
         DocumentChunkService documentChunkService = mock(DocumentChunkService.class);
         DocumentChunk parent = chunk("parent_1", null, 1, 101L, "完整父片段正文");
         when(documentChunkService.listByIds(any())).thenReturn(List.of(parent));
@@ -36,11 +36,8 @@ class ParentContextExpansionRetrieverTest {
     }
 
     @Test
-    void expandShouldKeepHitAndAppendNeighborsWhenParentExceedsBudget() {
+    void expandShouldUseFullParentWhenParentExceedsPreviousTokenBudget() {
         DocumentChunkService documentChunkService = mock(DocumentChunkService.class);
-        RetrievalProperties properties = new RetrievalProperties();
-        properties.getCandidate().setParentContextFullParentMaxTokens(100);
-        properties.getCandidate().setEvidenceTokenBudget(500);
         DocumentChunk parent = chunk("parent_1", null, 1, 101L, "父正文".repeat(1001));
         List<DocumentChunk> siblings = List.of(
                 chunk("child_0", "parent_1", 2, 101L, "前文"),
@@ -49,13 +46,34 @@ class ParentContextExpansionRetrieverTest {
                 chunk("child_history", "parent_1", 5, 102L, "历史版本后文"));
         when(documentChunkService.listByIds(any())).thenReturn(List.of(parent));
         when(documentChunkService.listByParentChunkIds(List.of("parent_1"))).thenReturn(siblings);
-        ParentContextExpansionRetriever retriever = new ParentContextExpansionRetriever(documentChunkService, properties);
+        ParentContextExpansionRetriever retriever = new ParentContextExpansionRetriever(documentChunkService,
+                new RetrievalProperties());
 
         List<RetrievalChunk> expanded = retriever.expand(List.of(hit("child_1", "parent_1", 3, 101L, "命中")));
 
-        assertThat(expanded).extracting(RetrievalChunk::chunkId)
-                .containsExactly("child_1", "child_0", "child_2");
-        assertThat(expanded.get(1).channel()).isEqualTo(ParentContextExpansionRetriever.PARENT_NEIGHBOR_CHANNEL);
+        assertThat(expanded).singleElement().satisfies(chunk -> {
+            assertThat(chunk.chunkId()).isEqualTo("parent_1");
+            assertThat(chunk.content()).isEqualTo("父正文".repeat(1001));
+            assertThat(chunk.channel()).isEqualTo(ParentContextExpansionRetriever.PARENT_CONTEXT_CHANNEL);
+        });
+    }
+
+    @Test
+    void expandShouldKeepHitAndAppendNeighborsWhenParentVersionDoesNotMatch() {
+        DocumentChunkService documentChunkService = mock(DocumentChunkService.class);
+        DocumentChunk parent = chunk("parent_1", null, 1, 102L, "历史父片段");
+        List<DocumentChunk> siblings = List.of(
+                chunk("child_0", "parent_1", 2, 101L, "前文"),
+                chunk("child_1", "parent_1", 3, 101L, "命中"),
+                chunk("child_2", "parent_1", 4, 101L, "后文"));
+        when(documentChunkService.listByIds(any())).thenReturn(List.of(parent));
+        when(documentChunkService.listByParentChunkIds(List.of("parent_1"))).thenReturn(siblings);
+        ParentContextExpansionRetriever retriever = new ParentContextExpansionRetriever(documentChunkService,
+                new RetrievalProperties());
+
+        List<RetrievalChunk> expanded = retriever.expand(List.of(hit("child_1", "parent_1", 3, 101L, "命中")));
+
+        assertThat(expanded).extracting(RetrievalChunk::chunkId).containsExactly("child_1", "child_0", "child_2");
         assertThat(expanded).allMatch(chunk -> Long.valueOf(101L).equals(chunk.documentVersionId()));
     }
 
