@@ -52,7 +52,7 @@ export const DocumentDrawer: React.FC<DocumentDrawerProps> = ({
 
   // 处理流水线参数
   const [chunkSize, setChunkSize] = useState<number>(500);
-  const [chunkOverlap, setChunkOverlap] = useState<number>(50);
+  const [chunkOverlap] = useState<number>(0);
 
   const isProcessingStatus = (s?: string) =>
     ["UPLOADED", "QUEUED", "PARSING", "PARSED", "CHUNKING", "CHUNKED", "INDEXING"].includes(s || "");
@@ -143,7 +143,7 @@ export const DocumentDrawer: React.FC<DocumentDrawerProps> = ({
       const req: ProcessDocumentRequest = {
         splitConfig: {
           chunkSize,
-          chunkOverlap,
+          chunkOverlap: 0,
         },
       };
       const res = await documentApi.processDocument(documentId, req, knowledgeBaseId);
@@ -524,14 +524,12 @@ export const DocumentDrawer: React.FC<DocumentDrawerProps> = ({
                         </label>
                         <input
                           type="number"
-                          min={0}
-                          max={500}
-                          step={10}
                           value={chunkOverlap}
-                          onChange={(e) => setChunkOverlap(parseInt(e.target.value, 10))}
-                          className="w-full h-8 px-2.5 rounded-[6px] border border-[#DEE0E3] text-xs font-mono"
+                          readOnly
+                          aria-label="Markdown 父子切分重叠字数固定为零"
+                          className="w-full h-8 px-2.5 rounded-[6px] border border-[#DEE0E3] bg-[#F5F6F7] text-xs font-mono text-[#646A73] cursor-not-allowed"
                         />
-                        <p className="text-[11px] text-[#8F959E] mt-1">建议为切片大小的 10% ~ 20%，保持上下文连贯性</p>
+                        <p className="text-[11px] text-[#8F959E] mt-1">Markdown 父子切分固定为 0，避免子分块重复正文</p>
                       </div>
                     </div>
 

@@ -11,6 +11,7 @@ import org.junit.jupiter.api.Test;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
  * Markdown 标题扫描器测试。
@@ -59,5 +60,25 @@ class MarkdownHeadingScannerTest {
                     "#### 二、节点插入方式的变化", "更多正文")
                     .doesNotContain("\n## 一、核心数据结构差异", "\n## 二、节点插入方式的变化");
         });
+    }
+
+    @Test
+    void scanShouldRecognizeWholeLineNumberedBoldHeadings() {
+        MarkdownHeadingScanner scanner = new MarkdownHeadingScanner(new DocumentSectionIdGenerator());
+
+        List<MarkdownSection> sections = scanner.scan("1\\. **总览**\n正文\n1.1 **范围**\n子正文",
+                new MarkdownSplitOptions(3, false, true, true));
+
+        assertThat(sections).extracting(MarkdownSection::title).containsExactly("总览", "范围");
+        assertThat(sections.get(1).parentSectionId()).isEqualTo(sections.getFirst().sectionId());
+    }
+
+    @Test
+    void scanShouldNotTreatNumberedBoldBodyOrCodeAsHeading() {
+        MarkdownHeadingScanner scanner = new MarkdownHeadingScanner(new DocumentSectionIdGenerator());
+
+        assertThatThrownBy(() -> scanner.scan("1\\. **强调文本** 后接正文\n```\n2\\. **代码示例**\n```",
+                new MarkdownSplitOptions(3, false, true, true)))
+                .hasMessageContaining("Markdown内容不存在有效标题");
     }
 }

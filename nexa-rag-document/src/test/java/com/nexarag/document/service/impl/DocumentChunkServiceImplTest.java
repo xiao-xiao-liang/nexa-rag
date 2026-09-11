@@ -54,6 +54,22 @@ class DocumentChunkServiceImplTest {
     }
 
     @Test
+    void toChunkShouldAllowBlankIndexContentWhenDraftSkipsIndexing() throws Exception {
+        DocumentChunkServiceImpl service = new DocumentChunkServiceImpl();
+        var method = DocumentChunkServiceImpl.class.getDeclaredMethod("toChunk", Long.class, Long.class, ChunkDraft.class,
+                int.class);
+        method.setAccessible(true);
+        ChunkDraft draft = new ChunkDraft("heading_1", null, 11L, "## 仅展示标题", "", 1,
+                Map.of("displayOnlyHeading", true), true);
+
+        DocumentChunk result = (DocumentChunk) method.invoke(service, 1L, 2L, draft, 0);
+
+        assertThat(result.getIndexContent()).isNull();
+        assertThat(result.getStatus()).isEqualTo(com.nexarag.document.enums.ChunkStatus.SKIP_INDEX);
+        assertThat(result.getSkipIndex()).isEqualTo(1);
+    }
+
+    @Test
     void toChunkShouldKeepSectionAndIndexContent() throws Exception {
         DocumentChunkServiceImpl service = new DocumentChunkServiceImpl();
         var method = DocumentChunkServiceImpl.class.getDeclaredMethod("toChunk", Long.class, Long.class, ChunkDraft.class,

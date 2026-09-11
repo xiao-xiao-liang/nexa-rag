@@ -62,7 +62,8 @@ public class ProcessConfigDefaults {
         MarkdownSplitOptions markdown = mergeMarkdownOptions(splitConfig.markdown(), defaultConfig.markdown());
         RegexSplitOptions regex = mergeRegexOptions(splitConfig.regex(), defaultConfig.regex());
         ExcelSplitOptions excel = mergeExcelOptions(splitConfig.excel(), defaultConfig.excel());
-        return new SplitConfigRequest(splitStrategy, chunkSize, chunkOverlap, markdown, regex, excel);
+        return new SplitConfigRequest(splitStrategy, chunkSize,
+                normalizeChunkOverlap(splitStrategy, chunkOverlap), markdown, regex, excel);
     }
 
     private SplitConfigRequest defaultSplitConfig(FileType fileType) {
@@ -71,8 +72,20 @@ public class ProcessConfigDefaults {
             case PPT, TEXT -> SplitStrategy.REGEX_TEXT;
             case PDF, WORD, MARKDOWN, UNKNOWN -> SplitStrategy.PARENT_MARKDOWN;
         };
-        return new SplitConfigRequest(splitStrategy, DEFAULT_CHUNK_SIZE, DEFAULT_CHUNK_OVERLAP,
+        return new SplitConfigRequest(splitStrategy, DEFAULT_CHUNK_SIZE,
+                normalizeChunkOverlap(splitStrategy, DEFAULT_CHUNK_OVERLAP),
                 defaultMarkdownOptions(), defaultRegexOptions(), defaultExcelOptions());
+    }
+
+    /**
+     * 归一化不同切分策略的重叠大小。
+     *
+     * @param splitStrategy 切分策略
+     * @param chunkOverlap  请求或默认重叠大小
+     * @return 可持久化的重叠大小
+     */
+    private Integer normalizeChunkOverlap(SplitStrategy splitStrategy, Integer chunkOverlap) {
+        return splitStrategy == SplitStrategy.PARENT_MARKDOWN ? 0 : chunkOverlap;
     }
 
     private MarkdownSplitOptions mergeMarkdownOptions(MarkdownSplitOptions options, MarkdownSplitOptions defaults) {

@@ -15,6 +15,8 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * Markdown 标题扫描器，负责按标题层级生成文档区块。
@@ -22,6 +24,10 @@ import java.util.Map;
 @Component
 @RequiredArgsConstructor
 public class MarkdownHeadingScanner {
+
+    private static final Pattern NUMBERED_BOLD_HEADING_PATTERN = Pattern.compile(
+            "^[\\t ]*(?<number>(?:\\d+(?:(?:\\\\?\\.)\\d+)+(?:\\\\?\\.)?|\\d+(?:\\\\?\\.)))"
+                    + "[\\t ]+\\*\\*(?<title>\\S(?:.*?\\S)?)\\*\\*[\\t ]*$");
 
     private final DocumentSectionIdGenerator sectionIdGenerator;
 
@@ -212,13 +218,30 @@ public class MarkdownHeadingScanner {
         while (level < trimmed.length() && trimmed.charAt(level) == '#') {
             level++;
         }
-        if (level == 0 || level > 6 || level > maxLevel) {
+        if (level > 0 && level <= 6 && level <= maxLevel
+                && (trimmed.length() == level || trimmed.charAt(level) == ' ')) {
+            return new Heading(level, trimmed.substring(level).trim(), 0);
+        }
+        return parseNumberedBoldHeading(line, maxLevel);
+    }
+
+    /**
+     * 严格识别整行“编号 + 加粗标题”，兼容 Pandoc 转义后的编号点号。
+     */
+    private Heading parseNumberedBoldHeading(String line, int maxLevel) {
+        Matcher matcher = NUMBERED_BOLD_HEADING_PATTERN.matcher(line);
+        if (!matcher.matches()) {
             return null;
         }
-        if (trimmed.length() > level && trimmed.charAt(level) != ' ') {
+        String normalizedNumber = matcher.group("number").replace("\\.", ".");
+        if (normalizedNumber.endsWith(".")) {
+            normalizedNumber = normalizedNumber.substring(0, normalizedNumber.length() - 1);
+        }
+        int level = normalizedNumber.split("\\.").length;
+        if (level > maxLevel) {
             return null;
         }
-        return new Heading(level, trimmed.substring(level).trim(), 0);
+        return new Heading(level, matcher.group("title"), 0);
     }
 
     private record Heading(int level, String title, int lineNumber) {

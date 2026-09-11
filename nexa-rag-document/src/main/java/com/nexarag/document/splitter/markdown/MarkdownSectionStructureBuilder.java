@@ -59,11 +59,13 @@ public class MarkdownSectionStructureBuilder {
                     ))
                     .toList();
 
-            // 2. 仅为直属正文非空的章节生成片段
+            // 2. 保留正文片段；保留标题时还需为无正文标题生成仅展示分块。
             List<ChunkDraft> chunks = new ArrayList<>();
             for (MarkdownSection section : sections) {
                 if (StringUtils.hasText(section.bodyText())) {
                     appendSectionChunks(chunks, context, strategy, section);
+                } else if (shouldKeepHeaders(context.config())) {
+                    chunks.add(newDisplayOnlyHeadingChunk(context, strategy, section));
                 }
             }
             return new DocumentSplitResult(sectionDrafts, chunks, true);
@@ -105,7 +107,8 @@ public class MarkdownSectionStructureBuilder {
         }
 
         String rawHeading = shouldKeepHeaders(config) ? headingText(section, "").stripTrailing() : "";
-        List<String> bodyWindows = markdownSafeWindowSplitter.split(bodyText, config.chunkSize(), config.chunkOverlap());
+        int chunkOverlap = strategy == SplitStrategy.PARENT_MARKDOWN ? 0 : config.chunkOverlap();
+        List<String> bodyWindows = markdownSafeWindowSplitter.split(bodyText, config.chunkSize(), chunkOverlap);
         for (int i = 0; i < bodyWindows.size(); i++) {
             String indexText = bodyWindows.get(i);
             String rawText = shouldKeepHeaders(config) ? rawHeading + "\n" + indexText : indexText;
@@ -127,6 +130,28 @@ public class MarkdownSectionStructureBuilder {
                 .indexContent(indexContent(context, section, indexText))
                 .metadata(metadata(context, strategy, section, false, chunkIndex))
                 .skipIndex(false)
+                .build();
+    }
+
+    /**
+     * 创建仅用于分块展示的 Markdown 标题。
+     *
+     * @param context  文档切分上下文
+     * @param strategy 切分策略
+     * @param section  无正文标题章节
+     * @return 不参与索引的标题分块
+     */
+    private ChunkDraft newDisplayOnlyHeadingChunk(DocumentSplitContext context, SplitStrategy strategy,
+                                                  MarkdownSection section) {
+        Map<String, Object> metadata = metadata(context, strategy, section, false, null);
+        metadata.put("displayOnlyHeading", true);
+        return ChunkDraft.builder()
+                .chunkId(chunkIdGenerator.nextChunkId(context.documentId()))
+                .sectionId(section.sectionId())
+                .text(headingText(section, "").stripTrailing())
+                .indexContent("")
+                .metadata(metadata)
+                .skipIndex(true)
                 .build();
     }
 

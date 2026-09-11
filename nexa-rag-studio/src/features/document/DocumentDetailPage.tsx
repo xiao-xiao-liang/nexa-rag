@@ -222,7 +222,7 @@ export const DocumentDetailPage: React.FC = () => {
     try {
       const res = await documentApi.processDocument(
         documentId,
-        { splitConfig: { chunkSize: cSize, chunkOverlap: Math.round(cSize * 0.1) } },
+        { splitConfig: { chunkSize: cSize, chunkOverlap: 0 } },
         knowledgeBaseId
       );
       feishuToast.success(`重新切片与处理已提交！批次号: ${res.processId || "处理中"}`);

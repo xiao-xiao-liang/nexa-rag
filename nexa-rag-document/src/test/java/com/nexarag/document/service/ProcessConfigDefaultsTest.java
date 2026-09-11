@@ -25,7 +25,7 @@ class ProcessConfigDefaultsTest {
 
         assertThat(result.splitConfig().splitStrategy()).isEqualTo(SplitStrategy.PARENT_MARKDOWN);
         assertThat(result.splitConfig().chunkSize()).isEqualTo(1000);
-        assertThat(result.splitConfig().chunkOverlap()).isEqualTo(100);
+        assertThat(result.splitConfig().chunkOverlap()).isZero();
         assertThat(result.parseConfig().enableOcr()).isTrue();
         assertThat(result.parseConfig().enableImageDescription()).isFalse();
         assertThat(result.indexConfig().enabled()).isTrue();
@@ -61,6 +61,16 @@ class ProcessConfigDefaultsTest {
         assertThat(result.splitConfig().regex().separator()).isEqualTo("\n\n");
         assertThat(result.parseConfig()).isSameAs(parseConfig);
         assertThat(result.indexConfig()).isSameAs(indexConfig);
+    }
+
+    @Test
+    void mergeShouldForceParentMarkdownOverlapToZero() {
+        SplitConfigRequest splitConfig = new SplitConfigRequest(SplitStrategy.PARENT_MARKDOWN, 500, 80);
+
+        ProcessDocumentRequest result = defaults.merge(FileType.MARKDOWN,
+                new UploadDocumentRequest("测试文档", null, splitConfig, null, null));
+
+        assertThat(result.splitConfig().chunkOverlap()).isZero();
     }
 
     private UploadDocumentRequest emptyUploadRequest() {

@@ -44,6 +44,43 @@ class MarkdownSectionStructureBuilderSafeWindowTest {
         });
     }
 
+    @Test
+    void buildShouldCreateDisplayOnlyChunkForBodylessHeadingWhenHeadersAreKept() {
+        DocumentSplitContext context = new DocumentSplitContext(1L, "测试", "demo.md", FileType.MARKDOWN,
+                "original/demo.md", null, "parsed/demo.md", null, "text/markdown",
+                "# 一级标题\n\n## 仅有标题\n\n### 有正文\n正文", null,
+                new SplitConfigRequest(SplitStrategy.PARENT_MARKDOWN, 1000, 0,
+                        new MarkdownSplitOptions(3, false, true, true), null, null));
+        MarkdownSectionStructureBuilder builder = new MarkdownSectionStructureBuilder(
+                new MarkdownHeadingScanner(new DocumentSectionIdGenerator()),
+                new MarkdownSafeWindowSplitter(new TextWindowSplitter()), new DocumentChunkIdGenerator(), null);
+
+        DocumentSplitResult splitResult = builder.build(context, SplitStrategy.PARENT_MARKDOWN);
+
+        assertThat(splitResult.chunks())
+                .anySatisfy(chunk -> {
+                    assertThat(chunk.text()).isEqualTo("## 仅有标题");
+                    assertThat(chunk.skipIndex()).isTrue();
+                    assertThat(chunk.metadata()).containsEntry("displayOnlyHeading", true);
+                });
+    }
+
+    @Test
+    void buildShouldNotCreateDisplayOnlyChunkWhenHeadersAreStripped() {
+        DocumentSplitContext context = new DocumentSplitContext(1L, "测试", "demo.md", FileType.MARKDOWN,
+                "original/demo.md", null, "parsed/demo.md", null, "text/markdown",
+                "# 一级标题\n\n## 仅有标题\n\n### 有正文\n正文", null,
+                new SplitConfigRequest(SplitStrategy.PARENT_MARKDOWN, 1000, 0,
+                        new MarkdownSplitOptions(3, true, true, true), null, null));
+        MarkdownSectionStructureBuilder builder = new MarkdownSectionStructureBuilder(
+                new MarkdownHeadingScanner(new DocumentSectionIdGenerator()),
+                new MarkdownSafeWindowSplitter(new TextWindowSplitter()), new DocumentChunkIdGenerator(), null);
+
+        DocumentSplitResult splitResult = builder.build(context, SplitStrategy.PARENT_MARKDOWN);
+
+        assertThat(splitResult.chunks()).noneMatch(chunk -> Boolean.TRUE.equals(chunk.metadata().get("displayOnlyHeading")));
+    }
+
     private int countOccurrences(String text, String token) {
         int count = 0;
         int index = 0;

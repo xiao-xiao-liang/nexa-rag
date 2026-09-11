@@ -189,12 +189,29 @@ public class DocumentChunkServiceImpl extends ServiceImpl<DocumentChunkMapper, D
                 .parentChunkId(draft.parentChunkId())
                 .sectionId(draft.sectionId())
                 .text(draft.text())
-                .indexContent(requireIndexContent(documentId, draft.indexContent()))
+                .indexContent(resolveIndexContent(documentId, draft))
                 .metadataJson(toMetadataJson(draft.metadata()))
                 .tokenCount(draft.tokenCount())
                 .status(draft.skipIndex() ? ChunkStatus.SKIP_INDEX : ChunkStatus.PENDING_INDEX)
                 .skipIndex(draft.skipIndex() ? 1 : 0)
                 .build();
+    }
+
+    /**
+     * 解析待持久化的索引正文。
+     *
+     * <p>仅展示片段明确跳过索引，允许不保存索引正文；其他片段仍必须具备索引正文，
+     * 防止错误数据进入向量或关键词索引链路。</p>
+     *
+     * @param documentId 文档ID
+     * @param draft 片段草稿
+     * @return 索引正文；仅展示片段无正文时返回 {@code null}
+     */
+    private String resolveIndexContent(Long documentId, ChunkDraft draft) {
+        if (draft.skipIndex() && !StringUtils.hasText(draft.indexContent())) {
+            return null;
+        }
+        return requireIndexContent(documentId, draft.indexContent());
     }
 
     private String requireIndexContent(Long documentId, String indexContent) {
