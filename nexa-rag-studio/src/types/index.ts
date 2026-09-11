@@ -68,6 +68,7 @@ export interface ChatCitationSummaryVO {
 export interface ChatCitationDetailVO {
   citationId: number;
   title: string;
+  headingPath?: string[];
   chunkOrder?: number;
   content: string;
   documentPath: string;

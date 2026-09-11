@@ -3,6 +3,7 @@ package com.nexarag.boot.controller;
 import com.nexarag.auth.context.UserContext;
 import com.nexarag.chat.domain.ChatCitationDTO;
 import com.nexarag.chat.domain.ChatCitationDetailVO;
+import com.nexarag.chat.domain.ChatCitationHeadingPathResolver;
 import com.nexarag.chat.id.ChatIdGenerator;
 import com.nexarag.chat.service.impl.ChatCitationService;
 import com.nexarag.common.exception.AbstractException;
@@ -56,6 +57,7 @@ public class ChatController {
     private final DocumentChunkService documentChunkService;
     private final DocumentService documentService;
     private final DocumentVersionService documentVersionService;
+    private final ChatCitationHeadingPathResolver citationHeadingPathResolver;
     private final Scheduler chatWorkflowScheduler;
 
     /**
@@ -180,6 +182,7 @@ public class ChatController {
                 || activeVersion.getSourceType() == ExternalDocumentSourceType.LOCAL
                 ? null : activeVersion.getSourceUrl();
         return Results.success(new ChatCitationDetailVO(citation.citationId(), document.getTitle(),
+                citationHeadingPathResolver.resolve(chunk.getMetadataJson()),
                 chunk.getChunkOrder(), chunk.getText(), documentPath, sourceUrl));
     }
 

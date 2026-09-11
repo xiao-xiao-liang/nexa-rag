@@ -137,6 +137,15 @@ export const FeishuCitationPopover: React.FC<FeishuCitationPopoverProps> = ({
             </Popover.Close>
           </div>
 
+          {detail?.headingPath && detail.headingPath.length > 0 && (
+            <div
+              className="mt-2 max-h-10 overflow-y-auto pr-1 text-[12px] leading-5 text-[#646A73] feishu-dropdown-scrollbar select-text"
+              title={detail.headingPath.join(" / ")}
+            >
+              {detail.headingPath.join(" / ")}
+            </div>
+          )}
+
           {/* 2. 核心内容区：纯白背景，复用 FeishuMarkdown 渲染体系 */}
           <div className="mt-3">
             {isLoading ? (
