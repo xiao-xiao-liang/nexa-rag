@@ -3,6 +3,7 @@ package com.nexarag.model.execution;
 import com.nexarag.model.enums.ModelBizType;
 import com.nexarag.model.enums.ModelRequestType;
 import com.nexarag.model.enums.TokenUsageSource;
+import com.nexarag.model.execution.telemetry.RagTokenBreakdown;
 import com.nexarag.model.gateway.chat.ChatModelRequest;
 import com.nexarag.model.gateway.chat.ChatModelResponse;
 import com.nexarag.model.gateway.chat.ChatModelStreamResponse;
@@ -11,26 +12,26 @@ import com.nexarag.model.gateway.embedding.EmbeddingModelResponse;
 import com.nexarag.model.gateway.rerank.RerankModelRequest;
 import com.nexarag.model.gateway.rerank.RerankModelResponse;
 import com.nexarag.model.route.ModelRouteDecision;
+import io.opentelemetry.context.Context;
+import reactor.core.publisher.Flux;
 
 import java.util.function.Function;
 import java.util.function.ToIntFunction;
 
-import reactor.core.publisher.Flux;
-
 /**
  * 模型执行命令。
  *
- * @param traceId                  链路追踪ID
- * @param bizType                  业务类型
- * @param bizId                    业务ID
- * @param routeKey                 路由Key
- * @param requestType              请求类型
- * @param executor                 实际模型调用逻辑
- * @param promptTokenExtractor     输入Token提取器
- * @param completionTokenExtractor 输出Token提取器
- * @param totalTokenExtractor      总Token提取器
+ * @param traceId                   链路追踪ID
+ * @param bizType                   业务类型
+ * @param bizId                     业务ID
+ * @param routeKey                  路由Key
+ * @param requestType               请求类型
+ * @param executor                  实际模型调用逻辑
+ * @param promptTokenExtractor      输入Token提取器
+ * @param completionTokenExtractor  输出Token提取器
+ * @param totalTokenExtractor       总Token提取器
  * @param tokenUsageSourceExtractor Token 用量来源提取器
- * @param <T>                      模型响应类型
+ * @param <T>                       模型响应类型
  */
 public record ModelExecutionCommand<T>(
         String traceId,
@@ -42,7 +43,21 @@ public record ModelExecutionCommand<T>(
         ToIntFunction<T> promptTokenExtractor,
         ToIntFunction<T> completionTokenExtractor,
         ToIntFunction<T> totalTokenExtractor,
-        Function<T, TokenUsageSource> tokenUsageSourceExtractor) {
+        Function<T, TokenUsageSource> tokenUsageSourceExtractor,
+        RagTokenBreakdown observabilityContext,
+        String generationId,
+        String observationName,
+        Context langfuseContext) {
+
+    public ModelExecutionCommand(String traceId, ModelBizType bizType, String bizId, String routeKey,
+                                 ModelRequestType requestType, Function<ModelRouteDecision, T> executor,
+                                 ToIntFunction<T> promptTokenExtractor,
+                                 ToIntFunction<T> completionTokenExtractor,
+                                 ToIntFunction<T> totalTokenExtractor,
+                                 Function<T, TokenUsageSource> tokenUsageSourceExtractor) {
+        this(traceId, bizType, bizId, routeKey, requestType, executor, promptTokenExtractor,
+                completionTokenExtractor, totalTokenExtractor, tokenUsageSourceExtractor, null, null, null, null);
+    }
 
     /**
      * 创建模型执行命令，兼容暂未显式提供 Token 来源的调用方。
@@ -63,7 +78,8 @@ public record ModelExecutionCommand<T>(
                                  ToIntFunction<T> completionTokenExtractor,
                                  ToIntFunction<T> totalTokenExtractor) {
         this(traceId, bizType, bizId, routeKey, requestType, executor, promptTokenExtractor,
-                completionTokenExtractor, totalTokenExtractor, response -> TokenUsageSource.UNKNOWN);
+                completionTokenExtractor, totalTokenExtractor, response -> TokenUsageSource.UNKNOWN,
+                null, null, null, null);
     }
 
     /**
@@ -87,7 +103,7 @@ public record ModelExecutionCommand<T>(
                 response -> 0,
                 response -> 0,
                 response -> safeToken(response.totalTokens()),
-                response -> providerUsageSource(response.totalTokens())
+                response -> providerUsageSource(response.totalTokens()), null, null, null, null
         );
     }
 
@@ -112,7 +128,8 @@ public record ModelExecutionCommand<T>(
                 response -> safeToken(response.promptTokens()),
                 response -> safeToken(response.completionTokens()),
                 response -> safeToken(response.totalTokens()),
-                response -> providerUsageSource(response.totalTokens())
+                response -> providerUsageSource(response.totalTokens()), request.observabilityContext(),
+                request.generationId(), request.observationName(), request.langfuseContext()
         );
     }
 
@@ -137,7 +154,8 @@ public record ModelExecutionCommand<T>(
                 response -> 0,
                 response -> 0,
                 response -> 0,
-                response -> TokenUsageSource.ESTIMATED
+                response -> TokenUsageSource.ESTIMATED, request.observabilityContext(), request.generationId(),
+                request.observationName(), request.langfuseContext()
         );
     }
 
@@ -162,7 +180,7 @@ public record ModelExecutionCommand<T>(
                 response -> 0,
                 response -> 0,
                 response -> safeToken(response.totalTokens()),
-                response -> providerUsageSource(response.totalTokens())
+                response -> providerUsageSource(response.totalTokens()), null, null, null, request.langfuseContext()
         );
     }
 

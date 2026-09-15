@@ -6,6 +6,7 @@ import com.nexarag.model.route.ModelRouter;
 import com.nexarag.retrieval.model.RetrievalChunk;
 import com.nexarag.retrieval.retriever.ParentContextExpansionRetriever;
 import com.nexarag.workflow.config.ModelInputEvidenceProperties;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
@@ -23,23 +24,19 @@ import java.util.Set;
  */
 @Component
 @Slf4j
+@RequiredArgsConstructor
 public class ModelInputEvidenceSelector {
 
     private final ModelRouter modelRouter;
     private final ModelInputEvidenceProperties properties;
 
-    public ModelInputEvidenceSelector(ModelRouter modelRouter, ModelInputEvidenceProperties properties) {
-        this.modelRouter = modelRouter;
-        this.properties = properties;
-    }
-
     /**
      * 按模型输入边界筛选证据。
      *
-     * @param acceptedChunks 证据质量节点接纳的候选
-     * @param directHitChunks 父子替换前的直接 Rerank 命中
+     * @param acceptedChunks     证据质量节点接纳的候选
+     * @param directHitChunks    父子替换前的直接 Rerank 命中
      * @param staticPromptTokens 不含证据的提示词、问题和历史估算 Token 数
-     * @param routeKey 模型路由键
+     * @param routeKey           模型路由键
      * @return 不会超过模型输入预算的完整证据片段
      */
     public List<RetrievalChunk> select(List<RetrievalChunk> acceptedChunks, List<RetrievalChunk> directHitChunks,
@@ -95,7 +92,7 @@ public class ModelInputEvidenceSelector {
      * @param routeKey 模型路由键
      * @return 可供提示词和证据共同使用的 Token 预算
      */
-    int availableInputTokens(String routeKey) {
+    public int availableInputTokens(String routeKey) {
         return modelRouter.plan(new ModelRouteContext(routeKey, false)).candidates().stream()
                 .mapToInt(decision -> availableInputTokens(decision.profile()))
                 .min()

@@ -5,46 +5,29 @@ import com.alibaba.cloud.ai.graph.action.EdgeAction;
 import com.nexarag.retrieval.config.RetrievalProperties;
 import com.nexarag.retrieval.model.RetrievalChunk;
 import com.nexarag.workflow.service.EvidenceQualityEvaluator;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
 import java.util.Map;
 
+import static com.nexarag.workflow.constants.ChatWorkflowExecutionConstant.DEFAULT_MAX_RETRIEVAL_ROUND;
+import static com.nexarag.workflow.constants.ChatWorkflowExecutionConstant.INITIAL_RETRIEVAL_ROUND;
 import static com.nexarag.workflow.constants.ChatWorkflowNodeConstants.RERANK_NODE;
 import static com.nexarag.workflow.constants.ChatWorkflowNodeConstants.SECTION_EXPANSION_NODE;
-import static com.nexarag.workflow.constants.ChatWorkflowStateKeys.EVIDENCE_EXPANSION_REASON;
-import static com.nexarag.workflow.constants.ChatWorkflowStateKeys.FUSED_RETRIEVAL_RESULTS;
-import static com.nexarag.workflow.constants.ChatWorkflowStateKeys.MAX_RETRIEVAL_ROUND;
-import static com.nexarag.workflow.constants.ChatWorkflowStateKeys.RETRIEVAL_ROUND;
-import static com.nexarag.workflow.constants.ChatWorkflowStateKeys.TRACE_ID;
+import static com.nexarag.workflow.constants.ChatWorkflowStateKeys.*;
 
 /**
  * 检索融合路由器，负责判断候选质量并准备一次扩召参数。
  */
 @Component
 @Slf4j
+@RequiredArgsConstructor
 public class RetrievalFusionDispatcher implements EdgeAction {
 
     private final RetrievalProperties retrievalProperties;
     private final EvidenceQualityEvaluator evidenceQualityEvaluator;
-
-    @Autowired
-    public RetrievalFusionDispatcher(RetrievalProperties retrievalProperties,
-                                     EvidenceQualityEvaluator evidenceQualityEvaluator) {
-        this.retrievalProperties = retrievalProperties;
-        this.evidenceQualityEvaluator = evidenceQualityEvaluator;
-    }
-
-    /**
-     * 兼容直接构造路由器的既有调用方。
-     *
-     * @param retrievalProperties 检索运行配置
-     */
-    public RetrievalFusionDispatcher(RetrievalProperties retrievalProperties) {
-        this(retrievalProperties, new EvidenceQualityEvaluator(retrievalProperties));
-    }
 
     /**
      * 根据融合候选和当前轮次选择章节扩展或重排序。
@@ -55,8 +38,8 @@ public class RetrievalFusionDispatcher implements EdgeAction {
     @Override
     public String apply(OverAllState state) {
         List<RetrievalChunk> results = state.value(FUSED_RETRIEVAL_RESULTS, List.of());
-        int round = state.value(RETRIEVAL_ROUND, 1);
-        int maxRound = state.value(MAX_RETRIEVAL_ROUND, 2);
+        int round = state.value(RETRIEVAL_ROUND, INITIAL_RETRIEVAL_ROUND);
+        int maxRound = state.value(MAX_RETRIEVAL_ROUND, DEFAULT_MAX_RETRIEVAL_ROUND);
         String expansionReason = evidenceQualityEvaluator.expansionReason(results);
         if ("READY".equals(expansionReason) || round >= maxRound) {
             log.info("检索候选不触发章节扩展，traceId={}，候选数={}，轮次={}，原因={}",

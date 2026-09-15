@@ -3,6 +3,7 @@ package com.nexarag.model.execution;
 import com.nexarag.common.exception.ServiceException;
 import com.nexarag.model.entity.ModelCallLog;
 import com.nexarag.model.enums.TokenUsageSource;
+import com.nexarag.model.execution.telemetry.GenerationTelemetryCollector;
 import com.nexarag.model.gateway.chat.ChatModelStreamResponse;
 import com.nexarag.model.governance.ModelGovernanceExecutor;
 import com.nexarag.model.governance.ModelGovernanceResolver;
@@ -19,6 +20,8 @@ import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
+import static com.nexarag.infra.observability.langfuse.constants.LangfuseOtelAttributeConstant.UNKNOWN_EXCEPTION;
+
 /**
  * 模型执行模板，统一处理路由和调用日志。
  */
@@ -28,6 +31,7 @@ public class ModelExecutionTemplate {
     private final ModelCallLogService modelCallLogService;
     private final ModelGovernanceExecutor modelGovernanceExecutor;
     private final ModelGovernanceResolver modelGovernanceResolver;
+    private final GenerationTelemetryCollector generationTelemetryCollector;
 
     /**
      * 创建模型执行模板。
@@ -36,24 +40,21 @@ public class ModelExecutionTemplate {
      * @param modelCallLogService 模型调用日志服务
      */
     public ModelExecutionTemplate(ModelRouter modelRouter, ModelCallLogService modelCallLogService) {
-        this(modelRouter, modelCallLogService, new ModelGovernanceExecutor(), new ModelGovernanceResolver());
+        this(modelRouter, modelCallLogService, new ModelGovernanceExecutor(), new ModelGovernanceResolver(), null);
     }
 
     /**
-     * 创建模型执行模板。
-     *
-     * @param modelRouter             模型路由器
-     * @param modelCallLogService     模型调用日志服务
-     * @param modelGovernanceExecutor 模型治理执行器
-     * @param modelGovernanceResolver 模型治理配置解析器
+     * 创建带 Langfuse Generation 采集能力的模型执行模板。
      */
     public ModelExecutionTemplate(ModelRouter modelRouter, ModelCallLogService modelCallLogService,
                                   ModelGovernanceExecutor modelGovernanceExecutor,
-                                  ModelGovernanceResolver modelGovernanceResolver) {
+                                  ModelGovernanceResolver modelGovernanceResolver,
+                                  GenerationTelemetryCollector generationTelemetryCollector) {
         this.modelRouter = modelRouter;
         this.modelCallLogService = modelCallLogService;
         this.modelGovernanceExecutor = modelGovernanceExecutor;
         this.modelGovernanceResolver = modelGovernanceResolver;
+        this.generationTelemetryCollector = generationTelemetryCollector;
     }
 
     /**
@@ -137,6 +138,7 @@ public class ModelExecutionTemplate {
                 fallbackFromCallId,
                 fallbackReason
         );
+        GenerationTelemetryCollector.ActiveGeneration generation = startGeneration(command, decision, log);
 
         try {
             // 1. 执行业务传入的模型调用逻辑
@@ -154,12 +156,16 @@ public class ModelExecutionTemplate {
                     command.tokenUsageSourceExtractor().apply(response),
                     durationMs
             );
+            completeGeneration(generation, command.promptTokenExtractor().applyAsInt(response),
+                    command.completionTokenExtractor().applyAsInt(response), command.totalTokenExtractor().applyAsInt(response),
+                    null);
             return response;
         } catch (Exception exception) {
             // 3. 记录失败结果并继续抛出异常
             long durationMs = Math.max(0, System.currentTimeMillis() - start);
             modelCallLogService.markFailed(log.getCallId(), exception.getClass().getSimpleName(),
                     exception.getMessage(), durationMs);
+            failGeneration(generation, exception);
             throw new ModelExecutionAttemptException(exception, log.getCallId(), exception.getClass().getSimpleName());
         }
     }
@@ -172,7 +178,7 @@ public class ModelExecutionTemplate {
     }
 
     private <T> Flux<T> attemptStreamBeforeFirstChunk(ModelExecutionCommand<Flux<T>> command, ModelRoutePlan plan,
-                                                       int index, String fallbackFromCallId, String fallbackReason) {
+                                                      int index, String fallbackFromCallId, String fallbackReason) {
         ModelRouteDecision decision = plan.candidates().get(index);
         long start = System.currentTimeMillis();
         ModelCallLog log = modelCallLogService.createRunningLog(
@@ -188,15 +194,17 @@ public class ModelExecutionTemplate {
                 fallbackFromCallId,
                 fallbackReason
         );
+        GenerationTelemetryCollector.ActiveGeneration generation = startGeneration(command, decision, log);
 
         try {
             // 1. 执行业务传入的流式模型调用逻辑，并在首个信号处决定是否 fallback
             return command.executor().apply(decision)
-                    .switchOnFirst((signal, flux) -> handleFirstStreamSignal(command, plan, index, log, start,
+                    .switchOnFirst((signal, flux) -> handleFirstStreamSignal(command, plan, index, log, generation, start,
                             signal, flux));
         } catch (Exception exception) {
             // 2. 处理流创建阶段直接抛出的异常，首个分片前允许继续尝试下一个候选
             markStreamFailed(log, start, exception);
+            failGeneration(generation, exception);
             if (hasNextCandidate(plan, index)) {
                 return attemptStreamBeforeFirstChunk(command, plan, index + 1, log.getCallId(),
                         exception.getClass().getSimpleName());
@@ -206,21 +214,24 @@ public class ModelExecutionTemplate {
     }
 
     private <T> Flux<T> handleFirstStreamSignal(ModelExecutionCommand<Flux<T>> command, ModelRoutePlan plan,
-                                                int index, ModelCallLog log, long start, Signal<? extends T> signal,
+                                                int index, ModelCallLog log, GenerationTelemetryCollector.ActiveGeneration generation,
+                                                long start, Signal<? extends T> signal,
                                                 Flux<T> flux) {
         if (signal.hasValue()) {
             // 1. 首个分片已经产生，锁定当前候选，后续错误不再 fallback
-            return observeLockedStream(command, log, start, flux);
+            return observeLockedStream(command, log, generation, start, flux);
         }
         if (signal.isOnComplete()) {
             // 2. 流在首个分片前正常结束，按空响应成功处理
             markStreamSuccess(log, start, null, 0, 0, 0, 0, 0, TokenUsageSource.ESTIMATED);
+            completeGeneration(generation, null, null, null, null);
             return Flux.empty();
         }
 
         // 3. 首个分片前失败，记录当前候选失败并尝试下一个候选
         Throwable exception = signal.getThrowable();
         markStreamFailed(log, start, exception);
+        failGeneration(generation, exception);
         if (hasNextCandidate(plan, index)) {
             return attemptStreamBeforeFirstChunk(command, plan, index + 1, log.getCallId(),
                     exception == null ? null : exception.getClass().getSimpleName());
@@ -228,7 +239,8 @@ public class ModelExecutionTemplate {
         return Flux.error(exception);
     }
 
-    private <T> Flux<T> observeLockedStream(ModelExecutionCommand<Flux<T>> command, ModelCallLog log, long start,
+    private <T> Flux<T> observeLockedStream(ModelExecutionCommand<Flux<T>> command, ModelCallLog log,
+                                            GenerationTelemetryCollector.ActiveGeneration generation, long start,
                                             Flux<T> flux) {
         AtomicInteger chunkCount = new AtomicInteger();
         AtomicInteger outputCharCount = new AtomicInteger();
@@ -242,9 +254,7 @@ public class ModelExecutionTemplate {
                     // 1. 记录首个文本分片耗时和流式输出规模
                     if (hasContent(chunk)) {
                         chunkCount.incrementAndGet();
-                        if (firstTokenLatencyMs.compareAndSet(-1L, Math.max(0, System.currentTimeMillis() - start))) {
-                            // 首个分片耗时已记录
-                        }
+                        firstTokenLatencyMs.compareAndSet(-1L, Math.max(0, System.currentTimeMillis() - start));// 首个分片耗时已记录
                         outputCharCount.addAndGet(outputCharCount(chunk));
                     }
                     // 2. 记录流式响应中最新的厂商 Token 用量
@@ -253,8 +263,16 @@ public class ModelExecutionTemplate {
                 .doOnComplete(() -> markStreamSuccess(log, start, firstTokenLatencyMs.get(),
                         chunkCount.get(), outputCharCount.get(), tokenValue(promptTokens),
                         tokenValue(completionTokens), tokenValue(totalTokens), tokenUsageSource(totalTokens)))
-                .doOnCancel(() -> markStreamCanceled(log, start))
-                .doOnError(exception -> markStreamFailed(log, start, exception))
+                .doOnComplete(() -> completeGeneration(generation, tokenValue(promptTokens), tokenValue(completionTokens),
+                        tokenValue(totalTokens), firstTokenLatencyMs.get() < 0 ? null : firstTokenLatencyMs.get()))
+                .doOnCancel(() -> {
+                    markStreamCanceled(log, start);
+                    cancelGeneration(generation);
+                })
+                .doOnError(exception -> {
+                    markStreamFailed(log, start, exception);
+                    failGeneration(generation, exception);
+                })
                 .filter(this::shouldEmitStreamChunk);
     }
 
@@ -286,7 +304,7 @@ public class ModelExecutionTemplate {
             return;
         }
         modelCallLogService.markFailed(log.getCallId(),
-                exception == null ? "UnknownException" : exception.getClass().getSimpleName(),
+                exception == null ? UNKNOWN_EXCEPTION : exception.getClass().getSimpleName(),
                 exception == null ? null : exception.getMessage(), durationMs);
     }
 
@@ -347,11 +365,35 @@ public class ModelExecutionTemplate {
     }
 
     private Integer tokenValue(AtomicInteger holder) {
-        return holder.get() < 0 ? 0 : holder.get();
+        return holder.get() < 0 ? null : holder.get();
     }
 
     private TokenUsageSource tokenUsageSource(AtomicInteger totalTokens) {
-        return totalTokens.get() < 0 ? TokenUsageSource.ESTIMATED : TokenUsageSource.PROVIDER_USAGE;
+        return totalTokens.get() < 0 ? TokenUsageSource.UNKNOWN : TokenUsageSource.PROVIDER_USAGE;
+    }
+
+    private GenerationTelemetryCollector.ActiveGeneration startGeneration(ModelExecutionCommand<?> command,
+                                                                          ModelRouteDecision decision, ModelCallLog log) {
+        return generationTelemetryCollector == null ? null : generationTelemetryCollector.start(command, decision, log);
+    }
+
+    private void completeGeneration(GenerationTelemetryCollector.ActiveGeneration generation, Integer inputTokens,
+                                    Integer outputTokens, Integer totalTokens, Long firstTokenMs) {
+        if (generation != null) {
+            generation.complete(inputTokens, outputTokens, totalTokens, firstTokenMs);
+        }
+    }
+
+    private void failGeneration(GenerationTelemetryCollector.ActiveGeneration generation, Throwable throwable) {
+        if (generation != null) {
+            generation.fail(throwable);
+        }
+    }
+
+    private void cancelGeneration(GenerationTelemetryCollector.ActiveGeneration generation) {
+        if (generation != null) {
+            generation.cancel();
+        }
     }
 
     private ModelExecutionAttemptException unwrapAttemptException(Exception exception) {

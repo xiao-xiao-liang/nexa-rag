@@ -3,6 +3,7 @@ package com.nexarag.workflow.dispatcher.chat;
 import com.alibaba.cloud.ai.graph.OverAllState;
 import com.nexarag.retrieval.config.RetrievalProperties;
 import com.nexarag.retrieval.enums.RetrievalScope;
+import com.nexarag.workflow.service.EvidenceQualityEvaluator;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -28,7 +29,7 @@ class RetrievalFusionDispatcherTest {
         RetrievalProperties properties = new RetrievalProperties();
         properties.getCandidate().setExpansionCandidateLimit(8);
         properties.getCandidate().setCoarseScoreFloor(0.2D);
-        RetrievalFusionDispatcher dispatcher = new RetrievalFusionDispatcher(properties);
+        RetrievalFusionDispatcher dispatcher = new RetrievalFusionDispatcher(properties, new EvidenceQualityEvaluator(properties));
 
         assertThat(dispatcher.apply(state)).isEqualTo(SECTION_EXPANSION_NODE);
         assertThat(state.value(RETRIEVAL_ROUND, 0)).isEqualTo(2);
@@ -38,7 +39,9 @@ class RetrievalFusionDispatcherTest {
     void applyShouldContinueToRerankAfterMaximumRound() {
         OverAllState state = stateWith(2, 2, 30);
 
-        assertThat(new RetrievalFusionDispatcher(new RetrievalProperties()).apply(state)).isEqualTo(RERANK_NODE);
+        RetrievalProperties properties = new RetrievalProperties();
+        assertThat(new RetrievalFusionDispatcher(properties, new EvidenceQualityEvaluator(properties)).apply(state))
+                .isEqualTo(RERANK_NODE);
     }
 
     private OverAllState stateWith(int round, int maxRound, int topK) {

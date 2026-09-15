@@ -7,22 +7,20 @@ import com.nexarag.chat.service.ConversationService;
 import com.nexarag.model.enums.ModelBizType;
 import com.nexarag.model.gateway.ModelGateway;
 import com.nexarag.model.gateway.chat.ChatModelRequest;
-import com.nexarag.model.toolkits.prompt.PromptBuilder;
 import com.nexarag.model.prompt.domain.PromptExecutionSnapshot;
+import com.nexarag.model.toolkits.prompt.PromptBuilder;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.stereotype.Component;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.stereotype.Component;
 
 import java.util.Map;
 
-import static com.nexarag.workflow.constants.ChatWorkflowStateKeys.CONVERSATION_ID;
-import static com.nexarag.workflow.constants.ChatWorkflowStateKeys.IS_NEW_CONVERSATION;
-import static com.nexarag.workflow.constants.ChatWorkflowStateKeys.USER_ID;
-import static com.nexarag.workflow.constants.ChatWorkflowStateKeys.USER_QUESTION;
-import static com.nexarag.workflow.constants.ChatWorkflowStateKeys.TRACE_ID;
-import static com.nexarag.workflow.constants.ChatWorkflowStateKeys.PROMPT_EXECUTION_SNAPSHOT;
 import static com.nexarag.chat.constants.ChatModelRouteConstants.CHAT_TITLE_ROUTE_KEY;
+import static com.nexarag.model.constants.PromptContractConstant.QUESTION_VARIABLE;
+import static com.nexarag.workflow.constants.ChatWorkflowExecutionConstant.TEMPORARY_TITLE_MAX_LENGTH;
+import static com.nexarag.workflow.constants.ChatWorkflowStateKeys.*;
+import static com.nexarag.workflow.constants.ChatWorkflowTelemetryConstant.CONVERSATION_TITLE_GENERATION_NAME;
 
 /**
  * 会话有效性节点，负责校验已有会话或创建新会话。
@@ -50,7 +48,8 @@ public class ConversationValidationNode implements NodeAction {
 
         // 2. 使用当前问题生成临时标题并创建会话
         String question = state.value(USER_QUESTION, "新会话");
-        String title = question.length() > 20 ? question.substring(0, 20) : question;
+        String title = question.length() > TEMPORARY_TITLE_MAX_LENGTH
+                ? question.substring(0, TEMPORARY_TITLE_MAX_LENGTH) : question;
         ChatConversationVO conversation = conversationService.create(userId, title);
         String traceId = state.value(TRACE_ID, "");
         PromptExecutionSnapshot snapshot = state.value(PROMPT_EXECUTION_SNAPSHOT, (PromptExecutionSnapshot) null);
@@ -67,7 +66,9 @@ public class ConversationValidationNode implements NodeAction {
                     .bizType(ModelBizType.CHAT)
                     .bizId(conversationId)
                     .routeKey(CHAT_TITLE_ROUTE_KEY)
-                    .messages(promptBuilder.buildTitleMessages(snapshot, Map.of("question", question == null ? "" : question)))
+                    .messages(promptBuilder.buildTitleMessages(snapshot,
+                            Map.of(QUESTION_VARIABLE, question == null ? "" : question)))
+                    .observationName(CONVERSATION_TITLE_GENERATION_NAME)
                     .build());
             if (response != null && response.content() != null && !response.content().isBlank()) {
                 // 2. 标题生成成功后更新会话

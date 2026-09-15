@@ -1,5 +1,6 @@
 package com.nexarag.workflow.node.chat;
 
+import static com.nexarag.model.constants.PromptContractConstant.INTENT_INSTRUCTION_CODE;
 import com.alibaba.cloud.ai.graph.OverAllState;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nexarag.model.gateway.ModelGateway;
@@ -71,8 +72,8 @@ class IntentRecognitionNodeTest {
     }
 
     private PromptExecutionSnapshot snapshot() {
-        return PromptExecutionSnapshot.of(Map.of(PromptBuilder.INTENT_INSTRUCTION,
-                new PromptExecutionSnapshot.PromptSnapshot(PromptBuilder.INTENT_INSTRUCTION, 1L, 2L, 3L, "{{question}}",
+        return PromptExecutionSnapshot.of(Map.of(INTENT_INSTRUCTION_CODE,
+                new PromptExecutionSnapshot.PromptSnapshot(INTENT_INSTRUCTION_CODE, 1L, 2L, 3L, "{{question}}",
                         new PromptVariableSchema(List.of(), List.of()))));
     }
 }

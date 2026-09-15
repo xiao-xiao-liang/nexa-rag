@@ -1,5 +1,6 @@
 package com.nexarag.workflow.node.chat;
 
+import static com.nexarag.model.constants.PromptContractConstant.REWRITE_INSTRUCTION_CODE;
 import com.alibaba.cloud.ai.graph.OverAllState;
 import com.nexarag.model.gateway.ModelGateway;
 import com.nexarag.model.toolkits.prompt.PromptBuilder;
@@ -82,8 +83,8 @@ class QuestionRewriteNodeTest {
     }
 
     private PromptExecutionSnapshot snapshot() {
-        return PromptExecutionSnapshot.of(Map.of(PromptBuilder.REWRITE_INSTRUCTION,
-                new PromptExecutionSnapshot.PromptSnapshot(PromptBuilder.REWRITE_INSTRUCTION, 1L, 2L, 3L, "{{question}}",
+        return PromptExecutionSnapshot.of(Map.of(REWRITE_INSTRUCTION_CODE,
+                new PromptExecutionSnapshot.PromptSnapshot(REWRITE_INSTRUCTION_CODE, 1L, 2L, 3L, "{{question}}",
                         new PromptVariableSchema(List.of(), List.of()))));
     }
 }

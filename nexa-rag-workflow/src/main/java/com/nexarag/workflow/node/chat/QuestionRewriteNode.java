@@ -1,34 +1,27 @@
 package com.nexarag.workflow.node.chat;
 
+import static com.nexarag.model.constants.PromptContractConstant.CONVERSATION_SUMMARY_VARIABLE;
+import static com.nexarag.model.constants.PromptContractConstant.QUESTION_VARIABLE;
+import static com.nexarag.model.constants.PromptContractConstant.RECENT_MESSAGES_VARIABLE;
+import static com.nexarag.workflow.constants.ChatWorkflowTelemetryConstant.QUESTION_REWRITE_GENERATION_NAME;
+import static com.nexarag.workflow.constants.ChatWorkflowTelemetryConstant.QUESTION_REWRITE_OPERATION_ID_SUFFIX;
+
 import com.alibaba.cloud.ai.graph.OverAllState;
 import com.alibaba.cloud.ai.graph.action.NodeAction;
 import com.nexarag.model.enums.ModelBizType;
 import com.nexarag.model.gateway.ModelGateway;
 import com.nexarag.model.gateway.chat.ChatModelRequest;
-import com.nexarag.model.toolkits.prompt.PromptBuilder;
 import com.nexarag.model.prompt.domain.PromptExecutionSnapshot;
+import com.nexarag.model.toolkits.prompt.PromptBuilder;
+import com.nexarag.workflow.stream.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import com.nexarag.workflow.stream.ChatGenerationAccumulator;
-import com.nexarag.workflow.stream.ChatGenerationEventPublisher;
-import com.nexarag.workflow.stream.ChatStreamEvent;
-import com.nexarag.workflow.stream.ChatStreamEventType;
-import com.nexarag.workflow.stream.ChatToolOperationDTO;
-import com.nexarag.workflow.stream.ChatToolOperationStatus;
 import org.springframework.stereotype.Component;
 
 import java.util.Map;
 
-import static com.nexarag.workflow.constants.ChatWorkflowStateKeys.CONVERSATION_CONTEXT;
-import static com.nexarag.workflow.constants.ChatWorkflowStateKeys.CONVERSATION_ID;
-import static com.nexarag.workflow.constants.ChatWorkflowStateKeys.GENERATION_ACCUMULATOR;
-import static com.nexarag.workflow.constants.ChatWorkflowStateKeys.GENERATION_ID;
-import static com.nexarag.workflow.constants.ChatWorkflowStateKeys.ASSISTANT_MESSAGE_ID;
-import static com.nexarag.workflow.constants.ChatWorkflowStateKeys.REWRITTEN_QUESTION;
-import static com.nexarag.workflow.constants.ChatWorkflowStateKeys.USER_QUESTION;
-import static com.nexarag.workflow.constants.ChatWorkflowStateKeys.TRACE_ID;
-import static com.nexarag.workflow.constants.ChatWorkflowStateKeys.PROMPT_EXECUTION_SNAPSHOT;
 import static com.nexarag.chat.constants.ChatModelRouteConstants.CHAT_REWRITE_ROUTE_KEY;
+import static com.nexarag.workflow.constants.ChatWorkflowStateKeys.*;
 import static com.nexarag.workflow.constants.ChatWorkflowSystemToolConstants.QUESTION_REWRITE_SEQUENCE;
 import static com.nexarag.workflow.constants.ChatWorkflowSystemToolConstants.QUESTION_REWRITE_TOOL_NAME;
 
@@ -70,9 +63,10 @@ public class QuestionRewriteNode implements NodeAction {
                     .bizId(CHAT_REWRITE_ROUTE_KEY)
                     .routeKey(CHAT_REWRITE_ROUTE_KEY)
                     .messages(promptBuilder.buildRewriteMessages(snapshot(state), Map.of(
-                            "conversationSummary", context == null ? "" : safe(context.summary()),
-                            "recentMessages", recentMessages(context),
-                            "question", safe(question))))
+                            CONVERSATION_SUMMARY_VARIABLE, context == null ? "" : safe(context.summary()),
+                            RECENT_MESSAGES_VARIABLE, recentMessages(context),
+                            QUESTION_VARIABLE, safe(question))))
+                    .observationName(QUESTION_REWRITE_GENERATION_NAME)
                     .build());
             rewrittenQuestion = response == null || response.content() == null || response.content().isBlank()
                     ? question : response.content().trim();
@@ -107,7 +101,7 @@ public class QuestionRewriteNode implements NodeAction {
 
     private ChatToolOperationDTO operation(OverAllState state, ChatToolOperationStatus status) {
         String generationId = state.value(GENERATION_ID, "");
-        return new ChatToolOperationDTO(generationId + ":tool:question-rewrite:1", generationId,
+        return new ChatToolOperationDTO(generationId + QUESTION_REWRITE_OPERATION_ID_SUFFIX, generationId,
                 QUESTION_REWRITE_SEQUENCE, QUESTION_REWRITE_TOOL_NAME, status);
     }
 

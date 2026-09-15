@@ -162,6 +162,57 @@ class PromptSchemaMigrationTest {
     }
 
     /**
+     * 验证 V33 将最终回答的当前问题发布为纯 USER 输入模板。
+     *
+     * @throws IOException 读取脚本失败时抛出
+     */
+    @Test
+    void shouldPublishAnswerUserInputPromptInV33() throws IOException {
+        Path migrationPath = Path.of("..", "nexa-rag-boot", "src", "main", "resources", "db", "migration",
+                "V33__publish_answer_user_input_prompt.sql");
+
+        assertThat(Files.exists(migrationPath)).isTrue();
+        String migrationSql = Files.readString(migrationPath);
+
+        assertThat(migrationSql).contains(
+                "chat.answer.current-question",
+                "FOR UPDATE;",
+                "COALESCE(MAX(version_no), 0) + 1",
+                "current_release_revision + 1",
+                "INSERT INTO prompt_version",
+                "INSERT INTO prompt_release",
+                "UPDATE prompt_definition",
+                "<current_question>\\n{{question}}\\n</current_question>");
+        assertThat(migrationSql).doesNotContain("仅呈现待回答的问题");
+    }
+
+    /**
+     * 验证 V34 发布适配小参数模型的最终回答输出契约。
+     *
+     * @throws IOException 读取脚本失败时抛出
+     */
+    @Test
+    void shouldPublishQwenAnswerOutputContractInV34() throws IOException {
+        Path migrationPath = Path.of("..", "nexa-rag-boot", "src", "main", "resources", "db", "migration",
+                "V34__publish_qwen_answer_output_contract.sql");
+
+        assertThat(Files.exists(migrationPath)).isTrue();
+        String migrationSql = Files.readString(migrationPath);
+
+        assertThat(migrationSql).contains(
+                "chat.answer.system-instruction",
+                "FOR UPDATE;",
+                "COALESCE(MAX(version_no), 0) + 1",
+                "current_release_revision + 1",
+                "禁止输出图片、图片说明、图片占位符或示例 URL",
+                "每个列表项必须独占一行",
+                "INSERT INTO prompt_version",
+                "INSERT INTO prompt_release",
+                "UPDATE prompt_definition");
+        assertThat(migrationSql).doesNotContain("http://example.com");
+    }
+
+    /**
      * 从 V15 的临时种子数据中提取指定 Prompt 正文。
      *
      * @param migrationSql V15 迁移脚本正文

@@ -6,15 +6,10 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nexarag.model.enums.ModelBizType;
 import com.nexarag.model.gateway.ModelGateway;
 import com.nexarag.model.gateway.chat.ChatModelRequest;
-import com.nexarag.model.toolkits.prompt.PromptBuilder;
 import com.nexarag.model.prompt.domain.PromptExecutionSnapshot;
+import com.nexarag.model.toolkits.prompt.PromptBuilder;
 import com.nexarag.retrieval.dto.res.IntentRecognitionResult;
-import com.nexarag.workflow.stream.ChatGenerationAccumulator;
-import com.nexarag.workflow.stream.ChatGenerationEventPublisher;
-import com.nexarag.workflow.stream.ChatStreamEvent;
-import com.nexarag.workflow.stream.ChatStreamEventType;
-import com.nexarag.workflow.stream.ChatToolOperationDTO;
-import com.nexarag.workflow.stream.ChatToolOperationStatus;
+import com.nexarag.workflow.stream.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -22,17 +17,13 @@ import org.springframework.stereotype.Component;
 import java.util.List;
 import java.util.Map;
 
-import static com.nexarag.workflow.constants.ChatWorkflowStateKeys.INTENT_RESULT;
-import static com.nexarag.workflow.constants.ChatWorkflowStateKeys.ASSISTANT_MESSAGE_ID;
-import static com.nexarag.workflow.constants.ChatWorkflowStateKeys.CONVERSATION_ID;
-import static com.nexarag.workflow.constants.ChatWorkflowStateKeys.GENERATION_ACCUMULATOR;
-import static com.nexarag.workflow.constants.ChatWorkflowStateKeys.GENERATION_ID;
-import static com.nexarag.workflow.constants.ChatWorkflowStateKeys.REWRITTEN_QUESTION;
-import static com.nexarag.workflow.constants.ChatWorkflowStateKeys.TRACE_ID;
-import static com.nexarag.workflow.constants.ChatWorkflowStateKeys.PROMPT_EXECUTION_SNAPSHOT;
 import static com.nexarag.chat.constants.ChatModelRouteConstants.CHAT_INTENT_ROUTE_KEY;
+import static com.nexarag.model.constants.PromptContractConstant.QUESTION_VARIABLE;
+import static com.nexarag.workflow.constants.ChatWorkflowStateKeys.*;
 import static com.nexarag.workflow.constants.ChatWorkflowSystemToolConstants.INTENT_RECOGNITION_SEQUENCE;
 import static com.nexarag.workflow.constants.ChatWorkflowSystemToolConstants.INTENT_RECOGNITION_TOOL_NAME;
+import static com.nexarag.workflow.constants.ChatWorkflowTelemetryConstant.INTENT_RECOGNITION_GENERATION_NAME;
+import static com.nexarag.workflow.constants.ChatWorkflowTelemetryConstant.INTENT_RECOGNITION_OPERATION_ID_SUFFIX;
 
 /**
  * 会话意图识别节点，负责识别检索意图和置信度。
@@ -68,7 +59,8 @@ public class IntentRecognitionNode implements NodeAction {
                     .bizType(ModelBizType.CHAT)
                     .bizId(CHAT_INTENT_ROUTE_KEY)
                     .routeKey(CHAT_INTENT_ROUTE_KEY)
-                    .messages(promptBuilder.buildIntentMessages(snapshot(state), Map.of("question", safe(question))))
+                    .messages(promptBuilder.buildIntentMessages(snapshot(state), Map.of(QUESTION_VARIABLE, safe(question))))
+                    .observationName(INTENT_RECOGNITION_GENERATION_NAME)
                     .build());
 
             // 2. 解析结构化意图结果
@@ -101,7 +93,7 @@ public class IntentRecognitionNode implements NodeAction {
 
     private ChatToolOperationDTO operation(OverAllState state, ChatToolOperationStatus status) {
         String generationId = state.value(GENERATION_ID, "");
-        return new ChatToolOperationDTO(generationId + ":tool:intent-recognition:1", generationId,
+        return new ChatToolOperationDTO(generationId + INTENT_RECOGNITION_OPERATION_ID_SUFFIX, generationId,
                 INTENT_RECOGNITION_SEQUENCE, INTENT_RECOGNITION_TOOL_NAME, status);
     }
 

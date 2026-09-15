@@ -6,29 +6,23 @@ import com.alibaba.cloud.ai.graph.RunnableConfig;
 import com.alibaba.cloud.ai.graph.StateGraph;
 import com.alibaba.cloud.ai.graph.exception.GraphStateException;
 import com.alibaba.cloud.ai.graph.streaming.StreamingOutput;
-import com.nexarag.common.exception.ServiceException;
 import com.nexarag.auth.tenant.TenantAccessGuard;
-import com.nexarag.model.toolkits.prompt.PromptBuilder;
+import com.nexarag.common.exception.ServiceException;
 import com.nexarag.model.toolkits.prompt.PromptReleaseResolver;
 import com.nexarag.workflow.service.StreamingWorkflowGraphRunner;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
-import org.springframework.stereotype.Service;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
 
 import java.util.Map;
 import java.util.Set;
 
+import static com.nexarag.model.constants.PromptContractConstant.*;
 import static com.nexarag.workflow.constants.ChatWorkflowGraphConstants.CHAT_CONVERSATION_GRAPH_NAME;
 import static com.nexarag.workflow.constants.ChatWorkflowGraphConstants.CHAT_THREAD_PREFIX;
-import static com.nexarag.workflow.constants.ChatWorkflowStateKeys.TRACE_ID;
-import static com.nexarag.workflow.constants.ChatWorkflowStateKeys.USER_ID;
-import static com.nexarag.workflow.constants.ChatWorkflowStateKeys.TENANT_ID;
-import static com.nexarag.workflow.constants.ChatWorkflowStateKeys.PROMPT_EXECUTION_SNAPSHOT;
-import static com.nexarag.workflow.constants.ChatWorkflowStateKeys.CONVERSATION_ID;
-import static com.nexarag.workflow.constants.ChatWorkflowStateKeys.GENERATION_ID;
-import static com.nexarag.workflow.constants.ChatWorkflowStateKeys.USER_QUESTION;
+import static com.nexarag.workflow.constants.ChatWorkflowStateKeys.*;
 
 /**
  * Chat Workflow Runner，负责编译并以请求级线程标识运行对话 Graph。
@@ -38,12 +32,12 @@ import static com.nexarag.workflow.constants.ChatWorkflowStateKeys.USER_QUESTION
 @Slf4j
 public class ChatWorkflowRunner implements StreamingWorkflowGraphRunner {
     private static final Set<String> CHAT_PROMPT_CODES = Set.of(
-            PromptBuilder.REWRITE_INSTRUCTION,
-            PromptBuilder.INTENT_INSTRUCTION,
-            PromptBuilder.ANSWER_SYSTEM_INSTRUCTION,
-            PromptBuilder.ANSWER_RETRIEVAL_EVIDENCE,
-            PromptBuilder.ANSWER_CURRENT_QUESTION,
-            PromptBuilder.TITLE_INSTRUCTION);
+            REWRITE_INSTRUCTION_CODE,
+            INTENT_INSTRUCTION_CODE,
+            ANSWER_SYSTEM_INSTRUCTION_CODE,
+            ANSWER_RETRIEVAL_EVIDENCE_CODE,
+            ANSWER_CURRENT_QUESTION_CODE,
+            TITLE_INSTRUCTION_CODE);
 
     private final CompiledGraph compiledGraph;
     private final PromptReleaseResolver promptReleaseResolver;

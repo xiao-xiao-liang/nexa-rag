@@ -13,9 +13,9 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
-import static com.nexarag.workflow.constants.ChatWorkflowStateKeys.FUSED_RETRIEVAL_RESULTS;
-import static com.nexarag.workflow.constants.ChatWorkflowStateKeys.RAW_RETRIEVAL_RESULTS;
-import static com.nexarag.workflow.constants.ChatWorkflowStateKeys.TRACE_ID;
+import static com.nexarag.workflow.constants.ChatWorkflowExecutionConstant.RRF_RANK_CONSTANT;
+import static com.nexarag.workflow.constants.ChatWorkflowExecutionConstant.RRF_RANK_OFFSET;
+import static com.nexarag.workflow.constants.ChatWorkflowStateKeys.*;
 
 /**
  * 检索融合节点，负责按片段去重并计算 RRF 分数。
@@ -35,7 +35,7 @@ public class RetrievalFusionNode implements NodeAction {
         for (RetrievalChunk chunk : chunks) {
             String key = chunk.chunkId() == null ? chunk.documentId() + ":" + chunk.chunkIndex() : chunk.chunkId();
             unique.putIfAbsent(key, chunk);
-            scores.merge(key, 1D / (60D + chunk.rank() + 1D), Double::sum);
+            scores.merge(key, 1D / (RRF_RANK_CONSTANT + chunk.rank() + RRF_RANK_OFFSET), Double::sum);
         }
         List<RetrievalChunk> fused = unique.entrySet().stream()
                 .sorted(Comparator.comparingDouble(entry -> -scores.get(entry.getKey())))

@@ -5,7 +5,9 @@ package com.nexarag.workflow.constants;
  */
 public final class ChatWorkflowStateKeys {
 
-    /** 工作流启动时捕获并在执行边界复验的可信租户ID。 */
+    /**
+     * 工作流启动时捕获并在执行边界复验的可信租户ID。
+     */
     public static final String TENANT_ID = "tenantId";
 
     public static final String USER_QUESTION = "userQuestion";
@@ -14,7 +16,9 @@ public final class ChatWorkflowStateKeys {
     public static final String INTENT_RESULT = "intentResult";
     public static final String FUSED_RETRIEVAL_RESULTS = "fusedRetrievalResults";
     public static final String RERANKED_RETRIEVAL_RESULTS = "rerankedRetrievalResults";
-    /** 父子上下文替换前的原始重排序正文，用于父片段超出模型窗口时回退。 */
+    /**
+     * 父子上下文替换前的原始重排序正文，用于父片段超出模型窗口时回退。
+     */
     public static final String PARENT_CONTEXT_FALLBACK_RESULTS = "parentContextFallbackResults";
     public static final String ACCEPTED_EVIDENCE_RESULTS = "acceptedEvidenceResults";
     public static final String CITATION_SET = "citationSet";
@@ -46,6 +50,10 @@ public final class ChatWorkflowStateKeys {
     public static final String PROMPT_EXECUTION_SNAPSHOT = "promptExecutionSnapshot";
     public static final String GENERATION_ACCUMULATOR = "generationAccumulator";
     public static final String TOOL_FAILURE_SUMMARIES = "toolFailureSummaries";
+    /**
+     * Langfuse 根 Trace 的可序列化父上下文载体，仅保存标识和关联属性。
+     */
+    public static final String LANGFUSE_OTEL_CONTEXT_CARRIER = "langfuseOtelContextCarrier";
 
     private ChatWorkflowStateKeys() {
     }

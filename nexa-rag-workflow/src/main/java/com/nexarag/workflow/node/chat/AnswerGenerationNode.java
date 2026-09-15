@@ -8,46 +8,33 @@ import com.nexarag.chat.domain.ChatCitationSetDTO;
 import com.nexarag.chat.domain.ChatCitationSummaryVO;
 import com.nexarag.chat.domain.ConversationContext;
 import com.nexarag.chat.service.ConversationMessageService;
+import com.nexarag.infra.observability.langfuse.otel.LangfuseOtelContextCodec;
 import com.nexarag.model.enums.ModelBizType;
+import com.nexarag.model.execution.telemetry.RagTokenBreakdown;
+import com.nexarag.model.execution.telemetry.RagTokenBreakdownStatus;
 import com.nexarag.model.gateway.ModelGateway;
-import com.nexarag.model.gateway.chat.ChatModelRequest;
 import com.nexarag.model.gateway.chat.ChatModelMessage;
-import com.nexarag.model.toolkits.prompt.PromptBuilder;
+import com.nexarag.model.gateway.chat.ChatModelRequest;
 import com.nexarag.model.prompt.domain.PromptExecutionSnapshot;
+import com.nexarag.model.toolkits.prompt.AnswerPromptComposition;
+import com.nexarag.model.toolkits.prompt.PromptBuilder;
 import com.nexarag.retrieval.model.RetrievalChunk;
-import com.nexarag.workflow.stream.ChatGenerationAccumulator;
-import com.nexarag.workflow.stream.ChatGenerationTaskManager;
-import com.nexarag.workflow.stream.ChatGenerationEventPublisher;
-import com.nexarag.workflow.stream.ChatWorkflowStreamingUtil;
-import com.nexarag.workflow.stream.ChatStreamEvent;
-import com.nexarag.workflow.stream.ChatStreamEventType;
 import com.nexarag.workflow.citation.CitationSetFactory;
 import com.nexarag.workflow.service.ModelInputEvidenceSelector;
+import com.nexarag.workflow.stream.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.stereotype.Component;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.stereotype.Component;
 import reactor.core.publisher.Flux;
 
 import java.util.List;
 import java.util.Map;
 
-import static com.nexarag.workflow.constants.ChatWorkflowNodeConstants.ANSWER_GENERATION_NODE;
-import static com.nexarag.workflow.constants.ChatWorkflowStateKeys.ASSISTANT_MESSAGE_ID;
-import static com.nexarag.workflow.constants.ChatWorkflowStateKeys.CONVERSATION_CONTEXT;
-import static com.nexarag.workflow.constants.ChatWorkflowStateKeys.CONVERSATION_ID;
-import static com.nexarag.workflow.constants.ChatWorkflowStateKeys.GENERATION_ID;
-import static com.nexarag.workflow.constants.ChatWorkflowStateKeys.GENERATION_ACCUMULATOR;
-import static com.nexarag.workflow.constants.ChatWorkflowStateKeys.MODEL_STREAM_RESULT;
-import static com.nexarag.workflow.constants.ChatWorkflowStateKeys.ACCEPTED_EVIDENCE_RESULTS;
-import static com.nexarag.workflow.constants.ChatWorkflowStateKeys.CITATION_SET;
-import static com.nexarag.workflow.constants.ChatWorkflowStateKeys.REWRITTEN_QUESTION;
-import static com.nexarag.workflow.constants.ChatWorkflowStateKeys.TRACE_ID;
-import static com.nexarag.workflow.constants.ChatWorkflowStateKeys.USER_ID;
-import static com.nexarag.workflow.constants.ChatWorkflowStateKeys.PROMPT_EXECUTION_SNAPSHOT;
-import static com.nexarag.workflow.constants.ChatWorkflowStateKeys.PARENT_CONTEXT_FALLBACK_RESULTS;
-import static com.nexarag.workflow.constants.ChatWorkflowStateKeys.TOOL_FAILURE_SUMMARIES;
 import static com.nexarag.chat.constants.ChatModelRouteConstants.CHAT_ANSWER_ROUTE_KEY;
+import static com.nexarag.workflow.constants.ChatWorkflowNodeConstants.ANSWER_GENERATION_NODE;
+import static com.nexarag.workflow.constants.ChatWorkflowStateKeys.*;
+import static com.nexarag.workflow.constants.ChatWorkflowTelemetryConstant.ANSWER_GENERATION_NAME;
 
 /**
  * 回答生成节点，负责创建助手消息占位并返回 Graph 可识别的模型流。
@@ -99,16 +86,40 @@ public class AnswerGenerationNode implements NodeAction {
 
         // 3. 调用最终回答模型并绑定取消句柄
         log.info("准备调用模型生成回答，traceId={}，已接纳正文数={}", state.value(TRACE_ID, ""), chunks.size());
+        String question = state.value(REWRITTEN_QUESTION, "");
+        String summary = summary(state);
+        List<ChatModelMessage> historyMessages = historyMessages(state);
+        String retrievalContent = retrievalEvidence(chunks, citationSet);
+        String toolContent = toolEvidence(toolFailureSummaries);
+        AnswerPromptComposition promptComposition = promptBuilder.buildAnswerPrompt(snapshot(state), question, summary,
+                historyMessages, retrievalContent, toolContent);
+        List<ChatModelMessage> finalMessages = promptComposition.messages();
+        RagTokenBreakdown observabilityContext = new RagTokenBreakdown(
+                promptComposition.systemInstruction(),
+                promptComposition.summary(),
+                promptComposition.historyMessages(),
+                promptComposition.question(),
+                promptComposition.retrievalContent(),
+                promptComposition.toolContent(),
+                modelInputEvidenceSelector.availableInputTokens(CHAT_ANSWER_ROUTE_KEY),
+                acceptedChunks.size(),
+                chunks.size(),
+                Math.max(0, acceptedChunks.size() - chunks.size()),
+                null, null, null, null, null, null, null,
+                RagTokenBreakdownStatus.UNAVAILABLE);
         Flux<com.nexarag.model.gateway.chat.ChatModelStreamResponse> modelStream = modelGateway.streamChat(
-                ChatModelRequest.builder()
-                        .traceId(state.value(TRACE_ID, ""))
-                        .bizType(ModelBizType.CHAT)
-                        .bizId(conversationId)
-                        .routeKey(CHAT_ANSWER_ROUTE_KEY)
-                        .messages(promptBuilder.buildAnswerMessages(snapshot(state),
-                                state.value(REWRITTEN_QUESTION, ""), summary(state), historyMessages(state),
-                                evidence(chunks, citationSet, toolFailureSummaries)))
-                        .build())
+                        ChatModelRequest.builder()
+                                .traceId(state.value(TRACE_ID, ""))
+                                .bizType(ModelBizType.CHAT)
+                                .bizId(conversationId)
+                                .routeKey(CHAT_ANSWER_ROUTE_KEY)
+                                .messages(finalMessages)
+                                .observabilityContext(observabilityContext)
+                                .generationId(generationId)
+                                .observationName(ANSWER_GENERATION_NAME)
+                                .langfuseContext(LangfuseOtelContextCodec.decode(
+                                        state.value(LANGFUSE_OTEL_CONTEXT_CARRIER, "")))
+                                .build())
                 .doOnSubscribe(subscription -> taskManager.bind(generationId, subscription::cancel));
 
         // 4. 返回 GraphFlux，使 Graph 在流结束后继续执行持久化节点
@@ -140,14 +151,26 @@ public class AnswerGenerationNode implements NodeAction {
 
     private String evidence(List<RetrievalChunk> chunks, ChatCitationSetDTO citationSet,
                             List<String> toolFailureSummaries) {
-        String evidence = java.util.stream.IntStream.range(0, chunks.size())
+        return appendToolEvidence(retrievalEvidence(chunks, citationSet), toolEvidence(toolFailureSummaries));
+    }
+
+    private String retrievalEvidence(List<RetrievalChunk> chunks, ChatCitationSetDTO citationSet) {
+        return java.util.stream.IntStream.range(0, chunks.size())
                 .mapToObj(index -> "【证据 " + citationSet.citations().get(index).citationId() + "】 "
                         + chunks.get(index).content())
                 .collect(java.util.stream.Collectors.joining("\n"));
-        if (toolFailureSummaries.isEmpty()) {
+    }
+
+    private String toolEvidence(List<String> toolFailureSummaries) {
+        return toolFailureSummaries == null || toolFailureSummaries.isEmpty()
+                ? "" : String.join("；", toolFailureSummaries);
+    }
+
+    private String appendToolEvidence(String evidence, String toolContent) {
+        if (toolContent == null || toolContent.isEmpty()) {
             return evidence;
         }
-        return evidence + "\n\n工具执行状态：" + String.join("；", toolFailureSummaries);
+        return evidence + "\n\n工具执行状态：" + toolContent;
     }
 
     private ChatCitationSetDTO emptyCitationSet() {

@@ -1,7 +1,7 @@
 package com.nexarag.model.config;
 
-import com.nexarag.model.toolkits.prompt.PromptSnapshotCache;
 import com.nexarag.model.execution.ModelExecutionTemplate;
+import com.nexarag.model.execution.telemetry.GenerationTelemetryCollector;
 import com.nexarag.model.governance.ModelGovernanceExecutor;
 import com.nexarag.model.governance.ModelGovernanceResolver;
 import com.nexarag.model.registry.ModelRegistry;
@@ -10,8 +10,9 @@ import com.nexarag.model.route.ModelRouter;
 import com.nexarag.model.route.PrimaryFallbackModelRouter;
 import com.nexarag.model.route.RegistryFirstModelRouter;
 import com.nexarag.model.route.WeightedModelRouteSelector;
-import com.nexarag.model.toolkits.ModelSecretEncryptor;
 import com.nexarag.model.service.ModelCallLogService;
+import com.nexarag.model.toolkits.ModelSecretEncryptor;
+import com.nexarag.model.toolkits.prompt.PromptSnapshotCache;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
@@ -81,8 +82,10 @@ public class ModelConfiguration {
     public ModelExecutionTemplate modelExecutionTemplate(ModelRouter modelRouter,
                                                          ModelCallLogService modelCallLogService,
                                                          ModelGovernanceExecutor executor,
-                                                         ModelGovernanceResolver resolver) {
-        return new ModelExecutionTemplate(modelRouter, modelCallLogService, executor, resolver);
+                                                         ModelGovernanceResolver resolver,
+                                                         GenerationTelemetryCollector generationTelemetryCollector) {
+        return new ModelExecutionTemplate(modelRouter, modelCallLogService, executor, resolver,
+                generationTelemetryCollector);
     }
 
     /**

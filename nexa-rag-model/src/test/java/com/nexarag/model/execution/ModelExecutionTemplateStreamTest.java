@@ -62,7 +62,8 @@ class ModelExecutionTemplateStreamTest {
                 .verifyComplete();
 
         verify(logService).markFailed(eq("call-1"), anyString(), contains("主模型连接失败"), anyLong());
-        verify(logService).markStreamSuccess(eq("call-2"), eq(0), eq(0), eq(0), any(TokenUsageSource.class),
+        verify(logService).markStreamSuccess(eq("call-2"), nullable(Integer.class), nullable(Integer.class),
+                nullable(Integer.class), eq(TokenUsageSource.UNKNOWN),
                 any(), any(), any(), any(), anyLong());
     }
 

@@ -2,6 +2,10 @@ package com.nexarag.workflow.node.chat;
 
 import com.alibaba.cloud.ai.graph.OverAllState;
 import com.alibaba.cloud.ai.graph.action.NodeAction;
+import com.nexarag.infra.observability.langfuse.LangfuseSpanScope;
+import com.nexarag.infra.observability.langfuse.LangfuseTelemetry;
+import com.nexarag.infra.observability.langfuse.model.LangfuseObservationType;
+import com.nexarag.infra.observability.langfuse.otel.LangfuseOtelContextCodec;
 import com.nexarag.retrieval.model.RetrievalChunk;
 import com.nexarag.workflow.model.EvidenceQuality;
 import com.nexarag.workflow.service.EvidenceQualityEvaluator;
@@ -12,10 +16,9 @@ import org.springframework.stereotype.Component;
 import java.util.List;
 import java.util.Map;
 
-import static com.nexarag.workflow.constants.ChatWorkflowStateKeys.ACCEPTED_EVIDENCE_RESULTS;
-import static com.nexarag.workflow.constants.ChatWorkflowStateKeys.EVIDENCE_QUALITY;
-import static com.nexarag.workflow.constants.ChatWorkflowStateKeys.RERANKED_RETRIEVAL_RESULTS;
-import static com.nexarag.workflow.constants.ChatWorkflowStateKeys.TRACE_ID;
+import static com.nexarag.infra.observability.langfuse.constants.LangfuseOtelAttributeConstant.GENERATION_ID_ATTRIBUTE;
+import static com.nexarag.workflow.constants.ChatWorkflowStateKeys.*;
+import static com.nexarag.workflow.constants.ChatWorkflowTelemetryConstant.*;
 
 /**
  * 证据质量节点，仅接纳正文；模型输入窗口在最终回答节点中按实际模型路由控制。
@@ -25,6 +28,7 @@ import static com.nexarag.workflow.constants.ChatWorkflowStateKeys.TRACE_ID;
 @RequiredArgsConstructor
 public class EvidenceQualityNode implements NodeAction {
 
+    private final LangfuseTelemetry telemetry;
     private final EvidenceQualityEvaluator evidenceQualityEvaluator;
 
     /**
@@ -37,13 +41,27 @@ public class EvidenceQualityNode implements NodeAction {
     public Map<String, Object> apply(OverAllState state) {
         // 1. 评估重排序候选，导航记录不能进入回答上下文
         List<RetrievalChunk> rankedChunks = state.value(RERANKED_RETRIEVAL_RESULTS, List.of());
-        EvidenceQuality quality = evidenceQualityEvaluator.accept(rankedChunks);
+        LangfuseSpanScope span = telemetry.startSpan(EVIDENCE_SELECTION_SPAN_NAME, LangfuseObservationType.EVALUATOR, Map.of(
+                        GENERATION_ID_ATTRIBUTE, state.value(GENERATION_ID, ""),
+                        EVIDENCE_CANDIDATE_COUNT_ATTRIBUTE, rankedChunks.size()),
+                LangfuseOtelContextCodec.decode(state.value(LANGFUSE_OTEL_CONTEXT_CARRIER, "")));
+        try {
+            EvidenceQuality quality = evidenceQualityEvaluator.accept(rankedChunks);
 
-        // 2. 不足时返回空正文，沿用回答提示词中的“现有资料不足”拒答路径
-        log.info("回答证据判定完成，traceId={}，候选数={}，接纳正文数={}，接纳片段ID={}，估算Token数={}，充分={}，原因={}",
-                state.value(TRACE_ID, ""), rankedChunks.size(), quality.acceptedChunks().size(),
-                quality.acceptedChunks().stream().map(RetrievalChunk::chunkId).toList(), quality.estimatedTokenCount(),
-                quality.sufficient(), quality.reason());
-        return Map.of(ACCEPTED_EVIDENCE_RESULTS, quality.acceptedChunks(), EVIDENCE_QUALITY, quality);
+            // 2. 不足时返回空正文，沿用回答提示词中的“现有资料不足”拒答路径
+            log.info("回答证据判定完成，traceId={}，候选数={}，接纳正文数={}，接纳片段ID={}，估算Token数={}，充分={}，原因={}",
+                    state.value(TRACE_ID, ""), rankedChunks.size(), quality.acceptedChunks().size(),
+                    quality.acceptedChunks().stream().map(RetrievalChunk::chunkId).toList(), quality.estimatedTokenCount(),
+                    quality.sufficient(), quality.reason());
+            span.addAttributes(Map.of(EVIDENCE_ACCEPTED_COUNT_ATTRIBUTE, quality.acceptedChunks().size(),
+                    EVIDENCE_ESTIMATED_TOKENS_ATTRIBUTE, quality.estimatedTokenCount(),
+                    EVIDENCE_SUFFICIENT_ATTRIBUTE, quality.sufficient()));
+            return Map.of(ACCEPTED_EVIDENCE_RESULTS, quality.acceptedChunks(), EVIDENCE_QUALITY, quality);
+        } catch (RuntimeException exception) {
+            span.fail(exception);
+            throw exception;
+        } finally {
+            span.close();
+        }
     }
 }

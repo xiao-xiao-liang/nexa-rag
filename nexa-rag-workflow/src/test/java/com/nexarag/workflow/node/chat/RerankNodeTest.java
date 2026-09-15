@@ -16,6 +16,7 @@ import static com.nexarag.workflow.constants.ChatWorkflowStateKeys.FUSED_RETRIEV
 import static com.nexarag.workflow.constants.ChatWorkflowStateKeys.RERANKED_RETRIEVAL_RESULTS;
 import static com.nexarag.workflow.constants.ChatWorkflowStateKeys.REWRITTEN_QUESTION;
 import static com.nexarag.workflow.constants.ChatWorkflowStateKeys.TRACE_ID;
+import static com.nexarag.infra.observability.langfuse.NoopLangfuseTelemetry.INSTANCE;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
@@ -30,7 +31,7 @@ class RerankNodeTest {
     @Test
     void applyShouldReturnEmptyResultWithoutCallingModelForEmptyCandidates() {
         ModelGateway modelGateway = mock(ModelGateway.class);
-        RerankNode node = new RerankNode(modelGateway, new RetrievalProperties());
+        RerankNode node = new RerankNode(modelGateway, new RetrievalProperties(), INSTANCE);
 
         Map<String, Object> result = node.apply(new OverAllState(Map.of(
                 REWRITTEN_QUESTION, "退款规则",
@@ -54,7 +55,7 @@ class RerankNodeTest {
                 .thenReturn(new RerankModelResponse(scores, "rerank-profile", 10));
         RetrievalProperties properties = new RetrievalProperties();
         properties.getCandidate().setRerankCandidateLimit(3);
-        RerankNode node = new RerankNode(modelGateway, properties);
+        RerankNode node = new RerankNode(modelGateway, properties, INSTANCE);
 
         Map<String, Object> result = node.apply(new OverAllState(Map.of(
                 REWRITTEN_QUESTION, "退款规则",

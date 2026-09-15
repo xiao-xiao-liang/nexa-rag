@@ -1,12 +1,20 @@
 package com.nexarag.boot.controller;
 
+import static com.nexarag.boot.constants.ChatApiPathConstant.CITATION;
+import static com.nexarag.boot.constants.ChatApiPathConstant.DOCUMENT_PREFIX;
+import static com.nexarag.boot.constants.ChatApiPathConstant.GENERATION;
+import static com.nexarag.boot.constants.ChatApiPathConstant.GENERATION_STREAM;
+import static com.nexarag.boot.constants.ChatApiPathConstant.KNOWLEDGE_BASE_DOCUMENT_PREFIX;
+import static com.nexarag.boot.constants.ChatApiPathConstant.ROOT;
+import static com.nexarag.boot.constants.ChatApiPathConstant.STREAM;
+
 import com.nexarag.auth.context.UserContext;
+import com.nexarag.boot.service.ChatWorkflowStreamService;
 import com.nexarag.chat.domain.ChatCitationDTO;
 import com.nexarag.chat.domain.ChatCitationDetailVO;
 import com.nexarag.chat.domain.ChatCitationHeadingPathResolver;
 import com.nexarag.chat.id.ChatIdGenerator;
 import com.nexarag.chat.service.impl.ChatCitationService;
-import com.nexarag.common.exception.AbstractException;
 import com.nexarag.common.exception.ClientException;
 import com.nexarag.common.trace.TraceIdContext;
 import com.nexarag.common.web.Result;
@@ -22,7 +30,6 @@ import com.nexarag.infra.enums.ExternalDocumentSourceType;
 import com.nexarag.workflow.error.ChatErrorDetail;
 import com.nexarag.workflow.error.ChatErrorResolver;
 import com.nexarag.workflow.request.ChatWorkflowRequest;
-import com.nexarag.workflow.service.WorkflowService;
 import com.nexarag.workflow.stream.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -31,23 +38,20 @@ import org.springframework.http.codec.ServerSentEvent;
 import org.springframework.web.bind.annotation.*;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
-import reactor.core.scheduler.Scheduler;
 
 import java.util.List;
 import java.util.concurrent.atomic.AtomicLong;
-
-import static com.nexarag.workflow.constants.ChatWorkflowGraphConstants.CHAT_CONVERSATION_GRAPH_NAME;
 
 /**
  * Chat 流式对话控制器，负责身份注入、SSE 映射和生成任务取消。
  */
 @RestController
-@RequestMapping("/api/chat")
+@RequestMapping(ROOT)
 @RequiredArgsConstructor
 @Slf4j
 public class ChatController {
 
-    private final WorkflowService workflowService;
+    private final ChatWorkflowStreamService chatWorkflowStreamService;
     private final ChatGenerationTaskManager taskManager;
     private final ChatGenerationEventPublisher eventPublisher;
     private final ChatStreamResumeService resumeService;
@@ -58,7 +62,6 @@ public class ChatController {
     private final DocumentService documentService;
     private final DocumentVersionService documentVersionService;
     private final ChatCitationHeadingPathResolver citationHeadingPathResolver;
-    private final Scheduler chatWorkflowScheduler;
 
     /**
      * 发起流式对话。
@@ -66,7 +69,7 @@ public class ChatController {
      * @param request 对话请求
      * @return SSE 事件流
      */
-    @PostMapping(value = "/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    @PostMapping(value = STREAM, produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public Flux<ServerSentEvent<ChatStreamEvent>> stream(@RequestBody ChatStreamRequest request) {
         if (request == null || request.content() == null || request.content().isBlank()) {
             throw new ClientException("消息内容不能为空");
@@ -85,10 +88,8 @@ public class ChatController {
         // 2. 先打开本实例事件订阅，再驱动 Graph 执行，避免丢失首个工具快照
         return Flux.defer(() -> {
                     Flux<ChatStreamEvent> realtimeEvents = eventPublisher.open(generationId);
-                    Flux<ChatStreamEvent> workflowCompletion = Flux.defer(() -> workflowService
-                                    .stream(CHAT_CONVERSATION_GRAPH_NAME, workflowRequest.toInitialState()))
-                            // Graph 的构建与前置节点均可能阻塞，必须整体脱离 Servlet 请求线程。
-                            .subscribeOn(chatWorkflowScheduler)
+                    Flux<ChatStreamEvent> workflowCompletion = Flux.defer(() -> chatWorkflowStreamService
+                                    .stream(workflowRequest))
                             // 所有客户端事件均由 eventPublisher 发布；Graph 包装的节点异常必须重新传播。
                             .flatMap(response -> response.isError()
                                     ? Mono.fromFuture(response.getOutput()).then()
@@ -122,7 +123,7 @@ public class ChatController {
      * @param afterVersion 客户端已接收的最大事件版本
      * @return SSE 事件流
      */
-    @GetMapping(value = "/generations/{generationId}/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    @GetMapping(value = GENERATION_STREAM, produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public Flux<ServerSentEvent<ChatStreamEvent>> resume(@PathVariable String generationId,
                                                          @RequestParam(defaultValue = "0") long afterVersion) {
         String userId = UserContext.getCurrUser().userId();
@@ -148,7 +149,7 @@ public class ChatController {
      *
      * @param generationId 生成任务 ID
      */
-    @DeleteMapping("/generations/{generationId}")
+    @DeleteMapping(GENERATION)
     public void cancel(@PathVariable String generationId) {
         String userId = UserContext.getCurrUser().userId();
         if (!taskManager.cancel(generationId, userId)) {
@@ -163,7 +164,7 @@ public class ChatController {
      * @param citationId 消息内引用编号
      * @return 引用预览与受控跳转地址
      */
-    @GetMapping("/messages/{messageId}/citations/{citationId}")
+    @GetMapping(CITATION)
     public Result<ChatCitationDetailVO> citation(@PathVariable String messageId, @PathVariable int citationId) {
         String userId = UserContext.getCurrUser().userId();
         ChatCitationDTO citation = citationService.getOwnedCitation(messageId, userId, citationId);
@@ -176,8 +177,8 @@ public class ChatController {
         if (activeVersion == null || !activeVersion.getDocumentVersionId().equals(chunk.getDocumentVersionId())) {
             throw new ClientException("引用分块所属版本不是当前生效版本或已失效");
         }
-        String documentPath = "/knowledge-base/" + document.getKnowledgeBaseId()
-                + "/documents/" + document.getDocumentId();
+        String documentPath = KNOWLEDGE_BASE_DOCUMENT_PREFIX + document.getKnowledgeBaseId()
+                + DOCUMENT_PREFIX + document.getDocumentId();
         String sourceUrl = activeVersion.getSourceType() == null
                 || activeVersion.getSourceType() == ExternalDocumentSourceType.LOCAL
                 ? null : activeVersion.getSourceUrl();

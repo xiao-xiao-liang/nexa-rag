@@ -1,13 +1,31 @@
 package com.nexarag.boot.config;
 
+import static com.nexarag.boot.constants.AuthApiPathConstant.ALL;
+import static com.nexarag.boot.constants.AuthApiPathConstant.API_ALL;
+import static com.nexarag.boot.constants.AuthApiPathConstant.AUTH_ACCOUNT_LOGIN;
+import static com.nexarag.boot.constants.AuthApiPathConstant.AUTH_CSRF_TOKEN;
+import static com.nexarag.boot.constants.AuthApiPathConstant.AUTH_EMAIL_CODE_LOGIN;
+import static com.nexarag.boot.constants.AuthApiPathConstant.AUTH_EMAIL_PASSWORD_LOGIN;
+import static com.nexarag.boot.constants.AuthApiPathConstant.AUTH_OAUTH_CALLBACK;
+import static com.nexarag.boot.constants.AuthApiPathConstant.AUTH_OAUTH_START;
+import static com.nexarag.boot.constants.AuthApiPathConstant.AUTH_PASSWORD_RESET;
+import static com.nexarag.boot.constants.AuthApiPathConstant.AUTH_REGISTER;
+import static com.nexarag.boot.constants.AuthApiPathConstant.AUTH_SEND_EMAIL_CODE;
+import static com.nexarag.boot.constants.AuthApiPathConstant.CRM_ALL;
+import static com.nexarag.boot.constants.AuthApiPathConstant.ERROR;
+import static com.nexarag.boot.constants.AuthApiPathConstant.FAVICON;
+import static com.nexarag.boot.constants.AuthApiPathConstant.MODEL_ALL;
+import static com.nexarag.boot.constants.AuthApiPathConstant.MODEL_OBSERVABILITY_ALL;
+import static com.nexarag.boot.constants.AuthApiPathConstant.MODEL_PROMPT_ALL;
+
 import cn.dev33.satoken.interceptor.SaInterceptor;
 import cn.dev33.satoken.router.SaRouter;
 import cn.dev33.satoken.stp.StpUtil;
+import com.nexarag.auth.constants.AuthPermissionConstants;
 import com.nexarag.auth.enums.AuthErrorCode;
 import com.nexarag.auth.enums.GlobalRoleCode;
-import com.nexarag.auth.constants.AuthPermissionConstants;
-import com.nexarag.auth.web.CsrfRequestValidator;
 import com.nexarag.auth.service.DeviceSessionService;
+import com.nexarag.auth.web.CsrfRequestValidator;
 import com.nexarag.common.exception.ClientException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -37,31 +55,32 @@ public class AuthWebConfiguration implements WebMvcConfigurer {
     public void addInterceptors(InterceptorRegistry registry) {
         registry.addInterceptor(new SaInterceptor(handler -> {
                     // 1. 除精确认证入口外，所有 API 必须拥有 Sa-Token 登录态
-                    SaRouter.match("/api/**")
-                            .notMatch("/api/auth/login/account", "/api/auth/login/email-password",
-                                    "/api/auth/login/email-code", "/api/auth/register", "/api/auth/email/send-code",
-                                    "/api/auth/password/reset", "/api/auth/csrf-token",
-                                    "/api/auth/oauth/*/start", "/api/auth/oauth/*/callback")
+                    SaRouter.match(API_ALL)
+                            .notMatch(AUTH_ACCOUNT_LOGIN, AUTH_EMAIL_PASSWORD_LOGIN, AUTH_EMAIL_CODE_LOGIN, AUTH_REGISTER,
+                                    AUTH_SEND_EMAIL_CODE, AUTH_PASSWORD_RESET, AUTH_CSRF_TOKEN, AUTH_OAUTH_START,
+                                    AUTH_OAUTH_CALLBACK)
                             .check(r -> requireLogin());
 
                     // 2. 管理 API 按资源校验权限，避免一种权限隐式访问其他管理能力
-                    SaRouter.match("/api/model/**")
-                            .notMatch("/api/model/prompts/**")
+                    SaRouter.match(MODEL_ALL)
+                            .notMatch(MODEL_PROMPT_ALL)
                             .check(r -> requirePermission(AuthPermissionConstants.MODEL_MANAGE));
-                    SaRouter.match("/api/model/prompts/**")
+                    SaRouter.match(MODEL_PROMPT_ALL)
                             .check(r -> requirePermission(AuthPermissionConstants.PROMPT_MANAGE));
-                    SaRouter.match("/api/crm/**")
+                    SaRouter.match(MODEL_OBSERVABILITY_ALL)
+                            .check(r -> requirePermission(AuthPermissionConstants.MODEL_MANAGE));
+                    SaRouter.match(CRM_ALL)
                             .check(r -> requirePermission(AuthPermissionConstants.CRM_VIEW));
                 }).isAnnotation(false))
-                .addPathPatterns("/**")
-                .excludePathPatterns("/error", "/favicon.ico");
+                .addPathPatterns(ALL)
+                .excludePathPatterns(ERROR, FAVICON);
         registry.addInterceptor(new HandlerInterceptor() {
             @Override
             public boolean preHandle(@NotNull HttpServletRequest request, @NotNull HttpServletResponse response, @NotNull Object handler) {
                 csrfRequestValidator.validate(request);
                 return true;
             }
-        }).addPathPatterns("/api/**");
+        }).addPathPatterns(API_ALL);
         registry.addInterceptor(new HandlerInterceptor() {
             @Override
             public boolean preHandle(@NotNull HttpServletRequest request, @NotNull HttpServletResponse response, @NotNull Object handler) {
@@ -70,7 +89,7 @@ public class AuthWebConfiguration implements WebMvcConfigurer {
                 }
                 return true;
             }
-        }).addPathPatterns("/api/**");
+        }).addPathPatterns(API_ALL);
     }
 
     /**

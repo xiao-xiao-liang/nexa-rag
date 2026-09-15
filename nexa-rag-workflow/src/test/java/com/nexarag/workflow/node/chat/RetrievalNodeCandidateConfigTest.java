@@ -13,6 +13,7 @@ import java.util.Map;
 
 import static com.nexarag.workflow.constants.ChatWorkflowStateKeys.REWRITTEN_QUESTION;
 import static com.nexarag.workflow.constants.ChatWorkflowStateKeys.TENANT_ID;
+import static com.nexarag.infra.observability.langfuse.NoopLangfuseTelemetry.INSTANCE;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
@@ -34,7 +35,7 @@ class RetrievalNodeCandidateConfigTest {
         properties.getCandidate().setCoarseScoreFloor(0D);
         when(retrievalService.retrieve(any())).thenReturn(java.util.List.of());
 
-        new RetrievalNode(retrievalService, properties, mock(ChatGenerationEventPublisher.class)).apply(new OverAllState(Map.of(
+        new RetrievalNode(retrievalService, properties, mock(ChatGenerationEventPublisher.class), INSTANCE).apply(new OverAllState(Map.of(
                 REWRITTEN_QUESTION, "退款规则", TENANT_ID, "tenant-001")));
 
         ArgumentCaptor<ConversationRetrievalRequest> captor = ArgumentCaptor.forClass(ConversationRetrievalRequest.class);
@@ -53,7 +54,7 @@ class RetrievalNodeCandidateConfigTest {
         when(retrievalService.retrieve(any())).thenThrow(new SaTokenContextException("上下文未初始化"));
 
         RetrievalNode node = new RetrievalNode(retrievalService, new RetrievalProperties(),
-                mock(ChatGenerationEventPublisher.class));
+                mock(ChatGenerationEventPublisher.class), INSTANCE);
 
         assertThatThrownBy(() -> node.apply(new OverAllState(Map.of(REWRITTEN_QUESTION, "退款规则",
                 TENANT_ID, "tenant-001"))))

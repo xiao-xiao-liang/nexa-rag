@@ -5,8 +5,10 @@ import com.nexarag.chat.domain.ChatCitationSetCodec;
 import com.nexarag.chat.domain.ChatCitationSetDTO;
 import com.nexarag.chat.service.ConversationMessageService;
 import com.nexarag.model.gateway.ModelGateway;
+import com.nexarag.model.gateway.chat.ChatModelRequest;
 import com.nexarag.model.gateway.chat.ChatModelMessage;
 import com.nexarag.model.toolkits.prompt.PromptBuilder;
+import com.nexarag.model.toolkits.prompt.AnswerPromptComposition;
 import com.nexarag.retrieval.model.RetrievalChunk;
 import com.nexarag.workflow.citation.CitationSetFactory;
 import com.nexarag.workflow.config.ModelInputEvidenceProperties;
@@ -56,6 +58,9 @@ class AnswerGenerationNodeCitationTest {
         ChatGenerationEventPublisher eventPublisher = mock(ChatGenerationEventPublisher.class);
         when(promptBuilder.buildAnswerMessages(any(), any(), any(), any(), any())).thenReturn(List.of(
                 new ChatModelMessage("SYSTEM", "规则")));
+        when(promptBuilder.buildAnswerPrompt(any(), any(), any(), any(), any(), any())).thenReturn(
+                new AnswerPromptComposition(List.of(new ChatModelMessage("SYSTEM", "规则")), "规则", "",
+                        List.of(), "报销规则", "", ""));
         when(eventPublisher.publish(any(ChatStreamEvent.class))).thenAnswer(invocation -> invocation.getArgument(0));
         when(modelGateway.streamChat(any())).thenReturn(Flux.never());
         AnswerGenerationNode node = new AnswerGenerationNode(modelGateway, promptBuilder,
@@ -81,6 +86,48 @@ class AnswerGenerationNodeCitationTest {
         ordered.verify(messageService).updateGeneratingAssistantReferences(eq("m1"), any());
         ordered.verify(eventPublisher).publish(any(ChatStreamEvent.class));
         ordered.verify(modelGateway).streamChat(any());
+    }
+
+    @Test
+    void shouldAttachFinalAnswerSemanticTokenBreakdownToModelRequest() {
+        ModelGateway modelGateway = mock(ModelGateway.class);
+        PromptBuilder promptBuilder = mock(PromptBuilder.class);
+        ConversationMessageService messageService = mock(ConversationMessageService.class);
+        ChatGenerationEventPublisher eventPublisher = mock(ChatGenerationEventPublisher.class);
+        when(promptBuilder.buildAnswerMessages(any(), any(), any(), any(), any())).thenReturn(List.of(
+                new ChatModelMessage("SYSTEM", "最终系统提示")));
+        when(promptBuilder.buildAnswerPrompt(any(), any(), any(), any(), any(), any())).thenReturn(
+                new AnswerPromptComposition(List.of(
+                        new ChatModelMessage("SYSTEM", "最终系统提示\n\n会话摘要：\n\n<retrieval_context>证据</retrieval_context>"),
+                        new ChatModelMessage("USER", "已渲染的问题")), "最终系统提示", "", List.of(), "报销规则",
+                        "【证据 1】 正文", ""));
+        when(eventPublisher.publish(any(ChatStreamEvent.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(modelGateway.streamChat(any())).thenReturn(Flux.never());
+        AnswerGenerationNode node = new AnswerGenerationNode(modelGateway, promptBuilder,
+                mock(ChatGenerationTaskManager.class), eventPublisher, new CitationSetFactory(), messageService,
+                new ChatCitationSetCodec(), new ModelInputEvidenceSelector(modelRouter(), new ModelInputEvidenceProperties()));
+
+        node.apply(new OverAllState(Map.of(
+                CONVERSATION_ID, "c1",
+                GENERATION_ID, "g1",
+                ASSISTANT_MESSAGE_ID, "m1",
+                REWRITTEN_QUESTION, "报销规则",
+                GENERATION_ACCUMULATOR, new ChatGenerationAccumulator(),
+                ACCEPTED_EVIDENCE_RESULTS, List.of(new RetrievalChunk("chunk-1", 10L, 2, null,
+                        "费用制度", "file", "正文", 0.9D, "hybrid", 1)))));
+
+        org.mockito.ArgumentCaptor<ChatModelRequest> requestCaptor =
+                org.mockito.ArgumentCaptor.forClass(ChatModelRequest.class);
+        verify(modelGateway).streamChat(requestCaptor.capture());
+        var breakdown = requestCaptor.getValue().observabilityContext();
+        assertThat(breakdown).isNotNull();
+        assertThat(breakdown.systemContent()).isEqualTo("最终系统提示");
+        assertThat(breakdown.questionContent()).isEqualTo("报销规则");
+        assertThat(breakdown.retrievalContent()).isEqualTo("【证据 1】 正文");
+        assertThat(breakdown.toolContent()).isEmpty();
+        assertThat(breakdown.retrievalCandidateCount()).isEqualTo(1);
+        assertThat(breakdown.retrievalAcceptedCount()).isEqualTo(1);
+        assertThat(breakdown.retrievalSkippedCount()).isZero();
     }
 
     private ModelRouter modelRouter() {
