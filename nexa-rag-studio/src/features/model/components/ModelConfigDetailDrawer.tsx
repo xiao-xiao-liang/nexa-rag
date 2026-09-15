@@ -6,6 +6,7 @@ import {
 } from "@/types";
 import { modelApi } from "@/lib/api.ts";
 import { FEISHU_FONT_FAMILY, FeishuPill, FeishuTag } from "@/components/ui/feishu-table";
+import { feishuToast } from "@/components/ui/FeishuToast";
 
 export interface ModelConfigDetailDrawerProps {
   isOpen: boolean;
@@ -63,7 +64,7 @@ export const ModelConfigDetailDrawer: React.FC<ModelConfigDetailDrawerProps> = (
       setRawKey(res);
       setShowRawKey(true);
     } catch (err: any) {
-      alert(err.message || "获取未脱敏 API Key 失败");
+      feishuToast.error(err.message || "获取未脱敏 API Key 失败");
     } finally {
       setLoadingRawKey(false);
     }

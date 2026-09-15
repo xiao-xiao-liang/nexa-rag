@@ -26,7 +26,11 @@ import {
   ModelConfigCreateRequest,
   ModelConfigUpdateRequest,
   ModelRouteResponse,
+  ModelRouteCreateRequest,
+  ModelRouteUpdateRequest,
   ModelRouteConfigResponse,
+  ModelRouteConfigCreateRequest,
+  ModelRouteConfigUpdateRequest,
   ModelGovernanceConfigResponse,
   ModelGovernanceConfigRequest,
   ModelConnectionTestResponse,
@@ -661,8 +665,71 @@ export const modelApi = {
     return await fetchJson<ModelRouteResponse[]>("/model/routes");
   },
 
+  async getRoute(routeId: number): Promise<ModelRouteResponse> {
+    return await fetchJson<ModelRouteResponse>(`/model/routes/${routeId}`);
+  },
+
+  async createRoute(data: ModelRouteCreateRequest): Promise<ModelRouteResponse> {
+    return await fetchJson<ModelRouteResponse>("/model/routes", {
+      method: "POST",
+      body: JSON.stringify(data),
+    });
+  },
+
+  async updateRoute(routeId: number, data: ModelRouteUpdateRequest): Promise<ModelRouteResponse> {
+    return await fetchJson<ModelRouteResponse>(`/model/routes/${routeId}`, {
+      method: "PATCH",
+      body: JSON.stringify(data),
+    });
+  },
+
+  async deleteRoute(routeId: number): Promise<void> {
+    await fetchJson<void>(`/model/routes/${routeId}`, {
+      method: "DELETE",
+    });
+  },
+
   async testRoute(routeId: number): Promise<ModelConnectionTestResponse> {
     return await fetchJson<ModelConnectionTestResponse>(`/model/routes/${routeId}/test`, { method: "POST" });
+  },
+
+  async getRouteGovernance(routeId: number): Promise<ModelGovernanceConfigResponse> {
+    return await fetchJson<ModelGovernanceConfigResponse>(`/model/routes/${routeId}/governance`);
+  },
+
+  async saveRouteGovernance(routeId: number, data: ModelGovernanceConfigRequest): Promise<ModelGovernanceConfigResponse> {
+    return await fetchJson<ModelGovernanceConfigResponse>(`/model/routes/${routeId}/governance`, {
+      method: "PUT",
+      body: JSON.stringify(data),
+    });
+  },
+
+  async listRouteConfigs(routeId: number): Promise<ModelRouteConfigResponse[]> {
+    return await fetchJson<ModelRouteConfigResponse[]>(`/model/routes/${routeId}/configs`);
+  },
+
+  async createRouteConfig(routeId: number, data: ModelRouteConfigCreateRequest): Promise<ModelRouteConfigResponse> {
+    return await fetchJson<ModelRouteConfigResponse>(`/model/routes/${routeId}/configs`, {
+      method: "POST",
+      body: JSON.stringify(data),
+    });
+  },
+
+  async updateRouteConfig(
+    routeId: number,
+    routeConfigId: number,
+    data: ModelRouteConfigUpdateRequest
+  ): Promise<ModelRouteConfigResponse> {
+    return await fetchJson<ModelRouteConfigResponse>(`/model/routes/${routeId}/configs/${routeConfigId}`, {
+      method: "PATCH",
+      body: JSON.stringify(data),
+    });
+  },
+
+  async deleteRouteConfig(routeId: number, routeConfigId: number): Promise<void> {
+    await fetchJson<void>(`/model/routes/${routeId}/configs/${routeConfigId}`, {
+      method: "DELETE",
+    });
   },
 
   async getRegistrySnapshot(): Promise<ModelRegistrySnapshotResponse> {

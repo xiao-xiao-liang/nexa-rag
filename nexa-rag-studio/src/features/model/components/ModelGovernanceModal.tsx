@@ -2,15 +2,18 @@ import React, { useState, useEffect } from "react";
 import { X } from "lucide-react";
 import {
   ModelConfigResponse,
+  ModelRouteResponse,
   ModelGovernanceConfigRequest,
 } from "../../../types";
 import { modelApi } from "../../../lib/api";
 import { FEISHU_FONT_FAMILY } from "../../../components/ui/feishu-table";
+import { feishuToast } from "../../../components/ui/FeishuToast";
 
 export interface ModelGovernanceModalProps {
   isOpen: boolean;
   onClose: () => void;
-  config: ModelConfigResponse | null;
+  config?: ModelConfigResponse | null;
+  route?: ModelRouteResponse | null;
   onSuccess: () => void;
 }
 
@@ -18,6 +21,7 @@ export const ModelGovernanceModal: React.FC<ModelGovernanceModalProps> = ({
   isOpen,
   onClose,
   config,
+  route,
   onSuccess,
 }) => {
   const [loading, setLoading] = useState(false);
@@ -58,16 +62,21 @@ export const ModelGovernanceModal: React.FC<ModelGovernanceModalProps> = ({
   const [streamMaxDurationMs, setStreamMaxDurationMs] = useState(120000);
 
   useEffect(() => {
-    if (!isOpen || !config) return;
+    if (!isOpen || (!config && !route)) return;
     loadGovernanceConfig();
-  }, [isOpen, config]);
+  }, [isOpen, config, route]);
 
   const loadGovernanceConfig = async () => {
-    if (!config) return;
+    if (!config && !route) return;
     setLoading(true);
     setErrorMessage(null);
     try {
-      const gv: any = await modelApi.getGovernance(config.configId);
+      const gv: any = route
+        ? await modelApi.getRouteGovernance(route.routeId)
+        : config
+        ? await modelApi.getGovernance(config.configId)
+        : null;
+
       if (gv) {
         setEnabled(gv.enabled !== false);
         setRetryEnabled(gv.retryEnabled !== false);
@@ -104,12 +113,13 @@ export const ModelGovernanceModal: React.FC<ModelGovernanceModalProps> = ({
   };
 
   const handleSave = async () => {
-    if (!config) return;
+    if (!config && !route) return;
     setSaving(true);
     setErrorMessage(null);
 
     const payload: ModelGovernanceConfigRequest = {
-      bindingMode: "CONFIG",
+      bindingMode: route ? "ROUTE" : "CONFIG",
+      routeKey: route ? route.routeKey : undefined,
       enabled,
       retryEnabled,
       maxAttempts: Number(maxAttempts) || 3,
@@ -135,17 +145,32 @@ export const ModelGovernanceModal: React.FC<ModelGovernanceModalProps> = ({
     };
 
     try {
-      await modelApi.saveGovernance(config.configId, payload);
+      if (route) {
+        await modelApi.saveRouteGovernance(route.routeId, payload);
+        feishuToast.success(`路由策略 [${route.routeKey}] 治理配置已保存生效`);
+      } else if (config) {
+        await modelApi.saveGovernance(config.configId, payload);
+        feishuToast.success(`模型配置 [${config.configKey || config.configName}] 治理配置已保存生效`);
+      }
       onSuccess();
       onClose();
     } catch (err: any) {
-      setErrorMessage(err.message || "保存治理配置失败");
+      const msg = err.message || "保存治理配置失败";
+      setErrorMessage(msg);
+      feishuToast.error(msg);
     } finally {
       setSaving(false);
     }
   };
 
-  if (!isOpen || !config) return null;
+  if (!isOpen || (!config && !route)) return null;
+
+  const targetTitle = route ? "路由治理策略参数" : "模型配置治理参数";
+  const targetBadge = route
+    ? (route.remark || route.routeKey)
+    : config
+    ? (config.configKey || config.configName)
+    : "";
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#1F2329]/40 backdrop-blur-[1px]">
@@ -157,10 +182,10 @@ export const ModelGovernanceModal: React.FC<ModelGovernanceModalProps> = ({
         <div className="h-[54px] px-6 border-b border-[#EFF0F1] flex items-center justify-between shrink-0 bg-white">
           <div className="flex items-center gap-2">
             <span className="text-[16px] font-semibold text-[#1F2329]">
-              模型配置治理参数
+              {targetTitle}
             </span>
             <span className="text-[12px] font-medium text-[#3370FF] bg-[#E8F3FF] px-2 py-0.5 rounded-full tabular-nums">
-              {config.configKey || config.configName}
+              {targetBadge}
             </span>
           </div>
           <button

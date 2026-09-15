@@ -31,9 +31,14 @@ import {
   FeishuActionDropdown,
   FEISHU_FONT_FAMILY,
 } from "../../components/ui/feishu-table";
+import { FeishuDialog } from "../../components/ui/FeishuDialog";
+import { feishuToast } from "../../components/ui/FeishuToast";
+import { FeishuSelect } from "../../components/ui/feishu-select";
 import { ModelConfigModal } from "./components/ModelConfigModal";
 import { ModelConfigDetailDrawer } from "./components/ModelConfigDetailDrawer";
 import { ModelGovernanceModal } from "./components/ModelGovernanceModal";
+import { ModelRouteModal } from "./components/ModelRouteModal";
+import { ModelRouteCandidatesDrawer } from "./components/ModelRouteCandidatesDrawer";
 
 export const ModelPage: React.FC = () => {
   const location = useLocation();
@@ -61,7 +66,7 @@ export const ModelPage: React.FC = () => {
   const [visibleKeyConfigIds, setVisibleKeyConfigIds] = useState<Set<number>>(new Set());
   const [loadingKeyConfigIds, setLoadingKeyConfigIds] = useState<Set<number>>(new Set());
 
-  // 弹窗与抽屉控制
+  // 模型配置弹窗与抽屉控制
   const [selectedConfig, setSelectedConfig] = useState<ModelConfigResponse | null>(null);
   const [isConfigModalOpen, setIsConfigModalOpen] = useState(false);
   const [isDetailDrawerOpen, setIsDetailDrawerOpen] = useState(false);
@@ -69,9 +74,21 @@ export const ModelPage: React.FC = () => {
   const [deletingConfig, setDeletingConfig] = useState<ModelConfigResponse | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
 
-  // 连通性测试状态
+  // 路由策略弹窗与抽屉控制
+  const [selectedRoute, setSelectedRoute] = useState<ModelRouteResponse | null>(null);
+  const [isRouteModalOpen, setIsRouteModalOpen] = useState(false);
+  const [isCandidatesDrawerOpen, setIsCandidatesDrawerOpen] = useState(false);
+  const [selectedGovRoute, setSelectedGovRoute] = useState<ModelRouteResponse | null>(null);
+  const [deletingRoute, setDeletingRoute] = useState<ModelRouteResponse | null>(null);
+  const [isDeletingRoute, setIsDeletingRoute] = useState(false);
+
+  // 连通性测试状态 (配置)
   const [testingConfigId, setTestingConfigId] = useState<number | null>(null);
   const [testFeedback, setTestFeedback] = useState<{ id: number; success: boolean; text: string } | null>(null);
+
+  // 连通性测试状态 (路由)
+  const [testingRouteId, setTestingRouteId] = useState<number | null>(null);
+  const [routeTestFeedback, setRouteTestFeedback] = useState<{ id: number; success: boolean; text: string } | null>(null);
 
   // 裸 Debug 通道
   const [debugRouteKey, setDebugRouteKey] = useState("default-chat-route");
@@ -134,7 +151,7 @@ export const ModelPage: React.FC = () => {
       setRawKeyCache((prev) => ({ ...prev, [configId]: rawKey }));
       setVisibleKeyConfigIds((prev) => new Set(prev).add(configId));
     } catch (err: any) {
-      alert(err.message || "获取未脱敏 API Key 失败");
+      feishuToast.error(err.message || "获取未脱敏 API Key 失败");
     } finally {
       setLoadingKeyConfigIds((prev) => {
         const next = new Set(prev);
@@ -149,9 +166,9 @@ export const ModelPage: React.FC = () => {
       await modelApi.refreshRegistry();
       const snap = await modelApi.getRegistrySnapshot();
       setSnapshot(snap);
-      await loadAllModelData();
+      feishuToast.success("模型路由注册表已热刷新同步");
     } catch (err: any) {
-      alert(err.message || "刷新注册表失败");
+      feishuToast.error(err.message || "刷新注册表失败");
     }
   };
 
@@ -184,11 +201,50 @@ export const ModelPage: React.FC = () => {
     try {
       await modelApi.deleteConfig(deletingConfig.configId);
       await loadAllModelData();
+      feishuToast.success("模型配置已成功删除");
       setDeletingConfig(null);
     } catch (err: any) {
-      alert(err.message || "删除配置失败");
+      feishuToast.error(err.message || "删除配置失败");
     } finally {
       setIsDeleting(false);
+    }
+  };
+
+  const handleTestRouteConnection = async (route: ModelRouteResponse) => {
+    setTestingRouteId(route.routeId);
+    setRouteTestFeedback(null);
+    try {
+      const res = await modelApi.testRoute(route.routeId);
+      setRouteTestFeedback({
+        id: route.routeId,
+        success: res.success,
+        text: res.success ? `连通正常 (${res.latencyMs}ms)` : `连接失败: ${res.errorMessage || "超时"}`,
+      });
+      setTimeout(() => setRouteTestFeedback(null), 4000);
+    } catch (err: any) {
+      setRouteTestFeedback({
+        id: route.routeId,
+        success: false,
+        text: err.message || "探测失败",
+      });
+      setTimeout(() => setRouteTestFeedback(null), 4000);
+    } finally {
+      setTestingRouteId(null);
+    }
+  };
+
+  const handleDeleteRouteConfirm = async () => {
+    if (!deletingRoute) return;
+    setIsDeletingRoute(true);
+    try {
+      await modelApi.deleteRoute(deletingRoute.routeId);
+      await loadAllModelData();
+      feishuToast.success("路由策略已成功删除");
+      setDeletingRoute(null);
+    } catch (err: any) {
+      feishuToast.error(err.message || "删除路由策略失败");
+    } finally {
+      setIsDeletingRoute(false);
     }
   };
 
@@ -206,10 +262,24 @@ export const ModelPage: React.FC = () => {
     }
   };
 
-  // 统计指标
+  // 模型配置统计指标
   const chatCount = useMemo(() => configs.filter((c) => (c.modelType || "").toUpperCase() === "CHAT").length, [configs]);
   const embedCount = useMemo(() => configs.filter((c) => (c.modelType || "").toUpperCase() === "EMBEDDING").length, [configs]);
   const rerankCount = useMemo(() => configs.filter((c) => (c.modelType || "").toUpperCase() === "RERANK").length, [configs]);
+
+  // 路由策略统计指标
+  const haRouteCount = useMemo(
+    () => routes.filter((r) => (r.strategy || "").toUpperCase().includes("PRIMARY")).length,
+    [routes]
+  );
+  const weightRouteCount = useMemo(
+    () => routes.filter((r) => (r.strategy || "").toUpperCase().includes("WEIGHT")).length,
+    [routes]
+  );
+  const totalCandidateCount = useMemo(
+    () => routes.reduce((acc, r) => acc + (r.candidateCount || 0), 0),
+    [routes]
+  );
 
   // 自适应宽度的模型配置列定义（具备 min/max 约束保护与最右侧无遮挡操作列）
   const configColumns: FeishuColumn<ModelConfigResponse>[] = [
@@ -408,13 +478,12 @@ export const ModelPage: React.FC = () => {
   const routeColumns: FeishuColumn<ModelRouteResponse>[] = [
     {
       key: "routeName",
-      title: "路由策略名称",
-      dataIndex: "routeName",
+      title: "路由策略标识与用途",
       minWidth: 200,
-      maxWidth: 360,
-      render: (val, r) => (
+      maxWidth: 340,
+      render: (_, r) => (
         <FeishuCellMainSub
-          main={val}
+          main={r.remark || r.routeKey}
           sub={`Route Key: ${r.routeKey}`}
         />
       ),
@@ -423,8 +492,8 @@ export const ModelPage: React.FC = () => {
       key: "modelType",
       title: "模型类别",
       dataIndex: "modelType",
-      minWidth: 100,
-      maxWidth: 140,
+      minWidth: 90,
+      maxWidth: 120,
       render: (val) => {
         const type = (String(val) || "").toUpperCase();
         if (type.includes("CHAT")) return <FeishuPill variant="blue" showDot={false}>对话</FeishuPill>;
@@ -434,23 +503,115 @@ export const ModelPage: React.FC = () => {
       },
     },
     {
+      key: "strategy",
+      title: "调度机制",
+      minWidth: 110,
+      maxWidth: 140,
+      render: (_, r) => {
+        const strat = (r.strategy || "").toUpperCase();
+        if (strat.includes("PRIMARY")) return <FeishuTag>主备容灾</FeishuTag>;
+        if (strat.includes("WEIGHT")) return <FeishuTag>权重分流</FeishuTag>;
+        return <FeishuTag>{r.strategy || "默认"}</FeishuTag>;
+      },
+    },
+    {
       key: "candidateCount",
       title: "绑定的候选配置",
-      minWidth: 140,
-      maxWidth: 180,
-      render: (_, r) => <span className="text-[13px] text-[#1F2329] tabular-nums">{r.candidateCount || 1} 个上游模型</span>,
+      minWidth: 130,
+      maxWidth: 170,
+      render: (_, r) => (
+        <span className="text-[13px] text-[#1F2329] tabular-nums font-medium">
+          {r.candidateCount ?? 0} 个模型节点
+        </span>
+      ),
+    },
+    {
+      key: "status",
+      title: "运行状态",
+      minWidth: 80,
+      maxWidth: 100,
+      render: (_, r) => {
+        const isActive = r.enabled !== false;
+        return isActive ? (
+          <FeishuPill variant="green" showDot={false}>活跃</FeishuPill>
+        ) : (
+          <FeishuPill variant="gray" showDot={false}>下线</FeishuPill>
+        );
+      },
     },
     {
       key: "actions",
       title: "操作",
       fixed: "right",
-      minWidth: 120,
-      maxWidth: 140,
-      render: () => (
-        <FeishuActionLink onClick={() => alert("路由拓扑管理功能")}>
-          配置规则
-        </FeishuActionLink>
-      ),
+      minWidth: 220,
+      maxWidth: 240,
+      render: (_, r) => {
+        const isThisTesting = testingRouteId === r.routeId;
+        const feedback = routeTestFeedback?.id === r.routeId ? routeTestFeedback : null;
+
+        return (
+          <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
+            <FeishuActionLink
+              onClick={() => {
+                setSelectedRoute(r);
+                setIsCandidatesDrawerOpen(true);
+              }}
+            >
+              拓扑编排
+            </FeishuActionLink>
+
+            {feedback ? (
+              <span
+                className={`text-[12px] px-2 py-0.5 rounded-[4px] font-medium tabular-nums ${
+                  feedback.success
+                    ? "bg-[#E6F7ED] text-[#00B42A]"
+                    : "bg-[#FFF2F0] text-[#F53F3F]"
+                }`}
+              >
+                {feedback.text}
+              </span>
+            ) : (
+              <FeishuActionLink
+                onClick={() => handleTestRouteConnection(r)}
+                className={isThisTesting ? "opacity-50" : ""}
+              >
+                {isThisTesting ? "探测中…" : "测试"}
+              </FeishuActionLink>
+            )}
+
+            <FeishuActionLink
+              variant="secondary"
+              onClick={() => {
+                setSelectedGovRoute(r);
+                setIsGovernanceModalOpen(true);
+              }}
+            >
+              治理
+            </FeishuActionLink>
+
+            <FeishuActionDropdown
+              items={[
+                {
+                  key: "edit",
+                  label: "编辑策略",
+                  onClick: () => {
+                    setSelectedRoute(r);
+                    setIsRouteModalOpen(true);
+                  },
+                },
+                {
+                  key: "delete",
+                  label: "删除策略",
+                  danger: true,
+                  onClick: () => {
+                    setDeletingRoute(r);
+                  },
+                },
+              ]}
+            />
+          </div>
+        );
+      },
     },
   ];
 
@@ -564,7 +725,10 @@ export const ModelPage: React.FC = () => {
           {activeView === "routes" && (
             <button
               type="button"
-              onClick={() => alert("新建路由策略功能")}
+              onClick={() => {
+                setSelectedRoute(null);
+                setIsRouteModalOpen(true);
+              }}
               className="inline-flex h-[32px] items-center gap-1.5 rounded-[6px] bg-[#3370FF] px-4 text-[14px] font-normal text-white hover:bg-[#2860E1] active:bg-[#1F4EC9] transition-colors shadow-none cursor-pointer"
             >
               <Plus className="size-4" />
@@ -574,7 +738,7 @@ export const ModelPage: React.FC = () => {
         </div>
       </header>
 
-      {/* 2. 4 联排飞书数据指标看板（仅在模型配置总览时展示） */}
+      {/* 2. 4 联排飞书数据指标看板 */}
       {activeView === "configs" && (
         <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {/* 卡片 1: 节点总数 */}
@@ -659,6 +823,90 @@ export const ModelPage: React.FC = () => {
         </section>
       )}
 
+      {activeView === "routes" && (
+        <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          {/* 卡片 1: 路由策略总数 */}
+          <div className="flex flex-col justify-between rounded-[12px] border border-[#DEE0E3] bg-white p-5 shadow-2xs hover:shadow-xs transition-shadow">
+            <div>
+              <span className="text-[13px] font-normal text-[#646A73] block">
+                路由策略总数
+              </span>
+              <div className="mt-1.5 text-[28px] font-bold text-[#1F2329] tracking-tight leading-tight tabular-nums">
+                {routes.length}
+              </div>
+            </div>
+            <div className="mt-3 flex items-center justify-between pt-2.5 border-t border-[#EFF0F1]">
+              <span className="inline-flex items-center gap-1 rounded-full bg-[#E6F8F5] px-2 py-0.5 text-[11px] font-medium text-[#10A893] tabular-nums">
+                <CheckCircle2 className="size-3" /> 100% 规则就绪
+              </span>
+              <svg className="h-5 w-16 shrink-0 overflow-visible" viewBox="0 0 64 20" fill="none" aria-hidden="true">
+                <path d="M0 16 Q 16 14, 24 8 T 44 10 T 64 3" stroke="#10A893" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+              </svg>
+            </div>
+          </div>
+
+          {/* 卡片 2: 主备高可用通道 */}
+          <div className="flex flex-col justify-between rounded-[12px] border border-[#DEE0E3] bg-white p-5 shadow-2xs hover:shadow-xs transition-shadow">
+            <div>
+              <span className="text-[13px] font-normal text-[#646A73] block">
+                主备容灾策略（HA）
+              </span>
+              <div className="mt-1.5 text-[28px] font-bold text-[#1F2329] tracking-tight leading-tight tabular-nums">
+                {haRouteCount}
+              </div>
+            </div>
+            <div className="mt-3 flex items-center justify-between pt-2.5 border-t border-[#EFF0F1]">
+              <span className="inline-flex items-center gap-1 rounded-full bg-[#E8F3FF] px-2 py-0.5 text-[11px] font-medium text-[#3370FF] tabular-nums">
+                <Sparkles className="size-3" /> 故障无缝降级
+              </span>
+              <svg className="h-5 w-16 shrink-0 overflow-visible" viewBox="0 0 64 20" fill="none" aria-hidden="true">
+                <path d="M0 14 Q 18 16, 32 9 T 54 8 T 64 2" stroke="#3370FF" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+              </svg>
+            </div>
+          </div>
+
+          {/* 卡片 3: 权重分流策略 */}
+          <div className="flex flex-col justify-between rounded-[12px] border border-[#DEE0E3] bg-white p-5 shadow-2xs hover:shadow-xs transition-shadow">
+            <div>
+              <span className="text-[13px] font-normal text-[#646A73] block">
+                权重分流策略（Weighted）
+              </span>
+              <div className="mt-1.5 text-[28px] font-bold text-[#1F2329] tracking-tight leading-tight tabular-nums">
+                {weightRouteCount}
+              </div>
+            </div>
+            <div className="mt-3 flex items-center justify-between pt-2.5 border-t border-[#EFF0F1]">
+              <span className="inline-flex items-center gap-1 rounded-full bg-[#E6F8F5] px-2 py-0.5 text-[11px] font-medium text-[#10A893] tabular-nums">
+                <Layers className="size-3" /> 多上游灰度调度
+              </span>
+              <svg className="h-5 w-16 shrink-0 overflow-visible" viewBox="0 0 64 20" fill="none" aria-hidden="true">
+                <path d="M0 15 Q 15 12, 30 11 T 50 6 T 64 2" stroke="#10A893" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+              </svg>
+            </div>
+          </div>
+
+          {/* 卡片 4: 挂载候选节点累计 */}
+          <div className="flex flex-col justify-between rounded-[12px] border border-[#DEE0E3] bg-white p-5 shadow-2xs hover:shadow-xs transition-shadow">
+            <div>
+              <span className="text-[13px] font-normal text-[#646A73] block">
+                挂载候选模型累计
+              </span>
+              <div className="mt-1.5 text-[28px] font-bold text-[#1F2329] tracking-tight leading-tight tabular-nums">
+                {totalCandidateCount}
+              </div>
+            </div>
+            <div className="mt-3 flex items-center justify-between pt-2.5 border-t border-[#EFF0F1]">
+              <span className="inline-flex items-center gap-1 rounded-full bg-[#FFF7E8] px-2 py-0.5 text-[11px] font-medium text-[#FF7D00] tabular-nums">
+                <Zap className="size-3" /> 已纳管上游节点
+              </span>
+              <svg className="h-5 w-16 shrink-0 overflow-visible" viewBox="0 0 64 20" fill="none" aria-hidden="true">
+                <path d="M0 16 Q 16 15, 32 10 T 52 7 T 64 4" stroke="#FF7D00" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+              </svg>
+            </div>
+          </div>
+        </section>
+      )}
+
       {/* 3. 核心内容区 */}
       {activeView === "configs" && (
         <FeishuDataTable
@@ -694,14 +942,28 @@ export const ModelPage: React.FC = () => {
         <div className="p-6 bg-white border border-[#DEE0E3] rounded-[12px] shadow-2xs space-y-4 max-w-[700px]">
           <div>
             <label className="block text-[13px] font-medium text-[#1F2329] mb-1.5">
-              目标路由 Key
+              目标路由策略 (Route Key)
             </label>
-            <input
-              type="text"
-              value={debugRouteKey}
-              onChange={(e) => setDebugRouteKey(e.target.value)}
-              className="w-full h-[36px] px-3 text-[14px] bg-white border border-[#DEE0E3] rounded-[6px] outline-none text-[#1F2329]"
-            />
+            {routes.length > 0 ? (
+              <FeishuSelect
+                options={routes.map((r) => ({
+                  value: r.routeKey,
+                  label: `${r.routeKey} (${r.remark || r.strategy})`,
+                }))}
+                value={debugRouteKey}
+                onChange={(val) => setDebugRouteKey(val)}
+                placeholder="请选择目标路由"
+                className="w-full"
+              />
+            ) : (
+              <input
+                type="text"
+                value={debugRouteKey}
+                onChange={(e) => setDebugRouteKey(e.target.value)}
+                placeholder="例如: default-chat-route"
+                className="w-full h-[36px] px-3 text-[14px] bg-white border border-[#DEE0E3] rounded-[6px] outline-none text-[#1F2329]"
+              />
+            )}
           </div>
 
           <div>
@@ -765,51 +1027,88 @@ export const ModelPage: React.FC = () => {
         }}
       />
 
-      {/* 单配置治理弹窗 */}
+      {/* 治理配置弹窗 (支持单配置与路由模式) */}
       <ModelGovernanceModal
         isOpen={isGovernanceModalOpen}
         onClose={() => {
           setIsGovernanceModalOpen(false);
           setSelectedConfig(null);
+          setSelectedGovRoute(null);
         }}
         config={selectedConfig}
+        route={selectedGovRoute}
         onSuccess={loadAllModelData}
       />
 
-      {/* 删除确认弹窗 */}
-      {deletingConfig && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-feishu-text-primary/40 backdrop-blur-[1px]">
-          <div className="w-full max-w-95 bg-white rounded-xl border border-[#DEE0E3] shadow-2xl p-6 animate-in zoom-in-95 duration-100">
-            <h4 className="text-[16px] font-semibold text-feishu-text-primary">
-              删除模型配置确认
-            </h4>
-            <p className="text-[13px] text-[#646A73] mt-2.5 leading-relaxed">
-              确定要删除模型配置{" "}
-              <strong className="text-feishu-text-primary">
-                {deletingConfig.configKey || deletingConfig.configName}
-              </strong>{" "}
-              吗？删除后将自动从所有关联路由候选中移除，该操作不可恢复。
-            </p>
-            <div className="flex items-center justify-end gap-2.5 mt-6">
-              <button
-                type="button"
-                onClick={() => setDeletingConfig(null)}
-                className="h-8 px-3.5 rounded-md border border-[#DEE0E3] bg-white hover:bg-[#F2F3F5] active:scale-[0.96] text-[14px] text-[#1F2329] transition-all cursor-pointer"
-              >
-                取消
-              </button>
-              <button
-                type="button"
-                onClick={handleDeleteConfirm}
-                disabled={isDeleting}
-                className="h-8 px-4 rounded-md bg-feishu-danger hover:bg-[#E02020] active:scale-[0.96] text-[14px] text-white transition-all cursor-pointer disabled:opacity-50"
-              >
-                {isDeleting ? "正在删除…" : "确定删除"}
-              </button>
+      {/* 新建/编辑路由策略模态弹窗 */}
+      <ModelRouteModal
+        isOpen={isRouteModalOpen}
+        onClose={() => {
+          setIsRouteModalOpen(false);
+          setSelectedRoute(null);
+        }}
+        route={selectedRoute}
+        onSuccess={loadAllModelData}
+      />
+
+      {/* 路由候选拓扑编排 560px 抽屉 */}
+      <ModelRouteCandidatesDrawer
+        isOpen={isCandidatesDrawerOpen}
+        onClose={() => {
+          setIsCandidatesDrawerOpen(false);
+          setSelectedRoute(null);
+        }}
+        route={selectedRoute}
+        availableConfigs={configs}
+        onSuccess={loadAllModelData}
+      />
+
+      {/* 删除模型配置确认弹窗 */}
+      <FeishuDialog
+        visible={!!deletingConfig}
+        type="danger"
+        title="删除模型配置确认"
+        width={420}
+        okText={isDeleting ? "正在删除…" : "确定删除"}
+        cancelText="取消"
+        onCancel={() => setDeletingConfig(null)}
+        onOk={handleDeleteConfirm}
+      >
+        <p className="text-[13px] text-[#646A73] leading-relaxed">
+          确定要删除模型配置{" "}
+          <strong className="text-[#1F2329]">
+            {deletingConfig?.configKey || deletingConfig?.configName}
+          </strong>{" "}
+          吗？删除后将自动从所有关联路由候选中移除，该操作不可恢复。
+        </p>
+      </FeishuDialog>
+
+      {/* 删除路由策略确认弹窗 */}
+      <FeishuDialog
+        visible={!!deletingRoute}
+        type="danger"
+        title="删除路由策略确认"
+        width={440}
+        okText={isDeletingRoute ? "正在删除…" : "确定删除"}
+        cancelText="取消"
+        onCancel={() => setDeletingRoute(null)}
+        onOk={handleDeleteRouteConfirm}
+      >
+        <div className="space-y-3">
+          <p className="text-[13px] text-[#646A73] leading-relaxed">
+            确定要删除路由策略{" "}
+            <strong className="text-[#1F2329]">
+              {deletingRoute?.remark || deletingRoute?.routeKey} ({deletingRoute?.routeKey})
+            </strong>{" "}
+            吗？删除前请确保已移除其下挂载的所有候选模型配置。
+          </p>
+          {deletingRoute?.routeKey.includes("default") && (
+            <div className="p-2.5 bg-[#FFF2F0] border border-[#FFCCC7] rounded-[6px] text-[12px] text-[#F53F3F]">
+              警告：这是系统内置核心路由，删除可能导致关联业务问答或检索流水线中断！
             </div>
-          </div>
+          )}
         </div>
-      )}
+      </FeishuDialog>
     </div>
   );
 };

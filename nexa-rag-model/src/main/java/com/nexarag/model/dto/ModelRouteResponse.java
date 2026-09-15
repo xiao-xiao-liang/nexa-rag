@@ -12,5 +12,6 @@ import java.time.LocalDateTime;
 @Builder
 public record ModelRouteResponse(Long routeId, String routeKey, ModelType modelType,
                                  ModelRouteStrategy strategy, Boolean enabled, String remark,
+                                 Integer candidateCount,
                                  LocalDateTime createTime, LocalDateTime updateTime) {
 }

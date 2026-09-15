@@ -456,22 +456,64 @@ export interface ModelGovernanceConfigRequest {
 export interface ModelRouteResponse {
   routeId: number;
   routeKey: string;
-  routeName: string;
-  modelType: string;
+  modelType: 'CHAT' | 'EMBEDDING' | 'RERANK' | string;
+  strategy: 'PRIMARY_BACKUP' | 'WEIGHT' | 'RULE' | string;
+  enabled: boolean;
+  remark?: string;
   candidateCount?: number;
+  createTime?: string;
+  updateTime?: string;
+  // 兼容旧字段
+  routeName?: string;
   description?: string;
-  createdTime: string;
-  updatedTime: string;
+  createdTime?: string;
+  updatedTime?: string;
+}
+
+export interface ModelRouteCreateRequest {
+  routeKey: string;
+  modelType: 'CHAT' | 'EMBEDDING' | 'RERANK';
+  strategy: 'PRIMARY_BACKUP' | 'WEIGHT' | 'RULE';
+  remark?: string;
+}
+
+export interface ModelRouteUpdateRequest {
+  routeKey?: string;
+  modelType?: 'CHAT' | 'EMBEDDING' | 'RERANK';
+  strategy?: 'PRIMARY_BACKUP' | 'WEIGHT' | 'RULE';
+  enabled?: boolean;
+  remark?: string;
 }
 
 export interface ModelRouteConfigResponse {
   routeConfigId: number;
   routeId: number;
   configId: number;
-  configName?: string;
-  weight: number;
+  role: 'PRIMARY' | 'BACKUP' | 'CANDIDATE';
   priority: number;
-  status: 'ACTIVE' | 'DISABLED';
+  weight: number;
+  enabled: boolean;
+  createTime?: string;
+  updateTime?: string;
+  // 前端关联展示辅助字段
+  configName?: string;
+  modelName?: string;
+  provider?: string;
+  status?: 'ACTIVE' | 'DISABLED';
+}
+
+export interface ModelRouteConfigCreateRequest {
+  configId: number;
+  role: 'PRIMARY' | 'BACKUP' | 'CANDIDATE';
+  priority?: number;
+  weight?: number;
+}
+
+export interface ModelRouteConfigUpdateRequest {
+  role?: 'PRIMARY' | 'BACKUP' | 'CANDIDATE';
+  priority?: number;
+  weight?: number;
+  enabled?: boolean;
 }
 
 export interface ModelGovernanceConfigResponse {

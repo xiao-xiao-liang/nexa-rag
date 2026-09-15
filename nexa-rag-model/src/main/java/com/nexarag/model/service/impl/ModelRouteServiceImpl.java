@@ -11,9 +11,10 @@ import com.nexarag.model.dto.ModelRouteUpdateRequest;
 import com.nexarag.model.entity.ModelGovernanceConfig;
 import com.nexarag.model.entity.ModelRegistryVersion;
 import com.nexarag.model.entity.ModelRoute;
+import com.nexarag.model.entity.ModelRouteConfig;
 import com.nexarag.model.governance.DefaultModelGovernancePolicyFactory;
-import com.nexarag.model.mapper.ModelRouteMapper;
 import com.nexarag.model.mapper.ModelRegistryVersionMapper;
+import com.nexarag.model.mapper.ModelRouteMapper;
 import com.nexarag.model.refresh.ModelRegistryChangePublisher;
 import com.nexarag.model.service.ModelGovernanceConfigService;
 import com.nexarag.model.service.ModelRouteConfigService;
@@ -25,6 +26,8 @@ import org.springframework.util.StringUtils;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 /**
  * 模型路由服务实现类，负责模型路由表基础数据操作。
@@ -75,16 +78,35 @@ public class ModelRouteServiceImpl extends ServiceImpl<ModelRouteMapper, ModelRo
 
     @Override
     public List<ModelRouteResponse> listRouteResponses() {
-        // 1. 查询模型路由列表并转换为响应对象
-        return this.list().stream()
-                .map(this::toResponse)
+        // 1. 查询模型路由列表
+        List<ModelRoute> routes = this.list();
+        if (routes.isEmpty()) {
+            return List.of();
+        }
+
+        // 2. 统计各路由下候选模型数量
+        Map<Long, Integer> candidateCountMap = modelRouteConfigService.lambdaQuery()
+                .select(ModelRouteConfig::getRouteId)
+                .list()
+                .stream()
+                .filter(c -> c.getRouteId() != null)
+                .collect(Collectors.groupingBy(ModelRouteConfig::getRouteId,
+                        Collectors.collectingAndThen(Collectors.counting(), Long::intValue)));
+
+        // 3. 转换为响应对象并填充候选数量
+        return routes.stream()
+                .map(route -> toResponse(route, candidateCountMap.getOrDefault(route.getRouteId(), 0)))
                 .toList();
     }
 
     @Override
     public ModelRouteResponse getRouteResponse(Long routeId) {
         // 1. 查询模型路由详情并转换为响应对象
-        return toResponse(getRequiredRoute(routeId));
+        ModelRoute route = getRequiredRoute(routeId);
+        long candidateCount = modelRouteConfigService.lambdaQuery()
+                .eq(ModelRouteConfig::getRouteId, routeId)
+                .count();
+        return toResponse(route, (int) candidateCount);
     }
 
     @Override
@@ -152,6 +174,17 @@ public class ModelRouteServiceImpl extends ServiceImpl<ModelRouteMapper, ModelRo
 
     @Override
     public ModelRouteResponse toResponse(ModelRoute route) {
+        return toResponse(route, null);
+    }
+
+    /**
+     * 将模型路由实体与候选计数转换为响应对象。
+     *
+     * @param route          模型路由实体
+     * @param candidateCount 候选配置数量
+     * @return 模型路由响应
+     */
+    public ModelRouteResponse toResponse(ModelRoute route, Integer candidateCount) {
         if (route == null) {
             return null;
         }
@@ -164,6 +197,7 @@ public class ModelRouteServiceImpl extends ServiceImpl<ModelRouteMapper, ModelRo
                 .strategy(route.getStrategy())
                 .enabled(route.getEnabled())
                 .remark(route.getRemark())
+                .candidateCount(candidateCount)
                 .createTime(route.getCreateTime())
                 .updateTime(route.getUpdateTime())
                 .build();

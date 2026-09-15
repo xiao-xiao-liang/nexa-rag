@@ -84,6 +84,31 @@ npm run build
 mvn clean test
 ```
 
+## Langfuse 模型观测
+
+模型观测默认关闭。开启后，NexaRAG 将 RAG Trace、检索/重排/证据筛选 Span 与每次模型调用的 Generation 上报到一个 Langfuse 项目；最终输入、输出和总 Token 以 vLLM 流式 `usage` 为准，`/tokenize` 仅用于解释系统、摘要、历史、问题、证据和工具等语义分段。
+
+```powershell
+$env:LANGFUSE_ENABLED = "true"
+$env:LANGFUSE_HOST = "http://localhost:3000" # 自托管；Cloud 则填写对应 Cloud Host
+$env:LANGFUSE_PUBLIC_KEY = "pk-lf-..."
+$env:LANGFUSE_SECRET_KEY = "sk-lf-..."
+$env:LANGFUSE_ENVIRONMENT = "local"
+```
+
+- 一个应用实例只配置一个 Langfuse Host：本地可指向自托管实例，线上可指向 Langfuse Cloud。
+- 默认 `capture-content=false`；问题、证据、Prompt、回答、API Key 和 Cookie 不会写入 Langfuse 属性、应用日志或模型观测接口。
+- vLLM Tokenizer 复用所选模型 Profile 的服务根路径调用 `/tokenize`，默认超时 800 ms、并发 2；失败只会使分段统计不完整，不影响聊天流。
+- `contextWindowTokens` 必须与手动配置的 vLLM `--max-model-len` 保持一致。例如当前选择 `4096`，就将该 Profile 的上下文窗口设为 `4096`；本功能不会自动改写 vLLM 参数。
+
+管理端可在已具备 `model:manage` 权限时调用：
+
+- `GET /api/model-observability/overview`：输入/输出 Token、TTFT、Template 开销的 P50/P95 与完整率。
+- `GET /api/model-observability/token-distribution`：完整分段样本的六段 Token 与 Template 开销 P50。
+- `GET /api/model-observability/traces`：不含正文和身份信息的调用明细。
+
+三个接口默认查询最近 24 小时，最大时间范围 7 天；相同时间范围的 Langfuse Observations 查询在进程内缓存 30 秒。它们用于人工判断 `max_model_len` 和召回 Token 预算，不包含 KV Cache、显存、调度或 Prometheus 指标。
+
 ## 真实环境集成验证
 
 默认测试不会连接外部中间件。需要验证 MySQL、Redis、Elasticsearch、Milvus 时，显式开启集成测试并通过环境变量或 Maven 参数传入密码。

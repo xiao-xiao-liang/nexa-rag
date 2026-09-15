@@ -3,6 +3,7 @@ package com.nexarag.model.service.impl;
 import com.nexarag.common.exception.ClientException;
 import com.nexarag.model.config.ModelGovernanceProperties;
 import com.nexarag.model.dto.ModelRouteCreateRequest;
+import com.nexarag.model.dto.ModelRouteResponse;
 import com.nexarag.model.entity.ModelGovernanceConfig;
 import com.nexarag.model.entity.ModelRoute;
 import com.nexarag.model.enums.ModelGovernanceBindingMode;
@@ -71,6 +72,22 @@ class ModelRouteServiceImplTest {
         assertThatThrownBy(() -> service.deleteRoute(2001L))
                 .isInstanceOf(ClientException.class)
                 .hasMessageContaining("请先移除路由下的模型配置");
+    }
+
+    @Test
+    void toResponseShouldIncludeCandidateCount() {
+        ModelRoute route = ModelRoute.builder()
+                .routeId(100L)
+                .routeKey("chat-test")
+                .modelType(ModelType.CHAT)
+                .strategy(ModelRouteStrategy.PRIMARY_BACKUP)
+                .enabled(true)
+                .remark("测试路由")
+                .build();
+        TestableModelRouteServiceImpl service = new TestableModelRouteServiceImpl(mock(ModelRouteConfigService.class));
+        ModelRouteResponse response = service.toResponse(route, 3);
+        assertThat(response.candidateCount()).isEqualTo(3);
+        assertThat(response.routeKey()).isEqualTo("chat-test");
     }
 
     private static class TestableModelRouteServiceImpl extends ModelRouteServiceImpl {
