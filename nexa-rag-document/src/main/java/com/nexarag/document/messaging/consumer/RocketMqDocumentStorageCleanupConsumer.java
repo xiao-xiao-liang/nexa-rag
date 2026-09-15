@@ -1,59 +1,43 @@
 package com.nexarag.document.messaging.consumer;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nexarag.common.error.BaseErrorCode;
 import com.nexarag.common.exception.ServiceException;
 import com.nexarag.document.service.DocumentPipelineOutboxService;
 import com.nexarag.document.service.DocumentVersionCleanupService;
-import com.nexarag.document.constants.DocumentMessagingConstants;
 import com.nexarag.infra.messaging.document.task.DocumentStorageCleanupMessage;
 import com.nexarag.infra.messaging.document.task.DocumentVersionStorageCleanupMessage;
 import com.nexarag.infra.storage.service.FileStorageService;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.rocketmq.common.message.MessageExt;
 import org.apache.rocketmq.spring.annotation.RocketMQMessageListener;
 import org.apache.rocketmq.spring.core.RocketMQListener;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 
 import java.util.LinkedHashSet;
 import java.util.Set;
 
+import static com.nexarag.document.constants.DocumentMessagingConstants.*;
+
 /**
  * 文档对象存储清理消费者，按消息版本幂等清理原始对象与解析制品。
  */
 @Slf4j
 @Component
+@RequiredArgsConstructor
 @RocketMQMessageListener(
-        topic = DocumentMessagingConstants.STORAGE_CLEANUP_TOPIC,
-        consumerGroup = DocumentMessagingConstants.STORAGE_CLEANUP_CONSUMER_GROUP,
-        maxReconsumeTimes = DocumentMessagingConstants.MAX_RECONSUME_TIMES)
+        topic = STORAGE_CLEANUP_TOPIC,
+        consumerGroup = STORAGE_CLEANUP_CONSUMER_GROUP,
+        maxReconsumeTimes = MAX_RECONSUME_TIMES)
 public class RocketMqDocumentStorageCleanupConsumer implements RocketMQListener<MessageExt> {
 
     private final ObjectMapper objectMapper;
     private final FileStorageService fileStorageService;
     private final DocumentPipelineOutboxService outboxService;
     private final DocumentVersionCleanupService documentVersionCleanupService;
-
-    @Autowired
-    public RocketMqDocumentStorageCleanupConsumer(ObjectMapper objectMapper, FileStorageService fileStorageService,
-                                                  DocumentPipelineOutboxService outboxService,
-                                                  DocumentVersionCleanupService documentVersionCleanupService) {
-        this.objectMapper = objectMapper;
-        this.fileStorageService = fileStorageService;
-        this.outboxService = outboxService;
-        this.documentVersionCleanupService = documentVersionCleanupService;
-    }
-
-    /**
-     * 兼容既有单元测试和全量文档清理消息。
-     */
-    public RocketMqDocumentStorageCleanupConsumer(ObjectMapper objectMapper, FileStorageService fileStorageService,
-                                                  DocumentPipelineOutboxService outboxService) {
-        this(objectMapper, fileStorageService, outboxService, null);
-    }
 
     @Override
     public void onMessage(MessageExt messageExt) {
@@ -103,9 +87,6 @@ public class RocketMqDocumentStorageCleanupConsumer implements RocketMQListener<
         }
         for (String objectName : objectNames) {
             fileStorageService.delete(objectName);
-        }
-        if (documentVersionCleanupService == null) {
-            throw new ServiceException("文档版本数据清理服务不可用");
         }
         documentVersionCleanupService.cleanup(message.documentId(), message.documentVersionId());
         outboxService.markTaskSucceeded(message.outboxId());

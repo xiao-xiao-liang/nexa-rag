@@ -8,7 +8,6 @@ import com.nexarag.infra.messaging.document.task.DocumentStorageCleanupMessage;
 import com.nexarag.infra.messaging.document.task.DocumentVersionStorageCleanupMessage;
 import com.nexarag.infra.storage.service.FileStorageService;
 import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.apache.rocketmq.common.message.MessageExt;
 
 import java.nio.charset.StandardCharsets;
@@ -31,10 +30,11 @@ import static org.mockito.ArgumentMatchers.eq;
 class RocketMqDocumentStorageCleanupConsumerTest {
 
     @Test
-    void shouldMarkFullDependencyConstructorForSpringInjection() {
+    void shouldExposeFullDependencyConstructor() {
         assertThat(Arrays.stream(RocketMqDocumentStorageCleanupConsumer.class.getConstructors())
                 .filter(constructor -> constructor.getParameterCount() == 4)
-                .anyMatch(constructor -> constructor.isAnnotationPresent(Autowired.class))).isTrue();
+                .toList())
+                .hasSize(1);
     }
 
     @Test
@@ -44,7 +44,7 @@ class RocketMqDocumentStorageCleanupConsumerTest {
         ObjectMapper objectMapper = mock(ObjectMapper.class);
         when(outboxService.markTaskProcessing(101L, 1)).thenReturn(true);
         RocketMqDocumentStorageCleanupConsumer consumer = new RocketMqDocumentStorageCleanupConsumer(
-                objectMapper, fileStorageService, outboxService);
+                objectMapper, fileStorageService, outboxService, mock(DocumentVersionCleanupService.class));
         DocumentStorageCleanupMessage message = new DocumentStorageCleanupMessage(101L, 1L, "operation-1",
                 "CLEAN_DOCUMENT_STORAGE", 1, "original/demo.pdf", "parsed/demo.md",
                 LocalDateTime.of(2026, 8, 9, 18, 30));
@@ -66,7 +66,7 @@ class RocketMqDocumentStorageCleanupConsumerTest {
         when(outboxService.markTaskProcessing(101L, 1)).thenReturn(true);
         doThrow(new IllegalStateException("MinIO不可用")).when(fileStorageService).delete("original/demo.pdf");
         RocketMqDocumentStorageCleanupConsumer consumer = new RocketMqDocumentStorageCleanupConsumer(
-                objectMapper, fileStorageService, outboxService);
+                objectMapper, fileStorageService, outboxService, mock(DocumentVersionCleanupService.class));
 
         DocumentStorageCleanupMessage message = new DocumentStorageCleanupMessage(101L, 1L, "operation-1",
                 "CLEAN_DOCUMENT_STORAGE", 1, "original/demo.pdf", "parsed/demo.md",
@@ -88,7 +88,7 @@ class RocketMqDocumentStorageCleanupConsumerTest {
         ObjectMapper objectMapper = mock(ObjectMapper.class);
         when(outboxService.markTaskProcessing(101L, 1)).thenReturn(true);
         RocketMqDocumentStorageCleanupConsumer consumer = new RocketMqDocumentStorageCleanupConsumer(
-                objectMapper, fileStorageService, outboxService);
+                objectMapper, fileStorageService, outboxService, mock(DocumentVersionCleanupService.class));
         DocumentStorageCleanupMessage message = new DocumentStorageCleanupMessage(101L, 1L, "operation-1",
                 "CLEAN_DOCUMENT_STORAGE", 1, "original/demo.pdf", "original/demo.pdf",
                 LocalDateTime.of(2026, 8, 9, 18, 30));
@@ -111,7 +111,7 @@ class RocketMqDocumentStorageCleanupConsumerTest {
                 "parsed/1/", "source-snapshots/1/", LocalDateTime.of(2026, 8, 9, 18, 30));
         when(objectMapper.readValue(any(byte[].class), eq(DocumentStorageCleanupMessage.class))).thenReturn(message);
         RocketMqDocumentStorageCleanupConsumer consumer = new RocketMqDocumentStorageCleanupConsumer(
-                objectMapper, fileStorageService, outboxService);
+                objectMapper, fileStorageService, outboxService, mock(DocumentVersionCleanupService.class));
 
         consumer.onMessage(messageExt(0));
 
@@ -132,7 +132,7 @@ class RocketMqDocumentStorageCleanupConsumerTest {
                 new DocumentStorageCleanupMessage(101L, 1L, "operation-1", "CLEAN_DOCUMENT_STORAGE", 1,
                         "original/demo.pdf", null, LocalDateTime.of(2026, 8, 9, 18, 30)));
         RocketMqDocumentStorageCleanupConsumer consumer = new RocketMqDocumentStorageCleanupConsumer(
-                objectMapper, fileStorageService, outboxService);
+                objectMapper, fileStorageService, outboxService, mock(DocumentVersionCleanupService.class));
 
         consumer.onMessage(messageExt(1));
 
