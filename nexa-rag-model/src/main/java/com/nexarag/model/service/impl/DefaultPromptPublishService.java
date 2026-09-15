@@ -5,21 +5,21 @@ import com.nexarag.common.exception.ClientException;
 import com.nexarag.model.entity.prompt.PromptDefinition;
 import com.nexarag.model.entity.prompt.PromptRelease;
 import com.nexarag.model.entity.prompt.PromptVersion;
-import com.nexarag.model.prompt.domain.PromptCanaryRule;
-import com.nexarag.model.prompt.domain.PromptReleaseResult;
-import com.nexarag.model.prompt.PromptTemplateValidator;
-import com.nexarag.model.prompt.domain.PromptVariableSchema;
 import com.nexarag.model.mapper.PromptDefinitionMapper;
 import com.nexarag.model.mapper.PromptReleaseMapper;
 import com.nexarag.model.mapper.PromptVersionMapper;
+import com.nexarag.model.prompt.PromptTemplateValidator;
+import com.nexarag.model.prompt.domain.PromptCanaryRule;
+import com.nexarag.model.prompt.domain.PromptReleaseResult;
+import com.nexarag.model.prompt.domain.PromptVariableSchema;
 import com.nexarag.model.prompt.refresh.PromptRefreshPublisher;
 import com.nexarag.model.prompt.refresh.PromptReleaseChangedMessage;
 import com.nexarag.model.service.PromptPublishService;
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
-import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
 import java.nio.charset.StandardCharsets;
@@ -31,6 +31,7 @@ import java.time.LocalDateTime;
  * 默认 Prompt 发布服务，确保版本正文不可变且发布记录只追加。
  */
 @Service
+@RequiredArgsConstructor
 public class DefaultPromptPublishService implements PromptPublishService {
 
     private final PromptTemplateValidator templateValidator;
@@ -38,43 +39,6 @@ public class DefaultPromptPublishService implements PromptPublishService {
     private final PromptVersionMapper versionMapper;
     private final PromptReleaseMapper releaseMapper;
     private final PromptRefreshPublisher refreshPublisher;
-
-    /**
-     * 创建带发布后刷新能力的 Prompt 发布服务。
-     *
-     * @param templateValidator  模板校验器
-     * @param definitionMapper   Prompt 定义数据访问接口
-     * @param versionMapper      Prompt 版本数据访问接口
-     * @param releaseMapper      Prompt 发布记录数据访问接口
-     * @param refreshPublisher   发布后刷新消息发布器
-     */
-    @Autowired
-    public DefaultPromptPublishService(PromptTemplateValidator templateValidator,
-                                       PromptDefinitionMapper definitionMapper,
-                                       PromptVersionMapper versionMapper,
-                                       PromptReleaseMapper releaseMapper,
-                                       PromptRefreshPublisher refreshPublisher) {
-        this.templateValidator = templateValidator;
-        this.definitionMapper = definitionMapper;
-        this.versionMapper = versionMapper;
-        this.releaseMapper = releaseMapper;
-        this.refreshPublisher = refreshPublisher;
-    }
-
-    /**
-     * 创建不启用事务后刷新回调的发布服务，供既有单元测试使用。
-     *
-     * @param templateValidator 模板校验器
-     * @param definitionMapper  Prompt 定义数据访问接口
-     * @param versionMapper     Prompt 版本数据访问接口
-     * @param releaseMapper     Prompt 发布记录数据访问接口
-     */
-    public DefaultPromptPublishService(PromptTemplateValidator templateValidator,
-                                       PromptDefinitionMapper definitionMapper,
-                                       PromptVersionMapper versionMapper,
-                                       PromptReleaseMapper releaseMapper) {
-        this(templateValidator, definitionMapper, versionMapper, releaseMapper, null);
-    }
 
     /**
      * 校验新模板、追加版本和发布记录，并更新当前发布指针。
@@ -193,7 +157,7 @@ public class DefaultPromptPublishService implements PromptPublishService {
      * @param releaseRevision 发布代次
      */
     private void registerRefreshAfterCommit(String promptCode, Long releaseId, long releaseRevision) {
-        if (refreshPublisher == null || !TransactionSynchronizationManager.isSynchronizationActive()) {
+        if (!TransactionSynchronizationManager.isSynchronizationActive()) {
             return;
         }
         PromptReleaseChangedMessage message = new PromptReleaseChangedMessage(promptCode, releaseId, releaseRevision);

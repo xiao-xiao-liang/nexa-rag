@@ -75,7 +75,7 @@ class PromptPublishServiceTest {
         when(definitionMapper.selectByPromptCodeForUpdate(definition.getPromptCode())).thenReturn(definition);
         when(versionMapper.selectNextVersionNo(definition.getPromptId())).thenReturn(2L);
         PromptPublishService service = new DefaultPromptPublishService(new DefaultPromptTemplateValidator(),
-                definitionMapper, versionMapper, releaseMapper);
+                definitionMapper, versionMapper, releaseMapper, mock(PromptRefreshPublisher.class));
 
         // 1. 提交新版本正文。
         service.submit(definition.getPromptCode(), "请回答：{{question}}", "测试人员");
@@ -97,7 +97,7 @@ class PromptPublishServiceTest {
         when(definitionMapper.selectByPromptCodeForUpdate(definition.getPromptCode())).thenReturn(definition);
         when(versionMapper.selectByContentChecksum(any(), any())).thenReturn(PromptVersion.builder().versionId(2L).build());
         PromptPublishService service = new DefaultPromptPublishService(new DefaultPromptTemplateValidator(),
-                definitionMapper, versionMapper, releaseMapper);
+                definitionMapper, versionMapper, releaseMapper, mock(PromptRefreshPublisher.class));
 
         // 1. 提交与历史版本正文相同的模板
         org.assertj.core.api.Assertions.assertThatThrownBy(() -> service.submit(definition.getPromptCode(),
@@ -121,7 +121,7 @@ class PromptPublishServiceTest {
         when(versionMapper.selectById(2L)).thenReturn(PromptVersion.builder().versionId(2L).promptId(1L).build());
         when(versionMapper.selectById(3L)).thenReturn(PromptVersion.builder().versionId(3L).promptId(9L).build());
         PromptPublishService service = new DefaultPromptPublishService(new DefaultPromptTemplateValidator(),
-                definitionMapper, versionMapper, releaseMapper);
+                definitionMapper, versionMapper, releaseMapper, mock(PromptRefreshPublisher.class));
 
         // 1. 发布一个属于其他 Prompt 的灰度版本
         org.assertj.core.api.Assertions.assertThatThrownBy(() -> service.release(definition.getPromptCode(), 2L, 3L,
@@ -145,7 +145,7 @@ class PromptPublishServiceTest {
         when(definitionMapper.selectByPromptCodeForUpdate(definition.getPromptCode())).thenReturn(definition);
         when(versionMapper.selectById(2L)).thenReturn(historicalVersion);
         PromptPublishService service = new DefaultPromptPublishService(new DefaultPromptTemplateValidator(),
-                definitionMapper, versionMapper, releaseMapper);
+                definitionMapper, versionMapper, releaseMapper, mock(PromptRefreshPublisher.class));
 
         // 1. 回滚到历史正文对应的版本
         PromptReleaseResult result = service.rollback(definition.getPromptCode(), 2L, "测试人员");
@@ -178,7 +178,7 @@ class PromptPublishServiceTest {
         when(definitionMapper.selectByPromptCodeForUpdate("chat.answer.current-question")).thenReturn(definition);
         when(versionMapper.selectNextVersionNo(1L)).thenReturn(1L);
         PromptPublishService service = new DefaultPromptPublishService(new DefaultPromptTemplateValidator(),
-                definitionMapper, versionMapper, releaseMapper);
+                definitionMapper, versionMapper, releaseMapper, mock(PromptRefreshPublisher.class));
 
         // 1. 提交引用已登记变量的新正文
         PromptReleaseResult result = service.submit("chat.answer.current-question", "请回答：{{question}}", "测试人员");
