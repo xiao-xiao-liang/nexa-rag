@@ -68,6 +68,14 @@ rocketmq:
     group: nexa-document-pipeline-producer # 文档流水线生产者组，同一应用集群应保持一致。
 
 nexa:
+  observability:
+    langfuse:
+      enabled: ${LANGFUSE_ENABLED:false}
+      host: ${LANGFUSE_HOST:}
+      public-key: ${LANGFUSE_PUBLIC_KEY:}
+      secret-key: ${LANGFUSE_SECRET_KEY:}
+      environment: ${LANGFUSE_ENVIRONMENT:local}
+      capture-content: false
   auth:
     web:
 #      allowed-origin:  http://localhost:3000 # Cookie 状态变更请求允许的唯一浏览器源。

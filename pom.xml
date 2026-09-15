@@ -57,6 +57,7 @@
         <milvus.version>2.6.6</milvus.version>
         <apache-poi.version>5.5.1</apache-poi.version>
         <pdfbox.version>3.0.8</pdfbox.version>
+        <opentelemetry.version>1.65.0</opentelemetry.version>
     </properties>
 
     <dependencyManagement>
