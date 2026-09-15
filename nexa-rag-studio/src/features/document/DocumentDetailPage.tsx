@@ -335,59 +335,71 @@ export const DocumentDetailPage: React.FC = () => {
     return <FeishuDocIcon fileName={fileName} size={size} />;
   };
 
-  // 渲染版本状态胶囊
+  // 渲染版本状态胶囊 (移除冗余圆点，进行态使用 2.4s 单向文字流光动效)
   const renderVersionStatusPill = (status: DocumentVersionStatus) => {
     switch (status) {
       case "INDEX_READY":
-        return <FeishuPill variant="green" dotColor="#10A893">索引已就绪</FeishuPill>;
+        return (
+          <FeishuPill variant="green" showDot={false}>
+            <span className="text-[#00B42A] font-medium">索引已就绪</span>
+          </FeishuPill>
+        );
       case "INDEXING":
         return (
-          <FeishuPill variant="blue" dotColor="#3370FF">
-            <span className="inline-flex items-center gap-1">
-              <span className="w-1.5 h-1.5 rounded-full bg-[#3370FF] animate-ping shrink-0" />
-              写入索引中
-            </span>
+          <FeishuPill variant="blue" showDot={false}>
+            <span className="shimmer-text-blue font-medium">写入索引中</span>
           </FeishuPill>
         );
       case "CHUNKED":
-        return <FeishuPill variant="purple" dotColor="#8D55ED">已完成切分</FeishuPill>;
+        return (
+          <FeishuPill variant="purple" showDot={false}>
+            <span className="text-[#8D55ED] font-medium">已完成切分</span>
+          </FeishuPill>
+        );
       case "CHUNKING":
         return (
-          <FeishuPill variant="purple" dotColor="#8D55ED">
-            <span className="inline-flex items-center gap-1">
-              <span className="w-1.5 h-1.5 rounded-full bg-[#8D55ED] animate-ping shrink-0" />
-              文本切分中
-            </span>
+          <FeishuPill variant="purple" showDot={false}>
+            <span className="shimmer-text-purple font-medium">文本切分中</span>
           </FeishuPill>
         );
       case "PARSED":
-        return <FeishuPill variant="blue" dotColor="#3370FF">解析完成</FeishuPill>;
+        return (
+          <FeishuPill variant="blue" showDot={false}>
+            <span className="text-[#3370FF] font-medium">解析完成</span>
+          </FeishuPill>
+        );
       case "PARSING":
         return (
-          <FeishuPill variant="blue" dotColor="#3370FF">
-            <span className="inline-flex items-center gap-1">
-              <span className="w-1.5 h-1.5 rounded-full bg-[#3370FF] animate-ping shrink-0" />
-              文档解析中
-            </span>
+          <FeishuPill variant="blue" showDot={false}>
+            <span className="shimmer-text-blue font-medium">文档解析中</span>
           </FeishuPill>
         );
       case "QUEUED":
         return (
-          <FeishuPill variant="orange" dotColor="#FF7D00">
-            <span className="inline-flex items-center gap-1">
-              <span className="w-1.5 h-1.5 rounded-full bg-[#FF7D00] animate-pulse shrink-0" />
-              排队中
-            </span>
+          <FeishuPill variant="orange" showDot={false}>
+            <span className="shimmer-text-orange font-medium">排队中</span>
           </FeishuPill>
         );
       case "UPLOADED":
-        return <FeishuPill variant="gray" dotColor="#8F959E">已就绪待处理</FeishuPill>;
+        return (
+          <FeishuPill variant="gray" showDot={false}>
+            <span className="text-[#646A73] font-medium">已就绪待处理</span>
+          </FeishuPill>
+        );
       case "FAILED":
-        return <FeishuPill variant="red" dotColor="#F53F3F">处理失败</FeishuPill>;
+        return (
+          <FeishuPill variant="red" showDot={false}>
+            <span className="text-[#F53F3F] font-medium">处理失败</span>
+          </FeishuPill>
+        );
       case "DELETING":
-        return <FeishuPill variant="red" dotColor="#F53F3F">删除清理中</FeishuPill>;
+        return (
+          <FeishuPill variant="red" showDot={false}>
+            <span className="shimmer-text-red font-medium">删除清理中</span>
+          </FeishuPill>
+        );
       default:
-        return <FeishuPill variant="gray">{status}</FeishuPill>;
+        return <FeishuPill variant="gray" showDot={false}>{status}</FeishuPill>;
     }
   };
 
@@ -690,15 +702,26 @@ export const DocumentDetailPage: React.FC = () => {
                   </span>
                   {processStatus?.status && (
                     <FeishuPill
+                      showDot={false}
                       variant={
                         processStatus.status === "INDEXED"
                           ? "green"
                           : processStatus.status === "FAILED"
                             ? "red"
-                            : "blue"
+                            : processStatus.status === "QUEUED"
+                              ? "orange"
+                              : "blue"
                       }
                     >
-                      {processStatus.status}
+                      {processStatus.status === "INDEXED" ? (
+                        <span className="text-[#1F2329] font-medium">已完成索引</span>
+                      ) : processStatus.status === "FAILED" ? (
+                        <span className="text-[#F53F3F] font-medium">处理失败</span>
+                      ) : processStatus.status === "QUEUED" ? (
+                        <span className="shimmer-text-orange font-medium">排队中</span>
+                      ) : (
+                        <span className="shimmer-text-blue font-medium">{processStatus.status}</span>
+                      )}
                     </FeishuPill>
                   )}
                 </div>

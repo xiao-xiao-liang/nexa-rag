@@ -257,15 +257,15 @@ export const DocumentDrawer: React.FC<DocumentDrawerProps> = ({
           <div className="flex items-center gap-3 text-xs text-[#646A75]">
             <span className="flex items-center gap-1.5">
               <span>状态:</span>
-              {currentStatus === "INDEXED" && <FeishuPill variant="green">已完成向量索引</FeishuPill>}
-              {currentStatus === "INDEXING" && <FeishuPill variant="blue">索引写入中</FeishuPill>}
-              {currentStatus === "PARSING" && <FeishuPill variant="blue">解析中</FeishuPill>}
-              {currentStatus === "CHUNKING" && <FeishuPill variant="purple">文本切分中</FeishuPill>}
-              {currentStatus === "CHUNKED" && <FeishuPill variant="purple">已切片待向量化</FeishuPill>}
-              {currentStatus === "QUEUED" && <FeishuPill variant="orange">排队等待中</FeishuPill>}
-              {currentStatus === "UPLOADED" && <FeishuPill variant="gray">已就绪待处理</FeishuPill>}
-              {currentStatus === "FAILED" && <FeishuPill variant="red">处理异常</FeishuPill>}
-              {!currentStatus && <FeishuPill variant="gray">未知</FeishuPill>}
+              {currentStatus === "INDEXED" && <FeishuPill variant="green" showDot={false}><span className="text-[#00B42A] font-medium">已完成向量索引</span></FeishuPill>}
+              {currentStatus === "INDEXING" && <FeishuPill variant="blue" showDot={false}><span className="shimmer-text-blue font-medium">索引写入中</span></FeishuPill>}
+              {currentStatus === "PARSING" && <FeishuPill variant="blue" showDot={false}><span className="shimmer-text-blue font-medium">解析中</span></FeishuPill>}
+              {currentStatus === "CHUNKING" && <FeishuPill variant="purple" showDot={false}><span className="shimmer-text-purple font-medium">文本切分中</span></FeishuPill>}
+              {currentStatus === "CHUNKED" && <FeishuPill variant="purple" showDot={false}><span className="text-[#8D55ED] font-medium">已切片待向量化</span></FeishuPill>}
+              {currentStatus === "QUEUED" && <FeishuPill variant="orange" showDot={false}><span className="shimmer-text-orange font-medium">排队等待中</span></FeishuPill>}
+              {currentStatus === "UPLOADED" && <FeishuPill variant="gray" showDot={false}><span className="text-[#646A73] font-medium">已就绪待处理</span></FeishuPill>}
+              {currentStatus === "FAILED" && <FeishuPill variant="red" showDot={false}><span className="text-[#F53F3F] font-medium">处理异常</span></FeishuPill>}
+              {!currentStatus && <FeishuPill variant="orange" showDot={false}><span className="shimmer-text-orange font-medium">排队等待中</span></FeishuPill>}
             </span>
 
             <span>·</span>

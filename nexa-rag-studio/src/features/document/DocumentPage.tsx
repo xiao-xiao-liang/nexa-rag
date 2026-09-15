@@ -57,12 +57,39 @@ export const DocumentPage: React.FC = () => {
     }
   };
 
+  // 解析并补充尚未生效文档的版本处理状态 (对齐图二详情页的版本接口)
+  const enrichDocumentStatus = async (records: DocumentSummaryVO[]): Promise<DocumentSummaryVO[]> => {
+    return await Promise.all(
+      records.map(async (doc) => {
+        if (!doc.status) {
+          try {
+            const vPage = await documentApi.listDocumentVersions(doc.documentId, 1, 1, knowledgeBaseId);
+            const latest = vPage.records?.[0];
+            if (latest?.status) {
+              return {
+                ...doc,
+                status: (latest.status === "INDEX_READY" ? "INDEXED" : latest.status) as DocumentStatus,
+                fileSize: doc.fileSize ?? latest.fileSize,
+                originalFileName: doc.originalFileName || latest.originalFileName,
+              };
+            }
+          } catch (e) {
+            console.warn("加载文档版本状态失败:", doc.documentId, e);
+          }
+        }
+        return doc;
+      })
+    );
+  };
+
   const loadDocuments = async () => {
     setLoading(true);
     try {
       const page = await documentApi.listDocuments(currentPage, pageSize, knowledgeBaseId);
-      setDocuments(page.records || []);
-      setTotalCount(page.total || page.records?.length || 0);
+      const rawRecords = page.records || [];
+      const records = await enrichDocumentStatus(rawRecords);
+      setDocuments(records);
+      setTotalCount(page.total || records.length || 0);
     } catch (err) {
       console.error("Failed to load documents", err);
     } finally {
@@ -75,14 +102,16 @@ export const DocumentPage: React.FC = () => {
 
   // 自动轮询：当列表包含处理中的文档时，每 2 秒静默更新一次列表，完成时自动停止
   useEffect(() => {
-    const hasProcessingDocs = documents.some((d) => isProcessing(d.status));
+    const hasProcessingDocs = documents.some((d) => isProcessing(d.status) || !d.status);
     if (!hasProcessingDocs) return;
 
     const timer = setInterval(async () => {
       try {
         const page = await documentApi.listDocuments(currentPage, pageSize, knowledgeBaseId);
-        setDocuments(page.records || []);
-        setTotalCount(page.total || page.records?.length || 0);
+        const rawRecords = page.records || [];
+        const records = await enrichDocumentStatus(rawRecords);
+        setDocuments(records);
+        setTotalCount(page.total || records.length || 0);
       } catch (err) {
         console.warn("Silent polling documents error:", err);
       }
@@ -95,7 +124,7 @@ export const DocumentPage: React.FC = () => {
   const counts = useMemo(() => {
     const total = totalCount || documents.length;
     const indexed = documents.filter((d) => d.status === "INDEXED").length;
-    const processing = documents.filter((d) => isProcessing(d.status)).length;
+    const processing = documents.filter((d) => isProcessing(d.status) || !d.status).length;
     const failed = documents.filter((d) => d.status === "FAILED").length;
     return { total, indexed, processing, failed };
   }, [documents, totalCount]);
@@ -105,57 +134,72 @@ export const DocumentPage: React.FC = () => {
     return <FeishuDocIcon fileName={fileName} format={fileType} size={20} />;
   };
 
-  // 渲染后端 9 大流转状态对应飞书胶囊标签
+  // 渲染后端 9 大流转状态对应飞书胶囊标签 (移除冗余圆点，进行态使用 2.4s 单向流光)
   const renderStatusPill = (status: DocumentStatus) => {
     switch (status) {
       case "INDEXED":
-        return <FeishuPill variant="green" dotColor="#10A893">已完成索引</FeishuPill>;
+        return (
+          <FeishuPill variant="green" showDot={false}>
+            <span className="text-[#1F2329] font-medium">已完成索引</span>
+          </FeishuPill>
+        );
       case "INDEXING":
         return (
-          <FeishuPill variant="blue" dotColor="#3370FF">
-            <span className="inline-flex items-center gap-1">
-              <span className="w-1.5 h-1.5 rounded-full bg-[#3370FF] animate-ping shrink-0" />
-              索引写入中
-            </span>
+          <FeishuPill variant="blue" showDot={false}>
+            <span className="shimmer-text-blue font-medium">索引写入中</span>
           </FeishuPill>
         );
       case "CHUNKED":
-        return <FeishuPill variant="purple" dotColor="#8D55ED">已完成切分</FeishuPill>;
+        return (
+          <FeishuPill variant="purple" showDot={false}>
+            <span className="text-[#8D55ED] font-medium">已完成切分</span>
+          </FeishuPill>
+        );
       case "CHUNKING":
         return (
-          <FeishuPill variant="purple" dotColor="#8D55ED">
-            <span className="inline-flex items-center gap-1">
-              <span className="w-1.5 h-1.5 rounded-full bg-[#8D55ED] animate-ping shrink-0" />
-              文本切分中
-            </span>
+          <FeishuPill variant="purple" showDot={false}>
+            <span className="shimmer-text-purple font-medium">文本切分中</span>
           </FeishuPill>
         );
       case "PARSED":
-        return <FeishuPill variant="blue" dotColor="#3370FF">解析完成</FeishuPill>;
+        return (
+          <FeishuPill variant="blue" showDot={false}>
+            <span className="text-[#3370FF] font-medium">解析完成</span>
+          </FeishuPill>
+        );
       case "PARSING":
         return (
-          <FeishuPill variant="blue" dotColor="#3370FF">
-            <span className="inline-flex items-center gap-1">
-              <span className="w-1.5 h-1.5 rounded-full bg-[#3370FF] animate-ping shrink-0" />
-              文档解析中
-            </span>
+          <FeishuPill variant="blue" showDot={false}>
+            <span className="shimmer-text-blue font-medium">文档解析中</span>
           </FeishuPill>
         );
       case "QUEUED":
         return (
-          <FeishuPill variant="orange" dotColor="#FF7D00">
-            <span className="inline-flex items-center gap-1">
-              <span className="w-1.5 h-1.5 rounded-full bg-[#FF7D00] animate-pulse shrink-0" />
-              排队等待中
-            </span>
+          <FeishuPill variant="orange" showDot={false}>
+            <span className="shimmer-text-orange font-medium">排队等待中</span>
           </FeishuPill>
         );
       case "UPLOADED":
-        return <FeishuPill variant="gray" dotColor="#8F959E">已就绪待处理</FeishuPill>;
+        return (
+          <FeishuPill variant="gray" showDot={false}>
+            <span className="text-[#646A73] font-medium">已就绪待处理</span>
+          </FeishuPill>
+        );
       case "FAILED":
-        return <FeishuPill variant="red" dotColor="#F53F3F">处理失败</FeishuPill>;
+        return (
+          <FeishuPill variant="red" showDot={false}>
+            <span className="text-[#F53F3F] font-medium">处理失败</span>
+          </FeishuPill>
+        );
       default:
-        return <FeishuPill variant="gray">{status}</FeishuPill>;
+        if (!status) {
+          return (
+            <FeishuPill variant="orange" showDot={false}>
+              <span className="shimmer-text-orange font-medium">排队等待中</span>
+            </FeishuPill>
+          );
+        }
+        return <FeishuPill variant="gray" showDot={false}>{status}</FeishuPill>;
     }
   };
 

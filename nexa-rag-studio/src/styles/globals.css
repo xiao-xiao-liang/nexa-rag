@@ -393,3 +393,45 @@ body {
     transform: translateY(-5px);
   }
 }
+
+/* 飞书 1:1 处理中文本单向流光动效 (Shimmer) - 2.4s 平滑循环 */
+@keyframes feishu-text-shimmer {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+.shimmer-text-orange {
+  background: linear-gradient(90deg, #b45309 0%, #b45309 30%, #ffffff 50%, #b45309 70%, #b45309 100%);
+  background-size: 200% 100%;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: feishu-text-shimmer 2.4s infinite ease-in-out;
+}
+
+.shimmer-text-blue {
+  background: linear-gradient(90deg, #1d4ed8 0%, #1d4ed8 30%, #ffffff 50%, #1d4ed8 70%, #1d4ed8 100%);
+  background-size: 200% 100%;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: feishu-text-shimmer 2.4s infinite ease-in-out;
+}
+
+.shimmer-text-purple {
+  background: linear-gradient(90deg, #6d28d9 0%, #6d28d9 30%, #ffffff 50%, #6d28d9 70%, #6d28d9 100%);
+  background-size: 200% 100%;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: feishu-text-shimmer 2.4s infinite ease-in-out;
+}
+
+.shimmer-text-red {
+  background: linear-gradient(90deg, #b91c1c 0%, #b91c1c 30%, #ffffff 50%, #b91c1c 70%, #b91c1c 100%);
+  background-size: 200% 100%;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: feishu-text-shimmer 2.4s infinite ease-in-out;
+}
