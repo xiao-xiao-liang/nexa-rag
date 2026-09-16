@@ -88,16 +88,10 @@
             <groupId>io.opentelemetry</groupId>
             <artifactId>opentelemetry-exporter-otlp</artifactId>
             <version>${opentelemetry.version}</version>
-            <exclusions>
-                <exclusion>
-                    <groupId>io.opentelemetry</groupId>
-                    <artifactId>opentelemetry-exporter-sender-okhttp</artifactId>
-                </exclusion>
-            </exclusions>
         </dependency>
         <dependency>
             <groupId>io.opentelemetry</groupId>
-            <artifactId>opentelemetry-exporter-sender-jdk</artifactId>
+            <artifactId>opentelemetry-exporter-sender-okhttp</artifactId>
             <version>${opentelemetry.version}</version>
         </dependency>
         <dependency>
