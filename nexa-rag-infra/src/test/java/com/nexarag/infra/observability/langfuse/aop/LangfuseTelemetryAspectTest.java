@@ -1,7 +1,9 @@
 package com.nexarag.infra.observability.langfuse.aop;
 
 import com.nexarag.infra.observability.langfuse.LangfuseTelemetry;
+import com.nexarag.infra.observability.langfuse.LangfuseSpanScope;
 import com.nexarag.infra.observability.langfuse.LangfuseTraceScope;
+import com.nexarag.infra.observability.langfuse.model.LangfuseObservationType;
 import com.nexarag.infra.observability.langfuse.model.LangfuseTraceCommand;
 import io.opentelemetry.context.Context;
 import org.junit.jupiter.api.Test;
@@ -13,6 +15,7 @@ import reactor.core.publisher.Flux;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -88,6 +91,36 @@ class LangfuseTelemetryAspectTest {
         }
     }
 
+    @Test
+    void shouldRecordSynchronousSpanAttributesAndResultAttributes() {
+        try (AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext(TestConfiguration.class)) {
+            RecordingTelemetry telemetry = context.getBean(RecordingTelemetry.class);
+
+            context.getBean(TestTraceService.class).selectEvidence(new SpanRequest("", 3));
+
+            assertThat(telemetry.spanCommands).singleElement().satisfies(command -> {
+                assertThat(command.name()).isEqualTo("rag.evidence-selection");
+                assertThat(command.type()).isEqualTo(LangfuseObservationType.EVALUATOR);
+                assertThat(command.attributes()).containsEntry("nexa.evidence.candidate_count", 3);
+            });
+            assertThat(telemetry.spanResultAttributes).containsExactly(Map.of("nexa.evidence.accepted_count", 2));
+            assertThat(telemetry.spanClosedCount.get()).isEqualTo(1);
+        }
+    }
+
+    @Test
+    void shouldMarkSynchronousSpanAsFailedWhenMethodThrows() {
+        try (AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext(TestConfiguration.class)) {
+            RecordingTelemetry telemetry = context.getBean(RecordingTelemetry.class);
+
+            assertThatThrownBy(() -> context.getBean(TestTraceService.class).failingSpan(new SpanRequest("", 3)))
+                    .isInstanceOf(IllegalStateException.class);
+
+            assertThat(telemetry.spanFailedCount.get()).isEqualTo(1);
+            assertThat(telemetry.spanClosedCount.get()).isEqualTo(1);
+        }
+    }
+
     @Configuration(proxyBeanMethods = false)
     @EnableAspectJAutoProxy
     static class TestConfiguration {
@@ -100,6 +133,11 @@ class LangfuseTelemetryAspectTest {
         @Bean
         LangfuseTelemetryAspect langfuseTelemetryAspect(RecordingTelemetry telemetry) {
             return new LangfuseTelemetryAspect(telemetry, new LangfuseExpressionResolver());
+        }
+
+        @Bean
+        LangfuseSpanAspect langfuseSpanAspect(RecordingTelemetry telemetry) {
+            return new LangfuseSpanAspect(telemetry, new LangfuseExpressionResolver());
         }
 
         @Bean
@@ -127,6 +165,19 @@ class LangfuseTelemetryAspectTest {
         public Flux<String> numericUserStream(NumericTraceRequest request) {
             return Flux.just("ok");
         }
+
+        @LangfuseSpan(name = "rag.evidence-selection", type = LangfuseObservationType.EVALUATOR,
+                parentContextCarrier = "#request.carrier", attributes = "nexa.evidence.candidate_count=#request.count",
+                resultAttributes = "nexa.evidence.accepted_count=#result['acceptedCount']")
+        public Map<String, Object> selectEvidence(SpanRequest request) {
+            return Map.of("acceptedCount", 2);
+        }
+
+        @LangfuseSpan(name = "rag.evidence-selection", type = LangfuseObservationType.EVALUATOR,
+                parentContextCarrier = "#request.carrier")
+        public void failingSpan(SpanRequest request) {
+            throw new IllegalStateException("模拟节点异常");
+        }
     }
 
     record TraceRequest(String traceId, String conversationId, String userId, String generationId) {
@@ -135,11 +186,18 @@ class LangfuseTelemetryAspectTest {
     record NumericTraceRequest(String traceId, String conversationId, Long userId, String generationId) {
     }
 
+    record SpanRequest(String carrier, int count) {
+    }
+
     static class RecordingTelemetry implements LangfuseTelemetry {
 
         private final List<LangfuseTraceCommand> commands = new ArrayList<>();
         private final AtomicInteger closedCount = new AtomicInteger();
         private final AtomicInteger failedCount = new AtomicInteger();
+        private final List<SpanCommand> spanCommands = new ArrayList<>();
+        private final List<Map<String, Object>> spanResultAttributes = new ArrayList<>();
+        private final AtomicInteger spanClosedCount = new AtomicInteger();
+        private final AtomicInteger spanFailedCount = new AtomicInteger();
 
         @Override
         public LangfuseTraceScope startTrace(LangfuseTraceCommand command) {
@@ -160,5 +218,35 @@ class LangfuseTelemetryAspectTest {
                 }
             };
         }
+
+        @Override
+        public LangfuseSpanScope startSpan(String name, LangfuseObservationType type, Map<String, Object> attributes,
+                                           Context parentContext) {
+            spanCommands.add(new SpanCommand(name, type, attributes));
+            return new LangfuseSpanScope() {
+                @Override
+                public Context context() {
+                    return Context.root();
+                }
+
+                @Override
+                public void addAttributes(Map<String, Object> resultAttributes) {
+                    spanResultAttributes.add(resultAttributes);
+                }
+
+                @Override
+                public void fail(Throwable throwable) {
+                    spanFailedCount.incrementAndGet();
+                }
+
+                @Override
+                public void close() {
+                    spanClosedCount.incrementAndGet();
+                }
+            };
+        }
+    }
+
+    record SpanCommand(String name, LangfuseObservationType type, Map<String, Object> attributes) {
     }
 }
