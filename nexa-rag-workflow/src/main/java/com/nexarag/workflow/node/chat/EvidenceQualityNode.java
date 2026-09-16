@@ -2,10 +2,8 @@ package com.nexarag.workflow.node.chat;
 
 import com.alibaba.cloud.ai.graph.OverAllState;
 import com.alibaba.cloud.ai.graph.action.NodeAction;
-import com.nexarag.infra.observability.langfuse.LangfuseSpanScope;
-import com.nexarag.infra.observability.langfuse.LangfuseTelemetry;
+import com.nexarag.infra.observability.langfuse.aop.LangfuseSpan;
 import com.nexarag.infra.observability.langfuse.model.LangfuseObservationType;
-import com.nexarag.infra.observability.langfuse.otel.LangfuseOtelContextCodec;
 import com.nexarag.retrieval.model.RetrievalChunk;
 import com.nexarag.workflow.model.EvidenceQuality;
 import com.nexarag.workflow.service.EvidenceQualityEvaluator;
@@ -28,7 +26,6 @@ import static com.nexarag.workflow.constants.ChatWorkflowTelemetryConstant.*;
 @RequiredArgsConstructor
 public class EvidenceQualityNode implements NodeAction {
 
-    private final LangfuseTelemetry telemetry;
     private final EvidenceQualityEvaluator evidenceQualityEvaluator;
 
     /**
@@ -38,30 +35,23 @@ public class EvidenceQualityNode implements NodeAction {
      * @return 已接纳正文及质量判定
      */
     @Override
+    @LangfuseSpan(name = EVIDENCE_SELECTION_SPAN_NAME, type = LangfuseObservationType.EVALUATOR,
+            parentContextCarrier = STATE_CARRIER_EXPRESSION,
+            attributes = {GENERATION_ID_ATTRIBUTE + "=" + STATE_GENERATION_ID_EXPRESSION,
+                    EVIDENCE_CANDIDATE_COUNT_ATTRIBUTE + "=" + STATE_RERANKED_COUNT_EXPRESSION},
+            resultAttributes = {EVIDENCE_ACCEPTED_COUNT_ATTRIBUTE + "=" + RESULT_EVIDENCE_ACCEPTED_COUNT_EXPRESSION,
+                    EVIDENCE_ESTIMATED_TOKENS_ATTRIBUTE + "=" + RESULT_EVIDENCE_ESTIMATED_TOKENS_EXPRESSION,
+                    EVIDENCE_SUFFICIENT_ATTRIBUTE + "=" + RESULT_EVIDENCE_SUFFICIENT_EXPRESSION})
     public Map<String, Object> apply(OverAllState state) {
         // 1. 评估重排序候选，导航记录不能进入回答上下文
         List<RetrievalChunk> rankedChunks = state.value(RERANKED_RETRIEVAL_RESULTS, List.of());
-        LangfuseSpanScope span = telemetry.startSpan(EVIDENCE_SELECTION_SPAN_NAME, LangfuseObservationType.EVALUATOR, Map.of(
-                        GENERATION_ID_ATTRIBUTE, state.value(GENERATION_ID, ""),
-                        EVIDENCE_CANDIDATE_COUNT_ATTRIBUTE, rankedChunks.size()),
-                LangfuseOtelContextCodec.decode(state.value(LANGFUSE_OTEL_CONTEXT_CARRIER, "")));
-        try {
-            EvidenceQuality quality = evidenceQualityEvaluator.accept(rankedChunks);
+        EvidenceQuality quality = evidenceQualityEvaluator.accept(rankedChunks);
 
-            // 2. 不足时返回空正文，沿用回答提示词中的“现有资料不足”拒答路径
-            log.info("回答证据判定完成，traceId={}，候选数={}，接纳正文数={}，接纳片段ID={}，估算Token数={}，充分={}，原因={}",
-                    state.value(TRACE_ID, ""), rankedChunks.size(), quality.acceptedChunks().size(),
-                    quality.acceptedChunks().stream().map(RetrievalChunk::chunkId).toList(), quality.estimatedTokenCount(),
-                    quality.sufficient(), quality.reason());
-            span.addAttributes(Map.of(EVIDENCE_ACCEPTED_COUNT_ATTRIBUTE, quality.acceptedChunks().size(),
-                    EVIDENCE_ESTIMATED_TOKENS_ATTRIBUTE, quality.estimatedTokenCount(),
-                    EVIDENCE_SUFFICIENT_ATTRIBUTE, quality.sufficient()));
-            return Map.of(ACCEPTED_EVIDENCE_RESULTS, quality.acceptedChunks(), EVIDENCE_QUALITY, quality);
-        } catch (RuntimeException exception) {
-            span.fail(exception);
-            throw exception;
-        } finally {
-            span.close();
-        }
+        // 2. 不足时返回空正文，沿用回答提示词中的“现有资料不足”拒答路径
+        log.info("回答证据判定完成，traceId={}，候选数={}，接纳正文数={}，接纳片段ID={}，估算Token数={}，充分={}，原因={}",
+                state.value(TRACE_ID, ""), rankedChunks.size(), quality.acceptedChunks().size(),
+                quality.acceptedChunks().stream().map(RetrievalChunk::chunkId).toList(), quality.estimatedTokenCount(),
+                quality.sufficient(), quality.reason());
+        return Map.of(ACCEPTED_EVIDENCE_RESULTS, quality.acceptedChunks(), EVIDENCE_QUALITY, quality);
     }
 }

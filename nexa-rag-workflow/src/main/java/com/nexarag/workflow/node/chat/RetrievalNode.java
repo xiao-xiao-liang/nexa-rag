@@ -62,9 +62,7 @@ public class RetrievalNode implements NodeAction {
                         RETRIEVAL_ROUND_ATTRIBUTE, request.round(),
                         RETRIEVAL_TOP_K_ATTRIBUTE, request.topK(),
                         RETRIEVAL_VECTOR_THRESHOLD_ATTRIBUTE, request.vectorThreshold()),
-                LangfuseOtelContextCodec.decode(state.value(
-                        com.nexarag.workflow.constants.ChatWorkflowStateKeys.LANGFUSE_OTEL_CONTEXT_CARRIER,
-                        "")));
+                LangfuseOtelContextCodec.decode(state.value(LANGFUSE_OTEL_CONTEXT_CARRIER, "")));
         try {
             ChatToolOperationDTO runningOperation = new ChatToolOperationDTO(generationId + RETRIEVAL_OPERATION_ID_SUFFIX,
                     generationId, KNOWLEDGE_SEARCH_SEQUENCE, KNOWLEDGE_SEARCH_TOOL_NAME, ChatToolOperationStatus.RUNNING);

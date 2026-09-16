@@ -2,6 +2,8 @@ package com.nexarag.workflow.node.chat;
 
 import com.alibaba.cloud.ai.graph.OverAllState;
 import com.alibaba.cloud.ai.graph.action.NodeAction;
+import com.nexarag.infra.observability.langfuse.aop.LangfuseSpan;
+import com.nexarag.infra.observability.langfuse.model.LangfuseObservationType;
 import com.nexarag.retrieval.model.RetrievalChunk;
 import com.nexarag.retrieval.retriever.ParentContextExpansionRetriever;
 import lombok.RequiredArgsConstructor;
@@ -11,9 +13,8 @@ import org.springframework.stereotype.Component;
 import java.util.List;
 import java.util.Map;
 
-import static com.nexarag.workflow.constants.ChatWorkflowStateKeys.RERANKED_RETRIEVAL_RESULTS;
-import static com.nexarag.workflow.constants.ChatWorkflowStateKeys.PARENT_CONTEXT_FALLBACK_RESULTS;
-import static com.nexarag.workflow.constants.ChatWorkflowStateKeys.TRACE_ID;
+import static com.nexarag.workflow.constants.ChatWorkflowStateKeys.*;
+import static com.nexarag.workflow.constants.ChatWorkflowTelemetryConstant.*;
 
 /**
  * 重排序后父子上下文扩展节点。
@@ -35,6 +36,10 @@ public class ParentContextExpansionNode implements NodeAction {
      * @return 替换后的重排序结果及原始直接命中子片段
      */
     @Override
+    @LangfuseSpan(name = PARENT_CONTEXT_EXPANSION_SPAN_NAME, type = LangfuseObservationType.RETRIEVER,
+            parentContextCarrier = STATE_CARRIER_EXPRESSION,
+            attributes = PARENT_CONTEXT_INPUT_COUNT_ATTRIBUTE + "=" + STATE_RERANKED_COUNT_EXPRESSION,
+            resultAttributes = PARENT_CONTEXT_OUTPUT_COUNT_ATTRIBUTE + "=" + RESULT_PARENT_CONTEXT_OUTPUT_COUNT_EXPRESSION)
     public Map<String, Object> apply(OverAllState state) {
         List<RetrievalChunk> rankedChunks = state.value(RERANKED_RETRIEVAL_RESULTS, List.of());
         List<RetrievalChunk> expandedChunks = parentContextExpansionRetriever.expand(rankedChunks);

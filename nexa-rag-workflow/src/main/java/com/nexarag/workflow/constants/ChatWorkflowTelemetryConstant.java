@@ -13,6 +13,7 @@ public final class ChatWorkflowTelemetryConstant {
     public static final String RETRIEVAL_SPAN_NAME = "rag.retrieval";
     public static final String RERANK_SPAN_NAME = "rag.rerank";
     public static final String EVIDENCE_SELECTION_SPAN_NAME = "rag.evidence-selection";
+    public static final String PARENT_CONTEXT_EXPANSION_SPAN_NAME = "rag.parent-context-expansion";
     public static final String RETRIEVAL_ROUND_ATTRIBUTE = "nexa.retrieval.round";
     public static final String RETRIEVAL_TOP_K_ATTRIBUTE = "nexa.retrieval.top_k";
     public static final String RETRIEVAL_VECTOR_THRESHOLD_ATTRIBUTE = "nexa.retrieval.vector_threshold";
@@ -27,11 +28,24 @@ public final class ChatWorkflowTelemetryConstant {
     public static final String EVIDENCE_ACCEPTED_COUNT_ATTRIBUTE = "nexa.evidence.accepted_count";
     public static final String EVIDENCE_ESTIMATED_TOKENS_ATTRIBUTE = "nexa.evidence.estimated_tokens";
     public static final String EVIDENCE_SUFFICIENT_ATTRIBUTE = "nexa.evidence.sufficient";
+    public static final String PARENT_CONTEXT_INPUT_COUNT_ATTRIBUTE = "nexa.parent_context.input_count";
+    public static final String PARENT_CONTEXT_OUTPUT_COUNT_ATTRIBUTE = "nexa.parent_context.output_count";
     public static final String RERANK_BIZ_ID = "chat-rerank";
     public static final String RERANK_ROUTE_KEY = "rerank";
     public static final String RETRIEVAL_OPERATION_ID_SUFFIX = ":tool:retrieval:1";
     public static final String QUESTION_REWRITE_OPERATION_ID_SUFFIX = ":tool:question-rewrite:1";
     public static final String INTENT_RECOGNITION_OPERATION_ID_SUFFIX = ":tool:intent-recognition:1";
+    public static final String STATE_CARRIER_EXPRESSION = "#state.value('langfuseOtelContextCarrier', '')";
+    public static final String STATE_GENERATION_ID_EXPRESSION = "#state.value('generationId', '')";
+    public static final String STATE_RERANKED_COUNT_EXPRESSION =
+            "#state.value('rerankedRetrievalResults', T(java.util.List).of()).size()";
+    public static final String RESULT_EVIDENCE_ACCEPTED_COUNT_EXPRESSION =
+            "#result['evidenceQuality'].acceptedChunks().size()";
+    public static final String RESULT_EVIDENCE_ESTIMATED_TOKENS_EXPRESSION =
+            "#result['evidenceQuality'].estimatedTokenCount()";
+    public static final String RESULT_EVIDENCE_SUFFICIENT_EXPRESSION = "#result['evidenceQuality'].sufficient()";
+    public static final String RESULT_PARENT_CONTEXT_OUTPUT_COUNT_EXPRESSION =
+            "#result['rerankedRetrievalResults'].size()";
 
     private ChatWorkflowTelemetryConstant() {
     }

@@ -1,6 +1,8 @@
 package com.nexarag.workflow.node.chat;
 
 import com.alibaba.cloud.ai.graph.OverAllState;
+import com.nexarag.infra.observability.langfuse.aop.LangfuseSpan;
+import com.nexarag.infra.observability.langfuse.model.LangfuseObservationType;
 import com.nexarag.retrieval.model.RetrievalChunk;
 import com.nexarag.retrieval.retriever.ParentContextExpansionRetriever;
 import org.junit.jupiter.api.Test;
@@ -32,5 +34,19 @@ class ParentContextExpansionNodeTest {
 
         assertThat(result.get(RERANKED_RETRIEVAL_RESULTS)).isEqualTo(List.of(parentChunk));
         assertThat(result.get(PARENT_CONTEXT_FALLBACK_RESULTS)).isEqualTo(List.of(rankedChunk));
+    }
+
+    @Test
+    void applyShouldDeclareParentContextRetrieverSpan() throws NoSuchMethodException {
+        LangfuseSpan span = ParentContextExpansionNode.class
+                .getMethod("apply", OverAllState.class)
+                .getAnnotation(LangfuseSpan.class);
+
+        assertThat(span.name()).isEqualTo("rag.parent-context-expansion");
+        assertThat(span.type()).isEqualTo(LangfuseObservationType.RETRIEVER);
+        assertThat(span.attributes()).containsExactly("nexa.parent_context.input_count="
+                + "#state.value('rerankedRetrievalResults', T(java.util.List).of()).size()");
+        assertThat(span.resultAttributes()).containsExactly("nexa.parent_context.output_count="
+                + "#result['rerankedRetrievalResults'].size()");
     }
 }
